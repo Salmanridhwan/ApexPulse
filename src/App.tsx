@@ -40,6 +40,7 @@ import { GlobalFiltersBar } from './components/GlobalFiltersBar';
 import { RagProbeModal } from './components/RagProbeModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
+import { preloadEcharts } from './components/widgets/ChartEcharts';
 import { SourceDrawer } from './components/SourceDrawer';
 import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { Login } from './pages/Login';
@@ -142,6 +143,14 @@ export default function App() {
       .catch((err) => console.error('Fetch tenants error:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pre-warm chunk echarts paralel dengan fetch data dashboard, agar chart
+  // pertama di workspace tidak menunggu unduhan ~1 MB (lihat ChartEcharts).
+  useEffect(() => {
+    if (currentUser && authToken && activeDashboard) {
+      preloadEcharts();
+    }
+  }, [currentUser, authToken, activeDashboard]);
 
   const handleLoginSuccess = (user: User, token: string) => {
     setCurrentUser(user);

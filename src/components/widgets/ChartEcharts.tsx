@@ -6,6 +6,10 @@ import type { ECharts, EChartsOption } from 'echarts';
 let echartsPromise: Promise<typeof import('echarts')> | null = null;
 const loadEcharts = () => (echartsPromise ??= import('echarts'));
 
+/** Mulai unduh chunk echarts lebih awal (saat dashboard dibuka),
+ *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
+export const preloadEcharts = (): Promise<typeof import('echarts')> => loadEcharts();
+
 interface ChartEchartsProps {
   type: 'line' | 'area' | 'bar' | 'donut';
   xAxis: string[];
