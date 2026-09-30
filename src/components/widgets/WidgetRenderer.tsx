@@ -1,0 +1,86 @@
+import React from 'react';
+import { Citation, WidgetSpec } from '../../types';
+import { ChartEcharts } from './ChartEcharts';
+import { DataTable } from './DataTable';
+import { KpiCard } from './KpiCard';
+import { NarasiCard } from './NarasiCard';
+
+interface WidgetRendererProps {
+  widget: WidgetSpec;
+  onOpenCitation?: (citation: Citation) => void;
+}
+
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
+  widget,
+  onOpenCitation,
+}) => {
+  switch (widget.type) {
+    case 'kpi':
+      return (
+        <KpiCard
+          value={widget.kpi?.value ?? '-'}
+          unit={widget.kpi?.unit}
+          delta={widget.kpi?.delta}
+          deltaLabel={widget.kpi?.deltaLabel}
+          target={widget.kpi?.target}
+          targetLabel={widget.kpi?.targetLabel}
+          sparkline={widget.kpi?.sparkline}
+          isCorrected={widget.manualCorrection?.isCorrected}
+        />
+      );
+
+    case 'line':
+    case 'area':
+    case 'bar':
+    case 'donut':
+      return (
+        <ChartEcharts
+          type={widget.type}
+          xAxis={widget.chart?.xAxis || []}
+          series={widget.chart?.series || []}
+          unit={widget.chart?.unit}
+          stacked={widget.chart?.stacked}
+          showLegend={widget.chart?.showLegend}
+        />
+      );
+
+    case 'table':
+      return (
+        <DataTable
+          columns={widget.table?.columns || []}
+          rows={widget.table?.rows || []}
+        />
+      );
+
+    case 'narasi':
+      return (
+        <NarasiCard
+          text={widget.narasi?.text || ''}
+          bulletPoints={widget.narasi?.bulletPoints}
+          citations={widget.citations || []}
+          onOpenCitation={onOpenCitation}
+        />
+      );
+
+    case 'bullet-target':
+      return (
+        <KpiCard
+          value={widget.kpi?.value ?? '-'}
+          unit={widget.kpi?.unit}
+          delta={widget.kpi?.delta}
+          deltaLabel={widget.kpi?.deltaLabel || 'Realisasi Target RKAP'}
+          target={widget.kpi?.target}
+          targetLabel={widget.kpi?.targetLabel}
+          sparkline={widget.kpi?.sparkline}
+          isCorrected={widget.manualCorrection?.isCorrected}
+        />
+      );
+
+    default:
+      return (
+        <div className="p-4 text-center text-xs text-slate-400">
+          Tipe widget {widget.type} tidak dikenali
+        </div>
+      );
+  }
+};

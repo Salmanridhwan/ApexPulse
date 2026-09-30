@@ -1,0 +1,370 @@
+import React, { useState } from 'react';
+import {
+  AlertTriangle,
+  BarChart3,
+  Calendar,
+  Check,
+  Edit3,
+  FileCheck,
+  History,
+  Layout,
+  Sliders,
+  Type,
+  UserCheck,
+  X,
+} from 'lucide-react';
+import { WidgetSpec, WidgetType } from '../types';
+
+interface WidgetEditorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  widget: WidgetSpec | null;
+  onSave: (updatedWidget: WidgetSpec) => void;
+  initialTab?: 'config' | 'correction';
+}
+
+export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
+  isOpen,
+  onClose,
+  widget,
+  onSave,
+  initialTab = 'config',
+}) => {
+  const [activeTab, setActiveTab] = useState<'config' | 'correction'>(initialTab);
+
+  // Form State
+  const [title, setTitle] = useState(widget?.title || '');
+  const [subtitle, setSubtitle] = useState(widget?.subtitle || '');
+  const [type, setType] = useState<WidgetType>(widget?.type || 'kpi');
+  const [category, setCategory] = useState(widget?.category || 'Operasional');
+  const [periode, setPeriode] = useState(widget?.periode || '2026-Q1');
+  const [unitKerja, setUnitKerja] = useState(widget?.unitKerja || 'Semua Unit');
+
+  // Manual Correction State (F-14)
+  const currentVal =
+    widget?.kpi?.value ??
+    widget?.chart?.series[0]?.data[widget?.chart?.series[0]?.data.length - 1] ??
+    '-';
+
+  const [correctedValue, setCorrectedValue] = useState(
+    widget?.manualCorrection?.isCorrected ? String(widget.manualCorrection.correctedValue) : String(currentVal)
+  );
+  const [correctedBy, setCorrectedBy] = useState(
+    widget?.manualCorrection?.correctedBy || 'Siti Rahmawati, S.E. (Analis BUMD)'
+  );
+  const [correctionReason, setCorrectionReason] = useState(
+    widget?.manualCorrection?.reason || 'Penyesuaian hasil rekonsiliasi audit internal'
+  );
+  const [isApplyingCorrection, setIsApplyingCorrection] = useState(
+    widget?.manualCorrection?.isCorrected || false
+  );
+
+  if (!isOpen || !widget) return null;
+
+  const chartTypes: Array<{ type: WidgetType; label: string; desc: string }> = [
+    { type: 'kpi', label: 'KPI Card', desc: 'Angka ringkas dengan delta & target' },
+    { type: 'line', label: 'Diagram Garis', desc: 'Visualisasi tren waktu berkala' },
+    { type: 'area', label: 'Area Chart', desc: 'Akumulasi volume dan distribusi' },
+    { type: 'bar', label: 'Diagram Batang', desc: 'Komparasi kategori atau bulanan' },
+    { type: 'donut', label: 'Diagram Donat', desc: 'Struktur proporsi persentase' },
+    { type: 'table', label: 'Tabel Rekap', desc: 'Matriks tabular sortable' },
+    { type: 'narasi', label: 'Narasi Eksekutif', desc: 'Teks sintesis temuan penting' },
+  ];
+
+  const handleSave = () => {
+    const updated: WidgetSpec = {
+      ...widget,
+      title,
+      subtitle,
+      type,
+      category,
+      periode,
+      unitKerja,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    if (isApplyingCorrection) {
+      updated.confidence = 'manual';
+      updated.manualCorrection = {
+        isCorrected: true,
+        originalValue: widget.manualCorrection?.originalValue || currentVal,
+        correctedValue: correctedValue,
+        correctedBy,
+        correctedAt: new Date().toISOString(),
+        reason: correctionReason,
+      };
+
+      if (updated.kpi) {
+        updated.kpi = {
+          ...updated.kpi,
+          value: correctedValue,
+        };
+      }
+    }
+
+    onSave(updated);
+    onClose();
+  };
+
+  const handleResetCorrection = () => {
+    setIsApplyingCorrection(false);
+    if (widget.manualCorrection) {
+      const updated: WidgetSpec = {
+        ...widget,
+        confidence: 'sumber',
+        manualCorrection: undefined,
+        kpi: widget.kpi
+          ? {
+              ...widget.kpi,
+              value: widget.manualCorrection.originalValue,
+            }
+          : undefined,
+      };
+      onSave(updated);
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+
+      {/* Modal Dialog */}
+      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">
+                Pengaturan & Kustomisasi Widget
+              </h2>
+              <p className="text-xs text-slate-500 truncate max-w-xs">{widget.title}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tab Nav */}
+        <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-4 text-xs font-medium">
+          <button
+            onClick={() => setActiveTab('config')}
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'config'
+                ? 'border-sky-600 text-sky-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Tipe Visualisasi & Parameter</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('correction')}
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'correction'
+                ? 'border-amber-600 text-amber-800'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <span>Koreksi Manual Angka (Fitur F-14)</span>
+            {widget.manualCorrection?.isCorrected && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 ml-1" />
+            )}
+          </button>
+        </div>
+
+        {/* Tab Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {activeTab === 'config' ? (
+            <>
+              {/* Judul & Subtitle */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-700 font-medium mb-1">
+                    Judul Widget
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-medium mb-1">
+                    Keterangan / Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Tipe Visualisasi Grid */}
+              <div>
+                <label className="block text-slate-700 font-medium mb-2">
+                  Pilih Tipe Visualisasi Chart
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {chartTypes.map((ct) => (
+                    <button
+                      key={ct.type}
+                      type="button"
+                      onClick={() => setType(ct.type)}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        type === ct.type
+                          ? 'border-sky-500 bg-sky-50/70 ring-1 ring-sky-500'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="font-semibold text-slate-800">{ct.label}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{ct.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Kategori & Periode */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="block text-slate-700 font-medium mb-1">Kategori</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value="Keuangan">Keuangan</option>
+                    <option value="Operasional">Operasional</option>
+                    <option value="Pelayanan">Pelayanan</option>
+                    <option value="Kepatuhan & Risiko">Kepatuhan & Risiko</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-medium mb-1">Periode Data</label>
+                  <select
+                    value={periode}
+                    onChange={(e) => setPeriode(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value="2026-Q1">Triwulan I 2026 (Aktual)</option>
+                    <option value="2026-Q2">Triwulan II 2026</option>
+                    <option value="2026-FY">Tahun Penuh 2026 (12 Bulan)</option>
+                    <option value="2025-FY">Tahun Buku 2025</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* TAB KOREKSI MANUAL (F-14 PRD) */
+            <div className="space-y-4">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 leading-relaxed">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-xs text-amber-900">
+                      Standar Kepatuhan Koreksi Angka BUMD
+                    </h4>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      Pengguna dapat menimpa angka jika terjadi revisi pembukuan resmi. Nilai asli tetap tersimpan di audit trail, dan kartu widget akan ditandai dengan badge "Dikoreksi Manual".
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-[10px] uppercase font-semibold text-slate-500">
+                  Nilai Asli dari Dokumen RAG:
+                </span>
+                <p className="text-base font-bold text-slate-800 mt-0.5">
+                  {String(widget.manualCorrection?.originalValue || currentVal)}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
+                  Nilai Baru Hasil Koreksi (Override)
+                </label>
+                <input
+                  type="text"
+                  value={correctedValue}
+                  onChange={(e) => {
+                    setCorrectedValue(e.target.value);
+                    setIsApplyingCorrection(true);
+                  }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-sm"
+                  placeholder="Contoh: Rp 45,20 M"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
+                  Nama Petugas Pengoreksi
+                </label>
+                <input
+                  type="text"
+                  value={correctedBy}
+                  onChange={(e) => setCorrectedBy(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">
+                  Alasan & Dasar Koreksi (Wajib untuk Audit)
+                </label>
+                <textarea
+                  rows={3}
+                  value={correctionReason}
+                  onChange={(e) => setCorrectionReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs"
+                  placeholder="Contoh: Penyesuaian saldo piutang berdasarkan Surat Keputusan Direksi No. 42/2026..."
+                />
+              </div>
+
+              {widget.manualCorrection?.isCorrected && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleResetCorrection}
+                    className="text-xs text-rose-600 hover:text-rose-700 font-medium underline"
+                  >
+                    Kembalikan ke Nilai Asli RAG (Batalkan Koreksi)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 text-xs font-medium transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Simpan Perubahan</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
