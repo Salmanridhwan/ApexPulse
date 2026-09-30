@@ -42,10 +42,18 @@ import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { SourceDrawer } from './components/SourceDrawer';
 import { WidgetEditorModal } from './components/WidgetEditorModal';
-import { Admin } from './pages/Admin';
-import { DashboardList } from './pages/DashboardList';
 import { Login } from './pages/Login';
-import { ShareView } from './pages/ShareView';
+
+// Halaman sekunder di-code-split: tidak membebani bundle awal.
+const Admin = React.lazy(() =>
+  import('./pages/Admin').then((m) => ({ default: m.Admin }))
+);
+const DashboardList = React.lazy(() =>
+  import('./pages/DashboardList').then((m) => ({ default: m.DashboardList }))
+);
+const ShareView = React.lazy(() =>
+  import('./pages/ShareView').then((m) => ({ default: m.ShareView }))
+);
 import {
   AlertRule,
   Citation,
@@ -64,7 +72,11 @@ export default function App() {
   const shareToken = shareMatch ? shareMatch[1] : null;
 
   if (shareToken) {
-    return <ShareView token={shareToken} />;
+    return (
+      <React.Suspense fallback={<div className="min-h-screen bg-slate-100" />}> 
+        <ShareView token={shareToken} />
+      </React.Suspense>
+    );
   }
 
   // Authentication State
@@ -421,6 +433,13 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} tenants={tenants} />;
   }
 
+  // Fallback untuk halaman yang di-lazy-load di bawah.
+  const pageFallback = (
+    <div className="flex-1 flex items-center justify-center h-screen text-sm text-slate-500">
+      Memuat modul...
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-row font-sans antialiased overflow-hidden h-screen">
       {/* ================= LEFT SIDEBAR (Always present across all views) ================= */}
@@ -459,34 +478,38 @@ export default function App() {
       {/* ================= MAIN CONTENT VIEWPORT ================= */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {viewMode === 'admin' ? (
-          <Admin
-            onBackToWorkspace={() => setViewMode('workspace')}
-            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          />
+          <React.Suspense fallback={pageFallback}>
+            <Admin
+              onBackToWorkspace={() => setViewMode('workspace')}
+              onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            />
+          </React.Suspense>
         ) : viewMode === 'dashboards' ? (
-          <DashboardList
-            dashboards={dashboards}
-            currentTenant={currentTenant}
-            onSelectDashboard={(d) => {
-              setActiveDashboard(d);
-              setViewMode('workspace');
-            }}
-            onCreateDashboard={() => {
-              handleCreateDashboard();
-              setViewMode('workspace');
-            }}
-            onOpenChat={() => {
-              setViewMode('workspace');
-              setIsChatOpen(true);
-            }}
-            onDuplicateDashboard={handleDuplicateDashboard}
-            onDeleteDashboard={handleDeleteDashboard}
-            onShareDashboard={(d) => {
-              setActiveDashboard(d);
-              setIsShareOpen(true);
-            }}
-            onBackToWorkspace={() => setViewMode('workspace')}
-          />
+          <React.Suspense fallback={pageFallback}>
+            <DashboardList
+              dashboards={dashboards}
+              currentTenant={currentTenant}
+              onSelectDashboard={(d) => {
+                setActiveDashboard(d);
+                setViewMode('workspace');
+              }}
+              onCreateDashboard={() => {
+                handleCreateDashboard();
+                setViewMode('workspace');
+              }}
+              onOpenChat={() => {
+                setViewMode('workspace');
+                setIsChatOpen(true);
+              }}
+              onDuplicateDashboard={handleDuplicateDashboard}
+              onDeleteDashboard={handleDeleteDashboard}
+              onShareDashboard={(d) => {
+                setActiveDashboard(d);
+                setIsShareOpen(true);
+              }}
+              onBackToWorkspace={() => setViewMode('workspace')}
+            />
+          </React.Suspense>
         ) : (
           <>
             {/* ================= CLEAN TOP HEADER ================= */}
