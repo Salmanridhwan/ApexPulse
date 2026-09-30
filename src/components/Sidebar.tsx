@@ -36,7 +36,8 @@ interface SidebarProps {
   onOpenAudit: () => void;
   onOpenAlerts: () => void;
   unreadAlertsCount: number;
-  currentView?: 'workspace' | 'admin';
+  currentView?: 'workspace' | 'dashboards' | 'admin';
+  onOpenDashboardList?: () => void;
   onOpenAdmin: () => void;
   currentUser: User | null;
   onLogout: () => void;
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAlerts,
   unreadAlertsCount,
   currentView = 'workspace',
+  onOpenDashboardList,
   onOpenAdmin,
   currentUser,
   onLogout,
@@ -115,21 +117,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Instansi BUMD Aktif
               </span>
               <div className="relative">
-                <select
-                  value={currentTenant?.id || ''}
-                  onChange={(e) => {
-                    const found = tenants.find((t) => t.id === e.target.value);
-                    if (found) onSelectTenant(found);
-                  }}
-                  className="w-full text-xs font-semibold text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500 transition-colors appearance-none pr-8 truncate"
-                >
-                  {tenants.map((t) => (
-                    <option key={t.id} value={t.id} className="bg-slate-900 text-white">
-                      {t.logo} {t.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                {currentUser?.role === 'admin' ? (
+                  <>
+                    <select
+                      value={currentTenant?.id || ''}
+                      onChange={(e) => {
+                        const found = tenants.find((t) => t.id === e.target.value);
+                        if (found) onSelectTenant(found);
+                      }}
+                      className="w-full text-xs font-semibold text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500 transition-colors appearance-none pr-8 truncate"
+                    >
+                      {tenants.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                          {t.logo} {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                  </>
+                ) : (
+                  <div
+                    className="w-full text-xs font-semibold text-white bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 truncate"
+                    title="Hanya administrator yang dapat berpindah instansi"
+                  >
+                    {currentTenant?.logo} {currentTenant?.name}
+                  </div>
+                )}
               </div>
               <p className="text-[10px] text-slate-400 flex items-center justify-between px-1">
                 <span className="capitalize">{currentTenant?.sector}</span>
@@ -158,6 +171,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
+            )}
+
+            {/* Gallery link */}
+            {onOpenDashboardList && (
+              <button
+                onClick={onOpenDashboardList}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all text-left mb-1.5 ${
+                  currentView === 'dashboards'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+                title="Galeri & Semua Dashboard"
+              >
+                <Layers className={`w-4 h-4 shrink-0 ${currentView === 'dashboards' ? 'text-white' : 'text-sky-400'}`} />
+                {!isCollapsed && <span className="flex-1">Semua Dashboard ({dashboards.length})</span>}
+              </button>
             )}
 
             <div className="space-y-0.5">

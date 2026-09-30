@@ -21,6 +21,8 @@ export interface User {
   role: UserRole;
   tenantId: string;
   avatar?: string;
+  /** Hash scrypt (salt:hash) — hanya dipakai di server, jangan pernah dikirim ke client. */
+  passwordHash?: string;
 }
 
 export type WidgetType = 'kpi' | 'line' | 'area' | 'bar' | 'donut' | 'table' | 'narasi' | 'bullet-target';

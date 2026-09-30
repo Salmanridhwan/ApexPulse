@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import path from 'path';
 import {
   AlertRule,
   AuditLog,
@@ -8,7 +10,35 @@ import {
   User,
   WidgetSpec,
 } from '../../types';
+import { hashPassword } from '../auth/session';
 import { getFallbackDemoDashboard } from '../builder/fallback';
+
+/**
+ * AuthPayload — data sesi yang tersimpan dalam cookie httpOnly.
+ * Sengaja dipisah dari record User agar hash password tidak pernah
+ * ikut ke client dan admin tidak bisa menimpa role/tenantId sendiri
+ * lewat endpoint mutasi.
+ */
+export interface AuthPayload {
+  userId: string;
+  role: User['role'];
+  tenantId: string;
+  name: string;
+}
+
+/** Kontrak respon user yang aman dikirim ke client (tanpa passwordHash). */
+export type SafeUser = Omit<User, 'passwordHash'>;
+
+const DATA_DIR = process.env.APEXPULSE_DATA_DIR || path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+
+interface PersistedState {
+  dashboards?: Dashboard[];
+  alertRules?: AlertRule[];
+  notifications?: NotificationItem[];
+  auditLogs?: AuditLog[];
+  shareTokens?: Record<string, string>;
+}
 
 export class InMemoryDb {
   public tenants: Tenant[] = [
@@ -80,7 +110,8 @@ export class InMemoryDb {
     },
   ];
 
-  public users: User[] = [
+  /** Record user TIDAK berisi passwordHash — hash disimpan terpisah di credentials. */
+  public users: SafeUser[] = [
     {
       id: 'user-admin',
       email: 'admin@apexpulse.id',
@@ -106,6 +137,9 @@ export class InMemoryDb {
       avatar: '👔',
     },
   ];
+
+  /** Kredensial terpisah: userId -> hash scrypt. Tidak pernah keluar dari server. */
+  public credentials: Record<string, string> = {};
 
   public dashboards: Dashboard[] = [];
 
@@ -206,10 +240,57 @@ export class InMemoryDb {
   public shareTokens: Record<string, string> = {}; // token -> dashboardId
 
   constructor() {
+    this.seedCredentials();
+    this.loadPersisted();
     this.seedInitialDashboards();
   }
 
+  /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
+  private seedCredentials() {
+    const demoPassword = process.env.DEMO_PASSWORD || 'apexpulse2026';
+    for (const u of this.users) {
+      this.credentials[u.id] = hashPassword(demoPassword);
+    }
+  }
+
+  /**
+   * Muat state yang dipersistenkan ke data/db.json supaya dashboard
+   * yang dibuat audiens demo tidak hilang saat server restart/PM2 reload.
+   * Tenants, users, dan alertRules bawaan tetap di-seed dari kode.
+   */
+  private loadPersisted() {
+    try {
+      if (!existsSync(DB_FILE)) return;
+      const parsed = JSON.parse(readFileSync(DB_FILE, 'utf-8')) as PersistedState;
+      if (Array.isArray(parsed.dashboards)) this.dashboards = parsed.dashboards;
+      if (Array.isArray(parsed.notifications)) this.notifications = parsed.notifications;
+      if (Array.isArray(parsed.auditLogs)) this.auditLogs = [...parsed.auditLogs, ...this.auditLogs];
+      if (parsed.shareTokens) this.shareTokens = parsed.shareTokens;
+    } catch (err) {
+      console.error('[ApexPulse DB] Gagal memuat data/db.json — memakai state seed:', err);
+    }
+  }
+
+  /** Tulis state ke disk (dipanggil setelah setiap mutasi). Fire-and-forget tapi sinkron & murah. */
+  public persist() {
+    try {
+      if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+      const state: PersistedState = {
+        dashboards: this.dashboards,
+        notifications: this.notifications,
+        auditLogs: this.auditLogs.slice(0, 500),
+        shareTokens: this.shareTokens,
+      };
+      writeFileSync(DB_FILE, JSON.stringify(state));
+    } catch (err) {
+      console.error('[ApexPulse DB] Gagal menyimpan data/db.json:', err);
+    }
+  }
+
   private seedInitialDashboards() {
+    // Kalau state persisted sudah berisi dashboard, jangan dobel seed.
+    if (this.dashboards.length > 0) return;
+
     const sectors: Array<{ sector: BumdSector; tenantId: string }> = [
       { sector: 'pdam', tenantId: 'tenant-pdam' },
       { sector: 'bank', tenantId: 'tenant-bank' },
@@ -239,6 +320,7 @@ export class InMemoryDb {
 
   createDashboard(dashboard: Dashboard): Dashboard {
     this.dashboards.unshift(dashboard);
+    this.persist();
     return dashboard;
   }
 
@@ -250,13 +332,16 @@ export class InMemoryDb {
       ...partial,
       updatedAt: new Date().toISOString(),
     };
+    this.persist();
     return this.dashboards[idx];
   }
 
   deleteDashboard(id: string, tenantId: string): boolean {
     const initialLen = this.dashboards.length;
     this.dashboards = this.dashboards.filter((d) => !(d.id === id && d.tenantId === tenantId));
-    return this.dashboards.length < initialLen;
+    const deleted = this.dashboards.length < initialLen;
+    if (deleted) this.persist();
+    return deleted;
   }
 
   duplicateDashboard(id: string, tenantId: string): Dashboard | undefined {
@@ -270,6 +355,7 @@ export class InMemoryDb {
       updatedAt: new Date().toISOString(),
     };
     this.dashboards.unshift(copy);
+    this.persist();
     return copy;
   }
 
@@ -280,25 +366,29 @@ export class InMemoryDb {
       timestamp: new Date().toISOString(),
     };
     this.auditLogs.unshift(log);
+    this.persist();
     return log;
   }
 
   // User Management
-  createUser(user: User): User {
+  createUser(user: SafeUser, passwordHash?: string): SafeUser {
     this.users.push(user);
+    if (passwordHash) this.credentials[user.id] = passwordHash;
     return user;
   }
 
-  updateUser(id: string, partial: Partial<User>): User | undefined {
+  updateUser(id: string, partial: Partial<User>): SafeUser | undefined {
     const idx = this.users.findIndex((u) => u.id === id);
     if (idx === -1) return undefined;
-    this.users[idx] = { ...this.users[idx], ...partial };
+    const { passwordHash: _ignored, ...rest } = partial as Partial<User> & { passwordHash?: string };
+    this.users[idx] = { ...this.users[idx], ...rest };
     return this.users[idx];
   }
 
   deleteUser(id: string): boolean {
     const len = this.users.length;
     this.users = this.users.filter((u) => u.id !== id);
+    delete this.credentials[id];
     return this.users.length < len;
   }
 

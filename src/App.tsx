@@ -43,7 +43,9 @@ import { Sidebar } from './components/Sidebar';
 import { SourceDrawer } from './components/SourceDrawer';
 import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { Admin } from './pages/Admin';
+import { DashboardList } from './pages/DashboardList';
 import { Login } from './pages/Login';
+import { ShareView } from './pages/ShareView';
 import {
   AlertRule,
   Citation,
@@ -56,9 +58,19 @@ import {
 } from './types';
 
 export default function App() {
+  // Public Share Route Handling (No Login Required)
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const shareMatch = pathname.match(/^\/share\/([^/]+)/);
+  const shareToken = shareMatch ? shareMatch[1] : null;
+
+  if (shareToken) {
+    return <ShareView token={shareToken} />;
+  }
+
   // Authentication State
+  // Sesi tercatat di cookie HttpOnly (dari server); token tak lagi disimpan di storage browser.
   const [authToken, setAuthToken] = useState<string | null>(() => {
-    return localStorage.getItem('apexpulse_token') || sessionStorage.getItem('apexpulse_token') || null;
+    return localStorage.getItem('apexpulse_user') || sessionStorage.getItem('apexpulse_user') ? 'cookie-session' : null;
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -74,7 +86,7 @@ export default function App() {
   });
 
   // App Core State
-  const [viewMode, setViewMode] = useState<'workspace' | 'admin'>('workspace');
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'admin'>('workspace');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -116,6 +128,7 @@ export default function App() {
         }
       })
       .catch((err) => console.error('Fetch tenants error:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLoginSuccess = (user: User, token: string) => {
@@ -139,9 +152,7 @@ export default function App() {
         // ignore
       }
     }
-    localStorage.removeItem('apexpulse_token');
     localStorage.removeItem('apexpulse_user');
-    sessionStorage.removeItem('apexpulse_token');
     sessionStorage.removeItem('apexpulse_user');
     setAuthToken(null);
     setCurrentUser(null);
@@ -179,6 +190,8 @@ export default function App() {
 
   // Handlers for Tenant Switcher
   const handleSelectTenant = (tenant: Tenant) => {
+    // Isolasi tenant: hanya admin yang boleh pindah konteks instansi.
+    if (currentUser?.role !== 'admin') return;
     setCurrentTenant(tenant);
   };
 
@@ -204,6 +217,43 @@ export default function App() {
     const newDash = await res.json();
     setDashboards((prev) => [newDash, ...prev]);
     setActiveDashboard(newDash);
+  };
+
+  const handleDeleteDashboard = async (dashboardId: string) => {
+    if (!currentTenant) return;
+    try {
+      const res = await fetch(`/api/dashboards/${dashboardId}?tenantId=${currentTenant.id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setDashboards((prev) => prev.filter((d) => d.id !== dashboardId));
+        if (activeDashboard?.id === dashboardId) {
+          const remaining = dashboards.filter((d) => d.id !== dashboardId);
+          setActiveDashboard(remaining[0] || null);
+        }
+      }
+    } catch (err) {
+      console.error('Delete dashboard error:', err);
+    }
+  };
+
+  const handleDuplicateDashboard = async (dashboard: Dashboard) => {
+    if (!currentTenant) return;
+    try {
+      const res = await fetch(`/api/dashboards/${dashboard.id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: currentTenant.id }),
+      });
+      if (res.ok) {
+        const duplicated: Dashboard = await res.json();
+        setDashboards((prev) => [duplicated, ...prev]);
+        setActiveDashboard(duplicated);
+        setViewMode('workspace');
+      }
+    } catch (err) {
+      console.error('Duplicate dashboard error:', err);
+    }
   };
 
   // Handlers for Widget Management
@@ -399,6 +449,7 @@ export default function App() {
           onOpenAlerts={() => setIsAlertsOpen(true)}
           unreadAlertsCount={unreadCount}
           currentView={viewMode}
+          onOpenDashboardList={() => setViewMode('dashboards')}
           onOpenAdmin={() => setViewMode('admin')}
           currentUser={currentUser}
           onLogout={handleLogout}
@@ -411,6 +462,30 @@ export default function App() {
           <Admin
             onBackToWorkspace={() => setViewMode('workspace')}
             onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+        ) : viewMode === 'dashboards' ? (
+          <DashboardList
+            dashboards={dashboards}
+            currentTenant={currentTenant}
+            onSelectDashboard={(d) => {
+              setActiveDashboard(d);
+              setViewMode('workspace');
+            }}
+            onCreateDashboard={() => {
+              handleCreateDashboard();
+              setViewMode('workspace');
+            }}
+            onOpenChat={() => {
+              setViewMode('workspace');
+              setIsChatOpen(true);
+            }}
+            onDuplicateDashboard={handleDuplicateDashboard}
+            onDeleteDashboard={handleDeleteDashboard}
+            onShareDashboard={(d) => {
+              setActiveDashboard(d);
+              setIsShareOpen(true);
+            }}
+            onBackToWorkspace={() => setViewMode('workspace')}
           />
         ) : (
           <>
