@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { Citation, WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
@@ -9,6 +9,7 @@ interface DashboardCanvasProps {
   onManualCorrection: (widget: WidgetSpec) => void;
   onDeleteWidget: (widgetId: string) => void;
   onDuplicateWidget: (widget: WidgetSpec) => void;
+  onReorderWidgets: (orderedIds: string[]) => void;
   onOpenCitation: (citation: Citation) => void;
   onOpenCatalog: () => void;
   onOpenChat: () => void;
@@ -20,10 +21,24 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onManualCorrection,
   onDeleteWidget,
   onDuplicateWidget,
+  onReorderWidgets,
   onOpenCitation,
   onOpenCatalog,
   onOpenChat,
 }) => {
+  // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  const pindahkan = (srcId: string, dstId: string) => {
+    if (!srcId || srcId === dstId) return;
+    const ids = widgets.map((w) => w.id);
+    const dari = ids.indexOf(srcId);
+    const ke = ids.indexOf(dstId);
+    if (dari === -1 || ke === -1) return;
+    ids.splice(ke, 0, ids.splice(dari, 1)[0]);
+    onReorderWidgets(ids);
+  };
   if (widgets.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-200">
@@ -70,7 +85,34 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         }
 
         return (
-          <div key={widget.id} className={`${colSpan} min-h-[220px]`}>
+          <div
+            key={widget.id}
+            data-widget-id={widget.id}
+            draggable
+            onDragStart={(e) => {
+              setDragId(widget.id);
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', widget.id);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setOverId(widget.id);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              pindahkan(dragId || e.dataTransfer.getData('text/plain'), widget.id);
+              setDragId(null);
+              setOverId(null);
+            }}
+            onDragEnd={() => {
+              setDragId(null);
+              setOverId(null);
+            }}
+            className={`${colSpan} min-h-[220px] rounded-lg transition-opacity ${
+              dragId === widget.id ? 'opacity-40' : ''
+            } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-sky-400' : ''}`}
+          >
             <WidgetCard
               widget={widget}
               onEdit={onEditWidget}

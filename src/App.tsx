@@ -368,6 +368,29 @@ export default function App() {
     });
   };
 
+  // Reorder widget via drag-and-drop: simpan urutan baru lalu persist.
+  const handleReorderWidgets = async (orderedIds: string[]) => {
+    if (!activeDashboard || !currentTenant) return;
+    const peta = new Map(activeDashboard.widgets.map((w) => [w.id, w]));
+    const ordered = orderedIds.map((id) => peta.get(id)).filter((w): w is WidgetSpec => !!w);
+    if (ordered.length !== activeDashboard.widgets.length) return; // ada id tak dikenal — abaikan
+    const updatedDashboard = { ...activeDashboard, widgets: ordered };
+
+    setActiveDashboard(updatedDashboard);
+    setDashboards((prev) =>
+      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
+    );
+
+    await fetch(`/api/dashboards/${activeDashboard.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        widgets: ordered,
+        tenantId: currentTenant.id,
+      }),
+    });
+  };
+
   const handleAddWidgetFromCatalog = async (widget: WidgetSpec) => {
     if (!activeDashboard || !currentTenant) return;
     const updatedWidgets = [widget, ...activeDashboard.widgets];
@@ -714,6 +737,7 @@ export default function App() {
           onManualCorrection={handleManualCorrection}
           onDeleteWidget={handleDeleteWidget}
           onDuplicateWidget={handleDuplicateWidget}
+          onReorderWidgets={handleReorderWidgets}
           onOpenCitation={handleOpenCitation}
           onOpenCatalog={() => setIsCatalogOpen(true)}
           onOpenChat={() => setIsChatOpen(true)}

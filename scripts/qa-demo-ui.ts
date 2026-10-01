@@ -7,6 +7,7 @@
  *   5. Klik "lihat sumber" pada widget -> drawer sitasi muncul
  *   6. Export (PNG/PDF) + share link read-only -> buka /share/:token
  *   7. Reload -> dashboard tersimpan dengan konfigurasi tetap utuh
+ *   8. Drag-and-drop pindah widget -> urutan berubah & tersimpan setelah reload
  *
  * Semua console error / pageerror / requestfailed dicatat; skrip gagal jika
  * ada error yang memengaruhi alur demo.
@@ -374,9 +375,59 @@ async function main() {
     );
   });
 
+  // ============ LANGKAH 8: DRAG-AND-DROP REORDER ============
+  await uji('8 — Drag-and-drop pindah widget & urutan tersimpan', async () => {
+    const ambilUrutan = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-widget-id]')].map(
+          (el) => (el as HTMLElement).dataset.widgetId || ''
+        )
+      );
+    const sebelum = await ambilUrutan();
+    assert.ok(sebelum.length >= 2, 'widget kurang dari 2 — reorder tidak bisa diuji');
+
+    // Drag widget pertama ke posisi widget kedua (event HTML5 DnD sintetis).
+    await page.evaluate(() => {
+      const kartu = [...document.querySelectorAll('[data-widget-id]')] as HTMLElement[];
+      const sumber = kartu[0];
+      const target = kartu[1];
+      const dt = new DataTransfer();
+      sumber.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      target.dispatchEvent(
+        new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt })
+      );
+      target.dispatchEvent(
+        new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })
+      );
+      sumber.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+    });
+
+    // Urutan berubah: widget pertama kini berbeda
+    let sesudah = sebelum;
+    const start8 = Date.now();
+    while (Date.now() - start8 < 5000) {
+      sesudah = await ambilUrutan();
+      if (sesudah[0] !== sebelum[0]) break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    assert.notStrictEqual(sesudah[0], sebelum[0], 'urutan widget tidak berubah setelah drag');
+    log(`  ℹ️ Urutan berubah: ${sebelum[0]?.slice(0, 12)} -> ${sesudah[0]?.slice(0, 12)}`);
+
+    // Reload -> urutan tersimpan (persistence)
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => !!document.querySelector('aside'), { timeout: 20000 });
+    const setelahReload = await ambilUrutan();
+    assert.deepStrictEqual(
+      setelahReload,
+      sesudah,
+      'urutan widget berubah setelah reload — persistensi reorder gagal'
+    );
+  });
+
   // ============ RINGKASAN ============
   log('\n════════════════════════════════════════');
-  log(`HASIL: ${hasil.lulus} lulus, ${hasil.gagal} gagal dari 7 langkah`);
+  const total = hasil.lulus + hasil.gagal;
+  log(`HASIL: ${hasil.lulus} lulus, ${hasil.gagal} gagal dari ${total} langkah`);
 
   if (consoleErrors.length) {
     log(`\n⚠️ Console errors (${consoleErrors.length}):`);
@@ -399,7 +450,7 @@ async function main() {
     gagalanDetail.forEach((d) => log(`  - ${d}`));
     process.exitCode = 1;
   } else {
-    log('\n🎉 SEMUA 7 LANGKAH SKENARIO DEMO LULUS, TANPA ERROR CONSOLE/NETWORK');
+    log(`\n🎉 SEMUA ${total} LANGKAH SKENARIO DEMO LULUS, TANPA ERROR CONSOLE/NETWORK`);
   }
 }
 
