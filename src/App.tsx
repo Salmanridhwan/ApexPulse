@@ -180,14 +180,20 @@ export default function App() {
     setViewMode('workspace');
   };
 
-  // Fetch Dashboards and Alerts when Tenant changes
+  // Fetch Dashboards and Alerts when Tenant changes OR user just logged in.
+  // (Tanpa authToken di dependency, fetch pertama saat boot kena 401 dan
+  // dashboards tidak pernah dimuat ulang setelah login sukses.)
   useEffect(() => {
-    if (!currentTenant) return;
+    if (!currentTenant || !authToken) return;
 
     // Fetch Dashboards
+    // Endpoint kini butuh sesi — kalau belum login (401) response berupa objek
+    // error, bukan array. Selalu lindungi dengan res.ok + Array.isArray agar
+    // state tidak pernah diisi objek dan merusak .filter() di render.
     fetch(`/api/dashboards?tenantId=${currentTenant.id}`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data: Dashboard[]) => {
+        if (!Array.isArray(data)) return;
         setDashboards(data);
         if (data.length > 0) {
           setActiveDashboard(data[0]);
@@ -199,15 +205,19 @@ export default function App() {
 
     // Fetch Alerts & Notifications
     fetch(`/api/alerts?tenantId=${currentTenant.id}`)
-      .then((res) => res.json())
-      .then((data) => setAlertRules(data))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setAlertRules(data);
+      })
       .catch((err) => console.error('Fetch alerts error:', err));
 
     fetch(`/api/notifications?tenantId=${currentTenant.id}`)
-      .then((res) => res.json())
-      .then((data) => setNotifications(data))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setNotifications(data);
+      })
       .catch((err) => console.error('Fetch notifications error:', err));
-  }, [currentTenant]);
+  }, [currentTenant, authToken]);
 
   // Handlers for Tenant Switcher
   const handleSelectTenant = (tenant: Tenant) => {
@@ -235,6 +245,7 @@ export default function App() {
         widgets: [],
       }),
     });
+    if (!res.ok) return;
     const newDash = await res.json();
     setDashboards((prev) => [newDash, ...prev]);
     setActiveDashboard(newDash);
@@ -409,9 +420,10 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId: currentTenant.id }),
     });
+    if (!res.ok) return;
     const data = await res.json();
-    if (data.notifications) {
-      setNotifications(data.notifications);
+    if (Array.isArray(data.notifications)) {
+      setNotifications((prev) => [...data.notifications, ...prev]);
     }
   };
 
@@ -422,6 +434,7 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rule),
     });
+    if (!res.ok) return;
     const newRule = await res.json();
     setAlertRules((prev) => [newRule, ...prev]);
   };
@@ -436,7 +449,7 @@ export default function App() {
     });
   };
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.isRead).length : 0;
 
   if (!currentUser || !authToken) {
     return <Login onLoginSuccess={handleLoginSuccess} tenants={tenants} />;

@@ -25,7 +25,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       const res = await fetch(`/api/dashboards/${dashboard.id}/share`, {
         method: 'POST',
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (!data?.token) throw new Error('Token tidak diterima dari server');
       setShareToken(data.token);
     } catch (err) {
       console.error('Failed to create share link:', err);
@@ -117,7 +119,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   <Lock className="w-3 h-3" /> Dilindungi Token Enkripsi
                 </span>
                 <a
-                  href={`/api/share/${shareToken}`}
+                  href={`/share/${shareToken}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-sky-600 hover:underline flex items-center gap-1"

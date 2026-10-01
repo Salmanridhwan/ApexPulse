@@ -70,22 +70,25 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
   const loadData = async () => {
     setIsLoading(true);
     try {
+      // Semua endpoint ini butuh sesi + role admin — kalau 401/403 jangan
+      // masukkan body error ke state array (bikin .filter/.map meledak).
+      const j = (r: Response) => (r.ok ? r.json() : null);
       const [statsRes, usersRes, tenantsRes, configRes, logsRes, alertsRes] = await Promise.all([
-        fetch('/api/admin/stats').then((r) => r.json()),
-        fetch('/api/admin/users').then((r) => r.json()),
-        fetch('/api/tenants').then((r) => r.json()),
-        fetch('/api/admin/config').then((r) => r.json()),
-        fetch('/api/audit-logs').then((r) => r.json()),
-        fetch('/api/alerts').then((r) => r.json()),
+        fetch('/api/admin/stats').then(j),
+        fetch('/api/admin/users').then(j),
+        fetch('/api/tenants').then(j),
+        fetch('/api/admin/config').then(j),
+        fetch('/api/audit-logs').then(j),
+        fetch('/api/alerts').then(j),
       ]);
 
-      setStats(statsRes);
-      setUsers(usersRes);
-      setTenants(tenantsRes);
-      setSystemConfig(configRes);
-      setAuditLogs(logsRes);
-      setAlertRules(alertsRes);
-      if (tenantsRes.length > 0 && !userTenantId) {
+      if (statsRes) setStats(statsRes);
+      if (Array.isArray(usersRes)) setUsers(usersRes);
+      if (Array.isArray(tenantsRes)) setTenants(tenantsRes);
+      if (configRes) setSystemConfig(configRes);
+      if (Array.isArray(logsRes)) setAuditLogs(logsRes);
+      if (Array.isArray(alertsRes)) setAlertRules(alertsRes);
+      if (Array.isArray(tenantsRes) && tenantsRes.length > 0 && !userTenantId) {
         setUserTenantId(tenantsRes[0].id);
       }
     } catch (err) {

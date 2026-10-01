@@ -28,13 +28,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleLogin = async (e?: React.FormEvent, customEmail?: string, customPass?: string) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
     setIsLoading(true);
 
-    const loginEmail = customEmail || email;
-    const loginPass = customPass || password;
+    const loginEmail = email;
+    const loginPass = password;
 
     try {
       const response = await fetch('/api/auth/login', {

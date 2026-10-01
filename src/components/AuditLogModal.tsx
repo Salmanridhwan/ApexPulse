@@ -20,8 +20,10 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({
     if (!isOpen) return;
     setIsLoading(true);
     fetch(`/api/audit-logs?tenantId=${tenantId}`)
-      .then((res) => res.json())
-      .then((data) => setLogs(data))
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setLogs(data);
+      })
       .catch((err) => console.error('Failed to fetch audit logs:', err))
       .finally(() => setIsLoading(false));
   }, [isOpen, tenantId]);
