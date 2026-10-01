@@ -38,6 +38,7 @@ interface PersistedState {
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
+  systemConfig?: typeof InMemoryDb.prototype.systemConfig;
 }
 
 export class InMemoryDb {
@@ -266,6 +267,10 @@ export class InMemoryDb {
       if (Array.isArray(parsed.notifications)) this.notifications = parsed.notifications;
       if (Array.isArray(parsed.auditLogs)) this.auditLogs = [...parsed.auditLogs, ...this.auditLogs];
       if (parsed.shareTokens) this.shareTokens = parsed.shareTokens;
+      // Konfigurasi sistem (termasuk RAG provider/url/key dari panel admin)
+      if (parsed.systemConfig) {
+        this.systemConfig = { ...this.systemConfig, ...parsed.systemConfig };
+      }
     } catch (err) {
       console.error('[ApexPulse DB] Gagal memuat data/db.json — memakai state seed:', err);
     }
@@ -280,6 +285,7 @@ export class InMemoryDb {
         notifications: this.notifications,
         auditLogs: this.auditLogs.slice(0, 500),
         shareTokens: this.shareTokens,
+        systemConfig: this.systemConfig,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {

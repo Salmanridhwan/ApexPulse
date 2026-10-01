@@ -527,6 +527,85 @@ async function main() {
     assert.ok(!masihAda, 'dashboard masih ada di API setelah dihapus');
   });
 
+  // ============ LANGKAH 11: PANEL ADMIN — KONFIGURASI RAG (API KEY) ============
+  await uji('11 — Panel admin: API key RAG (403 non-admin, mask, persist, probe)', async () => {
+    const panggil = (fn: (u: any) => Promise<any>) => page.evaluate(fn);
+
+    // (a) Non-admin kena 403
+    await panggil(async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'demo@apexpulse.id', password: 'apexpulse2026' }),
+      });
+    });
+    const statusDemo = await panggil(async () => {
+      const res = await fetch('/api/admin/config');
+      return res.status;
+    });
+    assert.strictEqual(statusDemo, 403, 'non-admin harusnya 403 saat GET /api/admin/config');
+
+    // (b) Login admin -> config terbaca, API key ter-mask
+    await panggil(async () => {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@apexpulse.id', password: 'apexpulse2026' }),
+      });
+    });
+    const cfgAwal = await panggil(async () => {
+      const res = await fetch('/api/admin/config');
+      return { status: res.status, data: await res.json() };
+    });
+    assert.strictEqual(cfgAwal.status, 200, 'admin harusnya 200 saat GET /api/admin/config');
+    assert.ok(
+      !cfgAwal.data.ragApiKey || cfgAwal.data.ragApiKey.includes('*'),
+      'API key dikirim ke browser tanpa masking'
+    );
+
+    // (c) Set provider HTTP + URL/key teman -> tersimpan
+    await panggil(async () => {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ragProvider: 'http',
+          ragApiUrl: 'http://127.0.0.1:9/v1',
+          ragApiKey: 'rag-key-uji-123456',
+        }),
+      });
+    });
+    const cfgBaru = await panggil(async () => {
+      const res = await fetch('/api/admin/config');
+      return res.json();
+    });
+    assert.strictEqual(cfgBaru.ragProvider, 'http', 'provider http tidak tersimpan');
+    assert.strictEqual(cfgBaru.ragApiUrl, 'http://127.0.0.1:9/v1', 'base url tidak tersimpan');
+    assert.ok(cfgBaru.ragApiKey.includes('*'), 'API key baru tidak ter-mask di respons');
+
+    // (d) Probe dengan endpoint mati -> status error yang anggun (bukan crash)
+    const probe = await panggil(async () => {
+      const res = await fetch('/api/rag-probe', { method: 'POST' });
+      return res.json();
+    });
+    assert.strictEqual(probe.status, 'error', 'probe ke endpoint mati harusnya status error');
+
+    // (e) Restore provider mock (URL/key tidak relevan saat mock)
+    await panggil(async () => {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ragProvider: 'mock' }),
+      });
+    });
+    const cfgAkhir = await panggil(async () => {
+      const res = await fetch('/api/admin/config');
+      return res.json();
+    });
+    assert.strictEqual(cfgAkhir.ragProvider, 'mock', 'provider tidak kembali ke mock');
+  });
+
   // ============ RINGKASAN ============
   log('\n════════════════════════════════════════');
   const total = hasil.lulus + hasil.gagal;

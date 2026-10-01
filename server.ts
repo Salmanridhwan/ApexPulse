@@ -6,8 +6,8 @@ import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { mockRag } from './src/services/rag/mock';
-import { db } from './src/services/store/inMemoryDb';
-import { SafeUser } from './src/services/store/inMemoryDb';
+import { ConfigurableRagClient, maskKey } from './src/services/rag/http';
+import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
   parseSessionCookie,
@@ -54,6 +54,19 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
+
+  // RAG client: baca konfigurasi dari panel admin (systemConfig) secara live.
+  // Default provider/url/key diambil dari env, lalu bisa dioverride admin via UI.
+  const ragClient = new ConfigurableRagClient(() => ({
+    provider: db.systemConfig.ragProvider,
+    baseUrl: db.systemConfig.ragApiUrl,
+    apiKey: db.systemConfig.ragApiKey,
+    timeoutMs: db.systemConfig.ragTimeoutSeconds,
+  }));
+  // Seed awal dari env (kalau ada) — admin tetap bisa override via panel.
+  if (process.env.RAG_PROVIDER === 'http') db.systemConfig.ragProvider = 'http';
+  if (process.env.RAG_API_URL) db.systemConfig.ragApiUrl = process.env.RAG_API_URL;
+  if (process.env.RAG_API_KEY) db.systemConfig.ragApiKey = process.env.RAG_API_KEY;
 
   app.use(express.json());
 
@@ -366,6 +379,7 @@ async function startServer() {
         tenantId,
         modeOverride,
         onProgress,
+        ragClient,
       });
 
       // Save to database
@@ -399,23 +413,42 @@ async function startServer() {
 
   // ================= RAG PROBE & DIAGNOSTICS =================
   app.post('/api/rag-probe', async (_req: Request, res: Response) => {
-    const probeRes = await mockRag.probe();
-    res.json({
-      timestamp: new Date().toISOString(),
-      status: 'healthy',
-      latencyMs: probeRes.latencyMs,
-      modeDetected: probeRes.detectedMode,
-      hasLlmStructuredJson: probeRes.canOutputJson,
-      hasDocumentMetadata: probeRes.hasMetadata,
-      sampleChunksCount: 4,
-      zodValidationPassed: true,
-      details: [
-        `RAG API Endpoint aktif dan merespons dalam ${probeRes.latencyMs}ms`,
-        `Mode saat ini: ${probeRes.detectedMode}`,
-        `Dukungan ekstraksi metadata dokumen: ${probeRes.hasMetadata ? 'Tersedia (periode, nilai, unit_kerja, kategori)' : 'Tidak tersedia'}`,
-        `Skema Zod ApexPulse: Validasi lulus 100%`,
-      ],
-    });
+    const cfg = db.systemConfig;
+    try {
+      const probeRes = await ragClient.probe();
+      res.json({
+        timestamp: new Date().toISOString(),
+        status: 'healthy',
+        latencyMs: probeRes.latencyMs,
+        modeDetected: probeRes.detectedMode,
+        hasLlmStructuredJson: probeRes.canOutputJson,
+        hasDocumentMetadata: probeRes.hasMetadata,
+        sampleChunksCount: 4,
+        zodValidationPassed: true,
+        details: [
+          `RAG API Endpoint aktif dan merespons dalam ${probeRes.latencyMs}ms (provider: ${cfg.ragProvider})`,
+          `Mode saat ini: ${probeRes.detectedMode}`,
+          `Dukungan ekstraksi metadata dokumen: ${probeRes.hasMetadata ? 'Tersedia (periode, nilai, unit_kerja, kategori)' : 'Tidak tersedia'}`,
+          `Skema Zod ApexPulse: Validasi lulus 100%`,
+        ],
+      });
+    } catch (err: any) {
+      res.json({
+        timestamp: new Date().toISOString(),
+        status: 'error',
+        latencyMs: 0,
+        modeDetected: 'Fallback',
+        hasLlmStructuredJson: false,
+        hasDocumentMetadata: false,
+        sampleChunksCount: 0,
+        zodValidationPassed: false,
+        details: [
+          `RAG provider (${cfg.ragProvider}) tidak merespons: ${err?.message || 'kesalahan tidak diketahui'}`, 
+          `Cek Base URL & API Key di Panel Admin → Konfigurasi RAG`, 
+          `Generate dashboard tetap berjalan dengan data contoh (fallback)`, 
+        ],
+      });
+    }
   });
 
   app.post('/api/rag/set-mode', (req: Request, res: Response) => {
@@ -702,7 +735,8 @@ async function startServer() {
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
-    res.json(db.systemConfig);
+    // API key dikirim ter-mask — nilai asli hanya hidup di server.
+    res.json({ ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) });
   });
 
   app.post('/api/admin/config', (req: Request, res: Response) => {
@@ -711,7 +745,13 @@ async function startServer() {
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
-    db.systemConfig = { ...db.systemConfig, ...req.body };
+    // API key jangan pernah tersimpan ter-mask sebagai nilai aktif: kalau admin
+    // tidak mengubah key (masih *********), pertahankan nilai lama.
+    const body = { ...req.body };
+    if (body.ragApiKey === maskKey(db.systemConfig.ragApiKey) || body.ragApiKey === '*********') {
+      body.ragApiKey = db.systemConfig.ragApiKey;
+    }
+    db.systemConfig = { ...db.systemConfig, ...body };
     if (req.body.defaultRagMode) {
       mockRag.setMode(req.body.defaultRagMode);
     }
@@ -721,9 +761,9 @@ async function startServer() {
       userName: session.name,
       action: 'Konfigurasi Sistem',
       target: 'System Settings',
-      details: `Memperbarui parameter sistem & RAG provider`,
+      details: `Memperbarui parameter sistem & RAG provider (provider: ${db.systemConfig.ragProvider}, url: ${db.systemConfig.ragApiUrl})`,
     });
-    res.json(db.systemConfig);
+    res.json({ ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) });
   });
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================

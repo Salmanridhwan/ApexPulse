@@ -307,19 +307,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </button>
 
-              {/* Admin Panel Button */}
-              <button
-                onClick={onOpenAdmin}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all text-left ${
-                  currentView === 'admin'
-                    ? 'bg-slate-700 text-white border border-slate-600'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                }`}
-                title="Buka Panel Admin & Tata Kelola"
-              >
-                <Shield className="w-4 h-4 text-slate-400 shrink-0" />
-                {!isCollapsed && <span>Panel Admin BUMD</span>}
-              </button>
+              {/* Admin Panel Button — hanya tampil untuk role admin */}
+              {currentUser?.role === 'admin' && (
+                <button
+                  onClick={onOpenAdmin}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all text-left ${
+                    currentView === 'admin'
+                      ? 'bg-slate-700 text-white border border-slate-600'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                  title="Buka Panel Admin & Tata Kelola"
+                >
+                  <Shield className="w-4 h-4 text-slate-400 shrink-0" />
+                  {!isCollapsed && <span>Panel Admin BUMD</span>}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { BumdSector, Dashboard, ProgressStep, WidgetSpec } from '../../types';
+import { RagClient } from '../rag/types';
 import { mockRag } from '../rag/mock';
 import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
@@ -11,6 +12,8 @@ export interface GenerateOptions {
   tenantId: string;
   modeOverride?: 'structured' | 'prose';
   onProgress?: (step: ProgressStep) => void;
+  /** Klien RAG aktif (mock atau HTTP sesuai konfigurasi admin). */
+  ragClient?: RagClient;
 }
 
 export interface GenerateResult {
@@ -53,7 +56,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     .map((p) => p.id)
     .join(', ');
 
-  const ragRes = await mockRag.query({
+  const ragRes = await (options.ragClient || mockRag).query({
     prompt: userPrompt,
     sector,
     mode: options.modeOverride,

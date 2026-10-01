@@ -539,10 +539,11 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Konfigurasi Integrasi RAG API & Dual Jalur
+                Konfigurasi Integrasi RAG API
               </h3>
               <p className="text-xs text-slate-500">
-                Pengaturan parameter koneksi ke server retrieval dokumen instansi BUMD
+                Tempel Base URL & API Key RAG dari penyedia layanan, pilih provider
+                <strong> HTTP</strong>, lalu simpan. Uji koneksi lewat sidebar → Diagnostik RAG Probe.
               </p>
             </div>
 
@@ -566,8 +567,8 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
                     }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
                   >
-                    <option value="mock">Simulasi BUMD Mock (6 Sektor Terintegrasi)</option>
-                    <option value="http">Koneksi HTTP Langsung (API RAG BUMD Asli)</option>
+                    <option value="mock">Mock — data demo lokal</option>
+                    <option value="http">HTTP — API RAG eksternal</option>
                   </select>
                 </div>
 
@@ -590,10 +591,11 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
 
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">
-                  URL Endpoint API RAG BUMD
+                  Base URL RAG
                 </label>
                 <input
                   type="text"
+                  placeholder="https://rag-teman-anda.example.com/v1"
                   value={systemConfig.ragApiUrl}
                   onChange={(e) =>
                     setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })
@@ -605,11 +607,12 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">
-                    Kunci API RAG (RAG_API_KEY)
+                    API Key RAG
                   </label>
                   <div className="relative">
                     <input
                       type="password"
+                      placeholder="tempel API key di sini"
                       value={systemConfig.ragApiKey}
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
