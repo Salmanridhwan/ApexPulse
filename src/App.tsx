@@ -31,6 +31,7 @@ import {
   Users,
 } from 'lucide-react';
 import { AlertsModal } from './components/AlertsModal';
+import { LogoTile } from './components/BrandMark';
 import { AuditLogModal } from './components/AuditLogModal';
 import { CatalogSidebar } from './components/CatalogSidebar';
 import { ChatPanel } from './components/ChatPanel';
@@ -620,10 +621,8 @@ export default function App() {
 
         {/* Dashboard Title & Executive Governance Banner */}
         {activeDashboard && !isPresentationMode && (
-          <div className="mb-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="mb-6 bg-slate-900 text-white p-6 rounded-lg border border-slate-800 shadow-lg">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               {/* Left Identity */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs text-sky-400 font-semibold tracking-wider uppercase">
@@ -633,9 +632,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl p-2 bg-white/10 rounded-xl border border-white/10 backdrop-blur-xs">
-                    {currentTenant?.logo || '🏛️'}
-                  </span>
+                  <LogoTile name={currentTenant?.name} id={currentTenant?.id} size="lg" />
                   <div>
                     <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white flex items-center gap-2 flex-wrap">
                       {activeDashboard.title}
@@ -678,7 +675,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setIsChatOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl transition-all shadow-md ring-2 ring-sky-400/20"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Chat RAG Copilot</span>

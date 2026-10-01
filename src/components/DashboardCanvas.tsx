@@ -26,8 +26,8 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
 }) => {
   if (widgets.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-        <div className="w-16 h-16 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 mb-4 ring-8 ring-sky-50/50">
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-200">
+        <div className="w-16 h-16 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
           <LayoutGrid className="w-8 h-8" />
         </div>
         <h3 className="text-base font-semibold text-slate-800">

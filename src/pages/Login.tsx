@@ -100,7 +100,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
 
       {/* Main Authentication Card */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-4xl bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12">
+        <div className="w-full max-w-4xl bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12">
           {/* Left Column: Official Context & Governance Info */}
           <div className="md:col-span-5 bg-slate-50/80 p-6 sm:p-8 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col justify-between space-y-6">
             <div className="space-y-4">

@@ -40,7 +40,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   return (
     <div className="relative bg-white rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden group">
       {/* Widget Header */}
-      <div className="px-4 py-3 border-b border-slate-100 flex items-start justify-between gap-2 bg-gradient-to-r from-slate-50/50 to-white">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-start justify-between gap-2 bg-slate-50/60">
         <div className="flex items-start gap-2 min-w-0">
           <div className="mt-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
             <GripVertical className="w-4 h-4" />

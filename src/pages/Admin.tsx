@@ -29,6 +29,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { AvatarTile } from '../components/BrandMark';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 interface AdminProps {
@@ -426,7 +427,7 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
                     return (
                       <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 font-medium flex items-center gap-2">
-                          <span className="text-base">{u.avatar || '👤'}</span>
+                          <AvatarTile name={u.name} id={u.id} size="sm" />
                           <span>{u.name}</span>
                         </td>
                         <td className="p-3 text-slate-500">{u.email}</td>
@@ -434,7 +435,7 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
                           <span
                             className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                               u.role === 'admin'
-                                ? 'bg-purple-100 text-purple-800'
+                                ? 'bg-slate-800 text-white'
                                 : u.role === 'direksi'
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-sky-100 text-sky-800'

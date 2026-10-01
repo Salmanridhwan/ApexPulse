@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Database,
   History,
   Layers,
   LayoutGrid,
@@ -15,8 +14,8 @@ import {
   Radio,
   Shield,
   Sparkles,
-  UserCheck,
 } from 'lucide-react';
+import { LogoTile, AvatarTile } from './BrandMark';
 import { Dashboard, Tenant, User } from '../types';
 
 interface SidebarProps {
@@ -77,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="h-14 border-b border-slate-800 px-4 flex items-center justify-between">
           {!isCollapsed && (
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-md ring-2 ring-sky-400/20 shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shrink-0">
                 <Activity className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -93,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {isCollapsed && (
-            <div className="w-8 h-8 mx-auto rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-md">
+            <div className="w-8 h-8 mx-auto rounded-lg bg-sky-600 flex items-center justify-center text-white">
               <Activity className="w-4 h-4" />
             </div>
           )}
@@ -129,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       {tenants.map((t) => (
                         <option key={t.id} value={t.id} className="bg-slate-900 text-white">
-                          {t.logo} {t.name}
+                          {t.name}
                         </option>
                       ))}
                     </select>
@@ -140,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="w-full text-xs font-semibold text-white bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 truncate"
                     title="Hanya administrator yang dapat berpindah instansi"
                   >
-                    {currentTenant?.logo} {currentTenant?.name}
+                    {currentTenant?.name}
                   </div>
                 )}
               </div>
@@ -150,8 +149,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </p>
             </div>
           ) : (
-            <div className="text-center" title={currentTenant?.name}>
-              <span className="text-2xl">{currentTenant?.logo || '🏛️'}</span>
+            <div className="flex justify-center" title={currentTenant?.name}>
+              <LogoTile name={currentTenant?.name} id={currentTenant?.id} />
             </div>
           )}
         </div>
@@ -313,12 +312,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onOpenAdmin}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all text-left ${
                   currentView === 'admin'
-                    ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+                    ? 'bg-slate-700 text-white border border-slate-600'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
                 title="Buka Panel Admin & Tata Kelola"
               >
-                <Shield className="w-4 h-4 text-purple-400 shrink-0" />
+                <Shield className="w-4 h-4 text-slate-400 shrink-0" />
                 {!isCollapsed && <span>Panel Admin BUMD</span>}
               </button>
             </div>
@@ -331,9 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!isCollapsed ? (
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xl p-1 bg-slate-800 rounded-lg shrink-0">
-                {currentUser?.avatar || '👤'}
-              </span>
+              <AvatarTile name={currentUser?.name} id={currentUser?.id} />
               <div className="min-w-0">
                 <p className="text-xs font-bold text-white truncate max-w-[130px]">
                   {currentUser?.name || 'Pengguna'}
@@ -354,7 +351,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <span className="text-xl">{currentUser?.avatar || '👤'}</span>
+            <AvatarTile name={currentUser?.name} id={currentUser?.id} />
             <button
               onClick={onToggleCollapse}
               className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"

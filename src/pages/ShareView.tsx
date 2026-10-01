@@ -14,6 +14,7 @@ import {
   Shield,
   ShieldCheck,
 } from 'lucide-react';
+import { LogoTile } from '../components/BrandMark';
 import { SourceDrawer } from '../components/SourceDrawer';
 import { WidgetCard } from '../components/widgets/WidgetCard';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
@@ -173,9 +174,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
       <header className="bg-white border-b border-slate-200/90 shadow-2xs px-6 py-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <span className="text-4xl p-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-2xs shrink-0">
-              {tenant?.logo || '🏛️'}
-            </span>
+            <LogoTile name={tenant?.name} id={tenant?.id} size="lg" />
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
                 <span>{tenant?.name || 'PEMERINTAH DAERAH / BUMD'}</span>

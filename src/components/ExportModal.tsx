@@ -81,8 +81,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           >
             {/* Kop Surat Resmi */}
             <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{tenant?.logo || '🏛️'}</span>
+              <div className="flex items-center gap-3">                  <span className="text-3xl" aria-hidden="true">{tenant?.logo || '🏛️'}</span>
                 <div>
                   <h1 className="text-sm font-extrabold tracking-tight uppercase text-slate-900">
                     {tenant?.name || 'PEMERINTAH DAERAH — BADAN USAHA MILIK DAERAH'}

@@ -17,6 +17,7 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
+import { LogoTile } from '../components/BrandMark';
 import { BumdSector, Dashboard, Tenant } from '../types';
 
 interface DashboardListProps {
@@ -71,10 +72,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   return (
     <div className="flex-1 bg-slate-50 min-h-screen flex flex-col">
       {/* Top Banner / Hero Header */}
-      <div className="bg-slate-900 border-b border-slate-800 text-white px-6 py-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto relative z-10">
+      <div className="bg-slate-900 border-b border-slate-800 text-white px-6 py-8">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-sky-400 font-semibold tracking-wider uppercase">
@@ -84,9 +83,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-3xl p-2 bg-white/10 rounded-xl border border-white/10 backdrop-blur-xs">
-                  {currentTenant?.logo || '🏛️'}
-                </span>
+                <LogoTile name={currentTenant?.name} id={currentTenant?.id} size="lg" />
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
                     Galeri Dashboard BUMD
@@ -105,14 +102,14 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <button
                 onClick={onOpenChat}
-                className="px-4 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-md transition-all flex items-center gap-2 border border-sky-400/30"
+                className="px-4 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-colors flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Buat via Chat AI RAG</span>
               </button>
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-xl shadow-xs transition-all flex items-center gap-2 border border-slate-700"
+                className="px-4 py-2.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg shadow-xs transition-colors flex items-center gap-2 border border-slate-700"
               >
                 <Plus className="w-4 h-4 text-sky-400" />
                 <span>Dashboard Baru</span>
@@ -143,7 +140,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             </div>
 
             <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                 <Activity className="w-5 h-5" />
               </div>
               <div>
@@ -288,7 +285,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         </span>
                       )}
                       {chartCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-purple-50 border border-purple-100 text-purple-700 rounded-md">
+                        <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 border border-amber-100 text-amber-700 rounded-md">
                           {chartCount} Grafik
                         </span>
                       )}
