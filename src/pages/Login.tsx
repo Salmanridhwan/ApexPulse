@@ -88,7 +88,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
           <div className="md:col-span-5 bg-slate-50/80 p-6 sm:p-8 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col justify-center space-y-5">
             <div>
               <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-snug">
-                Masuk ke Portal BUMD
+                Masuk ke Portal ApexPulse
               </h1>
               <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                 Dashboard kinerja instansi berbasis dokumen resmi RAG.
