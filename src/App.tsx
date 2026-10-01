@@ -551,6 +551,7 @@ export default function App() {
         {viewMode === 'admin' ? (
           <React.Suspense fallback={pageFallback}>
             <Admin
+              currentUser={currentUser}
               onBackToWorkspace={() => setViewMode('workspace')}
               onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />

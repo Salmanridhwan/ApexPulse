@@ -33,11 +33,12 @@ import { AvatarTile } from '../components/BrandMark';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 interface AdminProps {
+  currentUser: User | null;
   onBackToWorkspace: () => void;
   onToggleSidebar?: () => void;
 }
 
-export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar }) => {
+export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace, onToggleSidebar }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tenants' | 'rag' | 'alerts' | 'audit'>('overview');
 
   // Admin Data State
@@ -220,7 +221,7 @@ export const Admin: React.FC<AdminProps> = ({ onBackToWorkspace, onToggleSidebar
 
           <div className="flex items-center gap-3 text-xs shrink-0">
             <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-              Admin: <strong>Budi Santoso</strong>
+              Admin: <strong>{currentUser?.name || 'Administrator'}</strong>
             </span>
             <button
               onClick={loadData}
