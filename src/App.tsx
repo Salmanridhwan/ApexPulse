@@ -633,25 +633,27 @@ export default function App() {
 
                 <div className="flex items-center gap-3">
                   <LogoTile name={currentTenant?.name} id={currentTenant?.id} size="lg" />
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white flex items-center gap-2 flex-wrap">
+                  <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
                       {activeDashboard.title}
                     </h1>
-                    <p className="text-xs text-slate-300 mt-0.5 max-w-2xl leading-relaxed">
-                      {activeDashboard.description || 'Dashboard intelijensi dan monitoring kinerja berbasis retrieval dokumen resmi instansi BUMD.'}
-                    </p>
+                    {activeDashboard.description && (
+                      <p className="text-xs text-slate-300 mt-0.5 max-w-2xl line-clamp-1">
+                        {activeDashboard.description}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Quick Governance Accreditations */}
-                <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-slate-300">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">
+                <div className="pt-1 flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
                     <Award className="w-3.5 h-3.5 text-emerald-400" />
-                    Kategori Kinerja: SEHAT (Skor 86,4 / Kemendagri)
+                    Kinerja SEHAT · 86,4
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-slate-300 text-[11px]">
+                  <span className="inline-flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                    Standar Pengawasan BPKP & OJK
+                    Diaudit BPKP & OJK
                   </span>
                 </div>
               </div>
@@ -686,20 +688,20 @@ export default function App() {
             {/* Quick Metrics Bar across bottom of banner */}
             <div className="mt-5 pt-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
               <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Realisasi Target RKAP</span>
-                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">107,1% (Melampaui)</p>
+                <span className="text-[10px] uppercase font-semibold text-slate-400">Realisasi RKAP</span>
+                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">107,1%</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Tingkat Risiko / NRW</span>
-                <p className="text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums">22,4% (Kondisi Aman)</p>
+                <span className="text-[10px] uppercase font-semibold text-slate-400">Risiko / NRW</span>
+                <p className="text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums">22,4%</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Kolektibilitas Penagihan</span>
-                <p className="text-base font-bold font-mono text-slate-200 mt-0.5 tabular-nums">94,8% (Efisiensi Tinggi)</p>
+                <span className="text-[10px] uppercase font-semibold text-slate-400">Kolektibilitas</span>
+                <p className="text-base font-bold font-mono text-slate-200 mt-0.5 tabular-nums">94,8%</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Verifikasi Berkas LRA</span>
-                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">100% Sah & Tervalidasi</p>
+                <span className="text-[10px] uppercase font-semibold text-slate-400">Verifikasi LRA</span>
+                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">100%</p>
               </div>
             </div>
           </div>
