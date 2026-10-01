@@ -35,7 +35,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   // Resize lebar widget: tarik strip di tepi kanan kartu (mouse event native).
   const [resizeId, setResizeId] = useState<string | null>(null);
   const [previewW, setPreviewW] = useState<number | null>(null);
-  const resizeInfo = useRef<{ id: string; startX: number; startW: number; pxPerCol: number } | null>(null);
+  const resizeInfo = useRef<{ id: string; startX: number; startW: number; pxPerCol: number; arah: 1 | -1 } | null>(null);
   const previewWRef = useRef<number | null>(null);
 
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
@@ -43,20 +43,21 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   /** Diskritkan lebar mentah ke bucket yang dikenali pemetaan colSpan. */
   const bucket = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : 4);
 
-  const mulaiResize = (e: React.MouseEvent, widget: WidgetSpec) => {
+  /** arah: 1 = tepi kanan (geser kanan = melebar), -1 = tepi kiri (geser kiri = melebar). */
+  const mulaiResize = (e: React.MouseEvent, widget: WidgetSpec, arah: 1 | -1) => {
     e.preventDefault();
     e.stopPropagation();
     const kartu = (e.currentTarget as HTMLElement).closest('[data-widget-id]') as HTMLElement | null;
     const startW = widget.grid?.w ?? 6;
     const pxPerCol = kartu ? kartu.getBoundingClientRect().width / lgCols(startW) : 100;
-    resizeInfo.current = { id: widget.id, startX: e.clientX, startW, pxPerCol };
+    resizeInfo.current = { id: widget.id, startX: e.clientX, startW, pxPerCol, arah };
     setResizeId(widget.id);
     setPreviewW(startW);
     previewWRef.current = startW;
 
     const pindah = (ev: MouseEvent) => {
       if (!resizeInfo.current) return;
-      const delta = (ev.clientX - resizeInfo.current.startX) / resizeInfo.current.pxPerCol;
+      const delta = ((ev.clientX - resizeInfo.current.startX) / resizeInfo.current.pxPerCol) * resizeInfo.current.arah;
       const w = bucket(Math.round(resizeInfo.current.startW + delta));
       previewWRef.current = w;
       setPreviewW(w);
@@ -169,14 +170,20 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               onDuplicate={onDuplicateWidget}
               onOpenCitation={onOpenCitation}
             />
-            {/* Resize handle: strip tipis di tepi kanan — tarik untuk ubah lebar. */}
-            <span
-              onMouseDown={(e) => mulaiResize(e, widget)}
-              className={`absolute top-0 right-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${
-                resizeId === widget.id ? 'bg-sky-400/70' : 'bg-transparent hover:bg-sky-400/40'
-              }`}
-              title="Tarik untuk ubah lebar widget"
-            />
+            {/* Resize handle: strip tipis di tepi kiri & kanan — tarik untuk ubah lebar. */}
+            {([-1, 1] as const).map((arah) => (
+              <span
+                key={arah}
+                data-resize={arah === -1 ? 'kiri' : 'kanan'}
+                onMouseDown={(e) => mulaiResize(e, widget, arah)}
+                className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${
+                  arah === -1 ? 'left-0' : 'right-0'
+                } ${
+                  resizeId === widget.id ? 'bg-sky-400/70' : 'bg-transparent hover:bg-sky-400/40'
+                }`}
+                title="Tarik untuk ubah lebar widget"
+              />
+            ))}
           </div>
         );
       })}

@@ -435,16 +435,16 @@ async function main() {
     const sebelum = await ambilLebar();
     assert.ok(sebelum, 'kartu widget pertama tidak ditemukan');
 
-    // Tarik strip resize di tepi kanan kartu pertama ke kanan (+ lebar).
+    // Tarik strip resize di tepi KIRI kartu pertama ke kiri (arah keluar = melebar).
     await page.evaluate(() => {
       const kartu = document.querySelector('[data-widget-id]') as HTMLElement;
-      const strip = kartu.querySelector('span[title*="lebar"]') as HTMLElement;
+      const strip = kartu.querySelector('span[data-resize="kiri"]') as HTMLElement;
       const rect = strip.getBoundingClientRect();
       const y = rect.top + rect.height / 2;
       const x = rect.left + rect.width / 2;
       strip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: x, clientY: y }));
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: x + 600, clientY: y }));
-      window.dispatchEvent(new MouseEvent('mouseup', { clientX: x + 600, clientY: y }));
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: x - 600, clientY: y }));
+      window.dispatchEvent(new MouseEvent('mouseup', { clientX: x - 600, clientY: y }));
     });
 
     // col-span lg berubah (pemetaan bucket 4/6/8/12)
@@ -456,7 +456,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 300));
     }
     assert.ok(sesudah && sesudah.lg !== sebelum.lg, `lebar widget tidak berubah (${sebelum.lg})`);
-    log(`  ℹ️ Lebar lg berubah: ${sebelum.lg} -> ${sesudah.lg}`);
+    log(`  ℹ️ Lebar lg berubah (tarik tepi kiri ke kiri): ${sebelum.lg} -> ${sesudah.lg}`);
 
     // Reload -> lebar tersimpan
     await page.reload({ waitUntil: 'networkidle2' });
