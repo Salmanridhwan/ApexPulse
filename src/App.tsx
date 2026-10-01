@@ -513,8 +513,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-row font-sans antialiased overflow-hidden h-screen">
-      {/* ================= LEFT SIDEBAR (Always present across all views) ================= */}
-      {!isPresentationMode && (
+      {/* ================= LEFT SIDEBAR (disembunyikan di mode presentasi & admin) ================= */}
+      {!isPresentationMode && viewMode !== 'admin' && (
         <Sidebar
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -553,7 +553,6 @@ export default function App() {
             <Admin
               currentUser={currentUser}
               onBackToWorkspace={() => setViewMode('workspace')}
-              onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
           </React.Suspense>
         ) : viewMode === 'dashboards' ? (
