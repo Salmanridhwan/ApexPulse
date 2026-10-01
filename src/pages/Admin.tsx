@@ -13,6 +13,7 @@ import {
   Key,
   Layers,
   Lock,
+  Menu,
   Plus,
   Radio,
   RefreshCw,
@@ -38,6 +39,7 @@ interface AdminProps {
 
 export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tenants' | 'rag' | 'alerts' | 'audit'>('overview');
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
   // Admin Data State
   const [stats, setStats] = useState<any>(null);
@@ -189,13 +191,15 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
   return (
     <div className="flex-1 flex flex-row min-w-0 bg-slate-100/70 text-slate-800 font-sans">
       {/* Sidebar Panel Admin — menu navigasi vertikal */}
-      <aside className="w-56 shrink-0 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col justify-between">
+      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col justify-between transition-all duration-200`}>
         <div>
-          <div className="h-14 border-b border-slate-800 px-4 flex items-center gap-2">
+          <div className={`h-14 border-b border-slate-800 flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
             <Shield className="w-4 h-4 text-sky-400 shrink-0" />
-            <span className="text-sm font-bold text-white tracking-tight">Admin Center</span>
+            {!isNavCollapsed && (
+              <span className="text-sm font-bold text-white tracking-tight">Admin Center</span>
+            )}
           </div>
-          <nav className="p-3 space-y-1 text-xs font-medium">
+          <nav className={`p-3 space-y-1 text-xs font-medium ${isNavCollapsed ? 'px-2' : ''}`}>
             {[
               { id: 'overview', label: 'Ringkasan', icon: Activity },
               { id: 'users', label: 'Pengguna & RBAC', icon: Users },
@@ -210,14 +214,17 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                  title={tab.label}
+                  className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-left transition-colors ${
+                    isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
+                  } ${
                     isActive
                       ? 'bg-sky-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <span>{tab.label}</span>
+                  {!isNavCollapsed && <span className="truncate">{tab.label}</span>}
                 </button>
               );
             })}
@@ -226,10 +233,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
         <div className="p-3 border-t border-slate-800">
           <button
             onClick={onBackToWorkspace}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors"
+            title="Ke Workspace"
+            className={`w-full flex items-center gap-2 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors ${
+              isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
+            }`}
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ke Workspace</span>
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            {!isNavCollapsed && <span>Ke Workspace</span>}
           </button>
         </div>
       </aside>
@@ -239,6 +249,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
       <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setIsNavCollapsed((v) => !v)}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors shrink-0"
+              title={isNavCollapsed ? 'Tampilkan Sidebar Admin' : 'Sembunyikan Sidebar Admin'}
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="h-4 w-px bg-slate-700 hidden sm:block" />
             <div className="flex items-center gap-2 truncate">
               <Shield className="w-4 h-4 text-sky-400 shrink-0" />
               <h1 className="text-sm font-bold tracking-tight text-white truncate">
