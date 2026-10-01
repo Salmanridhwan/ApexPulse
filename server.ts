@@ -780,6 +780,9 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
+  // Persistence MySQL (Laragon) — muat state sebelum server menerima request.
+  await db.initMysql();
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[ApexPulse Server] Berjalan pada port ${PORT}`);
   });

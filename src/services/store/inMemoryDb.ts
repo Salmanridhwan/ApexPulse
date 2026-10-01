@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { DbSnapshot, MysqlStore } from './mysqlStore';
 import path from 'path';
 import {
   AlertRule,
@@ -246,6 +247,64 @@ export class InMemoryDb {
     this.seedInitialDashboards();
   }
 
+  // ================= MySQL (Laragon) =================
+  private mysql: MysqlStore | null = null;
+
+  /** Snapshot state penuh untuk mirror ke MySQL. */
+  private snapshot(): DbSnapshot {
+    return {
+      dashboards: this.dashboards,
+      notifications: this.notifications,
+      auditLogs: this.auditLogs.slice(0, 500),
+      shareTokens: this.shareTokens,
+      systemConfig: this.systemConfig,
+      users: this.users,
+      credentials: this.credentials,
+      tenants: this.tenants,
+    };
+  }
+
+  /**
+   * Sambungkan MySQL (Laragon) & muat state dari sana. Dipanggil server
+   * sebelum listen. Kalau MySQL mati, aplikasi tetap jalan — persistence
+   * fallback ke data/db.json (sudah ditulis sejak awal).
+   */
+  public async initMysql(): Promise<void> {
+    try {
+      this.mysql = new MysqlStore({
+        host: process.env.MYSQL_HOST || '127.0.0.1',
+        port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || 'apexpulse',
+      });
+      await this.mysql.init();
+      const loaded = await this.mysql.loadAll();
+      if (loaded) {
+        if (Array.isArray(loaded.dashboards)) this.dashboards = loaded.dashboards;
+        if (Array.isArray(loaded.notifications)) this.notifications = loaded.notifications;
+        if (Array.isArray(loaded.auditLogs)) this.auditLogs = loaded.auditLogs;
+        if (Array.isArray(loaded.users)) this.users = loaded.users;
+        if (Array.isArray(loaded.tenants)) this.tenants = loaded.tenants;
+        if (loaded.shareTokens) this.shareTokens = loaded.shareTokens;
+        if (loaded.credentials) this.credentials = loaded.credentials;
+        if (loaded.systemConfig) {
+          this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
+        }
+        console.log('[ApexPulse DB] State dimuat dari MySQL — persistence aktif');
+      } else {
+        await this.mysql.saveAll(this.snapshot());
+        console.log('[ApexPulse DB] MySQL siap — seed awal disimpan ke database');
+      }
+    } catch (err: any) {
+      console.error(
+        '[ApexPulse DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
+        err?.message || err
+      );
+      this.mysql = null;
+    }
+  }
+
   /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
   private seedCredentials() {
     const demoPassword = process.env.DEMO_PASSWORD || 'apexpulse2026';
@@ -276,7 +335,7 @@ export class InMemoryDb {
     }
   }
 
-  /** Tulis state ke disk (dipanggil setelah setiap mutasi). Fire-and-forget tapi sinkron & murah. */
+  /** Tulis state ke disk (jaring pengaman) + mirror ke MySQL bila tersedia. */
   public persist() {
     try {
       if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -290,6 +349,12 @@ export class InMemoryDb {
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
       console.error('[ApexPulse DB] Gagal menyimpan data/db.json:', err);
+    }
+    if (this.mysql) {
+      // Fire-and-forget: jangan blok respons request; error cukup dicatat.
+      this.mysql
+        .saveAll(this.snapshot())
+        .catch((err) => console.error('[ApexPulse DB] Mirror MySQL gagal:', err?.message || err));
     }
   }
 
@@ -380,6 +445,7 @@ export class InMemoryDb {
   createUser(user: SafeUser, passwordHash?: string): SafeUser {
     this.users.push(user);
     if (passwordHash) this.credentials[user.id] = passwordHash;
+    this.persist();
     return user;
   }
 
@@ -388,6 +454,7 @@ export class InMemoryDb {
     if (idx === -1) return undefined;
     const { passwordHash: _ignored, ...rest } = partial as Partial<User> & { passwordHash?: string };
     this.users[idx] = { ...this.users[idx], ...rest };
+    this.persist();
     return this.users[idx];
   }
 
@@ -395,12 +462,15 @@ export class InMemoryDb {
     const len = this.users.length;
     this.users = this.users.filter((u) => u.id !== id);
     delete this.credentials[id];
-    return this.users.length < len;
+    const deleted = this.users.length < len;
+    if (deleted) this.persist();
+    return deleted;
   }
 
   // Tenant Management
   createTenant(tenant: Tenant): Tenant {
     this.tenants.push(tenant);
+    this.persist();
     return tenant;
   }
 
@@ -408,6 +478,7 @@ export class InMemoryDb {
     const idx = this.tenants.findIndex((t) => t.id === id);
     if (idx === -1) return undefined;
     this.tenants[idx] = { ...this.tenants[idx], ...partial };
+    this.persist();
     return this.tenants[idx];
   }
 }
