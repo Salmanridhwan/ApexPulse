@@ -391,6 +391,29 @@ export default function App() {
     });
   };
 
+  // Resize lebar widget: grid.w diubah (bucket 4/6/8/12) lalu persist.
+  const handleResizeWidget = async (widgetId: string, w: number) => {
+    if (!activeDashboard || !currentTenant) return;
+    const updatedWidgets = activeDashboard.widgets.map((wg) =>
+      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w } } : wg
+    );
+    const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
+
+    setActiveDashboard(updatedDashboard);
+    setDashboards((prev) =>
+      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
+    );
+
+    await fetch(`/api/dashboards/${activeDashboard.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        widgets: updatedWidgets,
+        tenantId: currentTenant.id,
+      }),
+    });
+  };
+
   const handleAddWidgetFromCatalog = async (widget: WidgetSpec) => {
     if (!activeDashboard || !currentTenant) return;
     const updatedWidgets = [widget, ...activeDashboard.widgets];
@@ -738,6 +761,7 @@ export default function App() {
           onDeleteWidget={handleDeleteWidget}
           onDuplicateWidget={handleDuplicateWidget}
           onReorderWidgets={handleReorderWidgets}
+          onResizeWidget={handleResizeWidget}
           onOpenCitation={handleOpenCitation}
           onOpenCatalog={() => setIsCatalogOpen(true)}
           onOpenChat={() => setIsChatOpen(true)}
