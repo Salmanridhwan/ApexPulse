@@ -13,7 +13,6 @@ import {
   Key,
   Layers,
   Lock,
-  Menu,
   Plus,
   Radio,
   RefreshCw,
@@ -35,10 +34,9 @@ import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../type
 interface AdminProps {
   currentUser: User | null;
   onBackToWorkspace: () => void;
-  onToggleSidebar?: () => void;
 }
 
-export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace, onToggleSidebar }) => {
+export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tenants' | 'rag' | 'alerts' | 'audit'>('overview');
 
   // Admin Data State
@@ -189,28 +187,58 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace, on
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-slate-100/70 text-slate-800 font-sans">
-      {/* Top Header */}
+    <div className="flex-1 flex flex-row min-w-0 bg-slate-100/70 text-slate-800 font-sans">
+      {/* Sidebar Panel Admin — menu navigasi vertikal */}
+      <aside className="w-56 shrink-0 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col justify-between">
+        <div>
+          <div className="h-14 border-b border-slate-800 px-4 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-sky-400 shrink-0" />
+            <span className="text-sm font-bold text-white tracking-tight">Admin Center</span>
+          </div>
+          <nav className="p-3 space-y-1 text-xs font-medium">
+            {[
+              { id: 'overview', label: 'Ringkasan', icon: Activity },
+              { id: 'users', label: 'Pengguna & RBAC', icon: Users },
+              { id: 'tenants', label: 'BUMD & Tenant', icon: Building2 },
+              { id: 'rag', label: 'Konfigurasi RAG', icon: Database },
+              { id: 'alerts', label: 'Ambang Batas', icon: Bell },
+              { id: 'audit', label: 'Jejak Audit', icon: ShieldCheck },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                    isActive
+                      ? 'bg-sky-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+        <div className="p-3 border-t border-slate-800">
+          <button
+            onClick={onBackToWorkspace}
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Ke Workspace</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Kolom kanan: header + konten */}
+      <div className="flex-1 flex flex-col min-w-0">
       <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            {onToggleSidebar && (
-              <button
-                onClick={onToggleSidebar}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                title="Buka / Tutup Sidebar"
-              >
-                <Menu className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              onClick={onBackToWorkspace}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Ke Workspace</span>
-            </button>
-            <div className="h-4 w-px bg-slate-700 hidden sm:block" />
             <div className="flex items-center gap-2 truncate">
               <Shield className="w-4 h-4 text-sky-400 shrink-0" />
               <h1 className="text-sm font-bold tracking-tight text-white truncate">
@@ -231,35 +259,6 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace, on
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-6 overflow-x-auto no-scrollbar border-t border-slate-800/80 text-xs font-medium">
-          {[
-            { id: 'overview', label: 'Ringkasan Eksekutif', icon: Activity },
-            { id: 'users', label: 'Manajemen Pengguna & RBAC', icon: Users },
-            { id: 'tenants', label: 'Daftar BUMD & Multi-Tenant', icon: Building2 },
-            { id: 'rag', label: 'Konfigurasi RAG & Probe', icon: Database },
-            { id: 'alerts', label: 'Aturan Ambang Batas', icon: Bell },
-            { id: 'audit', label: 'Jejak Audit & Kepatuhan', icon: ShieldCheck },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`py-3 border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'border-sky-400 text-sky-400 font-semibold'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
         </div>
       </header>
 
@@ -973,6 +972,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace, on
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
