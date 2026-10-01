@@ -469,6 +469,64 @@ async function main() {
     );
   });
 
+  // ============ LANGKAH 10: HAPUS DASHBOARD DARI WORKSPACE ============
+  await uji('10 — Hapus dashboard (banner workspace) + verifikasi API', async () => {
+    // Buat dashboard sementara lewat API (sesi cookie halaman dipakai otomatis)
+    const idBaru = await page.evaluate(async () => {
+      const res = await fetch('/api/dashboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: 'tenant-pdam',
+          title: 'Dashboard QA Sementara',
+          description: 'uji hapus',
+          sector: 'pdam',
+          widgets: [],
+        }),
+      });
+      return res.ok ? (await res.json()).id : null;
+    });
+    assert.ok(idBaru, 'gagal membuat dashboard sementara via API');
+
+    // Reload -> dashboard terbaru jadi aktif pertama
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => !!document.querySelector('aside'), { timeout: 20000 });
+    const tampil = await page.waitForFunction(
+      () => (document.querySelector('h1')?.innerText || '').includes('Dashboard QA Sementara'),
+      { timeout: 10000 }
+    ).then(() => true).catch(() => false);
+    assert.ok(tampil, 'dashboard sementara tidak menjadi dashboard aktif setelah reload');
+
+    // Klik Hapus -> konfirmasi inline -> Hapus
+    const klikHapus = await klikCocok('Hapus');
+    assert.ok(klikHapus, 'tombol Hapus tidak ditemukan di banner');
+    const konfirmMuncul = await page.waitForFunction(
+      () => /Hapus dashboard ini\?/.test(document.body.innerText),
+      { timeout: 5000 }
+    ).then(() => true).catch(() => false);
+    assert.ok(konfirmMuncul, 'konfirmasi penghapusan tidak muncul');
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('button')].find(
+        (b) => (b.textContent || '').trim() === 'Hapus'
+      );
+      (btn as HTMLElement)?.click();
+    });
+
+    // Banner kembali ke dashboard lain + API tak lagi memuat id tsb
+    const ganti = await page.waitForFunction(
+      () => !(document.querySelector('h1')?.innerText || '').includes('Dashboard QA Sementara'),
+      { timeout: 10000 }
+    ).then(() => true).catch(() => false);
+    assert.ok(ganti, 'dashboard sementara masih tampil setelah dihapus');
+
+    const masihAda = await page.evaluate(async (id: string) => {
+      const res = await fetch('/api/dashboards?tenantId=tenant-pdam');
+      const data = await res.json();
+      return Array.isArray(data) && data.some((d: any) => d.id === id);
+    }, idBaru);
+    assert.ok(!masihAda, 'dashboard masih ada di API setelah dihapus');
+  });
+
   // ============ RINGKASAN ============
   log('\n════════════════════════════════════════');
   const total = hasil.lulus + hasil.gagal;

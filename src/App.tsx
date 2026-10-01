@@ -14,6 +14,7 @@ import {
   Filter,
   History,
   Layers,
+  Trash2,
   LayoutGrid,
   LogOut,
   Maximize2,
@@ -107,6 +108,7 @@ export default function App() {
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [hapusKonfirmasi, setHapusKonfirmasi] = useState(false);
 
   // RAG Mode State (Jalur A vs Jalur B)
   const [activeRagMode, setActiveRagMode] = useState<'structured' | 'prose'>('structured');
@@ -706,6 +708,35 @@ export default function App() {
 
               {/* Right Action Tools */}
               <div className="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                {hapusKonfirmasi ? (
+                  <div className="flex items-center gap-1 bg-rose-950/60 border border-rose-800 p-1 rounded-lg">
+                    <span className="px-2 text-[11px] text-rose-300">Hapus dashboard ini?</span>
+                    <button
+                      onClick={() => {
+                        setHapusKonfirmasi(false);
+                        handleDeleteDashboard(activeDashboard.id);
+                      }}
+                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold"
+                    >
+                      Hapus
+                    </button>
+                    <button
+                      onClick={() => setHapusKonfirmasi(false)}
+                      className="px-2 py-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md text-[11px]"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setHapusKonfirmasi(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-900/60 hover:border-rose-800 border border-slate-700 text-slate-300 hover:text-rose-200 text-xs font-semibold rounded-xl transition-colors shadow-xs"
+                    title="Hapus dashboard ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsPresentationMode(true)}
                   className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all shadow-xs"
