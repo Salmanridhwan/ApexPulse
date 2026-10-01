@@ -30,6 +30,56 @@ export interface AuthPayload {
 /** Kontrak respon user yang aman dikirim ke client (tanpa passwordHash). */
 export type SafeUser = Omit<User, 'passwordHash'>;
 
+/** User bawaan aplikasi — selalu dijamin ada meski DB berisi data lama. */
+const SEED_USERS: SafeUser[] = [
+  {
+    id: 'user-admin',
+    email: 'admin@apexpulse.id',
+    name: 'Budi Santoso, S.Kom, M.T.',
+    role: 'admin',
+    tenantId: 'tenant-pdam',
+    avatar: '',
+  },
+  {
+    id: 'user-demo',
+    email: 'demo@apexpulse.id',
+    name: 'Siti Rahmawati, S.E. (Analis BUMD)',
+    role: 'analis',
+    tenantId: 'tenant-pdam',
+    avatar: '',
+  },
+  {
+    id: 'user-direksi',
+    email: 'direksi@apexpulse.id',
+    name: 'Dr. Ir. Hendra Kusuma (Direktur Utama)',
+    role: 'direksi',
+    tenantId: 'tenant-pdam',
+    avatar: '',
+  },
+  {
+    id: 'user-admin-gmail',
+    email: 'admin@gmail.com',
+    name: 'Admin Umum',
+    role: 'admin',
+    tenantId: 'tenant-pdam',
+    avatar: '',
+  },
+  {
+    id: 'user-user-gmail',
+    email: 'user@gmail.com',
+    name: 'User Instansi',
+    role: 'analis',
+    tenantId: 'tenant-pdam',
+    avatar: '',
+  },
+];
+
+/** Password seed khusus per userId (selain default DEMO_PASSWORD). */
+const SEED_PASSWORDS: Record<string, string> = {
+  'user-admin-gmail': '123',
+  'user-user-gmail': '123',
+};
+
 const DATA_DIR = process.env.APEXPULSE_DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
@@ -113,32 +163,7 @@ export class InMemoryDb {
   ];
 
   /** Record user TIDAK berisi passwordHash — hash disimpan terpisah di credentials. */
-  public users: SafeUser[] = [
-    {
-      id: 'user-admin',
-      email: 'admin@apexpulse.id',
-      name: 'Budi Santoso, S.Kom, M.T.',
-      role: 'admin',
-      tenantId: 'tenant-pdam',
-      avatar: '👨‍💼',
-    },
-    {
-      id: 'user-demo',
-      email: 'demo@apexpulse.id',
-      name: 'Siti Rahmawati, S.E. (Analis BUMD)',
-      role: 'analis',
-      tenantId: 'tenant-pdam',
-      avatar: '👩‍💼',
-    },
-    {
-      id: 'user-direksi',
-      email: 'direksi@apexpulse.id',
-      name: 'Dr. Ir. Hendra Kusuma (Direktur Utama)',
-      role: 'direksi',
-      tenantId: 'tenant-pdam',
-      avatar: '👔',
-    },
-  ];
+  public users: SafeUser[] = [...SEED_USERS];
 
   /** Kredensial terpisah: userId -> hash scrypt. Tidak pernah keluar dari server. */
   public credentials: Record<string, string> = {};
@@ -291,6 +316,7 @@ export class InMemoryDb {
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
+        this.ensureSeedUsers();
         console.log('[ApexPulse DB] State dimuat dari MySQL — persistence aktif');
       } else {
         await this.mysql.saveAll(this.snapshot());
@@ -308,9 +334,31 @@ export class InMemoryDb {
   /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
   private seedCredentials() {
     const demoPassword = process.env.DEMO_PASSWORD || 'apexpulse2026';
-    for (const u of this.users) {
-      this.credentials[u.id] = hashPassword(demoPassword);
+    for (const u of SEED_USERS) {
+      this.credentials[u.id] = hashPassword(SEED_PASSWORDS[u.id] || demoPassword);
     }
+  }
+
+  /**
+   * Pastikan user seed (dari kode) selalu ada — dipanggil setelah state
+   * dimuat dari MySQL, karena koleksi users di DB bisa berisi data lama
+   * yang belum memuat user seed baru.
+   */
+  private ensureSeedUsers() {
+    let berubah = false;
+    for (const seed of SEED_USERS) {
+      if (!this.users.some((u) => u.id === seed.id)) {
+        this.users.push({ ...seed });
+        berubah = true;
+      }
+      if (!this.credentials[seed.id]) {
+        this.credentials[seed.id] = hashPassword(
+          SEED_PASSWORDS[seed.id] || process.env.DEMO_PASSWORD || 'apexpulse2026'
+        );
+        berubah = true;
+      }
+    }
+    if (berubah) this.persist();
   }
 
   /**
