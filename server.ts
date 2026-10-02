@@ -3,6 +3,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
@@ -1205,7 +1206,8 @@ async function startServer() {
   });
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================
-  if (process.env.NODE_ENV === 'production') {
+  const distExists = fs.existsSync(path.join(__dirname, 'dist', 'index.html'));
+  if (process.env.NODE_ENV === 'production' || distExists) {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
