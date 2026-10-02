@@ -5,6 +5,7 @@ import {
   Check,
   Filter,
   Layers,
+  Loader2,
   Plus,
   Search,
   Sparkles,
@@ -31,6 +32,8 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [sectorTab, setSectorTab] = useState<'current' | 'universal' | 'all'>('current');
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
+  const [memuatIds, setMemuatIds] = useState<Record<string, boolean>>({});
+  const [galat, setGalat] = useState<Record<string, string>>({});
 
   if (!isOpen) return null;
 
@@ -62,97 +65,58 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
     return true;
   });
 
-  const handleAdd = (preset: CatalogPreset) => {
-    // Generate an authentic widget spec from this preset
-    const newWidgetId = `w-preset-${preset.id}-${Date.now()}`;
-    const primaryType = preset.tipeChart[0] || 'kpi';
+  const jumlahUniversal = WIDGET_CATALOG.filter((p) => p.sektor.includes('universal')).length;
 
-    let kpiData;
-    let chartData;
-    let tableData;
-    let narasiData;
-
-    if (primaryType === 'kpi' || primaryType === 'bullet-target') {
-      kpiData = {
-        value: preset.satuan.includes('Rupiah') ? 'Rp 38,5 M' : preset.satuan.includes('%') ? '24,2%' : '148.650',
-        unit: preset.satuan,
-        delta: 6.8,
-        deltaLabel: 'vs Target RKAP',
-        target: 35.0,
-        targetLabel: 'Target RKAP',
-        sparkline: [30, 32, 34, 36, 38.5],
+  /**
+   * Tambah widget dari preset: definisi indikator dari katalog, ANGKANYA dari dokumen
+   * resmi lewat /api/widgets/ambil-data. Kalau dokumen tidak memuat indikatornya,
+   * widget tidak ditambahkan (tidak ada angka contoh atau sitasi palsu).
+   */
+  const handleAdd = async (preset: CatalogPreset) => {
+    const tipe = preset.tipeChart[0] || 'kpi';
+    setMemuatIds((prev) => ({ ...prev, [preset.id]: true }));
+    setGalat((prev) => ({ ...prev, [preset.id]: '' }));
+    try {
+      const res = await fetch('/api/widgets/ambil-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: preset.queryRagContoh, tipe, sector }),
+      });
+      const isi = await res.json().catch(() => null);
+      if (!res.ok || !isi?.widget) {
+        setGalat((prev) => ({ ...prev, [preset.id]: isi?.error || 'Gagal mengambil data dari dokumen.' }));
+        return;
+      }
+      const sumber = isi.widget;
+      const widget: WidgetSpec = {
+        id: `w-preset-${preset.id}-${Date.now()}`,
+        presetId: preset.id,
+        type: sumber.type,
+        // Judul memakai nama metrik yang benar-benar diambil dari dokumen, sedangkan
+        // preset yang dipakai dicatat di subjudul. Jadi tidak ada widget yang diberi
+        // label indikator lain padahal isinya metrik berbeda.
+        title: sumber.title || preset.nama,
+        subtitle: `${preset.id} · ${preset.nama}`,
+        category: preset.kategori,
+        confidence: 'sumber',
+        grid: { x: 0, y: 0, w: preset.defaultLayout.w, h: preset.defaultLayout.h },
+        kpi: sumber.kpi,
+        chart: sumber.chart,
+        table: sumber.table,
+        narasi: sumber.narasi,
+        citations: sumber.citations || [],
+        unitKerja: sumber.unitKerja,
+        periode: sumber.periode,
+        lastUpdated: new Date().toISOString(),
       };
-    } else if (['line', 'area', 'bar', 'donut'].includes(primaryType)) {
-      chartData = {
-        xAxis: MONTHS_12,
-        series: [
-          {
-            name: preset.nama,
-            data: [42, 44, 45, 47, 49, 52, 51, 54, 56, 58, 60, 62],
-            color: '#0284c7',
-          },
-        ],
-        unit: preset.satuan,
-        showLegend: true,
-      };
-    } else if (primaryType === 'table') {
-      tableData = {
-        columns: [
-          { key: 'parameter', label: 'Indikator' },
-          { key: 'target', label: 'Target' },
-          { key: 'realisasi', label: 'Realisasi' },
-          { key: 'capaian', label: 'Capaian (%)' },
-        ],
-        rows: [
-          { parameter: 'Wilayah Pusat', target: '100', realisasi: '108', capaian: '108%' },
-          { parameter: 'Wilayah Barat', target: '85', realisasi: '91', capaian: '107%' },
-          { parameter: 'Wilayah Timur', target: '70', realisasi: '72', capaian: '103%' },
-        ],
-      };
-    } else {
-      narasiData = {
-        text: `Ringkasan evaluasi indikator ${preset.nama}: Capaian berada pada tren positif dengan konsistensi di atas pagu perencanaan triwulanan.`,
-        bulletPoints: ['Verifikasi data dokumen resmi LRA 2026', 'Telah disetujui tim evaluasi kinerja'],
-      };
+      onAddWidget(widget);
+      setAddedIds((prev) => ({ ...prev, [preset.id]: true }));
+      setTimeout(() => setAddedIds((prev) => ({ ...prev, [preset.id]: false })), 2500);
+    } catch {
+      setGalat((prev) => ({ ...prev, [preset.id]: 'Tidak bisa menghubungi server.' }));
+    } finally {
+      setMemuatIds((prev) => ({ ...prev, [preset.id]: false }));
     }
-
-    const widget: WidgetSpec = {
-      id: newWidgetId,
-      presetId: preset.id,
-      type: primaryType,
-      title: preset.nama,
-      subtitle: preset.deskripsi,
-      category: preset.kategori,
-      confidence: 'sumber',
-      grid: {
-        x: 0,
-        y: 0,
-        w: preset.defaultLayout.w,
-        h: preset.defaultLayout.h,
-      },
-      kpi: kpiData,
-      chart: chartData,
-      table: tableData,
-      narasi: narasiData,
-      citations: [
-        {
-          id: `cit-preset-${preset.id}`,
-          docName: `Laporan_Kinerja_${preset.id}_2026.pdf`,
-          page: 8,
-          chunkSnippet: `Capaian metrik ${preset.nama} diverifikasi berdasarkan dokumen berkas resmi triwulan 2026.`,
-          confidenceScore: 0.96,
-          date: '2026-03-31',
-        },
-      ],
-      periode: '2026-Q1',
-      lastUpdated: new Date().toISOString(),
-    };
-
-    onAddWidget(widget);
-    setAddedIds((prev) => ({ ...prev, [preset.id]: true }));
-    setTimeout(() => {
-      setAddedIds((prev) => ({ ...prev, [preset.id]: false }));
-    }, 2000);
   };
 
   return (
@@ -167,7 +131,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
               <span>Katalog Preset Widget</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700 font-semibold">
-                40 Preset
+                {WIDGET_CATALOG.length} Preset
               </span>
             </h2>
             <p className="text-xs text-slate-500">Preset indikator standar BUMD (PRD Bab 6)</p>
@@ -199,33 +163,30 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
         <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg text-xs">
           <button
             onClick={() => setSectorTab('current')}
-            className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${
-              sectorTab === 'current'
+            className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${sectorTab === 'current'
                 ? 'bg-white text-sky-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Sektor {sector.toUpperCase()} & Universal
           </button>
           <button
             onClick={() => setSectorTab('universal')}
-            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${
-              sectorTab === 'universal'
+            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'universal'
                 ? 'bg-white text-sky-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
-            Universal (14)
+            Universal ({jumlahUniversal})
           </button>
           <button
             onClick={() => setSectorTab('all')}
-            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${
-              sectorTab === 'all'
+            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'all'
                 ? 'bg-white text-sky-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
-            Semua (40)
+            Semua ({WIDGET_CATALOG.length})
           </button>
         </div>
 
@@ -235,11 +196,10 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`text-[11px] whitespace-nowrap px-2.5 py-0.5 rounded-full transition-colors ${
-                selectedCategory === cat
+              className={`text-[11px] whitespace-nowrap px-2.5 py-0.5 rounded-full transition-colors ${selectedCategory === cat
                   ? 'bg-sky-600 text-white font-medium'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               {cat}
             </button>
@@ -256,6 +216,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
         ) : (
           filteredPresets.map((preset) => {
             const isAdded = addedIds[preset.id];
+            const isMemuat = memuatIds[preset.id];
             return (
               <div
                 key={preset.id}
@@ -288,13 +249,18 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
 
                   <button
                     onClick={() => handleAdd(preset)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                      isAdded
+                    disabled={isMemuat}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60 ${isAdded
                         ? 'bg-emerald-600 text-white'
                         : 'bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white'
-                    }`}
+                      }`}
                   >
-                    {isAdded ? (
+                    {isMemuat ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mengambil data...</span>
+                      </>
+                    ) : isAdded ? (
                       <>
                         <Check className="w-3.5 h-3.5" />
                         <span>Ditambahkan!</span>
@@ -307,6 +273,12 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                     )}
                   </button>
                 </div>
+
+                {galat[preset.id] && (
+                  <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                    {galat[preset.id]}
+                  </p>
+                )}
               </div>
             );
           })

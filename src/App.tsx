@@ -2,20 +2,18 @@ import React, { useEffect, useState } from 'react';
 import {
   Activity,
   AlertCircle,
-  Award,
   Bell,
   Building2,
   CheckCircle,
-  ChevronDown,
   Clock,
   Download,
+  EllipsisVertical,
   FileCheck,
   FileText,
   Filter,
   History,
-  Layers,
-  Trash2,
   LayoutGrid,
+  Trash2,
   LogOut,
   Maximize2,
   Menu,
@@ -26,20 +24,15 @@ import {
   Search,
   Share2,
   Shield,
-  ShieldCheck,
   Sparkles,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import { AlertsModal } from './components/AlertsModal';
-import { LogoTile } from './components/BrandMark';
-import { AuditLogModal } from './components/AuditLogModal';
 import { CatalogSidebar } from './components/CatalogSidebar';
 import { ChatPanel } from './components/ChatPanel';
 import { DashboardCanvas } from './components/DashboardCanvas';
 import { ExportModal } from './components/ExportModal';
-import { GlobalFiltersBar } from './components/GlobalFiltersBar';
-import { RagProbeModal } from './components/RagProbeModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
@@ -53,6 +46,12 @@ const Admin = React.lazy(() =>
 );
 const DashboardList = React.lazy(() =>
   import('./pages/DashboardList').then((m) => ({ default: m.DashboardList }))
+);
+const AuditLogPage = React.lazy(() =>
+  import('./pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage }))
+);
+const AlertsPage = React.lazy(() =>
+  import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage }))
 );
 const ShareView = React.lazy(() =>
   import('./pages/ShareView').then((m) => ({ default: m.ShareView }))
@@ -76,7 +75,7 @@ export default function App() {
 
   if (shareToken) {
     return (
-      <React.Suspense fallback={<div className="min-h-screen bg-slate-100" />}> 
+      <React.Suspense fallback={<div className="min-h-screen bg-slate-100" />}>
         <ShareView token={shareToken} />
       </React.Suspense>
     );
@@ -101,7 +100,18 @@ export default function App() {
   });
 
   // App Core State
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'admin'>('workspace');
+  // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'admin'>(() => {
+    const saved = localStorage.getItem('apexpulse_user') || sessionStorage.getItem('apexpulse_user');
+    if (saved) {
+      try {
+        if (JSON.parse(saved)?.role === 'admin') return 'admin';
+      } catch (e) {
+        // ignore
+      }
+    }
+    return 'workspace';
+  });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -109,18 +119,14 @@ export default function App() {
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hapusKonfirmasi, setHapusKonfirmasi] = useState(false);
-
-  // RAG Mode State (Jalur A vs Jalur B)
-  const [activeRagMode, setActiveRagMode] = useState<'structured' | 'prose'>('structured');
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
-  const [isProbeOpen, setIsProbeOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
 
   // Active Selection for Drawer & Editor
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
@@ -161,6 +167,10 @@ export default function App() {
     const assigned = tenants.find((t) => t.id === user.tenantId);
     if (assigned) {
       setCurrentTenant(assigned);
+    }
+    // Role admin langsung masuk panel admin, tidak lewat workspace.
+    if (user.role === 'admin') {
+      setViewMode('admin');
     }
   };
 
@@ -488,16 +498,6 @@ export default function App() {
     setAlertRules((prev) => [newRule, ...prev]);
   };
 
-  // Toggle RAG Mode
-  const handleToggleRagMode = async (mode: 'structured' | 'prose') => {
-    setActiveRagMode(mode);
-    await fetch('/api/rag/set-mode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
-    });
-  };
-
   const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.isRead).length : 0;
 
   if (!currentUser || !authToken) {
@@ -512,7 +512,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-row font-sans antialiased overflow-hidden h-screen">
+    <div className="min-h-screen bg-blue-50 text-slate-800 flex flex-row font-sans antialiased overflow-hidden h-screen">
       {/* ================= LEFT SIDEBAR (disembunyikan di mode presentasi & admin) ================= */}
       {!isPresentationMode && viewMode !== 'admin' && (
         <Sidebar
@@ -531,15 +531,11 @@ export default function App() {
             setViewMode('workspace');
             handleCreateDashboard();
           }}
-          activeRagMode={activeRagMode}
-          onToggleRagMode={handleToggleRagMode}
-          onOpenCatalog={() => setIsCatalogOpen(true)}
-          onOpenProbe={() => setIsProbeOpen(true)}
-          onOpenAudit={() => setIsAuditLogOpen(true)}
-          onOpenAlerts={() => setIsAlertsOpen(true)}
+          onOpenDashboardList={() => setViewMode('dashboards')}
+          onOpenAudit={() => setViewMode('audit')}
+          onOpenAlerts={() => setViewMode('alerts')}
           unreadAlertsCount={unreadCount}
           currentView={viewMode}
-          onOpenDashboardList={() => setViewMode('dashboards')}
           onOpenAdmin={() => setViewMode('admin')}
           currentUser={currentUser}
           onLogout={handleLogout}
@@ -547,259 +543,366 @@ export default function App() {
       )}
 
       {/* ================= MAIN CONTENT VIEWPORT ================= */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className={`flex-1 flex flex-col min-w-0 h-screen overflow-y-auto transition-[padding] duration-200 ${isChatOpen ? 'lg:pr-[440px]' : ''}`}>
         {viewMode === 'admin' ? (
           <React.Suspense fallback={pageFallback}>
             <Admin
               currentUser={currentUser}
-              onBackToWorkspace={() => setViewMode('workspace')}
-            />
-          </React.Suspense>
-        ) : viewMode === 'dashboards' ? (
-          <React.Suspense fallback={pageFallback}>
-            <DashboardList
-              dashboards={dashboards}
-              currentTenant={currentTenant}
-              onSelectDashboard={(d) => {
-                setActiveDashboard(d);
-                setViewMode('workspace');
-              }}
-              onCreateDashboard={() => {
-                handleCreateDashboard();
-                setViewMode('workspace');
-              }}
-              onOpenChat={() => {
-                setViewMode('workspace');
-                setIsChatOpen(true);
-              }}
-              onDuplicateDashboard={handleDuplicateDashboard}
-              onDeleteDashboard={handleDeleteDashboard}
-              onShareDashboard={(d) => {
-                setActiveDashboard(d);
-                setIsShareOpen(true);
-              }}
-              onBackToWorkspace={() => setViewMode('workspace')}
+              onLogout={handleLogout}
             />
           </React.Suspense>
         ) : (
           <>
-            {/* ================= CLEAN TOP HEADER ================= */}
+            {/* ================= TOP HEADER (ringkas, seragam seluruh halaman) ================= */}
             {!isPresentationMode && (
-              <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
+              <header className="sticky top-0 z-30 bg-white border-b border-blue-100">
                 <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-                  {/* Left Zone: Sidebar Toggle & Contextual Breadcrumb */}
+                  {/* Kiri: toggle sidebar + pemilih dashboard */}
                   <div className="flex items-center gap-3 min-w-0">
                     <button
                       onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                      className="p-1.5 rounded-lg text-blue-500 hover:text-blue-900 hover:bg-blue-50 transition-colors shrink-0"
                       title="Buka / Tutup Sidebar"
                     >
                       <Menu className="w-4 h-4" />
                     </button>
 
-                    <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+                    <div className="h-4 w-px bg-blue-100 hidden sm:block" />
 
-                    <div className="flex items-center gap-1.5 text-xs truncate">
-                      <span className="font-semibold text-slate-700 truncate">{currentTenant?.name}</span>
-                      <span className="text-slate-300">/</span>
-                      <span className="font-bold text-slate-900 truncate">{activeDashboard?.title}</span>
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-wide text-blue-500 truncate max-w-[40vw]">
+                        {currentTenant?.name}
+                      </div>
+                      <h1 className="truncate max-w-[46vw] sm:max-w-[26rem] text-sm font-bold text-blue-900">
+                        {viewMode === 'dashboards'
+                          ? 'Galeri Dashboard'
+                          : viewMode === 'audit'
+                            ? 'Jejak Audit'
+                            : viewMode === 'alerts'
+                              ? 'Ambang Batas & Alert'
+                              : activeDashboard?.title || 'Belum ada dashboard'}
+                      </h1>
                     </div>
                   </div>
 
-                  {/* Right Zone: Primary Actions */}
+                  {/* Kanan: aksi utama + menu ringkas */}
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Print & Export */}
-                    <button
-                      onClick={() => setIsExportOpen(true)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors flex items-center gap-1.5"
-                      title="Cetak & Ekspor Laporan Resmi"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="hidden sm:inline">Cetak / Ekspor</span>
-                    </button>
-
-                    {/* Share Link */}
-                    <button
-                      onClick={() => setIsShareOpen(true)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors flex items-center gap-1.5"
-                      title="Bagikan Tautan Publik (Read-Only)"
-                    >
-                      <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="hidden sm:inline">Bagikan</span>
-                    </button>
-
-                    {/* Master Chat RAG Copilot */}
                     <button
                       onClick={() => setIsChatOpen(!isChatOpen)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Chat RAG Copilot</span>
+                      <span className="hidden sm:inline">Chat RAG Copilot</span>
                     </button>
-                  </div>
-                </div>
 
-                {/* Global Filters Bar */}
-                {activeDashboard && (
-                  <GlobalFiltersBar
-                    filters={activeDashboard.globalFilters}
-                    onChange={handleGlobalFiltersChange}
-                    totalWidgets={activeDashboard.widgets.length}
-                  />
-                )}
-              </header>
-            )}
+                    {viewMode === 'dashboards' && (
+                      <button
+                        onClick={() => {
+                          setViewMode('workspace');
+                          handleCreateDashboard();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-blue-700" />
+                        <span className="hidden sm:inline">Dashboard Baru</span>
+                      </button>
+                    )}
 
-            {/* ================= MAIN CONTENT ================= */}
-            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-        {/* Executive Presentation Floating Bar when Active */}
-        {isPresentationMode && (
-          <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900/90 text-white px-3 py-1.5 rounded-full shadow-2xl backdrop-blur-md border border-slate-700 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold">Mode Presentasi Eksekutif</span>
-            <button
-              onClick={() => setIsPresentationMode(false)}
-              className="ml-2 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
-            >
-              <Minimize2 className="w-3 h-3" />
-              <span>Keluar</span>
-            </button>
-          </div>
-        )}
+                    {viewMode === 'workspace' && activeDashboard && (
+                      <button
+                        onClick={() => setIsCatalogOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                        title="Tambah widget dari katalog preset"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5 text-blue-700" />
+                        <span className="hidden sm:inline">Katalog Preset</span>
+                      </button>
+                    )}
 
-        {/* Dashboard Title & Executive Governance Banner */}
-        {activeDashboard && !isPresentationMode && (
-          <div className="mb-6 bg-slate-900 text-white p-6 rounded-lg border border-slate-800 shadow-lg">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              {/* Left Identity */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-sky-400 font-semibold tracking-wider uppercase">
-                  <span>{currentTenant?.name || 'PEMERINTAH DAERAH'}</span>
-                  <span>•</span>
-                  <span>{currentTenant?.city}</span>
-                </div>
+                    {viewMode === 'workspace' && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsMoreMenuOpen((v) => !v)}
+                          className="p-1.5 rounded-lg border border-blue-100 text-blue-700 hover:bg-blue-50 transition-colors"
+                          title="Aksi lain"
+                        >
+                          <EllipsisVertical className="w-4 h-4" />
+                        </button>
 
-                <div className="flex items-center gap-3">
-                  <LogoTile name={currentTenant?.name} id={currentTenant?.id} size="lg" />
-                  <div className="min-w-0">
-                    <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
-                      {activeDashboard.title}
-                    </h1>
-                    {activeDashboard.description && (
-                      <p className="text-xs text-slate-300 mt-0.5 max-w-2xl line-clamp-1">
-                        {activeDashboard.description}
-                      </p>
+                        {isMoreMenuOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
+                            <div className="absolute right-0 mt-1 w-64 bg-white border border-blue-100 rounded-xl shadow-lg z-50 p-1.5 text-xs">
+                              <button
+                                onClick={() => {
+                                  setIsMoreMenuOpen(false);
+                                  setIsPresentationMode(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-600 hover:bg-blue-50"
+                              >
+                                <Maximize2 className="w-4 h-4 shrink-0" />
+                                <span>Mode Presentasi</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsMoreMenuOpen(false);
+                                  setIsExportOpen(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-600 hover:bg-blue-50"
+                              >
+                                <Printer className="w-4 h-4 shrink-0" />
+                                <span>Cetak / Ekspor</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsMoreMenuOpen(false);
+                                  setIsShareOpen(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-600 hover:bg-blue-50"
+                              >
+                                <Share2 className="w-4 h-4 shrink-0" />
+                                <span>Bagikan Tautan</span>
+                              </button>
+
+                              {activeDashboard && (
+                                <div className="mt-1 pt-2 border-t border-blue-100">
+                                  <div className="px-2.5 pb-1.5 flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-500">
+                                    <Filter className="w-3 h-3" />
+                                    <span>Filter Dashboard</span>
+                                  </div>
+                                  {([
+                                    { key: 'periode', label: 'Periode', opts: [['2026-Q1', 'Triwulan I 2026'], ['2026-Q2', 'Triwulan II 2026'], ['2026-FY', 'Tahun Penuh 2026'], ['2025-FY', 'Tahun 2025']] },
+                                    { key: 'unitKerja', label: 'Unit Kerja', opts: [['Semua', 'Semua Unit'], ['Kantor Pusat', 'Kantor Pusat'], ['Wilayah Barat', 'Wilayah Barat'], ['Wilayah Timur', 'Wilayah Timur']] },
+                                    { key: 'kategori', label: 'Kategori', opts: [['Semua', 'Semua Kategori'], ['Keuangan', 'Keuangan'], ['Operasional', 'Operasional'], ['Pelayanan', 'Pelayanan'], ['Kepatuhan & Risiko', 'Kepatuhan & Risiko']] },
+                                  ] as const).map((f) => (
+                                    <label key={f.key} className="block px-1.5 pb-1.5">
+                                      <span className="block text-[10px] text-blue-500 mb-0.5">{f.label}</span>
+                                      <select
+                                        value={(activeDashboard.globalFilters as any)[f.key]}
+                                        onChange={(e) =>
+                                          handleGlobalFiltersChange({
+                                            ...activeDashboard.globalFilters,
+                                            [f.key]: e.target.value,
+                                          })
+                                        }
+                                        className="w-full text-xs font-medium text-blue-900 bg-blue-50/70 border border-blue-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                      >
+                                        {f.opts.map(([val, teks]) => (
+                                          <option key={val} value={val}>
+                                            {teks}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              {activeDashboard && (
+                                <div className="mt-1 pt-1.5 border-t border-blue-100">
+                                  {hapusKonfirmasi ? (
+                                    <div className="mx-1.5 my-1 p-2 rounded-lg bg-rose-50 border border-rose-200">
+                                      <p className="text-[11px] text-rose-700 mb-1.5">Hapus dashboard ini?</p>
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          onClick={() => {
+                                            setHapusKonfirmasi(false);
+                                            setIsMoreMenuOpen(false);
+                                            handleDeleteDashboard(activeDashboard.id);
+                                          }}
+                                          className="flex-1 px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold"
+                                        >
+                                          Hapus
+                                        </button>
+                                        <button
+                                          onClick={() => setHapusKonfirmasi(false)}
+                                          className="flex-1 px-2 py-1 bg-white text-slate-600 hover:bg-blue-50 border border-blue-100 rounded-md text-[11px]"
+                                        >
+                                          Batal
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setHapusKonfirmasi(true)}
+                                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-rose-600 hover:bg-rose-50"
+                                    >
+                                      <Trash2 className="w-4 h-4 shrink-0" />
+                                      <span>Hapus Dashboard</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
+              </header>
+            )}
 
-                {/* Quick Governance Accreditations */}
-                <div className="pt-1 flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
-                    <Award className="w-3.5 h-3.5 text-emerald-400" />
-                    Kinerja SEHAT · 86,4
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                    Diaudit BPKP & OJK
-                  </span>
-                </div>
-              </div>
-
-              {/* Right Action Tools */}
-              <div className="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
-                {hapusKonfirmasi ? (
-                  <div className="flex items-center gap-1 bg-rose-950/60 border border-rose-800 p-1 rounded-lg">
-                    <span className="px-2 text-[11px] text-rose-300">Hapus dashboard ini?</span>
+            {viewMode === 'dashboards' ? (
+              <React.Suspense fallback={pageFallback}>
+                <DashboardList
+                  dashboards={dashboards}
+                  currentTenant={currentTenant}
+                  onSelectDashboard={(d) => {
+                    setActiveDashboard(d);
+                    setViewMode('workspace');
+                  }}
+                  onCreateDashboard={() => {
+                    handleCreateDashboard();
+                    setViewMode('workspace');
+                  }}
+                  onOpenChat={() => {
+                    setViewMode('workspace');
+                    setIsChatOpen(true);
+                  }}
+                  onDuplicateDashboard={handleDuplicateDashboard}
+                  onDeleteDashboard={handleDeleteDashboard}
+                  onShareDashboard={(d) => {
+                    setActiveDashboard(d);
+                    setIsShareOpen(true);
+                  }}
+                  onBackToWorkspace={() => setViewMode('workspace')}
+                />
+              </React.Suspense>
+            ) : viewMode === 'audit' ? (
+              <React.Suspense fallback={pageFallback}>
+                <AuditLogPage
+                  tenantId={currentTenant?.id || 'tenant-pdam'}
+                  onBackToWorkspace={() => setViewMode('workspace')}
+                />
+              </React.Suspense>
+            ) : viewMode === 'alerts' ? (
+              <React.Suspense fallback={pageFallback}>
+                <AlertsPage
+                  tenantId={currentTenant?.id || 'tenant-pdam'}
+                  onBackToWorkspace={() => setViewMode('workspace')}
+                />
+              </React.Suspense>
+            ) : (
+              <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+                {/* Executive Presentation Floating Bar when Active */}
+                {isPresentationMode && (
+                  <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900/90 text-white px-3 py-1.5 rounded-full shadow-2xl backdrop-blur-md border border-slate-700 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-semibold">Mode Presentasi Eksekutif</span>
                     <button
-                      onClick={() => {
-                        setHapusKonfirmasi(false);
-                        handleDeleteDashboard(activeDashboard.id);
-                      }}
-                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold"
+                      onClick={() => setIsPresentationMode(false)}
+                      className="ml-2 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
                     >
-                      Hapus
-                    </button>
-                    <button
-                      onClick={() => setHapusKonfirmasi(false)}
-                      className="px-2 py-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md text-[11px]"
-                    >
-                      Batal
+                      <Minimize2 className="w-3 h-3" />
+                      <span>Keluar</span>
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setHapusKonfirmasi(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-900/60 hover:border-rose-800 border border-slate-700 text-slate-300 hover:text-rose-200 text-xs font-semibold rounded-xl transition-colors shadow-xs"
-                    title="Hapus dashboard ini"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Hapus</span>
-                  </button>
                 )}
-                <button
-                  onClick={() => setIsPresentationMode(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all shadow-xs"
-                  title="Tampilan layar penuh untuk presentasi Direksi & Kepala Daerah"
-                >
-                  <Maximize2 className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Mode Presentasi</span>
-                </button>
-                <button
-                  onClick={() => setIsCatalogOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5 text-sky-400" />
-                  <span>+ Tambah Widget</span>
-                </button>
-                <button
-                  onClick={() => setIsChatOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Chat RAG Copilot</span>
-                </button>
-              </div>
-            </div>
 
-            {/* Quick Metrics Bar across bottom of banner */}
-            <div className="mt-5 pt-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Realisasi RKAP</span>
-                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">107,1%</p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Risiko / NRW</span>
-                <p className="text-base font-bold font-mono text-sky-400 mt-0.5 tabular-nums">22,4%</p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Kolektibilitas</span>
-                <p className="text-base font-bold font-mono text-slate-200 mt-0.5 tabular-nums">94,8%</p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Verifikasi LRA</span>
-                <p className="text-base font-bold font-mono text-emerald-400 mt-0.5 tabular-nums">100%</p>
-              </div>
-            </div>
-          </div>
+                {/* Judul dashboard ringkas (banner gelap dihapus — light minimal).
+                    Hierarki: deskripsi = lead utama, meta = keterangan sekunder. */}
+                {activeDashboard && !isPresentationMode && (
+                  <div className="mb-5 min-w-0">
+                    <p className="text-sm font-medium text-slate-600 max-w-2xl leading-relaxed">
+                      {activeDashboard.description ||
+                        `${currentTenant?.name || ''} — ${currentTenant?.city || ''}`}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {activeDashboard.widgets.length} widget · Diperbarui{' '}
+                      {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {/* Bar aksi kanvas — pil filter kiri, tombol aksi kanan (ala referensi) */}
+                {activeDashboard && !isPresentationMode && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-blue-100 rounded-lg">
+                        <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
+                        {activeDashboard.widgets.length} Widget
+                      </span>
+                      {([
+                        { key: 'periode', label: 'Periode' },
+                        { key: 'unitKerja', label: 'Unit Kerja' },
+                        { key: 'kategori', label: 'Kategori' },
+                      ] as const).map((f) => (
+                        <label
+                          key={f.key}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white border border-blue-100 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
+                        >
+                          <span className="text-slate-500 font-medium">{f.label}:</span>
+                          <select
+                            value={(activeDashboard.globalFilters as any)[f.key]}
+                            onChange={(e) =>
+                              handleGlobalFiltersChange({
+                                ...activeDashboard.globalFilters,
+                                [f.key]: e.target.value,
+                              })
+                            }
+                            className="text-xs font-semibold text-blue-800 bg-transparent focus:outline-none cursor-pointer"
+                          >
+                            {(f.key === 'periode'
+                              ? [['2026-Q1', 'Triwulan I 2026'], ['2026-Q2', 'Triwulan II 2026'], ['2026-FY', 'Tahun Penuh 2026'], ['2025-FY', 'Tahun 2025']]
+                              : f.key === 'unitKerja'
+                                ? [['Semua', 'Semua Unit'], ['Kantor Pusat', 'Kantor Pusat'], ['Wilayah Barat', 'Wilayah Barat'], ['Wilayah Timur', 'Wilayah Timur']]
+                                : [['Semua', 'Semua Kategori'], ['Keuangan', 'Keuangan'], ['Operasional', 'Operasional'], ['Pelayanan', 'Pelayanan'], ['Kepatuhan & Risiko', 'Kepatuhan & Risiko']]
+                            ).map(([val, teks]) => (
+                              <option key={val} value={val}>{teks}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setIsCatalogOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Tambah Chart</span>
+                      </button>
+                      <button
+                        onClick={() => setIsExportOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Ekspor</span>
+                      </button>
+                      <button
+                        onClick={() => setIsShareOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Bagikan</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dashboard Canvas Grid */}
+                <DashboardCanvas
+                  widgets={activeDashboard?.widgets || []}
+                  onEditWidget={handleEditWidget}
+                  onManualCorrection={handleManualCorrection}
+                  onDeleteWidget={handleDeleteWidget}
+                  onDuplicateWidget={handleDuplicateWidget}
+                  onReorderWidgets={handleReorderWidgets}
+                  onResizeWidget={handleResizeWidget}
+                  onOpenCitation={handleOpenCitation}
+                  onOpenCatalog={() => setIsCatalogOpen(true)}
+                  onOpenChat={() => setIsChatOpen(true)}
+                />
+              </main>
+            )}
+          </>
         )}
-
-        {/* Dashboard Canvas Grid */}
-        <DashboardCanvas
-          widgets={activeDashboard?.widgets || []}
-          onEditWidget={handleEditWidget}
-          onManualCorrection={handleManualCorrection}
-          onDeleteWidget={handleDeleteWidget}
-          onDuplicateWidget={handleDuplicateWidget}
-          onReorderWidgets={handleReorderWidgets}
-          onResizeWidget={handleResizeWidget}
-          onOpenCitation={handleOpenCitation}
-          onOpenCatalog={() => setIsCatalogOpen(true)}
-          onOpenChat={() => setIsChatOpen(true)}
-        />
-      </main>
-      </>
-      )}
       </div>
 
       {/* ================= MODALS & DRAWERS ================= */}
@@ -818,7 +921,6 @@ export default function App() {
             ...prev.filter((d) => d.id !== newDash.id),
           ]);
         }}
-        activeMode={activeRagMode}
       />
 
       {/* 2. 40 Widget Catalog Preset Sidebar */}
@@ -856,14 +958,6 @@ export default function App() {
         onAddRule={handleAddAlertRule}
       />
 
-      {/* 6. RAG Probe Diagnostic Runner Modal */}
-      <RagProbeModal
-        isOpen={isProbeOpen}
-        onClose={() => setIsProbeOpen(false)}
-        activeMode={activeRagMode}
-        onToggleMode={handleToggleRagMode}
-      />
-
       {/* 7. Share Read-Only Link Modal */}
       <ShareModal
         isOpen={isShareOpen}
@@ -879,12 +973,6 @@ export default function App() {
         tenant={currentTenant}
       />
 
-      {/* 9. Audit Log History Modal */}
-      <AuditLogModal
-        isOpen={isAuditLogOpen}
-        onClose={() => setIsAuditLogOpen(false)}
-        tenantId={currentTenant?.id || 'tenant-pdam'}
-      />
     </div>
   );
 }

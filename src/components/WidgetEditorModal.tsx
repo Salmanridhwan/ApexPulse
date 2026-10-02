@@ -115,9 +115,9 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
         manualCorrection: undefined,
         kpi: widget.kpi
           ? {
-              ...widget.kpi,
-              value: widget.manualCorrection.originalValue,
-            }
+            ...widget.kpi,
+            value: widget.manualCorrection.originalValue,
+          }
           : undefined,
       };
       onSave(updated);
@@ -157,22 +157,20 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
         <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-4 text-xs font-medium">
           <button
             onClick={() => setActiveTab('config')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'config'
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'config'
                 ? 'border-sky-600 text-sky-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+              }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Tipe Visualisasi & Parameter</span>
           </button>
           <button
             onClick={() => setActiveTab('correction')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'correction'
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'correction'
                 ? 'border-amber-600 text-amber-800'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+              }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
             <span>Koreksi Manual Angka (Fitur F-14)</span>
@@ -223,11 +221,10 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                       key={ct.type}
                       type="button"
                       onClick={() => setType(ct.type)}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        type === ct.type
+                      className={`p-2.5 rounded-xl border text-left transition-all ${type === ct.type
                           ? 'border-sky-500 bg-sky-50/70 ring-1 ring-sky-500'
                           : 'border-slate-200 bg-white hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <p className="font-semibold text-slate-800">{ct.label}</p>
                       <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{ct.desc}</p>

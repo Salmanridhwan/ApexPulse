@@ -96,33 +96,30 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
         <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-4 text-xs font-medium">
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'notifications'
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'notifications'
                 ? 'border-rose-600 text-rose-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+              }`}
           >
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Notifikasi Aktif ({notifications.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('rules')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'rules'
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'rules'
                 ? 'border-sky-600 text-sky-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+              }`}
           >
             <Sliders className="w-3.5 h-3.5" />
             <span>Daftar Aturan ({alertRules.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'create'
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'create'
                 ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
+              }`}
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Buat Aturan Baru</span>
@@ -152,22 +149,20 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                 notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      notif.severity === 'critical'
+                    className={`p-3.5 rounded-xl border transition-all ${notif.severity === 'critical'
                         ? 'bg-rose-50/60 border-rose-200 text-rose-900'
                         : notif.severity === 'warning'
-                        ? 'bg-amber-50/60 border-amber-200 text-amber-900'
-                        : 'bg-slate-50 border-slate-200 text-slate-800'
-                    }`}
+                          ? 'bg-amber-50/60 border-amber-200 text-amber-900'
+                          : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <ShieldAlert
-                          className={`w-4 h-4 ${
-                            notif.severity === 'critical'
+                          className={`w-4 h-4 ${notif.severity === 'critical'
                               ? 'text-rose-600'
                               : 'text-amber-600'
-                          }`}
+                            }`}
                         />
                         <h4 className="font-semibold">{notif.title}</h4>
                       </div>
@@ -203,11 +198,10 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-800">{rule.title}</span>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                        rule.severity === 'critical'
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${rule.severity === 'critical'
                           ? 'bg-rose-100 text-rose-800'
                           : 'bg-amber-100 text-amber-800'
-                      }`}
+                        }`}
                     >
                       {rule.severity.toUpperCase()}
                     </span>

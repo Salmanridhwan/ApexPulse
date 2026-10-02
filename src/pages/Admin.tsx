@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
   Bell,
   Building2,
   Check,
@@ -13,6 +12,7 @@ import {
   Key,
   Layers,
   Lock,
+  LogOut,
   Menu,
   Plus,
   Radio,
@@ -34,10 +34,10 @@ import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../type
 
 interface AdminProps {
   currentUser: User | null;
-  onBackToWorkspace: () => void;
+  onLogout: () => void;
 }
 
-export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) => {
+export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tenants' | 'rag' | 'alerts' | 'audit'>('overview');
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
@@ -50,6 +50,10 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // RAG Probe State (uji koneksi RAG)
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeResult, setProbeResult] = useState<any>(null);
 
   // User Modal State
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -188,10 +192,31 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
     }
   };
 
+  const handleProbeRag = async () => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    try {
+      const res = await fetch('/api/rag-probe', { method: 'POST' });
+      const data = await res.json();
+      setProbeResult(data);
+    } catch (err: any) {
+      setProbeResult({
+        status: 'error',
+        latencyMs: 0,
+        details: [
+          'Gagal menghubungi endpoint diagnostik server.',
+          err?.message || 'Kesalahan jaringan tidak diketahui.',
+        ],
+      });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-row min-w-0 bg-slate-100/70 text-slate-800 font-sans">
+    <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-slate-100/70 text-slate-800 font-sans">
       {/* Sidebar Panel Admin — menu navigasi vertikal */}
-      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col justify-between transition-all duration-200`}>
+      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 h-full overflow-hidden bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col transition-all duration-200`}>
         <div>
           <div className={`h-14 border-b border-slate-800 flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
             <Shield className="w-4 h-4 text-sky-400 shrink-0" />
@@ -215,13 +240,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   title={tab.label}
-                  className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-left transition-colors ${
-                    isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
-                  } ${
-                    isActive
+                  className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
+                    } ${isActive
                       ? 'bg-sky-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   {!isNavCollapsed && <span className="truncate">{tab.label}</span>}
@@ -230,58 +253,53 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
             })}
           </nav>
         </div>
-        <div className="p-3 border-t border-slate-800">
-          <button
-            onClick={onBackToWorkspace}
-            title="Ke Workspace"
-            className={`w-full flex items-center gap-2 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors ${
-              isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
-            }`}
-          >
-            <ArrowLeft className="w-4 h-4 shrink-0" />
-            {!isNavCollapsed && <span>Ke Workspace</span>}
-          </button>
-        </div>
       </aside>
 
       {/* Kolom kanan: header + konten */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-800 shadow-md">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+        <header className="shrink-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => setIsNavCollapsed((v) => !v)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors shrink-0"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
                 title={isNavCollapsed ? 'Tampilkan Sidebar Admin' : 'Sembunyikan Sidebar Admin'}
               >
                 <Menu className="w-4 h-4" />
               </button>
-              <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
               <div className="flex items-center gap-2 truncate">
-                <Shield className="w-4 h-4 text-sky-400 shrink-0" />
-                <h1 className="text-sm font-bold tracking-tight text-white truncate">
+                <Shield className="w-4 h-4 text-sky-600 shrink-0" />
+                <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">
                   ApexPulse Admin & Governance Center
                 </h1>
               </div>
             </div>
 
             <div className="flex items-center gap-3 text-xs shrink-0">
-              <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-                Admin: <strong>{currentUser?.name || 'Administrator'}</strong>
+              <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
+                Admin: <strong className="text-slate-800">{currentUser?.name || 'Administrator'}</strong>
               </span>
               <button
                 onClick={loadData}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
                 title="Segarkan Data"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-lg border border-slate-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
+                title="Keluar"
+              >
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </header>
 
         {/* Main Body */}
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
           {/* ================= TAB 1: OVERVIEW ================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
@@ -313,9 +331,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                   <span className="text-[10px] text-amber-600 font-medium">Evaluasi Otomatis</span>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Status RAG</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Provider RAG</span>
                   <p className="text-base font-bold text-sky-700 mt-2 truncate">
-                    {stats?.activeRagMode === 'structured' ? 'Jalur A' : 'Jalur B'}
+                    {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
                   </p>
                   <span className="text-[10px] text-emerald-600 font-medium">Sehat (Online)</span>
                 </div>
@@ -451,19 +469,18 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                           <td className="p-3 text-slate-500">{u.email}</td>
                           <td className="p-3">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                                u.role === 'admin'
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
                                   ? 'bg-slate-800 text-white'
                                   : u.role === 'direksi'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-sky-100 text-sky-800'
-                              }`}
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-sky-100 text-sky-800'
+                                }`}
                             >
                               {u.role === 'admin'
                                 ? 'Administrator'
                                 : u.role === 'direksi'
-                                ? 'Direksi / Pengawas'
-                                : 'Analis Kinerja'}
+                                  ? 'Direksi / Pengawas'
+                                  : 'Analis Kinerja'}
                             </span>
                           </td>
                           <td className="p-3">
@@ -561,7 +578,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                 </h3>
                 <p className="text-xs text-slate-500">
                   Tempel Base URL & API Key RAG dari penyedia layanan, pilih provider
-                  <strong> HTTP</strong>, lalu simpan. Uji koneksi lewat sidebar → Diagnostik RAG Probe.
+                  <strong> HTTP</strong>, lalu simpan.
                 </p>
               </div>
 
@@ -569,6 +586,18 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Pengaturan sistem berhasil disimpan dan diperbarui!</span>
+                </div>
+              )}
+
+              {/* Jebakan paling sering: URL & key sudah diisi, provider masih Mock. */}
+              {systemConfig.ragProvider !== 'http' && (systemConfig.ragApiUrl || systemConfig.ragApiKey) && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    Provider masih <strong>Mock</strong>, jadi Base URL &amp; API Key di bawah{' '}
+                    <strong>tidak dipakai</strong> — dashboard tetap disusun dari data contoh. Ubah
+                    Provider ke <strong>HTTP</strong> lalu simpan, baru klik “Uji Koneksi Sekarang”.
+                  </span>
                 </div>
               )}
 
@@ -590,21 +619,6 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
-                      Mode Dual Jalur Default
-                    </label>
-                    <select
-                      value={systemConfig.defaultRagMode}
-                      onChange={(e) =>
-                        setSystemConfig({ ...systemConfig, defaultRagMode: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                      <option value="structured">Jalur A (LLM JSON Terstruktur)</option>
-                      <option value="prose">Jalur B (Agregasi Metadata Murni - Tanpa AI)</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div>
@@ -620,6 +634,28 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                     }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Sertakan prefix API-nya, mis. <span className="font-mono">https://rag.aiones.app/api/v1</span>.
+                    Kalau hanya domain, aplikasi mencoba menambahkan <span className="font-mono">/api/v1</span> otomatis.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Knowledge Base ID <span className="font-normal text-slate-400">(opsional — jika layanan RAG menskopkan retrieval per KB)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="kb-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={systemConfig.ragKnowledgeBaseId || ''}
+                    onChange={(e) =>
+                      setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Daftar KB & dokumen bisa dilihat di layanan RAG teman (endpoint /api/v1/knowledge)
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -660,6 +696,26 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                   </div>
                 </div>
 
+                <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <input
+                    id="ragUseExtract"
+                    type="checkbox"
+                    checked={systemConfig.ragUseExtract !== false}
+                    onChange={(e) =>
+                      setSystemConfig({ ...systemConfig, ragUseExtract: e.target.checked })
+                    }
+                    className="mt-0.5 w-4 h-4 accent-sky-600"
+                  />
+                  <label htmlFor="ragUseExtract" className="text-[11px] text-slate-600 leading-relaxed">
+                    <span className="font-semibold text-slate-800">
+                      Jalur A — pakai endpoint /extract
+                    </span>{' '}
+                    (disarankan). Angka dashboard diambil langsung dari dokumen beserta halaman
+                    sumbernya, jadi tidak lagi mengandalkan deret contoh. Kalau layanan RAG tidak
+                    punya /extract, aplikasi otomatis memakai jalur retrieval biasa.
+                  </label>
+                </div>
+
                 {/* SMTP Settings */}
                 <div className="pt-4 border-t border-slate-200 space-y-3">
                   <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
@@ -693,7 +749,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                   </div>
                 </div>
 
-                <div className="pt-3">
+                <div className="pt-3 flex items-center gap-3">
                   <button
                     type="submit"
                     className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-xs"
@@ -702,6 +758,90 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                   </button>
                 </div>
               </form>
+
+              {/* ===== UJI KONEKSI RAG ===== */}
+              <div className="pt-4 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Radio className="w-4 h-4 text-sky-600" />
+                      <span>Uji Koneksi RAG</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Kirim sampel query ke layanan RAG aktif untuk memastikan koneksi, metadata,
+                      dan keluaran JSON terstruktur berjalan dengan baik.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleProbeRag}
+                    disabled={probeLoading}
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-sky-300 hover:bg-sky-50 text-sky-700 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${probeLoading ? 'animate-spin' : ''}`} />
+                    {probeLoading ? 'Menguji...' : 'Uji Koneksi Sekarang'}
+                  </button>
+                </div>
+
+                {probeResult && (
+                  <div
+                    className={`p-4 rounded-xl border text-xs space-y-2 ${
+                      probeResult.status === 'healthy'
+                        ? 'bg-emerald-50 border-emerald-200'
+                        : probeResult.status === 'degraded'
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-rose-50 border-rose-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-bold">
+                      {probeResult.status === 'healthy' ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span className="text-emerald-800">
+                            RAG Berjalan Normal ({probeResult.latencyMs} ms)
+                          </span>
+                        </>
+                      ) : probeResult.status === 'degraded' ? (
+                        <>
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          <span className="text-amber-800">
+                            RAG Merespons, Tapi Terbatas ({probeResult.latencyMs} ms)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-4 h-4 text-rose-600" />
+                          <span className="text-rose-800">Koneksi RAG Gagal</span>
+                        </>
+                      )}
+                    </div>
+                    {probeResult.peringatan && (
+                      <p className="text-amber-800 font-semibold flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{probeResult.peringatan}</span>
+                      </p>
+                    )}
+                    {(probeResult.details || []).map((d: string, i: number) =>
+                      /^PERINGATAN/i.test(d) ? (
+                        <p key={i} className="text-amber-800 font-semibold">{d}</p>
+                      ) : null
+                    )}
+                    {probeResult.modeDetected && (
+                      <p className="text-slate-600">
+                        Mode terdeteksi: <strong>{probeResult.modeDetected}</strong>
+                        {typeof probeResult.sampleChunksCount === 'number' && (
+                          <> • Potongan dokumen terambil: <strong>{probeResult.sampleChunksCount}</strong></>
+                        )}
+                      </p>
+                    )}
+                    <ul className="list-disc list-inside text-slate-600 space-y-0.5">
+                      {(probeResult.details || []).map((d: string, i: number) => (
+                        <li key={i}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -729,11 +869,10 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onBackToWorkspace }) 
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-800">{rule.title}</span>
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                              rule.severity === 'critical'
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${rule.severity === 'critical'
                                 ? 'bg-rose-100 text-rose-800'
                                 : 'bg-amber-100 text-amber-800'
-                            }`}
+                              }`}
                           >
                             {rule.severity.toUpperCase()}
                           </span>

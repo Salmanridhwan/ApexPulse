@@ -26,6 +26,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
           targetLabel={widget.kpi?.targetLabel}
           sparkline={widget.kpi?.sparkline}
           isCorrected={widget.manualCorrection?.isCorrected}
+          title={widget.title}
         />
       );
 
@@ -33,6 +34,8 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
     case 'area':
     case 'bar':
     case 'donut':
+    case 'gauge':
+    case 'heatmap':
       return (
         <ChartEcharts
           type={widget.type}
@@ -41,6 +44,9 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
           unit={widget.chart?.unit}
           stacked={widget.chart?.stacked}
           showLegend={widget.chart?.showLegend}
+          min={widget.chart?.min}
+          max={widget.chart?.max}
+          heatmapData={widget.heatmap?.data}
         />
       );
 
@@ -73,6 +79,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
           targetLabel={widget.kpi?.targetLabel}
           sparkline={widget.kpi?.sparkline}
           isCorrected={widget.manualCorrection?.isCorrected}
+          title={widget.title}
         />
       );
 

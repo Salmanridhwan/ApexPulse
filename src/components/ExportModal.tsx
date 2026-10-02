@@ -134,18 +134,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                         {String(w.kpi?.value ?? w.chart?.series[0]?.data.slice(-1)[0] ?? '-')} {w.kpi?.unit || ''}
                       </td>
                       <td className="p-2">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
-                          w.manualCorrection?.isCorrected
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${w.manualCorrection?.isCorrected
                             ? 'bg-amber-100 text-amber-800'
                             : w.confidence === 'sumber'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-sky-100 text-sky-800'
-                        }`}>
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-sky-100 text-sky-800'
+                          }`}>
                           {w.manualCorrection?.isCorrected
                             ? 'Dikoreksi Manual'
                             : w.confidence === 'sumber'
-                            ? 'Dokumen Resmi'
-                            : 'Inferensi AI'}
+                              ? 'Dokumen Resmi'
+                              : 'Inferensi AI'}
                         </span>
                       </td>
                     </tr>
@@ -163,7 +162,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <ul className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50">
                 {uniqueCitations.map((c, i) => (
                   <li key={i} className="text-[11px] text-slate-700 leading-relaxed">
-                    <strong>[{i + 1}]</strong> Berkas: <span className="font-semibold text-slate-900">{c.docName}</span> (Halaman: {c.page}, Terbit: {c.date}). 
+                    <strong>[{i + 1}]</strong> Berkas: <span className="font-semibold text-slate-900">{c.docName}</span> (Halaman: {c.page}, Terbit: {c.date}).
                     <span className="italic text-slate-500 block pl-4 mt-0.5">"{c.chunkSnippet}"</span>
                   </li>
                 ))}

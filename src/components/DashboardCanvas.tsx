@@ -93,10 +93,10 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           <LayoutGrid className="w-8 h-8" />
         </div>
         <h3 className="text-base font-semibold text-slate-800">
-          Kanvas Dashboard Belum Memiliki Widget
+          Bangun dashboard pertama Anda
         </h3>
         <p className="text-sm text-slate-500 max-w-md mt-1 mb-6">
-          Mulai dengan membuat dashboard otomatis dari pangkalan dokumen RAG BUMD lewat chat cerdas atau pilih dari 40 preset katalog siap pakai.
+          Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.
         </p>
         <div className="flex items-center gap-3">
           <button
@@ -104,14 +104,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-sm transition-colors"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Generate via Chat</span>
+            <span>Buat via Chat</span>
           </button>
           <button
             onClick={onOpenCatalog}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Buka Katalog Widget</span>
+            <span>Pilih dari Katalog</span>
           </button>
         </div>
       </div>
@@ -125,13 +125,17 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
         const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
         let colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
-        if (wAktif >= 10 || widget.type === 'narasi') {
+        if (wAktif >= 10) {
           colSpan = 'col-span-1 md:col-span-6 lg:col-span-12';
         } else if (wAktif >= 7) {
           colSpan = 'col-span-1 md:col-span-6 lg:col-span-8';
         } else if (wAktif >= 5) {
           colSpan = 'col-span-1 md:col-span-6 lg:col-span-6';
         }
+        // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
+        const tinggiMin = ['line', 'bar', 'area', 'donut', 'table', 'heatmap'].includes(widget.type)
+          ? 'min-h-[248px]'
+          : 'min-h-[148px]';
 
         return (
           <div
@@ -158,9 +162,8 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               setDragId(null);
               setOverId(null);
             }}
-            className={`${colSpan} min-h-[220px] rounded-lg relative transition-opacity ${
-              dragId === widget.id ? 'opacity-40' : ''
-            } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-sky-400' : ''}`}
+            className={`${colSpan} ${tinggiMin} rounded-lg relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
+              } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-sky-400' : ''}`}
           >
             <WidgetCard
               widget={widget}
@@ -176,11 +179,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                 key={arah}
                 data-resize={arah === -1 ? 'kiri' : 'kanan'}
                 onMouseDown={(e) => mulaiResize(e, widget, arah)}
-                className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${
-                  arah === -1 ? 'left-0' : 'right-0'
-                } ${
-                  resizeId === widget.id ? 'bg-sky-400/70' : 'bg-transparent hover:bg-sky-400/40'
-                }`}
+                className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${arah === -1 ? 'left-0' : 'right-0'
+                  } ${resizeId === widget.id ? 'bg-sky-400/70' : 'bg-transparent hover:bg-sky-400/40'
+                  }`}
                 title="Tarik untuk ubah lebar widget"
               />
             ))}

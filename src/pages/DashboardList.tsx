@@ -3,9 +3,7 @@ import {
   Activity,
   Building2,
   Calendar,
-  CheckCircle,
   Copy,
-  ExternalLink,
   Eye,
   Filter,
   Layers,
@@ -17,7 +15,6 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
-import { LogoTile } from '../components/BrandMark';
 import { BumdSector, Dashboard, Tenant } from '../types';
 
 interface DashboardListProps {
@@ -52,8 +49,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
     const matchesSearch =
       d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (d.description && d.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesSector =
-      selectedSector === 'all' || d.sector === selectedSector;
+    const matchesSector = selectedSector === 'all' || d.sector === selectedSector;
     return matchesSearch && matchesSector;
   });
 
@@ -70,122 +66,103 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   );
 
   return (
-    <div className="flex-1 bg-slate-50 min-h-screen flex flex-col">
-      {/* Top Banner / Hero Header */}
-      <div className="bg-slate-900 border-b border-slate-800 text-white px-6 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-sky-400 font-semibold tracking-wider uppercase">
-                <span>{currentTenant?.name || 'PEMERINTAH DAERAH'}</span>
-                <span>•</span>
-                <span>{currentTenant?.city}</span>
-              </div>
+    <div className="flex-1 bg-blue-50 min-h-screen flex flex-col">
+      {/* Main Body */}
+      <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
+        {/* Baris aksi halaman */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <button
+            onClick={onBackToWorkspace}
+            className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1.5"
+          >
+            ← Kembali ke Workspace
+          </button>
 
-              <div className="flex items-center gap-3">
-                <LogoTile name={currentTenant?.name} id={currentTenant?.id} size="lg" />
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
-                    Galeri Dashboard BUMD
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 font-semibold">
-                      {dashboards.length} Tersedia
-                    </span>
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                    Kelola dan pantau seluruh dashboard indikator kinerja resmi instansi {currentTenant?.shortName || 'BUMD'} berbasis data RAG terintegrasi.
-                  </p>
-                </div>
-              </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={onOpenChat}
+              className="px-4 py-2.5 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Buat via Chat AI RAG</span>
+            </button>
+            <button
+              onClick={onCreateDashboard}
+              className="px-4 py-2.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 border border-blue-100"
+            >
+              <Plus className="w-4 h-4 text-blue-700" />
+              <span>Dashboard Baru</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Ringkasan angka (putih, kartu biru muda) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+              <LayoutGrid className="w-5 h-5" />
             </div>
-
-            {/* Quick Actions */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <button
-                onClick={onOpenChat}
-                className="px-4 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-colors flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Buat via Chat AI RAG</span>
-              </button>
-              <button
-                onClick={onCreateDashboard}
-                className="px-4 py-2.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg shadow-xs transition-colors flex items-center gap-2 border border-slate-700"
-              >
-                <Plus className="w-4 h-4 text-sky-400" />
-                <span>Dashboard Baru</span>
-              </button>
+            <div>
+              <p className="text-[11px] text-blue-500 font-medium">Total Dashboard</p>
+              <p className="text-lg font-bold text-blue-900">{dashboards.length}</p>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-800/80">
-            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400">
-                <LayoutGrid className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 font-medium">Total Dashboard</p>
-                <p className="text-lg font-bold text-white">{dashboards.length}</p>
-              </div>
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-sky-100 text-sky-700">
+              <Layers className="w-5 h-5" />
             </div>
-
-            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                <Layers className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 font-medium">Total Widget Aktif</p>
-                <p className="text-lg font-bold text-white">{totalWidgets}</p>
-              </div>
+            <div>
+              <p className="text-[11px] text-blue-500 font-medium">Total Widget Aktif</p>
+              <p className="text-lg font-bold text-blue-900">{totalWidgets}</p>
             </div>
+          </div>
 
-            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                <Activity className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 font-medium">Kartu KPI / Metrik</p>
-                <p className="text-lg font-bold text-white">{totalKpis}</p>
-              </div>
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+              <Activity className="w-5 h-5" />
             </div>
+            <div>
+              <p className="text-[11px] text-blue-500 font-medium">Kartu KPI / Metrik</p>
+              <p className="text-lg font-bold text-blue-900">{totalKpis}</p>
+            </div>
+          </div>
 
-            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 font-medium">Sektor BUMD</p>
-                <p className="text-lg font-bold text-white capitalize">{currentTenant?.sector || 'Multi'}</p>
-              </div>
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-sky-100 text-sky-700">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-blue-500 font-medium">Sektor BUMD</p>
+              <p className="text-lg font-bold text-blue-900 capitalize">
+                {currentTenant?.sector || 'Multi'}
+              </p>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Body */}
-      <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Search & Filter Toolbar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-white p-4 rounded-xl border border-blue-100 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full sm:w-96">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+            <Search className="w-4 h-4 text-blue-400 absolute left-3.5 top-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari dashboard berdasarkan judul atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 shrink-0">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-xs text-blue-500 font-medium flex items-center gap-1.5 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-blue-400" />
               <span>Sektor:</span>
             </span>
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-colors"
+              className="text-xs font-medium text-blue-900 bg-blue-50/70 border border-blue-100 rounded-lg px-3 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
             >
               <option value="all">Semua Sektor BUMD</option>
               <option value="pdam">Air Minum (PDAM)</option>
@@ -200,13 +177,11 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
         {/* Dashboard Grid */}
         {filteredDashboards.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center max-w-lg mx-auto my-12">
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white rounded-xl border border-dashed border-blue-200 p-12 text-center max-w-lg mx-auto my-12">
+            <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-4">
               <LayoutGrid className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 mb-1">
-              Tidak Ada Dashboard yang Sesuai
-            </h3>
+            <h3 className="text-sm font-bold text-blue-900 mb-1">Tidak Ada Dashboard yang Sesuai</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               {searchQuery
                 ? 'Tidak ditemukan dashboard dengan kata kunci pencarian tersebut. Coba periksa kembali ejaan Anda.'
@@ -215,16 +190,16 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Buat Dashboard Baru</span>
               </button>
               <button
                 onClick={onOpenChat}
-                className="px-4 py-2 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                 <span>Gunakan AI RAG</span>
               </button>
             </div>
@@ -241,13 +216,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               return (
                 <div
                   key={dash.id}
-                  className="bg-white rounded-2xl border border-slate-200/90 hover:border-sky-300 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
+                  className="bg-white rounded-xl border border-blue-100 hover:border-blue-300 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
                 >
                   <div className="p-5 space-y-4">
                     {/* Top Tag & Sector */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200/60">
-                        <Tag className="w-3 h-3 text-slate-400" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 capitalize border border-blue-100">
+                        <Tag className="w-3 h-3 text-blue-500" />
                         {dash.sector || currentTenant?.sector || 'BUMD'}
                       </span>
                       <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
@@ -264,19 +239,20 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div>
                       <h3
                         onClick={() => onSelectDashboard(dash)}
-                        className="text-base font-bold text-slate-900 group-hover:text-sky-600 cursor-pointer transition-colors line-clamp-1"
+                        className="text-base font-bold text-blue-900 group-hover:text-blue-700 cursor-pointer transition-colors line-clamp-1"
                         title={dash.title}
                       >
                         {dash.title}
                       </h3>
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                        {dash.description || 'Dashboard intelijensi dan monitoring kinerja berbasis dokumen RAG BUMD.'}
+                        {dash.description ||
+                          'Dashboard intelijensi dan monitoring kinerja berbasis dokumen RAG BUMD.'}
                       </p>
                     </div>
 
                     {/* Widget Composition Badges */}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="text-[11px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-md">
+                      <span className="text-[11px] font-medium px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-md">
                         {dash.widgets.length} Total Widget
                       </span>
                       {kpiCount > 0 && (
@@ -285,12 +261,12 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         </span>
                       )}
                       {chartCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 border border-amber-100 text-amber-700 rounded-md">
+                        <span className="text-[11px] font-medium px-2 py-0.5 bg-blue-100/60 border border-blue-100 text-blue-800 rounded-md">
                           {chartCount} Grafik
                         </span>
                       )}
                       {tableCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-md">
+                        <span className="text-[11px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-md">
                           {tableCount} Tabel
                         </span>
                       )}
@@ -298,10 +274,10 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   </div>
 
                   {/* Card Bottom Action Bar */}
-                  <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="px-5 py-3.5 bg-blue-50/60 border-t border-blue-100 flex items-center justify-between gap-2">
                     <button
                       onClick={() => onSelectDashboard(dash)}
-                      className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Buka Kanvas</span>
@@ -310,7 +286,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onShareDashboard(dash)}
-                        className="p-2 text-slate-500 hover:text-sky-600 hover:bg-slate-200/60 rounded-lg transition-colors"
+                        className="p-2 text-blue-500 hover:text-blue-800 hover:bg-blue-100/70 rounded-lg transition-colors"
                         title="Bagikan Tautan Read-Only"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -318,20 +294,20 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
                       <button
                         onClick={() => onDuplicateDashboard(dash)}
-                        className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors"
+                        className="p-2 text-blue-500 hover:text-blue-800 hover:bg-blue-100/70 rounded-lg transition-colors"
                         title="Duplikat Dashboard"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
 
                       {deleteConfirmId === dash.id ? (
-                        <div className="flex items-center gap-1 bg-red-50 p-0.5 rounded-lg border border-red-200">
+                        <div className="flex items-center gap-1 bg-rose-50 p-0.5 rounded-lg border border-rose-200">
                           <button
                             onClick={() => {
                               onDeleteDashboard(dash.id);
                               setDeleteConfirmId(null);
                             }}
-                            className="px-2 py-1 bg-red-600 text-white rounded text-[10px] font-bold hover:bg-red-700"
+                            className="px-2 py-1 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-700"
                           >
                             Hapus
                           </button>
@@ -345,7 +321,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       ) : (
                         <button
                           onClick={() => setDeleteConfirmId(dash.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Hapus Dashboard"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

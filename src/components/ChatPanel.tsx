@@ -23,7 +23,6 @@ interface ChatPanelProps {
   tenantId: string;
   activeDashboardId?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
-  activeMode: 'structured' | 'prose';
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -33,7 +32,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   tenantId,
   activeDashboardId,
   onDashboardUpdated,
-  activeMode,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -87,7 +85,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           sector,
           tenantId,
           activeDashboardId,
-          modeOverride: activeMode,
         }),
       });
 
@@ -185,9 +182,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <div>
             <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
               <span>Chat Orchestrator RAG</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-medium">
-                {activeMode === 'structured' ? 'Jalur A (JSON)' : 'Jalur B (Metadata)'}
-              </span>
             </h2>
             <p className="text-xs text-slate-500">Ekstraksi otomatis dokumen instansi BUMD</p>
           </div>
@@ -205,16 +199,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex flex-col ${
-              msg.sender === 'user' ? 'items-end' : 'items-start'
-            }`}
+            className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'
+              }`}
           >
             <div
-              className={`max-w-[88%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-xs ${
-                msg.sender === 'user'
+              className={`max-w-[88%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-xs ${msg.sender === 'user'
                   ? 'bg-sky-600 text-white rounded-tr-none'
                   : 'bg-slate-50 border border-slate-200/80 text-slate-800 rounded-tl-none'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-1.5 mb-1 opacity-70 text-[10px]">
                 {msg.sender === 'user' ? (
@@ -278,8 +270,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       step.status === 'completed'
                         ? 'text-slate-700 font-medium'
                         : step.status === 'in_progress'
-                        ? 'text-sky-800 font-medium'
-                        : 'text-slate-400'
+                          ? 'text-sky-800 font-medium'
+                          : 'text-slate-400'
                     }
                   >
                     {step.title}

@@ -224,9 +224,8 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
               return (
                 <div
                   key={widget.id}
-                  className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
-                    isWide ? 'md:col-span-2' : ''
-                  }`}
+                  className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between ${isWide ? 'md:col-span-2' : ''
+                    }`}
                 >
                   <div className="p-4 sm:p-5 flex-1 flex flex-col">
                     <div className="flex items-start justify-between gap-3 mb-3 border-b border-slate-100 pb-3">
