@@ -40,7 +40,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     title: 'Instruksi pengguna berhasil diuraikan',
     status: 'completed',
   });
-  logSummary.push(`[ApexPulse Orchestrator] Analisis query: "${userPrompt}" untuk sektor: ${sector}`);
+  logSummary.push(`[AionesBoard Orchestrator] Analisis query: "${userPrompt}" untuk sektor: ${sector}`);
 
   // Step 2: Query RAG & Retrieval Chunks
   onProgress?.({

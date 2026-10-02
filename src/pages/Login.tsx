@@ -16,8 +16,8 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
-  const [email, setEmail] = useState('demo@apexpulse.id');
-  const [password, setPassword] = useState('apexpulse2026');
+  const [email, setEmail] = useState('demo@aionesboard.id');
+  const [password, setPassword] = useState('aionesboard2026');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +50,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       // Sesi ditandai via cookie HttpOnly yang diset server — localStorage hanya
       // menyimpan profil user untuk mempercepat boot UI (bukan kredensial).
       const store = rememberMe ? localStorage : sessionStorage;
-      store.setItem('apexpulse_user', JSON.stringify(data.user));
+      store.setItem('aionesboard_user', JSON.stringify(data.user));
 
       onLoginSuccess(data.user, 'cookie-session');
     } catch (err: any) {
@@ -70,7 +70,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
               AP
             </div>
             <span className="font-bold text-slate-900 text-sm tracking-tight flex items-center gap-2">
-              ApexPulse
+              AionesBoard
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-300">
                 PORTAL BUMD
               </span>
@@ -88,7 +88,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
           <div className="md:col-span-5 bg-slate-50/80 p-6 sm:p-8 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col justify-center space-y-5">
             <div>
               <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-snug">
-                Masuk ke Portal ApexPulse
+                Masuk ke Portal AionesBoard
               </h1>
               <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                 Dashboard kinerja instansi berbasis dokumen resmi RAG.
@@ -147,7 +147,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">Kata Sandi</label>
                   <span className="text-[11px] font-mono text-slate-400">
-                    Default: apexpulse2026
+                    Default: aionesboard2026
                   </span>
                 </div>
                 <div className="relative">
@@ -207,7 +207,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 px-6 py-4 text-xs text-slate-500">
         <div className="max-w-6xl mx-auto">
-          © 2026 ApexPulse — Portal Dashboard BUMD
+          © 2026 AionesBoard — Portal Dashboard BUMD
         </div>
       </footer>
     </div>

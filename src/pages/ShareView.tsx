@@ -86,7 +86,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
           <Activity className="w-6 h-6" />
         </div>
         <h2 className="text-base font-bold text-white tracking-wide">
-          Memuat Tampilan Publik ApexPulse...
+          Memuat Tampilan Publik AionesBoard...
         </h2>
         <p className="text-xs text-slate-400 mt-1 max-w-sm">
           Mengambil spesifikasi visualisasi dan memverifikasi integritas sitasi dokumen BUMD.
@@ -121,7 +121,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
               <span>Protokol Keamanan Data BUMD</span>
             </div>
             <p className="text-slate-500 leading-normal">
-              ApexPulse menerapkan isolasi tenant multi-instansi. Tautan read-only dapat dibatasi durasi berlakunya atau dicabut sewaktu-waktu oleh administrator instansi.
+              AionesBoard menerapkan isolasi tenant multi-instansi. Tautan read-only dapat dibatasi durasi berlakunya atau dicabut sewaktu-waktu oleh administrator instansi.
             </p>
           </div>
 
@@ -130,7 +130,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
               href="/"
               className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
             >
-              Kembali ke Beranda ApexPulse
+              Kembali ke Beranda AionesBoard
             </a>
           </div>
         </div>
@@ -278,7 +278,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token }) => {
       {/* Official Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         <p className="font-semibold text-slate-700">
-          ApexPulse — Sistem Otomasi Visualisasi & Intelijensi Data BUMD
+          AionesBoard — Sistem Otomasi Visualisasi & Intelijensi Data BUMD
         </p>
         <p className="text-[11px] text-slate-400 mt-1">
           Dihasilkan secara aman dari repositori dokumen RAG terenkripsi • Standar Tata Kelola Pemerintahan Daerah

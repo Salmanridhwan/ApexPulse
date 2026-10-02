@@ -1,18 +1,18 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 /**
- * Autentikasi ApexPulse — memakai crypto bawaan Node (scrypt + HMAC),
+ * Autentikasi AionesBoard — memakai crypto bawaan Node (scrypt + HMAC),
  * tanpa dependensi eksternal. Token sesi dikirim via cookie HttpOnly.
  */
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'apexpulse-dev-secret-ganti-di-produksi';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'aionesboard-dev-secret-ganti-di-produksi';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 hari
 
 // Di produksi, secret default berarti siapa pun yang tahu kode bisa memalsukan
 // token sesi. Peringatkan dengan keras (jangan diam-diam aman-palsu).
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
   console.warn(
-    '[ApexPulse Auth] SESSION_SECRET belum diisi — memakai secret default. ' +
+    '[AionesBoard Auth] SESSION_SECRET belum diisi — memakai secret default. ' +
       'Set SESSION_SECRET di .env sebelum dipakai produksi!'
   );
 }
@@ -67,7 +67,7 @@ export function verifySession(token: string | undefined): SessionPayload | null 
   }
 }
 
-export const SESSION_COOKIE = 'apexpulse_session';
+export const SESSION_COOKIE = 'aionesboard_session';
 
 export function sessionCookieHeader(token: string): string {
   return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;

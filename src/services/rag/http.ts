@@ -120,7 +120,7 @@ export const SKEMA_FOKUS: Record<string, any> = {
 };
 
 
-/** Ubah satu item hasil /extract menjadi Widget Spec ApexPulse (sesuai skema Zod). */
+/** Ubah satu item hasil /extract menjadi Widget Spec AionesBoard (sesuai skema Zod). */
 /** Batas panjang teks supaya kartu tidak penuh dan tidak terpotong CSS. */
 const BATAS_TEKS = { judulDash: 64, judul: 56, label: 44, nilai: 20, satuan: 18, delta: 62, narasi: 340, deskripsi: 150 };
 
@@ -281,23 +281,65 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
   // --- Grafik: hanya kalau kategori dan seluruh seri panjangnya sama
   const g = payload?.grafik;
   const kategori = (Array.isArray(g?.kategori) ? g.kategori : []).map((x: any) => potong(x, 24));
-  const seri = (Array.isArray(g?.seri) ? g.seri : [])
-    .map((s: any, i: number) => ({
-      name: potong(s?.nama || `Seri ${i + 1}`, 28),
-      data: (Array.isArray(s?.data) ? s.data : []).map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n)),
-      color: WARNA_SERI[i % WARNA_SERI.length],
-    }))
+
+  // ── Normalisasi satuan grafik ──────────────────────────────────────────────
+  // RAG kadang mengembalikan data lintas satuan dalam satu grafik, mis. beberapa
+  // item kategori dalam "triliun" dan sisanya dalam "miliar". Normalisasi ke
+  // satuan terkecil (miliar) agar bar proporsional.
+  function deteksiMultiplierSatuan(teks: string): number {
+    const u = (teks || '').toLowerCase();
+    if (/triliun/.test(u)) return 1_000;   // 1 triliun = 1000 miliar
+    if (/miliar|milyar/.test(u)) return 1;
+    if (/juta/.test(u)) return 0.001;
+    if (/ribu/.test(u)) return 0.000_001;
+    return 1;
+  }
+
+  // Periksa apakah label xAxis/kategori mengandung satuan (mis. "Sustainable Bond (triliun)")
+  // dan nilai yang dikembalikan RAG masih dalam angka aslinya.
+  // Juga cek satuan header grafik (g.satuan).
+  const satuanGrafik = String(g?.satuan || '');
+  const multiplierGrafik = deteksiMultiplierSatuan(satuanGrafik);
+
+  // Periksa per-seri: apakah ada metadata satuan per-seri dari RAG.
+  const seriRaw = (Array.isArray(g?.seri) ? g.seri : []);
+  const multiplierPerSeri = seriRaw.map((s: any) => deteksiMultiplierSatuan(String(s?.satuan || satuanGrafik)));
+  const adaSatuanCampur = multiplierPerSeri.some((m: number) => m !== multiplierPerSeri[0]);
+  const multiplierDasar = adaSatuanCampur ? Math.min(...multiplierPerSeri) : 1;
+
+  const seri = seriRaw
+    .map((s: any, i: number) => {
+      const mult = adaSatuanCampur ? multiplierPerSeri[i] / multiplierDasar : 1;
+      return {
+        name: potong(s?.nama || `Seri ${i + 1}`, 28),
+        data: (Array.isArray(s?.data) ? s.data : [])
+          .map((n: any) => {
+            const angka = Number(n);
+            return Number.isFinite(angka) ? angka * mult : NaN;
+          })
+          .filter((n: number) => Number.isFinite(n)),
+        color: WARNA_SERI[i % WARNA_SERI.length],
+      };
+    })
     .filter((s: any) => s.data.length >= 3);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const grafikValid = kategori.length >= 3 && kategori.length <= 6 && seri.length > 0 && seri.every((s: any) => s.data.length === kategori.length);
   if (g && grafikValid) {
+    // Satuan display: kalau ada satuan campur, pakai satuan terkecil yang jadi basis.
+    let unitDisplay = satuanSeragam(g?.satuan);
+    if (adaSatuanCampur) {
+      const satuanMin = seriRaw[multiplierPerSeri.indexOf(Math.min(...multiplierPerSeri))]?.satuan;
+      unitDisplay = satuanSeragam(satuanMin) || unitDisplay;
+    }
     widgets.push({
       ...dasar,
       id: 'w-grafik-1',
       type: ['line', 'bar', 'area'].includes(g?.tipe) ? g.tipe : 'bar',
       title: judulGrafik(g?.judul, seri, kategori),
-      subtitle: satuanSeragam(g?.satuan),
+      subtitle: unitDisplay,
       grid: penata.kotak(12, 4),
-      chart: { xAxis: kategori, series: seri, unit: satuanSeragam(g?.satuan), showLegend: seri.length > 1 },
+      chart: { xAxis: kategori, series: seri, unit: unitDisplay, showLegend: seri.length > 1 },
       citations: [kutipanExtract('grafik-1', g?.docName, g?.page, g?.chunkSnippet)],
       periode: potong(g?.periode, 12) || '',
     });
@@ -646,9 +688,9 @@ export class ConfigurableRagClient implements RagClient {
       const { dipakai } = await this.resolveBase(cfg);
 
       // JALUR A lebih dulu: /extract mengembalikan angka nyata + sumbernya.
-      // Kalau endpoint ini tidak ada / tidak menemukan apa pun, lanjut ke
-      // retrieval biasa di bawah (Jalur B) tanpa menggagalkan permintaan.
-      if (cfg.useExtract !== false) {
+      // Jika mode === 'prose' (tanya-jawab / chat biasa), langsung gunakan /query
+      // agar dijawab oleh LLM dengan narasi teks dan kutipan sumber.
+      if (options.mode !== 'prose' && cfg.useExtract !== false) {
         const hasil = await this.cobaExtractJalurA(dipakai, cfg, options);
         if (hasil) {
           return {

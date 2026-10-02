@@ -41,7 +41,7 @@ export const LogoTile: React.FC<LogoTileProps> = ({ name, id, size = 'md', class
       style={{ backgroundColor: warnaTile(id || name || 'AP') }}
       title={name}
     >
-      {monogram(name || 'ApexPulse')}
+      {monogram(name || 'AionesBoard')}
     </span>
   );
 };

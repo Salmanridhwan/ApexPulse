@@ -271,7 +271,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <div className="flex items-center gap-2 truncate">
                 <Shield className="w-4 h-4 text-sky-600 shrink-0" />
                 <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">
-                  ApexPulse Admin & Governance Center
+                  AionesBoard Admin & Governance Center
                 </h1>
               </div>
             </div>
@@ -661,7 +661,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">
-                      API Key RAG
+                      API Key LLM / RAG
                     </label>
                     <div className="relative">
                       <input
@@ -679,7 +679,27 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">
-                      Batas Waktu Respons RAG (Detik)
+                      Model LLM <span className="font-normal text-slate-400">(untuk Chat Orchestrator)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="gpt-4o-mini"
+                      value={(systemConfig as any).ragModel || 'gpt-4o-mini'}
+                      onChange={(e) =>
+                        setSystemConfig({ ...systemConfig, ragModel: e.target.value } as any)
+                      }
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Contoh: <span className="font-mono">gpt-4o-mini</span>, <span className="font-mono">gemini-1.5-flash</span>, <span className="font-mono">llama-3.1-70b</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Batas Waktu Respons (Detik)
                     </label>
                     <input
                       type="number"
@@ -695,6 +715,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     <p className="text-[10px] text-slate-400 mt-1">Standar PRD: maksimal 60 detik</p>
                   </div>
                 </div>
+
 
                 <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <input

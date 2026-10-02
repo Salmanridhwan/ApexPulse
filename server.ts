@@ -20,7 +20,7 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, Dashboard, NotificationItem, ProgressStep, WidgetSpec } from './src/types';
+import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, WidgetSpec } from './src/types';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 
@@ -265,6 +265,62 @@ async function startServer() {
     res.json(dup);
   });
 
+  // ================= RIWAYAT CHAT (satu chat per dashboard) =================
+  // Riwayat menempel pada dashboard-nya dan dibuat MALAS saat dashboard pertama
+  // kali dibuka — dashboard lama tidak perlu migrasi data apa pun.
+  app.get('/api/dashboards/:id/chat', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const dashboard = db.getDashboardById(req.params.id, tenantId);
+    if (!dashboard) {
+      return res.status(404).json({ error: 'Dashboard tidak ditemukan atau akses ditolak.' });
+    }
+    const chat = db.ensureChatForDashboard(dashboard.id, tenantId, session.userId, dashboard.title);
+    res.json({ chat, dashboard });
+  });
+
+  // Ringkasan (tanpa isi pesan) — untuk indikator riwayat di kartu dashboard.
+  app.get('/api/chats', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const ringkas = db.getChats(effectiveTenantId(req, session)).map((c) => ({
+      id: c.id,
+      dashboardId: c.dashboardId,
+      title: c.title,
+      messageCount: c.messages.length,
+      updatedAt: c.updatedAt,
+    }));
+    res.json(ringkas);
+  });
+
+  app.patch('/api/chats/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    if (!title) return res.status(400).json({ error: 'Judul chat wajib diisi.' });
+    const updated = db.updateChat(req.params.id, { title }, effectiveTenantId(req, session));
+    if (!updated) return res.status(404).json({ error: 'Chat tidak ditemukan.' });
+    res.json(updated);
+  });
+
+  // Hapus riwayat chat SAJA — dashboard-nya sengaja dibiarkan hidup.
+  app.delete('/api/chats/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const ok = db.deleteChat(req.params.id, effectiveTenantId(req, session));
+    if (!ok) return res.status(404).json({ error: 'Chat tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId: effectiveTenantId(req, session),
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Riwayat Chat',
+      target: req.params.id,
+      details: 'Riwayat percakapan dihapus; dashboard tetap ada',
+    });
+    res.json({ success: true });
+  });
+
   // ================= CHAT & SSE STREAMING ROUTE =================
   // Ambil data NYATA satu indikator untuk widget dari katalog preset.
   // Tidak ada angka contoh: kalau dokumen tidak memuat indikatornya, balas 502.
@@ -306,6 +362,8 @@ async function startServer() {
     if (!session) return;
 
     const { prompt, activeDashboardId } = req.body;
+    // Dashboard milik chat ini. `activeDashboardId` lama tetap didukung sebagai alias.
+    const dashboardId: string | undefined = req.body.dashboardId || activeDashboardId;
     const sector = (req.body.sector || 'pdam') as BumdSector;
     const tenantId = effectiveTenantId(req, session);
 
@@ -325,11 +383,118 @@ async function startServer() {
 
     try {
       const lower = prompt.toLowerCase();
-      let activeDash = activeDashboardId
-        ? db.getDashboardById(activeDashboardId, tenantId)
-        : db.getDashboards(tenantId)[0];
+      const activeDash = dashboardId ? db.getDashboardById(dashboardId, tenantId) : undefined;
+
+      // Riwayat menempel pada dashboard-nya; dibuat kalau belum ada (lazy).
+      let chat = activeDash
+        ? db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title)
+        : undefined;
+      let pesanUserTercatat = false;
+      const pesanBaru = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+        if (!chat && activeDash) {
+          chat = db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title);
+        }
+        if (!chat) return;
+        db.addChatMessage(
+          chat.id,
+          {
+            ...msg,
+            id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            timestamp: new Date().toISOString(),
+          },
+          tenantId
+        );
+      };
+      const catatPesanUser = () => {
+        if (pesanUserTercatat) return;
+        pesanUserTercatat = true;
+        pesanBaru({ sender: 'user', text: prompt });
+      };
+      /** Balasan asisten — urutannya dijamin setelah prompt user. */
+      const catatAsisten = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+        catatPesanUser();
+        pesanBaru(msg);
+      };
 
       // Check if this is a conversational EDIT instruction
+
+      // Case 0: Chart / widget recommendations & pertanyaan penambahan chart
+      const isRekomendasi =
+        lower.includes('rekomendasi') ||
+        lower.includes('rekomendasikan') ||
+        lower.includes('chart apa') ||
+        lower.includes('grafik apa') ||
+        lower.includes('widget apa') ||
+        lower.includes('tambah chart') ||
+        lower.includes('tambahkan chart') ||
+        lower.includes('tambah grafik') ||
+        lower.includes('tambahkan grafik') ||
+        lower.includes('tambah widget') ||
+        lower.includes('tambahkan widget') ||
+        lower.includes('saran chart') ||
+        lower.includes('saran grafik') ||
+        lower.includes('apa yang bisa') ||
+        lower.includes('chart yang bisa') ||
+        lower.includes('chart yang dapat') ||
+        lower.includes('suggest') ||
+        lower.includes('bisa menambahkan') ||
+        lower.includes('bisa tambah') ||
+        lower.includes('apakah bisa') ||
+        lower.includes('chart lagi') ||
+        lower.includes('widget lagi') ||
+        lower.includes('grafik lagi');
+
+      if (isRekomendasi) {
+        sendEvent('step', { id: 's0', title: 'Menganalisis katalog widget & dokumen...', status: 'in_progress' });
+        await new Promise((r) => setTimeout(r, 300));
+
+        const tenant = db.tenants.find((t) => t.id === tenantId);
+        const sectorFilter = sector || tenant?.sector || 'universal';
+
+        // Pick relevant widgets from catalog (matching sector, max 6)
+        const matched = WIDGET_CATALOG.filter(
+          (w) => w.sektor.includes(sectorFilter as any) || w.sektor.includes('universal')
+        ).slice(0, 6);
+
+        // Exclude already-added widget ids if dashboard exists
+        const existingNames = activeDash?.widgets.map((w) => w.title.toLowerCase()) || [];
+        const suggestions = matched
+          .filter((w) => !existingNames.includes(w.nama.toLowerCase()))
+          .slice(0, 6);
+
+        const recommendations = (suggestions.length > 0 ? suggestions : matched.slice(0, 6)).map((w) => ({
+          id: w.id,
+          name: w.nama,
+          category: w.kategori,
+          chartTypes: w.tipeChart,
+          description: w.deskripsi,
+          prompt: `Tambahkan widget "${w.nama}" ke dashboard`,
+        }));
+
+        sendEvent('step', { id: 's0', title: `Ditemukan ${recommendations.length} rekomendasi chart`, status: 'completed' });
+
+        const isPertanyaanBisa = lower.includes('bisa') || lower.includes('apakah') || lower.includes('cara');
+        const pembuka = isPertanyaanBisa
+          ? `Tentu saja bisa! Anda dapat menambahkan widget chart baru ke dashboard ini kapan saja.\n\n`
+          : '';
+
+        const replyText = `${pembuka}Berikut beberapa rekomendasi chart dari katalog dokumen resmi ${sector.toUpperCase()} yang relevan. Anda bisa langsung mengklik salah satu tombol di bawah untuk menyematkannya ke kanvas:`;
+        catatAsisten({
+          sender: 'system',
+          text: replyText,
+          actionTaken: 'recommend',
+          recommendations,
+        } as any);
+
+        sendEvent('result', {
+          actionTaken: 'recommend',
+          message: replyText,
+          recommendations,
+        });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
+
       // Case 1: Hapus widget
       if (lower.startsWith('hapus widget') || lower.includes('delete widget')) {
         sendEvent('step', { id: 's1', title: 'Menganalisis widget yang akan dihapus...', status: 'in_progress' });
@@ -356,6 +521,11 @@ async function startServer() {
             });
 
             sendEvent('step', { id: 's1', title: `Widget "${removed.title}" berhasil dihapus`, status: 'completed' });
+            catatAsisten({
+              sender: 'system',
+              text: `Widget "${removed.title}" telah dihapus dari dashboard.`,
+              actionTaken: 'remove_widget',
+            });
             sendEvent('result', {
               actionTaken: 'remove_widget',
               message: `Widget "${removed.title}" telah dihapus dari dashboard.`,
@@ -405,6 +575,11 @@ async function startServer() {
             });
 
             sendEvent('step', { id: 's1', title: `Tipe visualisasi widget "${target.title}" diubah ke ${newType.toUpperCase()}`, status: 'completed' });
+            catatAsisten({
+              sender: 'system',
+              text: `Visualisasi widget "${target.title}" telah diubah menjadi ${newType.toUpperCase()}.`,
+              actionTaken: 'update_widget',
+            });
             sendEvent('result', {
               actionTaken: 'update_widget',
               message: `Visualisasi widget "${target.title}" telah diubah menjadi ${newType.toUpperCase()}.`,
@@ -416,7 +591,106 @@ async function startServer() {
         }
       }
 
-      // Case 3: DEFAULT -> Generate Full Dashboard via RAG Orchestrator
+      // Case 2.5: Pertanyaan bebas (chatbot) — jawab via /query RAG tanpa generate dashboard
+      // Deteksi: pertanyaan informatif, bukan perintah membuat/mengubah dashboard
+      const isGenerateDash =
+        lower.includes('buat dashboard') ||
+        lower.includes('buatkan dashboard') ||
+        lower.includes('generate dashboard') ||
+        lower.includes('buat laporan') ||
+        lower.includes('buatkan laporan') ||
+        lower.includes('tampilkan dashboard') ||
+        lower.includes('perbarui dashboard') ||
+        lower.includes('update dashboard') ||
+        lower.includes('buat kpi') ||
+        lower.includes('buatkan kpi');
+
+      const isPertanyaanBebas =
+        !isGenerateDash && (
+          lower.includes('?') ||
+          lower.startsWith('berapa') ||
+          lower.startsWith('apa') ||
+          lower.startsWith('siapa') ||
+          lower.startsWith('bagaimana') ||
+          lower.startsWith('mengapa') ||
+          lower.startsWith('kenapa') ||
+          lower.startsWith('kapan') ||
+          lower.startsWith('di mana') ||
+          lower.startsWith('dimana') ||
+          lower.startsWith('jelaskan') ||
+          lower.startsWith('ceritakan') ||
+          lower.startsWith('sebutkan') ||
+          lower.startsWith('tolong jelaskan') ||
+          lower.startsWith('tolong ceritakan') ||
+          lower.startsWith('tolong sebutkan') ||
+          lower.startsWith('cari') ||
+          lower.startsWith('cari tahu') ||
+          lower.startsWith('info') ||
+          lower.startsWith('informasi') ||
+          lower.includes('total') ||
+          lower.includes('berapa besar') ||
+          lower.includes('berapa total') ||
+          lower.includes('berapa jumlah') ||
+          lower.includes('berapa nilai') ||
+          lower.includes('tunjukkan') ||
+          lower.includes('persentase') ||
+          lower.includes('rasio') ||
+          lower.includes('pertumbuhan') ||
+          lower.includes('perkembangan') ||
+          lower.includes('kinerja') ||
+          lower.includes('capaian') ||
+          lower.includes('ringkasan')
+        );
+
+      if (isPertanyaanBebas) {
+        sendEvent('step', { id: 'sc0', title: 'Mencari jawaban di dokumen resmi...', status: 'in_progress' });
+
+        try {
+          const ragResult = await ragClient.query({
+            prompt,
+            sector,
+            mode: 'prose',
+          });
+
+          sendEvent('step', { id: 'sc0', title: 'Dokumen ditemukan, menyusun jawaban...', status: 'completed' });
+
+          const answer = ragResult.answer || 'Maaf, jawaban tidak ditemukan di dokumen yang tersedia.';
+          const citationsCount = ragResult.citations?.length || 0;
+
+          // Bangun teks balasan: jawaban + sumber
+          let replyText = answer;
+          if (citationsCount > 0) {
+            const sumberUnik = ragResult.citations
+              .slice(0, 3)
+              .map((c) => `• ${c.docName}${c.page ? ` (hal. ${c.page})` : ''}`)
+              .join('\n');
+            replyText += `\n\n📄 **Sumber Dokumen:**\n${sumberUnik}`;
+          }
+
+          catatAsisten({
+            sender: 'system',
+            text: replyText,
+            actionTaken: 'qa_answer' as any,
+            modeUsed: ragResult.mode,
+            citationsCount,
+          } as any);
+
+          sendEvent('result', {
+            actionTaken: 'qa_answer',
+            message: replyText,
+            modeUsed: ragResult.mode,
+            citationsCount,
+            latencyMs: ragResult.latencyMs,
+          });
+          sendEvent('done', { ok: true });
+          return res.end();
+        } catch (err: any) {
+          // Jika RAG gagal untuk pertanyaan, lanjut ke default generate dashboard
+          console.warn('[chat] chatbot RAG gagal, lanjut ke generate dashboard:', err?.message);
+        }
+      }
+
+      // Case 3: DEFAULT -> Generate / Perbarui Dashboard via RAG Orchestrator
       const onProgress = (step: ProgressStep) => {
         sendEvent('step', step);
       };
@@ -429,22 +703,76 @@ async function startServer() {
         ragClient,
       });
 
-      // Save to database
-      db.createDashboard(genResult.dashboard);
+      let dashboardTersimpan: Dashboard;
+      if (activeDash) {
+        dashboardTersimpan =
+          db.updateDashboard(
+            activeDash.id,
+            {
+              title: genResult.dashboard.title,
+              description: genResult.dashboard.description,
+              widgets: genResult.dashboard.widgets,
+              sector,
+            },
+            tenantId
+          ) || activeDash;
+      } else {
+        dashboardTersimpan = db.createDashboard(genResult.dashboard);
+        chat = db.ensureChatForDashboard(
+          dashboardTersimpan.id,
+          tenantId,
+          session.userId,
+          dashboardTersimpan.title
+        );
+        pesanUserTercatat = false;
+      }
 
       db.addAuditLog({
         tenantId,
         userId: session.userId,
         userName: session.name,
         action: 'Generate Dashboard Otomatis',
-        target: genResult.dashboard.title,
+        target: dashboardTersimpan.title,
         details: `Via ${genResult.modeUsed}, Sitasi: ${genResult.citationsCount}, Latensi: ${genResult.latencyMs}ms`,
+      });
+
+      // Susun jawaban percakapan yang kontekstual, manusiawi, dan informatif (bukan template kaku)
+      const kpis = dashboardTersimpan.widgets.filter((w) => w.type === 'kpi');
+      const charts = dashboardTersimpan.widgets.filter((w) => ['bar', 'line', 'area', 'donut', 'heatmap'].includes(w.type));
+      const narasiWidget = dashboardTersimpan.widgets.find((w) => w.type === 'narasi');
+
+      const kpiItems = kpis.slice(0, 3).map((k) => `• **${k.title}**: ${k.kpi?.value} ${k.kpi?.unit || ''}`).join('\n');
+      const chartNames = charts.map((c) => `• ${c.title} (${c.type.toUpperCase()})`).join('\n');
+
+      let replyText = `Tentu! Dashboard **"${dashboardTersimpan.title}"** berhasil ${activeDash ? 'diperbarui' : 'disintesis'} menggunakan dokumen resmi ${sector.toUpperCase()}.\n\n`;
+
+      if (narasiWidget?.narasi?.text) {
+        replyText += `📋 **Ringkasan Temuan Dokumen:**\n${narasiWidget.narasi.text}\n\n`;
+      }
+
+      if (charts.length > 0) {
+        replyText += `📈 **Visualisasi Grafik:**\n${chartNames}\n\n`;
+      }
+
+      if (kpiItems) {
+        replyText += `🎯 **Indikator Kunci Utama:**\n${kpiItems}\n\n`;
+      }
+
+      replyText += `Seluruh data diverifikasi langsung via **${genResult.modeUsed}** dengan **${genResult.citationsCount} sitasi resmi**.\n`;
+      replyText += `Anda bisa meminta penyesuaian lebih lanjut (misalnya: *"rekomendasi chart"*, *"ubah grafik ke diagram garis"*, atau *"hapus widget [nama]"*).`;
+
+      catatAsisten({
+        sender: 'system',
+        text: replyText,
+        actionTaken: 'create_dashboard',
+        modeUsed: genResult.modeUsed,
+        citationsCount: genResult.citationsCount,
       });
 
       sendEvent('result', {
         actionTaken: 'create_dashboard',
-        message: `Dashboard berhasil dibuat via ${genResult.modeUsed} dengan ${genResult.citationsCount} sitasi resmi terverifikasi.`,
-        dashboard: genResult.dashboard,
+        message: replyText,
+        dashboard: dashboardTersimpan,
         modeUsed: genResult.modeUsed,
         citationsCount: genResult.citationsCount,
         latencyMs: genResult.latencyMs,
@@ -452,6 +780,7 @@ async function startServer() {
 
       sendEvent('done', { ok: true });
       res.end();
+
     } catch (err: any) {
       sendEvent('error', { message: err?.message || 'Terjadi kesalahan sistem saat pemrosesan RAG.' });
       res.end();

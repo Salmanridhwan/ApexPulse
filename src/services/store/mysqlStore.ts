@@ -1,5 +1,5 @@
 /**
- * Mirror persistence ApexPulse ke MySQL (Laragon).
+ * Mirror persistence AionesBoard ke MySQL (Laragon).
  *
  * Pola: in-memory tetap sumber baca (cepat untuk demo), setiap mutasi
  * di-mirror ke MySQL dengan mengganti koleksi terkait dalam satu transaksi
@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AuditLog, Dashboard, NotificationItem, Tenant } from '../../types';
+import { AlertRule, AuditLog, Chat, Dashboard, NotificationItem, Tenant } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 export interface MysqlConfig {
@@ -21,6 +21,7 @@ export interface MysqlConfig {
 
 export interface DbSnapshot {
   dashboards: Dashboard[];
+  chats: Chat[];
   alertRules: AlertRule[];
   notifications: NotificationItem[];
   auditLogs: AuditLog[];
@@ -33,6 +34,7 @@ export interface DbSnapshot {
 
 export interface LoadedState {
   dashboards?: Dashboard[];
+  chats?: Chat[];
   alertRules?: AlertRule[];
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
@@ -95,7 +97,7 @@ export class MysqlStore {
     const pkCols = (pkRows as Array<{ COLUMN_NAME: string }>).map((r) => r.COLUMN_NAME);
     if (pkCols.length === 1 && pkCols[0] === 'name') {
       await this.pool.query('ALTER TABLE collections DROP PRIMARY KEY, ADD PRIMARY KEY (name, idx)');
-      console.log('[ApexPulse DB] Tabel collections dimigrasikan ke PK komposit (name, idx)');
+      console.log('[AionesBoard DB] Tabel collections dimigrasikan ke PK komposit (name, idx)');
     }
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS kv (
@@ -121,6 +123,7 @@ export class MysqlStore {
       );
     }
     if (arrays.dashboards) hasil.dashboards = arrays.dashboards as Dashboard[];
+    if (arrays.chats) hasil.chats = arrays.chats as Chat[];
     if (arrays.alertRules) hasil.alertRules = arrays.alertRules as AlertRule[];
     if (arrays.notifications) hasil.notifications = arrays.notifications as NotificationItem[];
     if (arrays.auditLogs) hasil.auditLogs = arrays.auditLogs as AuditLog[];
@@ -159,6 +162,10 @@ export class MysqlStore {
       await masukkan(
         'dashboards',
         s.dashboards.map((d) => ({ id: d.id, data: d }))
+      );
+      await masukkan(
+        'chats',
+        s.chats.map((c) => ({ id: c.id, data: c }))
       );
       await masukkan(
         'alertRules',

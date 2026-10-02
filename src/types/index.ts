@@ -188,16 +188,41 @@ export interface ProgressStep {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
+export interface ChatRecommendation {
+  id: string;       // WIDGET_CATALOG id, e.g. 'W-01'
+  name: string;
+  category: string;
+  chartTypes: string[];
+  description: string;
+  prompt: string;   // suggested follow-up prompt to send
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'recommend';
   affectedWidgetId?: string;
   modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)';
   citationsCount?: number;
   progressSteps?: ProgressStep[];
+  recommendations?: ChatRecommendation[];
+}
+
+/**
+ * Satu percakapan orkestrator, terikat pada SATU dashboard.
+ * `dashboardId` unik: satu dashboard tidak boleh punya dua chat.
+ */
+export interface Chat {
+  id: string;
+  dashboardId: string;
+  tenantId: string;
+  userId: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RAGProbeResult {

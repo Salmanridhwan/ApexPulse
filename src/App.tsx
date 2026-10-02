@@ -84,11 +84,11 @@ export default function App() {
   // Authentication State
   // Sesi tercatat di cookie HttpOnly (dari server); token tak lagi disimpan di storage browser.
   const [authToken, setAuthToken] = useState<string | null>(() => {
-    return localStorage.getItem('apexpulse_user') || sessionStorage.getItem('apexpulse_user') ? 'cookie-session' : null;
+    return localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user') ? 'cookie-session' : null;
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('apexpulse_user') || sessionStorage.getItem('apexpulse_user');
+    const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -102,7 +102,7 @@ export default function App() {
   // App Core State
   // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
   const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'admin'>(() => {
-    const saved = localStorage.getItem('apexpulse_user') || sessionStorage.getItem('apexpulse_user');
+    const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
     if (saved) {
       try {
         if (JSON.parse(saved)?.role === 'admin') return 'admin';
@@ -120,6 +120,8 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hapusKonfirmasi, setHapusKonfirmasi] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  // Jumlah pesan riwayat per dashboardId — indikator di kartu DashboardList.
+  const [chatCounts, setChatCounts] = useState<Record<string, number>>({});
 
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -161,6 +163,34 @@ export default function App() {
     }
   }, [currentUser, authToken, activeDashboard]);
 
+  // Auto Fullscreen saat Mode Presentasi diaktifkan / dinonaktifkan
+  useEffect(() => {
+    if (isPresentationMode) {
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn('Auto fullscreen error:', err);
+        });
+      }
+    } else {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  }, [isPresentationMode]);
+
+  // Sync state ketika pengguna menekan tombol ESC browser
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isPresentationMode) {
+        setIsPresentationMode(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [isPresentationMode]);
+
   const handleLoginSuccess = (user: User, token: string) => {
     setCurrentUser(user);
     setAuthToken(token);
@@ -186,11 +216,31 @@ export default function App() {
         // ignore
       }
     }
-    localStorage.removeItem('apexpulse_user');
-    sessionStorage.removeItem('apexpulse_user');
+    localStorage.removeItem('aionesboard_user');
+    sessionStorage.removeItem('aionesboard_user');
     setAuthToken(null);
     setCurrentUser(null);
     setViewMode('workspace');
+  };
+
+  /** Muat ringkasan riwayat chat tenant (jumlah pesan per dashboard). */
+  const muatChatCounts = async (tenantId: string) => {
+    try {
+      const res = await fetch(`/api/chats?tenantId=${tenantId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      setChatCounts(
+        Object.fromEntries(
+          data.map((c: { dashboardId: string; messageCount: number }) => [
+            c.dashboardId,
+            c.messageCount,
+          ])
+        )
+      );
+    } catch (err) {
+      console.error('Fetch chat counts error:', err);
+    }
   };
 
   // Fetch Dashboards and Alerts when Tenant changes OR user just logged in.
@@ -215,6 +265,9 @@ export default function App() {
         }
       })
       .catch((err) => console.error('Fetch dashboards error:', err));
+
+    // Indikator riwayat di kartu dashboard.
+    muatChatCounts(currentTenant.id);
 
     // Fetch Alerts & Notifications
     fetch(`/api/alerts?tenantId=${currentTenant.id}`)
@@ -664,39 +717,7 @@ export default function App() {
                                 <span>Bagikan Tautan</span>
                               </button>
 
-                              {activeDashboard && (
-                                <div className="mt-1 pt-2 border-t border-blue-100">
-                                  <div className="px-2.5 pb-1.5 flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-500">
-                                    <Filter className="w-3 h-3" />
-                                    <span>Filter Dashboard</span>
-                                  </div>
-                                  {([
-                                    { key: 'periode', label: 'Periode', opts: [['2026-Q1', 'Triwulan I 2026'], ['2026-Q2', 'Triwulan II 2026'], ['2026-FY', 'Tahun Penuh 2026'], ['2025-FY', 'Tahun 2025']] },
-                                    { key: 'unitKerja', label: 'Unit Kerja', opts: [['Semua', 'Semua Unit'], ['Kantor Pusat', 'Kantor Pusat'], ['Wilayah Barat', 'Wilayah Barat'], ['Wilayah Timur', 'Wilayah Timur']] },
-                                    { key: 'kategori', label: 'Kategori', opts: [['Semua', 'Semua Kategori'], ['Keuangan', 'Keuangan'], ['Operasional', 'Operasional'], ['Pelayanan', 'Pelayanan'], ['Kepatuhan & Risiko', 'Kepatuhan & Risiko']] },
-                                  ] as const).map((f) => (
-                                    <label key={f.key} className="block px-1.5 pb-1.5">
-                                      <span className="block text-[10px] text-blue-500 mb-0.5">{f.label}</span>
-                                      <select
-                                        value={(activeDashboard.globalFilters as any)[f.key]}
-                                        onChange={(e) =>
-                                          handleGlobalFiltersChange({
-                                            ...activeDashboard.globalFilters,
-                                            [f.key]: e.target.value,
-                                          })
-                                        }
-                                        className="w-full text-xs font-medium text-blue-900 bg-blue-50/70 border border-blue-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                      >
-                                        {f.opts.map(([val, teks]) => (
-                                          <option key={val} value={val}>
-                                            {teks}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
+
 
                               {activeDashboard && (
                                 <div className="mt-1 pt-1.5 border-t border-blue-100">
@@ -766,6 +787,12 @@ export default function App() {
                     setActiveDashboard(d);
                     setIsShareOpen(true);
                   }}
+                  chatCounts={chatCounts}
+                  onOpenChatHistory={(d) => {
+                    setActiveDashboard(d);
+                    setViewMode('workspace');
+                    setIsChatOpen(true);
+                  }}
                   onBackToWorkspace={() => setViewMode('workspace')}
                 />
               </React.Suspense>
@@ -785,103 +812,115 @@ export default function App() {
               </React.Suspense>
             ) : (
               <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-                {/* Executive Presentation Floating Bar when Active */}
-                {isPresentationMode && (
-                  <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900/90 text-white px-3 py-1.5 rounded-full shadow-2xl backdrop-blur-md border border-slate-700 text-xs">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-semibold">Mode Presentasi Eksekutif</span>
-                    <button
-                      onClick={() => setIsPresentationMode(false)}
-                      className="ml-2 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
-                    >
-                      <Minimize2 className="w-3 h-3" />
-                      <span>Keluar</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Judul dashboard ringkas (banner gelap dihapus — light minimal).
-                    Hierarki: deskripsi = lead utama, meta = keterangan sekunder. */}
-                {activeDashboard && !isPresentationMode && (
-                  <div className="mb-5 min-w-0">
-                    <p className="text-sm font-medium text-slate-600 max-w-2xl leading-relaxed">
-                      {activeDashboard.description ||
-                        `${currentTenant?.name || ''} — ${currentTenant?.city || ''}`}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {activeDashboard.widgets.length} widget · Diperbarui{' '}
-                      {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                  </div>
-                )}
-
-                {/* Bar aksi kanvas — pil filter kiri, tombol aksi kanan (ala referensi) */}
-                {activeDashboard && !isPresentationMode && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-blue-100 rounded-lg">
-                        <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
-                        {activeDashboard.widgets.length} Widget
-                      </span>
-                      {([
-                        { key: 'periode', label: 'Periode' },
-                        { key: 'unitKerja', label: 'Unit Kerja' },
-                        { key: 'kategori', label: 'Kategori' },
-                      ] as const).map((f) => (
-                        <label
-                          key={f.key}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white border border-blue-100 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
-                        >
-                          <span className="text-slate-500 font-medium">{f.label}:</span>
-                          <select
-                            value={(activeDashboard.globalFilters as any)[f.key]}
-                            onChange={(e) =>
-                              handleGlobalFiltersChange({
-                                ...activeDashboard.globalFilters,
-                                [f.key]: e.target.value,
-                              })
-                            }
-                            className="text-xs font-semibold text-blue-800 bg-transparent focus:outline-none cursor-pointer"
-                          >
-                            {(f.key === 'periode'
-                              ? [['2026-Q1', 'Triwulan I 2026'], ['2026-Q2', 'Triwulan II 2026'], ['2026-FY', 'Tahun Penuh 2026'], ['2025-FY', 'Tahun 2025']]
-                              : f.key === 'unitKerja'
-                                ? [['Semua', 'Semua Unit'], ['Kantor Pusat', 'Kantor Pusat'], ['Wilayah Barat', 'Wilayah Barat'], ['Wilayah Timur', 'Wilayah Timur']]
-                                : [['Semua', 'Semua Kategori'], ['Keuangan', 'Keuangan'], ['Operasional', 'Operasional'], ['Pelayanan', 'Pelayanan'], ['Kepatuhan & Risiko', 'Kepatuhan & Risiko']]
-                            ).map(([val, teks]) => (
-                              <option key={val} value={val}>{teks}</option>
-                            ))}
-                          </select>
-                        </label>
-                      ))}
+                {/* Executive Presentation Top Header with Title when Active */}
+                {isPresentationMode && activeDashboard && (
+                  <div className="mb-6 bg-white/95 backdrop-blur-md text-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-500/50" />
+                        <span className="text-xs uppercase font-bold tracking-wider text-blue-600">
+                          {currentTenant?.name || 'Laporan Eksekutif'} • Mode Presentasi
+                        </span>
+                      </div>
+                      <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                        {activeDashboard.title}
+                      </h1>
+                      {activeDashboard.description && (
+                        <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed font-medium">
+                          {activeDashboard.description}
+                        </p>
+                      )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                      <span className="text-xs text-slate-600 font-semibold px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200/80 hidden sm:inline-block">
+                        {activeDashboard.widgets.length} Widget
+                      </span>
                       <button
-                        onClick={() => setIsCatalogOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                        onClick={() => setIsPresentationMode(false)}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-900 border border-slate-200/90 transition-all flex items-center gap-1.5 text-xs font-bold shadow-2xs active:scale-[0.98]"
                       >
-                        <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Tambah Chart</span>
+                        <Minimize2 className="w-4 h-4 text-slate-600" />
+                        <span>Keluar Presentasi</span>
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Visual Header & Toolbar Card */}
+                {activeDashboard && !isPresentationMode && (
+                  <div className="mb-6 bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 rounded-2xl p-4 sm:p-5">
+                    {/* Ringkasan & Deskripsi Header */}
+                    <div className="pb-4 mb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-relaxed">
+                          {activeDashboard.description ||
+                            `${currentTenant?.name || ''} — ${currentTenant?.city || ''}`}
+                        </h2>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 font-medium">
+                          <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">
+                            {activeDashboard.widgets.length} widget
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Diperbarui{' '}
+                            {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mode Presentasi Button (di atas 3 tombol aksi) */}
                       <button
-                        onClick={() => setIsExportOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                        onClick={() => setIsPresentationMode(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-blue-50/80 hover:text-blue-700 border border-slate-200/90 hover:border-blue-200 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-150 active:scale-[0.98] self-start sm:self-center shrink-0"
                       >
-                        <Printer className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Ekspor</span>
+                        <Maximize2 className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Mode Presentasi</span>
                       </button>
-                      <button
-                        onClick={() => setIsShareOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span>Bagikan</span>
-                      </button>
+                    </div>
+
+                    {/* Controls Toolbar (Widget Counter & Action Buttons) */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      {/* Sub-group Kiri: Status & Counter */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Widget Counter Pill */}
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100/90 border border-slate-200/80 rounded-xl shadow-2xs">
+                          <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
+                          {activeDashboard.widgets.length} Widget
+                        </span>
+                      </div>
+
+                      {/* Sub-group Kanan: Aksi Utama */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => setIsCatalogOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-150 active:scale-[0.98]"
+                        >
+                          <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Tambah Chart</span>
+                        </button>
+
+                        <button
+                          onClick={() => setIsExportOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-150 active:scale-[0.98]"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Ekspor</span>
+                        </button>
+
+                        <button
+                          onClick={() => setIsShareOpen(true)}
+                          className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 rounded-xl shadow-md shadow-blue-800/20 hover:shadow-lg hover:shadow-blue-800/30 transition-all duration-150 active:scale-[0.98]"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span>Bagikan</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -910,10 +949,14 @@ export default function App() {
       {/* 1. Chat Panel with SSE Streaming */}
       <ChatPanel
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => {
+          setIsChatOpen(false);
+          // Pesan baru mungkin saja bertambah — segarkan indikator.
+          if (currentTenant) muatChatCounts(currentTenant.id);
+        }}
         sector={currentTenant?.sector || 'pdam'}
         tenantId={currentTenant?.id || 'tenant-pdam'}
-        activeDashboardId={activeDashboard?.id}
+        dashboardId={activeDashboard?.id}
         onDashboardUpdated={(newDash) => {
           setActiveDashboard(newDash);
           setDashboards((prev) => [

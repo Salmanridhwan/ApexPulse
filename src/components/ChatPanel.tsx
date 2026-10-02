@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
+  BarChart2,
   Bot,
   CheckCircle2,
   ChevronRight,
@@ -9,52 +10,159 @@ import {
   FileCheck,
   Layers,
   Loader2,
+  PieChart,
+  Plus,
   Send,
   Sparkles,
+  TrendingUp,
   Trash2,
   X,
 } from 'lucide-react';
-import { BumdSector, ChatMessage, Dashboard, ProgressStep } from '../types';
+import { BumdSector, ChatMessage, ChatRecommendation, Dashboard, ProgressStep } from '../types';
 
 interface ChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   sector: BumdSector;
   tenantId: string;
-  activeDashboardId?: string;
+  /** Dashboard pemilik percakapan ini — sumber riwayatnya. */
+  dashboardId?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
 }
+
+// Chart type icon helper
+const ChartIcon: React.FC<{ type: string; className?: string }> = ({ type, className = 'w-3 h-3' }) => {
+  if (type === 'bar') return <BarChart2 className={className} />;
+  if (type === 'line' || type === 'area') return <TrendingUp className={className} />;
+  if (type === 'donut' || type === 'pie') return <PieChart className={className} />;
+  return <Layers className={className} />;
+};
+
+// Category color map
+const categoryColor: Record<string, string> = {
+  Keuangan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Operasional: 'bg-sky-50 text-sky-700 border-sky-200',
+  'Kepatuhan & Risiko': 'bg-amber-50 text-amber-700 border-amber-200',
+  SDM: 'bg-violet-50 text-violet-700 border-violet-200',
+  Pelanggan: 'bg-rose-50 text-rose-700 border-rose-200',
+};
+const getCategoryClass = (cat: string) =>
+  categoryColor[cat] || 'bg-slate-50 text-slate-600 border-slate-200';
+
+// Recommendation cards component
+const RecommendationCards: React.FC<{
+  items: ChatRecommendation[];
+  onSelect: (prompt: string) => void;
+  isStreaming: boolean;
+}> = ({ items, onSelect, isStreaming }) => (
+  <div className="mt-3 grid gap-2">
+    {items.map((rec, i) => (
+      <button
+        key={rec.id}
+        disabled={isStreaming}
+        onClick={() => onSelect(rec.prompt)}
+        className="group text-left w-full bg-white border border-slate-200 hover:border-sky-400 hover:shadow-md rounded-xl p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ animationDelay: `${i * 60}ms` }}
+      >
+        <div className="flex items-start gap-2.5">
+          {/* index badge */}
+          <span className="shrink-0 w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-[10px] font-bold flex items-center justify-center mt-0.5 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+            {i + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+              <span className="text-xs font-semibold text-slate-800 leading-tight">{rec.name}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getCategoryClass(rec.category)}`}>
+                {rec.category}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-snug line-clamp-2 mb-2">{rec.description}</p>
+            {/* chart type pills */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {rec.chartTypes.slice(0, 3).map((ct) => (
+                <span
+                  key={ct}
+                  className="inline-flex items-center gap-0.5 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono"
+                >
+                  <ChartIcon type={ct} className="w-2.5 h-2.5" />
+                  {ct}
+                </span>
+              ))}
+            </div>
+          </div>
+          {/* CTA arrow */}
+          <div className="shrink-0 mt-1 text-slate-300 group-hover:text-sky-500 transition-colors">
+            <Plus className="w-4 h-4" />
+          </div>
+        </div>
+      </button>
+    ))}
+  </div>
+);
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   isOpen,
   onClose,
   sector,
   tenantId,
-  activeDashboardId,
+  dashboardId,
   onDashboardUpdated,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg-welcome',
-      sender: 'system',
-      text: `Halo! Saya asisten orkestrator ApexPulse. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [inputPrompt, setInputPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ProgressStep[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  /** Timestamp pesan dari server berbentuk ISO; tampilkan sebagai jam lokal. */
+  const jam = (ts: string) => {
+    const d = new Date(ts);
+    return isNaN(d.getTime())
+      ? ts
+      : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentSteps]);
 
+  // Riwayat dimuat dari server tiap dashboard aktif berubah (server yang membuatnya).
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isStreaming) return; // Jangan bersihkan atau muat ulang riwayat saat sedang streaming respon!
+
+    if (!dashboardId) {
+      setChatId(undefined);
+      // PERBAIKAN: Jangan panggil setMessages([]) agar pesan lokal yang baru dikirim tidak hilang!
+      return;
+    }
+    let batal = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/dashboards/${dashboardId}/chat`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (batal) return;
+        setChatId(data.chat?.id);
+        if (Array.isArray(data.chat?.messages) && data.chat.messages.length > 0) {
+          setMessages(data.chat.messages);
+        }
+      } catch (err) {
+        if (!batal) console.error('Gagal memuat riwayat chat:', err);
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+  }, [isOpen, dashboardId, isStreaming]);
+
   const quickPrompts = [
-    `Buat dashboard kinerja keuangan & operasional ${sector.toUpperCase()} 2026`,
-    `Tampilkan tren capaian 12 bulan dan kepatuhan RKAP`,
-    `Ubah grafik visualisasi jadi diagram batang`,
-    `Hapus widget arus kas`,
+    `Berapa total aset ${sector.toUpperCase()} tahun 2025?`,
+    `Apa saja indikator kinerja utama ${sector.toUpperCase()}?`,
+    `Buat dashboard kinerja keuangan ${sector.toUpperCase()} 2026`,
+    `Rekomendasi chart untuk dashboard ini`,
+    `Bagaimana pertumbuhan laba bersih tahun ini?`,
   ];
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -73,8 +181,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setCurrentSteps([
-      { id: 'step-0', title: 'Menghubungkan ke API RAG...', status: 'in_progress' },
+      { id: 'step-0', title: 'Menghubungkan ke AionesBoard Orchestrator...', status: 'in_progress' },
     ]);
+
+    const streamStart = Date.now();
+    let pendingBotMsg: ChatMessage | null = null;
+    let pendingDashboard: Dashboard | null = null;
 
     try {
       const response = await fetch('/api/chat', {
@@ -84,7 +196,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           prompt,
           sector,
           tenantId,
-          activeDashboardId,
+          dashboardId,
         }),
       });
 
@@ -126,9 +238,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 });
               } else if (currentEvent === 'result') {
                 if (data.dashboard) {
-                  onDashboardUpdated(data.dashboard);
+                  pendingDashboard = data.dashboard;
                 }
-                const botMsg: ChatMessage = {
+                pendingBotMsg = {
                   id: `bot-${Date.now()}`,
                   sender: 'system',
                   text: data.message || 'Operasi selesai.',
@@ -136,16 +248,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   actionTaken: data.actionTaken,
                   modeUsed: data.modeUsed,
                   citationsCount: data.citationsCount,
+                  recommendations: data.recommendations,
                 };
-                setMessages((prev) => [...prev, botMsg]);
               } else if (currentEvent === 'error') {
-                const errMsg: ChatMessage = {
+                pendingBotMsg = {
                   id: `bot-err-${Date.now()}`,
                   sender: 'system',
                   text: `⚠️ Terjadi kendala: ${data.message}`,
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 };
-                setMessages((prev) => [...prev, errMsg]);
               }
             } catch (parseErr) {
               console.error('SSE JSON parse error:', parseErr);
@@ -154,16 +265,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
       }
     } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `bot-err-${Date.now()}`,
-          sender: 'system',
-          text: `Gagal memproses instruksi: ${err.message || 'Koneksi terputus.'}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      pendingBotMsg = {
+        id: `bot-err-${Date.now()}`,
+        sender: 'system',
+        text: `Gagal memproses instruksi: ${err.message || 'Koneksi terputus.'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
     } finally {
+      // Jamin durasi loading minimal (1000ms) agar indikator stepper terlihat jelas
+      const elapsed = Date.now() - streamStart;
+      const MIN_DISPLAY_TIME = 1000;
+      if (elapsed < MIN_DISPLAY_TIME) {
+        await new Promise((r) => setTimeout(r, MIN_DISPLAY_TIME - elapsed));
+      }
+
+      if (pendingDashboard) {
+        onDashboardUpdated(pendingDashboard);
+      }
+      if (pendingBotMsg) {
+        const msgToAdd = pendingBotMsg;
+        setMessages((prev) => [...prev, msgToAdd]);
+      }
+
       setIsStreaming(false);
       setCurrentSteps([]);
     }
@@ -183,15 +306,41 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
               <span>Chat Orchestrator RAG</span>
             </h2>
-            <p className="text-xs text-slate-500">Ekstraksi otomatis dokumen instansi BUMD</p>
+            <p className="text-xs text-slate-500">
+              {chatId && dashboardId ? `Riwayat tersimpan · ${messages.length} pesan` : 'Tanya dokumen resmi atau buat dashboard BUMD'}
+            </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {chatId && dashboardId && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Hapus riwayat percakapan ini? Dashboard-nya tetap ada.')) return;
+                try {
+                  const del = await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+                  if (!del.ok) throw new Error(`HTTP ${del.status}`);
+                  // Server membuat ulang chat kosong untuk dashboard ini.
+                  const ulang = await fetch(`/api/dashboards/${dashboardId}/chat`);
+                  const data = await ulang.json();
+                  setChatId(data.chat?.id);
+                  setMessages(data.chat?.messages || []);
+                } catch (err) {
+                  console.error('Gagal menghapus riwayat chat:', err);
+                }
+              }}
+              title="Hapus riwayat chat (dashboard tetap ada)"
+              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages List */}
@@ -199,29 +348,107 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'
-              }`}
+            className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[88%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-xs ${msg.sender === 'user'
+              className={`max-w-[92%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-xs ${
+                msg.sender === 'user'
                   ? 'bg-sky-600 text-white rounded-tr-none'
                   : 'bg-slate-50 border border-slate-200/80 text-slate-800 rounded-tl-none'
-                }`}
+              }`}
             >
+              {/* Sender & time */}
               <div className="flex items-center gap-1.5 mb-1 opacity-70 text-[10px]">
                 {msg.sender === 'user' ? (
                   <span>Anda</span>
                 ) : (
                   <>
                     <Bot className="w-3 h-3 text-sky-600" />
-                    <span>ApexPulse Orchestrator</span>
+                    <span>AionesBoard Orchestrator</span>
                   </>
                 )}
                 <span>•</span>
-                <span>{msg.timestamp}</span>
+                <span>{jam(msg.timestamp)}</span>
               </div>
 
-              <p className="whitespace-pre-line">{msg.text}</p>
+              {/* Message text – render markdown: bold, code, headings, bullet, newline */}
+              <div className="leading-relaxed space-y-1">
+                {msg.text.split('\n').map((rawLine, li) => {
+                  const line = rawLine.trim();
+                  if (!line) return <div key={li} className="h-1.5" />;
+
+                  // Inline parser: bold & code
+                  const renderInline = (s: string) => {
+                    // split by code `...`
+                    const codeParts = s.split(/`([^`]+)`/g);
+                    return codeParts.map((cp, ci) => {
+                      if (ci % 2 === 1) {
+                        return (
+                          <code key={ci} className="px-1 py-0.5 rounded bg-slate-200 text-slate-800 text-[11px] font-mono">
+                            {cp}
+                          </code>
+                        );
+                      }
+                      // split by **bold**
+                      const boldParts = cp.split(/\*\*(.*?)\*\*/g);
+                      return boldParts.map((bp, bi) =>
+                        bi % 2 === 1 ? <strong key={`${ci}-${bi}`} className="font-semibold text-slate-900">{bp}</strong> : <span key={`${ci}-${bi}`}>{bp}</span>
+                      );
+                    });
+                  };
+
+                  // Heading: ## or ###
+                  if (line.startsWith('### ')) {
+                    return <h4 key={li} className="font-bold text-slate-800 text-xs mt-2">{renderInline(line.replace(/^###\s+/, ''))}</h4>;
+                  }
+                  if (line.startsWith('## ')) {
+                    return <h3 key={li} className="font-bold text-slate-900 text-xs mt-2.5 border-b border-slate-200/80 pb-0.5">{renderInline(line.replace(/^##\s+/, ''))}</h3>;
+                  }
+
+                  // Bullet list
+                  const isBullet = line.startsWith('•') || line.startsWith('- ');
+                  if (isBullet) {
+                    return (
+                      <div key={li} className="flex items-start gap-1.5 pl-1.5 text-slate-700">
+                        <span className="text-sky-600 font-bold leading-tight">•</span>
+                        <span className="flex-1">{renderInline(line.replace(/^[•\-]\s*/, ''))}</span>
+                      </div>
+                    );
+                  }
+
+                  // Table row separator: |---|---|
+                  if (/^\|[\s\-:|]+\|$/.test(line)) {
+                    return null;
+                  }
+
+                  // Table row
+                  if (line.startsWith('|') && line.endsWith('|')) {
+                    const cells = line.slice(1, -1).split('|').map((c) => c.trim());
+                    return (
+                      <div key={li} className="grid grid-flow-col auto-cols-fr gap-2 py-0.5 px-1 bg-white/70 rounded text-[11px] font-mono border-b border-slate-200/50">
+                        {cells.map((cell, ci) => (
+                          <span key={ci} className="truncate">{renderInline(cell)}</span>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <p key={li} className="text-slate-800">
+                      {renderInline(line)}
+                    </p>
+                  );
+                })}
+              </div>
+
+              {/* ✦ Interactive Recommendation Cards */}
+              {msg.recommendations && msg.recommendations.length > 0 && (
+                <RecommendationCards
+                  items={msg.recommendations}
+                  onSelect={handleSendMessage}
+                  isStreaming={isStreaming}
+                />
+              )}
 
               {/* Mode & Citations Metadata Pill */}
               {(msg.modeUsed || msg.citationsCount) && (
@@ -244,40 +471,91 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         ))}
 
-        {/* Live SSE Streaming Steps Card */}
+        {/* Live SSE Streaming Loading Card */}
         {isStreaming && (
-          <div className="bg-sky-50/80 border border-sky-200 rounded-xl p-3.5 space-y-2.5 animate-pulse-subtle">
-            <div className="flex items-center justify-between text-xs font-semibold text-sky-900">
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-600" />
-                Memproses Permintaan RAG...
-              </span>
-              <span className="text-[10px] text-sky-700">Streaming SSE</span>
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              {currentSteps.map((step) => (
-                <div key={step.id} className="flex items-start gap-2">
-                  {step.status === 'completed' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
-                  ) : step.status === 'in_progress' ? (
-                    <Loader2 className="w-3.5 h-3.5 text-sky-600 animate-spin mt-0.5 shrink-0" />
-                  ) : (
-                    <Clock className="w-3.5 h-3.5 text-slate-300 mt-0.5 shrink-0" />
-                  )}
-                  <span
-                    className={
-                      step.status === 'completed'
-                        ? 'text-slate-700 font-medium'
-                        : step.status === 'in_progress'
-                          ? 'text-sky-800 font-medium'
-                          : 'text-slate-400'
-                    }
-                  >
-                    {step.title}
-                  </span>
+          <div className="flex flex-col items-start space-y-2 animate-fadeIn">
+            {/* Assistant Bubble Skeleton & Typing Indicator */}
+            <div className="max-w-[95%] w-full bg-white border border-sky-200/90 rounded-2xl rounded-tl-none p-4 text-xs shadow-md space-y-3">
+              {/* Header Indicator */}
+              <div className="flex items-center justify-between border-b border-sky-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                    <div className="w-6 h-6 rounded-lg bg-sky-600 text-white flex items-center justify-center relative z-10 shadow-xs">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-800 text-[11px] block">AionesBoard Orchestrator</span>
+                    <span className="text-[10px] text-sky-600 font-medium flex items-center gap-1">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      Sedang memproses & menganalisis...
+                    </span>
+                  </div>
                 </div>
-              ))}
+
+                {/* Animated Bouncing Dots */}
+                <div className="flex items-center gap-1 bg-sky-50 px-2 py-1 rounded-full border border-sky-100">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+
+              {/* Realtime Stepper Progress List */}
+              <div className="space-y-2 pt-0.5">
+                {currentSteps.map((step) => {
+                  const isDone = step.status === 'completed';
+                  const isCurrent = step.status === 'in_progress';
+                  return (
+                    <div
+                      key={step.id}
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-300 ${
+                        isCurrent
+                          ? 'bg-sky-50 border border-sky-200/80 text-sky-900 font-semibold shadow-2xs'
+                          : isDone
+                            ? 'text-slate-700 bg-slate-50/70 border border-transparent'
+                            : 'text-slate-400 opacity-60'
+                      }`}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : isCurrent ? (
+                        <Loader2 className="w-4 h-4 text-sky-600 animate-spin shrink-0" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-slate-300 shrink-0" />
+                      )}
+                      <span className="flex-1 truncate">{step.title}</span>
+                      {isCurrent && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-600 text-white font-mono uppercase tracking-wider animate-pulse">
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Progress Line Bar */}
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                <div
+                  className="bg-gradient-to-r from-sky-500 to-blue-600 h-full transition-all duration-500 rounded-full animate-pulse"
+                  style={{
+                    width: `${
+                      currentSteps.length > 0
+                        ? Math.max(
+                            20,
+                            Math.round(
+                              (currentSteps.filter((s) => s.status === 'completed').length /
+                                currentSteps.length) *
+                                100
+                            )
+                          )
+                        : 15
+                    }%`,
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -292,7 +570,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             key={idx}
             disabled={isStreaming}
             onClick={() => handleSendMessage(qp)}
-            className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-full text-slate-600 transition-colors shrink-0 disabled:opacity-50"
+            className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-full text-slate-600 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {qp}
           </button>
@@ -310,11 +588,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         >
           <input
             type="text"
-            placeholder={`Ketik instruksi dashboard ${sector.toUpperCase()}...`}
+            placeholder={
+              isStreaming
+                ? 'Sedang memproses instruksi... Mohon tunggu sebentar'
+                : `Ketik instruksi dashboard ${sector.toUpperCase()}...`
+            }
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             disabled={isStreaming}
-            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all disabled:opacity-50"
+            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
           />
           <button
             type="submit"

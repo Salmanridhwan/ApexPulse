@@ -140,7 +140,7 @@ export const SourceDrawer: React.FC<SourceDrawerProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
           <span className="text-[11px] text-slate-400">
-            ApexPulse Retrieval Verification
+            AionesBoard Retrieval Verification
           </span>
           <button
             onClick={onClose}

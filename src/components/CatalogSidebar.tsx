@@ -22,6 +22,110 @@ interface CatalogSidebarProps {
   onAddWidget: (widget: WidgetSpec) => void;
 }
 
+const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => {
+  const primaryType = preset.tipeChart[0] || 'bar';
+
+  if (primaryType === 'kpi') {
+    return (
+      <div className="bg-slate-950/90 text-white rounded-lg p-2.5 flex items-center justify-between border border-slate-800/80 my-2 shadow-inner">
+        <div>
+          <span className="text-[10px] text-slate-400 font-medium block">Estimasi Nilai ({preset.satuan})</span>
+          <div className="text-sm font-extrabold text-sky-400 tracking-tight flex items-baseline gap-1.5 mt-0.5">
+            <span>128.4</span>
+            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">+8.5% YoY</span>
+          </div>
+        </div>
+        <div className="w-16 h-7 opacity-90">
+          <svg viewBox="0 0 60 25" className="w-full h-full text-sky-400">
+            <path d="M0 20 Q15 5 30 15 T60 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  if (primaryType === 'donut') {
+    return (
+      <div className="bg-slate-950/90 text-white rounded-lg p-2 flex items-center justify-between gap-2 border border-slate-800/80 my-2">
+        <div className="w-14 h-14 shrink-0 relative flex items-center justify-center">
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4.5" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeDasharray="45 100" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#34d399" strokeWidth="4.5" strokeDasharray="25 100" strokeDashoffset="-45" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#fbbf24" strokeWidth="4.5" strokeDasharray="18 100" strokeDashoffset="-70" />
+          </svg>
+          <span className="absolute text-[8px] font-bold text-slate-300">100%</span>
+        </div>
+        <div className="flex-1 space-y-1 text-[10px] pr-1">
+          <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"/>Segmen Utama</span><span className="font-bold text-[10px]">45%</span></div>
+          <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"/>Segmen Sekunder</span><span className="font-bold text-[10px]">25%</span></div>
+          <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"/>Lainnya</span><span className="font-bold text-[10px]">18%</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (primaryType === 'line' || primaryType === 'area') {
+    return (
+      <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
+        <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
+          <span>Tren Historis</span>
+          <span className="text-sky-400 font-semibold">{preset.satuan}</span>
+        </div>
+        <div className="h-11 w-full pt-1">
+          <svg viewBox="0 0 120 40" className="w-full h-full">
+            <defs>
+              <linearGradient id={`grad-${preset.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5 L 120 40 L 0 40 Z" fill={`url(#grad-${preset.id})`} />
+            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="120" cy="5" r="3" fill="#0284c7" stroke="#ffffff" strokeWidth="1.5" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  if (primaryType === 'gauge') {
+    return (
+      <div className="bg-slate-950/90 text-white rounded-lg p-2 flex items-center justify-between border border-slate-800/80 my-2">
+        <div className="w-16 h-11 relative flex items-center justify-center">
+          <svg viewBox="0 0 40 25" className="w-full h-full">
+            <path d="M 5 22 A 15 15 0 0 1 35 22" fill="none" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 5 22 A 15 15 0 0 1 28 9" fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" />
+          </svg>
+          <span className="absolute text-[10px] font-extrabold text-emerald-400 top-4">84%</span>
+        </div>
+        <div className="text-right text-[10px] pr-1">
+          <span className="text-slate-400 block">Status Capaian</span>
+          <span className="text-emerald-400 font-bold text-xs">Sangat Baik</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: Bar chart preview
+  return (
+    <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
+      <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
+        <span>Visualisasi Perbandingan</span>
+        <span className="text-sky-400 font-semibold">{preset.satuan}</span>
+      </div>
+      <div className="h-11 w-full flex items-end justify-between gap-1 px-1 pt-1">
+        <div className="w-full bg-sky-500/80 rounded-t h-[40%]" />
+        <div className="w-full bg-sky-500/80 rounded-t h-[65%]" />
+        <div className="w-full bg-sky-500/80 rounded-t h-[50%]" />
+        <div className="w-full bg-blue-600 rounded-t h-[85%]" />
+        <div className="w-full bg-sky-500/80 rounded-t h-[70%]" />
+        <div className="w-full bg-indigo-500 rounded-t h-[95%]" />
+      </div>
+    </div>
+  );
+};
+
 export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
   isOpen,
   onClose,
@@ -239,6 +343,9 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {preset.deskripsi}
                 </p>
+
+                {/* Live Visual Chart Preview */}
+                <PresetChartPreview preset={preset} />
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-400">
                   <div className="flex items-center gap-2">

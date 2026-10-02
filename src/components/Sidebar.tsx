@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="min-w-0">
                 <span className="font-extrabold text-sm tracking-tight text-blue-900 block truncate">
-                  ApexPulse
+                  AionesBoard
                 </span>
                 <p className="text-[10px] text-blue-500 truncate">Sistem Otomasi Data RAG</p>
               </div>

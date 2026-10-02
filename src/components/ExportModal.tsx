@@ -87,7 +87,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     {tenant?.name || 'PEMERINTAH DAERAH — BADAN USAHA MILIK DAERAH'}
                   </h1>
                   <p className="text-[11px] text-slate-600 font-medium">
-                    Sistem Pemantauan Kinerja & Data Terintegrasi ApexPulse • {tenant?.city || 'Indonesia'}
+                    Sistem Pemantauan Kinerja & Data Terintegrasi AionesBoard • {tenant?.city || 'Indonesia'}
                   </p>
                 </div>
               </div>

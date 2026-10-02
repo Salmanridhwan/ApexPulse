@@ -10,6 +10,68 @@ const loadEcharts = () => (echartsPromise ??= import('echarts'));
  *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
 export const preloadEcharts = (): Promise<typeof import('echarts')> => loadEcharts();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIT NORMALIZATION
+// Problem: RAG sometimes returns series data where some items are in "triliun"
+// and others in "miliar". ECharts has no concept of units, so it compares raw
+// numbers directly — causing 1.0 (triliun) to look smaller than 985.4 (miliar).
+//
+// Fix: detect the dominant unit from the `unit` prop, and apply a multiplier so
+// ALL values are expressed in the SAME base unit (miliar) before charting.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Parse a unit string and return its multiplier relative to "miliar" base. */
+function unitMultiplier(unit: string): number {
+  const u = unit.toLowerCase();
+  if (/triliun/.test(u)) return 1_000;    // 1 triliun = 1000 miliar
+  if (/juta/.test(u)) return 0.001;       // 1 juta = 0.001 miliar
+  if (/ribu/.test(u)) return 0.000_001;   // 1 ribu = 0.000001 miliar
+  return 1; // miliar or unknown → no conversion
+}
+
+/**
+ * Normalize series data so all values are expressed in miliar.
+ * Reads `unit` from each series entry (falls back to the widget-level unit).
+ * Returns the normalized series plus the resolved display unit label.
+ */
+function normalizeSeriesData(
+  series: Array<{ name: string; data: number[]; color?: string; unit?: string }>,
+  widgetUnit?: string
+): {
+  normalizedSeries: Array<{ name: string; data: number[]; color?: string }>;
+  displayUnit: string;
+} {
+  // Determine per-series multipliers; use widget-level unit as fallback.
+  const multipliers = series.map((s) => unitMultiplier(s.unit || widgetUnit || ''));
+
+  // If all multipliers are the same (or 1), skip normalization.
+  const allSame = multipliers.every((m) => m === multipliers[0]);
+  if (allSame && multipliers[0] === 1) {
+    return {
+      normalizedSeries: series,
+      displayUnit: widgetUnit || '',
+    };
+  }
+
+  // Normalize everything to miliar base.
+  const normalizedSeries = series.map((s, i) => ({
+    ...s,
+    data: s.data.map((v) => v * multipliers[i]),
+  }));
+
+  // Pick a sensible display unit:
+  // If original widget unit is triliun and we normalized to miliar, say "miliar".
+  const maxMultiplier = Math.max(...multipliers);
+  let displayUnit = widgetUnit || '';
+  if (maxMultiplier >= 1_000) {
+    // Originally mixed triliun/miliar → display in miliar (already converted)
+    displayUnit = displayUnit.replace(/triliun/i, 'miliar');
+    if (!displayUnit) displayUnit = 'Rp miliar';
+  }
+
+  return { normalizedSeries, displayUnit };
+}
+
 interface ChartEchartsProps {
   type: 'line' | 'area' | 'bar' | 'donut' | 'gauge' | 'heatmap';
   xAxis: string[];
@@ -17,6 +79,9 @@ interface ChartEchartsProps {
     name: string;
     data: number[];
     color?: string;
+    /** Satuan per-seri (opsional). Bila diisi, normalisasi antar satuan dilakukan
+     *  sebelum rendering sehingga bar triliun tidak terlihat lebih kecil dari miliar. */
+    unit?: string;
   }>;
   unit?: string;
   stacked?: boolean;
@@ -41,6 +106,12 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
 
+  // ── Normalisasi satuan SEBELUM render ─────────────────────────────────────
+  // Bila ada seri dengan satuan berbeda (mis. triliun vs miliar), konversi semua
+  // ke satuan terkecil yang masuk akal (miliar) agar bar proporsional.
+  const { normalizedSeries, displayUnit } = normalizeSeriesData(series, unit);
+  // ──────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!chartRef.current) return;
 
@@ -59,7 +130,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       let option: EChartsOption = {};
 
       if (type === 'gauge') {
-        const nilai = series[0]?.data?.[0] ?? 0;
+        const nilai = normalizedSeries[0]?.data?.[0] ?? 0;
         const gMin = min ?? 0;
         const gMax = max ?? 100;
         const persen = Math.max(0, Math.min(1, (nilai - gMin) / (gMax - gMin || 1)));
@@ -90,25 +161,25 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
                 fontWeight: 'bold' as any,
                 color: '#0f172a',
                 offsetCenter: [0, '10%'],
-                formatter: (v: number) => `${v}${unit ? ' ' + unit : ''}`,
+                formatter: (v: number) => `${v}${displayUnit ? ' ' + displayUnit : ''}`,
               },
-              data: [{ value: nilai, name: series[0]?.name || '' }],
+              data: [{ value: nilai, name: normalizedSeries[0]?.name || '' }],
             },
           ],
         };
       } else if (type === 'heatmap') {
         // Konvensi: xAxis = label kolom (bawah), nama seri = label baris (kiri).
         const cols = xAxis;
-        const rows = series.map((s) => s.name);
+        const rows = normalizedSeries.map((s) => s.name);
         // Matriks [baris][kolom]: heatmapData eksplisit, atau series[r].data[kolom-c].
-        const matriks = heatmapData ?? series.map((s) => cols.map((_, c) => s.data[c] ?? 0));
+        const matriks = heatmapData ?? normalizedSeries.map((s) => cols.map((_, c) => s.data[c] ?? 0));
         const semuaNilai = (heatmapData ?? []).flat();
         const vMin = semuaNilai.length ? Math.min(...semuaNilai) : 0;
         const vMax = semuaNilai.length ? Math.max(...semuaNilai) : 100;
         option = {
           tooltip: {
             position: 'top',
-            formatter: (p: any) => `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${unit ? ' ' + unit : ''}`,
+            formatter: (p: any) => `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${displayUnit ? ' ' + displayUnit : ''}`,
           },
           grid: { left: 10, right: 10, top: 10, bottom: 30, containLabel: true },
           xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#64748b', fontSize: 10 } },
@@ -138,7 +209,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       } else if (type === 'donut') {
         const pieData = xAxis.map((label, idx) => ({
           name: label,
-          value: series[0]?.data[idx] || 0,
+          value: normalizedSeries[0]?.data[idx] || 0,
         }));
 
         option = {
@@ -155,7 +226,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             : undefined,
           series: [
             {
-              name: unit || 'Nilai',
+              name: displayUnit || 'Nilai',
               type: 'pie',
               radius: ['45%', '72%'],
               avoidLabelOverlap: false,
@@ -183,7 +254,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       } else {
         const isArea = type === 'area';
         const paletSoft = ['#93c5fd', '#1d4ed8', '#7dd3fc', '#bfdbfe', '#38bdf8', '#dbeafe'];
-        const echartsSeries = series.map((s, sIdx) => {
+        const echartsSeries = normalizedSeries.map((s, sIdx) => {
           // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
           const baseColor = s.color || (sIdx === 0 ? (type === 'bar' ? '#93c5fd' : '#1d4ed8') : paletSoft[sIdx % paletSoft.length]);
           return {
@@ -223,9 +294,9 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             borderColor: '#1e40af',
             borderRadius: 8,
             textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
-            valueFormatter: (val: any) => `${val} ${unit || ''}`.trim(),
+            valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
           },
-          legend: showLegend && series.length > 1
+          legend: showLegend && normalizedSeries.length > 1
             ? {
               top: 0,
               icon: 'circle',
@@ -238,7 +309,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             left: '3%',
             right: '4%',
             bottom: '3%',
-            top: series.length > 1 && showLegend ? '15%' : '10%',
+            top: normalizedSeries.length > 1 && showLegend ? '15%' : '10%',
             containLabel: true,
           },
           xAxis: {
@@ -255,7 +326,13 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               color: '#94a3b8',
               fontSize: 11,
               fontFamily: 'JetBrains Mono',
-              formatter: (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`),
+              formatter: (v: number) => {
+                // Unit-aware axis label: show T suffix for triliun-scale values
+                if (/triliun/i.test(displayUnit) || v >= 1_000_000) {
+                  return v >= 1_000 ? `${(v / 1_000).toFixed(1)}T` : `${v}M`;
+                }
+                return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
+              },
             },
           },
           series: echartsSeries,
@@ -276,7 +353,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       window.removeEventListener('resize', handleResize);
       resizeObserver?.disconnect();
     };
-  }, [type, xAxis, series, unit, stacked, showLegend, min, max, heatmapData]);
+  }, [type, xAxis, series, unit, stacked, showLegend, min, max, heatmapData, normalizedSeries, displayUnit]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {

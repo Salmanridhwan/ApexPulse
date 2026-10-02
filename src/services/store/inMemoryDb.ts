@@ -5,6 +5,8 @@ import {
   AlertRule,
   AuditLog,
   BumdSector,
+  Chat,
+  ChatMessage,
   Dashboard,
   NotificationItem,
   Tenant,
@@ -34,7 +36,7 @@ export type SafeUser = Omit<User, 'passwordHash'>;
 const SEED_USERS: SafeUser[] = [
   {
     id: 'user-admin',
-    email: 'admin@apexpulse.id',
+    email: 'admin@aionesboard.id',
     name: 'Budi Santoso, S.Kom, M.T.',
     role: 'admin',
     tenantId: 'tenant-pdam',
@@ -42,7 +44,7 @@ const SEED_USERS: SafeUser[] = [
   },
   {
     id: 'user-demo',
-    email: 'demo@apexpulse.id',
+    email: 'demo@aionesboard.id',
     name: 'Siti Rahmawati, S.E. (Analis BUMD)',
     role: 'analis',
     tenantId: 'tenant-pdam',
@@ -50,7 +52,7 @@ const SEED_USERS: SafeUser[] = [
   },
   {
     id: 'user-direksi',
-    email: 'direksi@apexpulse.id',
+    email: 'direksi@aionesboard.id',
     name: 'Dr. Ir. Hendra Kusuma (Direktur Utama)',
     role: 'direksi',
     tenantId: 'tenant-pdam',
@@ -80,11 +82,12 @@ const SEED_PASSWORDS: Record<string, string> = {
   'user-user-gmail': '123',
 };
 
-const DATA_DIR = process.env.APEXPULSE_DATA_DIR || path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.AIONESBOARD_DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 interface PersistedState {
   dashboards?: Dashboard[];
+  chats?: Chat[];
   alertRules?: AlertRule[];
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
@@ -175,6 +178,9 @@ export class InMemoryDb {
 
   public dashboards: Dashboard[] = [];
 
+  /** Riwayat percakapan orkestrator — satu chat per dashboard (relasi 1:1). */
+  public chats: Chat[] = [];
+
   public alertRules: AlertRule[] = [
     {
       id: 'alert-1',
@@ -250,7 +256,7 @@ export class InMemoryDb {
       userId: 'user-admin',
       userName: 'Budi Santoso',
       action: 'Inisialisasi Sistem',
-      target: 'ApexPulse Engine',
+      target: 'AionesBoard Engine',
       details: 'Sistem boot up dengan 6 tenant BUMD dan 40 preset katalog widget.',
       timestamp: new Date().toISOString(),
     },
@@ -260,6 +266,7 @@ export class InMemoryDb {
     ragProvider: 'mock' as 'mock' | 'http',
     ragApiUrl: 'https://api-rag-bumd.pemda.go.id/v1',
     ragApiKey: 'rag_live_sec_*********',
+    ragModel: 'gpt-4o-mini',
     ragKnowledgeBaseId: '',
     ragTimeoutSeconds: 60,
     /** Jalur A via endpoint /extract (angka nyata + halaman sumber) — default aktif. */
@@ -267,7 +274,7 @@ export class InMemoryDb {
     smtpHost: 'smtp.mailgun.org',
     smtpPort: 587,
     smtpUser: 'alert@bumd-pemda.go.id',
-    smtpFrom: 'ApexPulse Alert System <alert@apexpulse.id>',
+    smtpFrom: 'AionesBoard Alert System <alert@aionesboard.id>',
     auditRetentionDays: 90,
   };
 
@@ -286,6 +293,7 @@ export class InMemoryDb {
   private snapshot(): DbSnapshot {
     return {
       dashboards: this.dashboards,
+      chats: this.chats,
       alertRules: this.alertRules,
       notifications: this.notifications,
       auditLogs: this.auditLogs.slice(0, 500),
@@ -314,12 +322,13 @@ export class InMemoryDb {
         port: parseInt(process.env.MYSQL_PORT || '3306', 10),
         user: process.env.MYSQL_USER || 'root',
         password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'apexpulse',
+        database: process.env.MYSQL_DATABASE || 'aionesboard',
       });
       await this.mysql.init();
       const loaded = await this.mysql.loadAll();
       if (loaded) {
         if (Array.isArray(loaded.dashboards)) this.dashboards = loaded.dashboards;
+        if (Array.isArray(loaded.chats)) this.chats = loaded.chats;
         if (Array.isArray(loaded.alertRules) && loaded.alertRules.length > 0) {
           this.alertRules = loaded.alertRules;
         }
@@ -333,14 +342,14 @@ export class InMemoryDb {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
         this.ensureSeedUsers();
-        console.log('[ApexPulse DB] State dimuat dari MySQL — persistence aktif');
+        console.log('[AionesBoard DB] State dimuat dari MySQL — persistence aktif');
       } else {
         await this.mysql.saveAll(this.snapshot());
-        console.log('[ApexPulse DB] MySQL siap — seed awal disimpan ke database');
+        console.log('[AionesBoard DB] MySQL siap — seed awal disimpan ke database');
       }
     } catch (err: any) {
       console.error(
-        '[ApexPulse DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
+        '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
         err?.message || err
       );
       this.mysql = null;
@@ -349,7 +358,7 @@ export class InMemoryDb {
 
   /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
   private seedCredentials() {
-    const demoPassword = process.env.DEMO_PASSWORD || 'apexpulse2026';
+    const demoPassword = process.env.DEMO_PASSWORD || 'aionesboard2026';
     for (const u of SEED_USERS) {
       this.credentials[u.id] = hashPassword(SEED_PASSWORDS[u.id] || demoPassword);
     }
@@ -369,7 +378,7 @@ export class InMemoryDb {
       }
       if (!this.credentials[seed.id]) {
         this.credentials[seed.id] = hashPassword(
-          SEED_PASSWORDS[seed.id] || process.env.DEMO_PASSWORD || 'apexpulse2026'
+          SEED_PASSWORDS[seed.id] || process.env.DEMO_PASSWORD || 'aionesboard2026'
         );
         berubah = true;
       }
@@ -387,6 +396,7 @@ export class InMemoryDb {
       if (!existsSync(DB_FILE)) return;
       const parsed = JSON.parse(readFileSync(DB_FILE, 'utf-8')) as PersistedState;
       if (Array.isArray(parsed.dashboards)) this.dashboards = parsed.dashboards;
+      if (Array.isArray(parsed.chats)) this.chats = parsed.chats;
       if (Array.isArray(parsed.alertRules) && parsed.alertRules.length > 0) {
         this.alertRules = parsed.alertRules;
       }
@@ -403,7 +413,7 @@ export class InMemoryDb {
       // Jamin user seed tetap ada walau file fallback sudah usang.
       this.ensureSeedUsers();
     } catch (err) {
-      console.error('[ApexPulse DB] Gagal memuat data/db.json — memakai state seed:', err);
+      console.error('[AionesBoard DB] Gagal memuat data/db.json — memakai state seed:', err);
     }
   }
 
@@ -425,6 +435,7 @@ export class InMemoryDb {
       if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
       const state: PersistedState = {
         dashboards: this.dashboards,
+        chats: this.chats,
         alertRules: this.alertRules,
         notifications: this.notifications,
         auditLogs: this.auditLogs.slice(0, 500),
@@ -436,13 +447,13 @@ export class InMemoryDb {
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
-      console.error('[ApexPulse DB] Gagal menyimpan data/db.json:', err);
+      console.error('[AionesBoard DB] Gagal menyimpan data/db.json:', err);
     }
     if (this.mysql) {
       // Fire-and-forget: jangan blok respons request; error cukup dicatat.
       this.mysql
         .saveAll(this.snapshot())
-        .catch((err) => console.error('[ApexPulse DB] Mirror MySQL gagal:', err?.message || err));
+        .catch((err) => console.error('[AionesBoard DB] Mirror MySQL gagal:', err?.message || err));
     }
   }
 
@@ -499,6 +510,8 @@ export class InMemoryDb {
     const initialLen = this.dashboards.length;
     this.dashboards = this.dashboards.filter((d) => !(d.id === id && d.tenantId === tenantId));
     const deleted = this.dashboards.length < initialLen;
+    // Dashboard hilang = chat-nya tidak ada gunanya lagi (relasi 1:1).
+    if (deleted) this.chats = this.chats.filter((c) => c.dashboardId !== id);
     if (deleted) this.persist();
     return deleted;
   }
@@ -527,6 +540,91 @@ export class InMemoryDb {
     this.auditLogs.unshift(log);
     this.persist();
     return log;
+  }
+
+  // ================= Chat (riwayat per dashboard) =================
+
+  /** Chat milik satu dashboard. `dashboardId` unik — dijaga di sini, bukan di UI. */
+  getChatByDashboardId(dashboardId: string, tenantId?: string): Chat | undefined {
+    const c = this.chats.find((item) => item.dashboardId === dashboardId);
+    if (!c) return undefined;
+    if (tenantId && c.tenantId !== tenantId) return undefined; // Isolation guarantee!
+    return c;
+  }
+
+  getChatById(id: string, tenantId?: string): Chat | undefined {
+    const c = this.chats.find((item) => item.id === id);
+    if (!c) return undefined;
+    if (tenantId && c.tenantId !== tenantId) return undefined;
+    return c;
+  }
+
+  /**
+   * Ambil chat dashboard ini; buat kalau belum ada.
+   * Idempoten dan sengaja malas (lazy) supaya dashboard lama tidak perlu migrasi.
+   */
+  ensureChatForDashboard(
+    dashboardId: string,
+    tenantId: string,
+    userId: string,
+    title: string
+  ): Chat {
+    const ada = this.getChatByDashboardId(dashboardId, tenantId);
+    if (ada) return ada;
+    const now = new Date().toISOString();
+    const chat: Chat = {
+      id: `chat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      dashboardId,
+      tenantId,
+      userId,
+      title: title || 'Percakapan Dashboard',
+      messages: [
+        {
+          id: `msg-welcome-${Date.now()}`,
+          sender: 'system',
+          text: 'Halo! Saya asisten orkestrator AionesBoard. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
+          timestamp: now,
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.chats.unshift(chat);
+    this.persist();
+    return chat;
+  }
+
+  /** Semua chat tenant — dipakai indikator jumlah pesan di daftar dashboard. */
+  getChats(tenantId: string): Chat[] {
+    return this.chats.filter((c) => c.tenantId === tenantId);
+  }
+
+  addChatMessage(chatId: string, msg: ChatMessage, tenantId?: string): Chat | undefined {
+    const chat = this.getChatById(chatId, tenantId);
+    if (!chat) return undefined;
+    chat.messages.push(msg);
+    chat.updatedAt = new Date().toISOString();
+    this.persist();
+    return chat;
+  }
+
+  updateChat(id: string, partial: Partial<Chat>, tenantId: string): Chat | undefined {
+    const chat = this.getChatById(id, tenantId);
+    if (!chat) return undefined;
+    // Kaitan ke dashboard/tenant tidak boleh dipindah lewat PATCH.
+    const { dashboardId: _d, tenantId: _t, id: _i, messages: _m, ...rest } = partial;
+    Object.assign(chat, rest, { updatedAt: new Date().toISOString() });
+    this.persist();
+    return chat;
+  }
+
+  /** Hapus chat saja — dashboard-nya SENGAJA dibiarkan hidup. */
+  deleteChat(id: string, tenantId: string): boolean {
+    const len = this.chats.length;
+    this.chats = this.chats.filter((c) => !(c.id === id && c.tenantId === tenantId));
+    const deleted = this.chats.length < len;
+    if (deleted) this.persist();
+    return deleted;
   }
 
   // User Management

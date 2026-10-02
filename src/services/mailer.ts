@@ -1,5 +1,5 @@
 /**
- * Mailer alert ApexPulse — SMTP lewat nodemailer, dengan antrean sederhana.
+ * Mailer alert AionesBoard — SMTP lewat nodemailer, dengan antrean sederhana.
  *
  * Pengiriman email TIDAK boleh menahan permintaan HTTP: route cukup menaruh
  * tugas di antrean (`antreEmail`) lalu langsung menjawab. Antrean dikuras satu
@@ -23,7 +23,7 @@ const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
-const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER || 'ApexPulse <no-reply@apexpulse.local>';
+const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER || 'AionesBoard <no-reply@aionesboard.local>';
 
 /** Daftar penerima notifikasi email (dipisah koma di env `ALERT_EMAIL_TO`). */
 export function penerimaAlert(): string[] {

@@ -27,6 +27,10 @@ interface DashboardListProps {
   onDeleteDashboard: (dashboardId: string) => void;
   onShareDashboard: (dashboard: Dashboard) => void;
   onBackToWorkspace: () => void;
+  /** Buka dashboard + panel riwayat chat-nya. */
+  onOpenChatHistory?: (dashboard: Dashboard) => void;
+  /** Jumlah pesan riwayat per dashboardId. */
+  chatCounts?: Record<string, number>;
 }
 
 export const DashboardList: React.FC<DashboardListProps> = ({
@@ -39,6 +43,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   onDeleteDashboard,
   onShareDashboard,
   onBackToWorkspace,
+  onOpenChatHistory,
+  chatCounts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('all');
@@ -66,75 +72,50 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   );
 
   return (
-    <div className="flex-1 bg-blue-50 min-h-screen flex flex-col">
+    <div className="flex-1 bg-gradient-to-b from-blue-50/60 via-slate-50 to-blue-50/40 min-h-screen flex flex-col">
       {/* Main Body */}
-      <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
-        {/* Baris aksi halaman */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <button
-            onClick={onBackToWorkspace}
-            className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1.5"
-          >
-            ← Kembali ke Workspace
-          </button>
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1 space-y-6">
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={onOpenChat}
-              className="px-4 py-2.5 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Buat via Chat AI RAG</span>
-            </button>
-            <button
-              onClick={onCreateDashboard}
-              className="px-4 py-2.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 border border-blue-100"
-            >
-              <Plus className="w-4 h-4 text-blue-700" />
-              <span>Dashboard Baru</span>
-            </button>
-          </div>
-        </div>
 
-        {/* Ringkasan angka (putih, kartu biru muda) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+        {/* Ringkasan Angka Metrik (Cards Grid) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
+          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-700 shrink-0">
               <LayoutGrid className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-blue-500 font-medium">Total Dashboard</p>
-              <p className="text-lg font-bold text-blue-900">{dashboards.length}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Total Dashboard</p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{dashboards.length}</p>
             </div>
           </div>
 
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-sky-100 text-sky-700">
+          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-700 shrink-0">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-blue-500 font-medium">Total Widget Aktif</p>
-              <p className="text-lg font-bold text-blue-900">{totalWidgets}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Total Widget Aktif</p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{totalWidgets}</p>
             </div>
           </div>
 
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-700 shrink-0">
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-blue-500 font-medium">Kartu KPI / Metrik</p>
-              <p className="text-lg font-bold text-blue-900">{totalKpis}</p>
+              <p className="text-[11px] text-slate-500 font-semibold">Kartu KPI / Metrik</p>
+              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{totalKpis}</p>
             </div>
           </div>
 
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-sky-100 text-sky-700">
+          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-700 shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-blue-500 font-medium">Sektor BUMD</p>
-              <p className="text-lg font-bold text-blue-900 capitalize">
+              <p className="text-[11px] text-slate-500 font-semibold">Sektor BUMD</p>
+              <p className="text-base font-bold text-slate-900 capitalize truncate max-w-[120px] mt-0.5">
                 {currentTenant?.sector || 'Multi'}
               </p>
             </div>
@@ -142,27 +123,27 @@ export const DashboardList: React.FC<DashboardListProps> = ({
         </div>
 
         {/* Search & Filter Toolbar */}
-        <div className="bg-white p-4 rounded-xl border border-blue-100 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3.5">
           <div className="relative w-full sm:w-96">
-            <Search className="w-4 h-4 text-blue-400 absolute left-3.5 top-3 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari dashboard berdasarkan judul atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs text-blue-500 font-medium flex items-center gap-1.5 shrink-0">
-              <Filter className="w-3.5 h-3.5 text-blue-400" />
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+            <span className="text-xs text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-blue-600" />
               <span>Sektor:</span>
             </span>
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="text-xs font-medium text-blue-900 bg-blue-50/70 border border-blue-100 rounded-lg px-3 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+              className="text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             >
               <option value="all">Semua Sektor BUMD</option>
               <option value="pdam">Air Minum (PDAM)</option>
@@ -177,11 +158,11 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
         {/* Dashboard Grid */}
         {filteredDashboards.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-blue-200 p-12 text-center max-w-lg mx-auto my-12">
-            <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center max-w-lg mx-auto my-8 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-4 border border-blue-100">
               <LayoutGrid className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-blue-900 mb-1">Tidak Ada Dashboard yang Sesuai</h3>
+            <h3 className="text-base font-bold text-slate-900 mb-1">Tidak Ada Dashboard yang Sesuai</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               {searchQuery
                 ? 'Tidak ditemukan dashboard dengan kata kunci pencarian tersebut. Coba periksa kembali ejaan Anda.'
@@ -190,22 +171,20 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2 text-xs font-semibold text-white bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl transition-all shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Buat Dashboard Baru</span>
+                + Dashboard Baru
               </button>
               <button
                 onClick={onOpenChat}
-                className="px-4 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl transition-all border border-slate-200"
               >
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span>Gunakan AI RAG</span>
+                Gunakan AI RAG
               </button>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredDashboards.map((dash) => {
               const kpiCount = dash.widgets.filter((w) => w.type === 'kpi').length;
               const chartCount = dash.widgets.filter((w) =>
@@ -216,17 +195,17 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               return (
                 <div
                   key={dash.id}
-                  className="bg-white rounded-xl border border-blue-100 hover:border-blue-300 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
+                  className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 hover:border-blue-400/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
                 >
-                  <div className="p-5 space-y-4">
+                  <div className="p-5 space-y-3.5">
                     {/* Top Tag & Sector */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 capitalize border border-blue-100">
-                        <Tag className="w-3 h-3 text-blue-500" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 capitalize border border-blue-200/60">
+                        <Tag className="w-3 h-3 text-blue-600" />
                         {dash.sector || currentTenant?.sector || 'BUMD'}
                       </span>
-                      <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
+                      <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         {new Date(dash.updatedAt || Date.now()).toLocaleDateString('id-ID', {
                           day: 'numeric',
                           month: 'short',
@@ -239,34 +218,34 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div>
                       <h3
                         onClick={() => onSelectDashboard(dash)}
-                        className="text-base font-bold text-blue-900 group-hover:text-blue-700 cursor-pointer transition-colors line-clamp-1"
+                        className="text-base font-bold text-slate-900 group-hover:text-blue-700 cursor-pointer transition-colors line-clamp-1 tracking-tight"
                         title={dash.title}
                       >
                         {dash.title}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed font-medium">
                         {dash.description ||
                           'Dashboard intelijensi dan monitoring kinerja berbasis dokumen RAG BUMD.'}
                       </p>
                     </div>
 
                     {/* Widget Composition Badges */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="text-[11px] font-medium px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-md">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-slate-100 border border-slate-200/80 text-slate-700 rounded-lg">
                         {dash.widgets.length} Total Widget
                       </span>
                       {kpiCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 border border-sky-100 text-sky-700 rounded-md">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-sky-50 border border-sky-200/60 text-sky-700 rounded-lg">
                           {kpiCount} KPI
                         </span>
                       )}
                       {chartCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-blue-100/60 border border-blue-100 text-blue-800 rounded-md">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 border border-blue-200/60 text-blue-800 rounded-lg">
                           {chartCount} Grafik
                         </span>
                       )}
                       {tableCount > 0 && (
-                        <span className="text-[11px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-md">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg">
                           {tableCount} Tabel
                         </span>
                       )}
@@ -274,19 +253,37 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   </div>
 
                   {/* Card Bottom Action Bar */}
-                  <div className="px-5 py-3.5 bg-blue-50/60 border-t border-blue-100 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => onSelectDashboard(dash)}
-                      className="px-3.5 py-1.5 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Buka Kanvas</span>
-                    </button>
+                  <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => onSelectDashboard(dash)}
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Buka Kanvas</span>
+                      </button>
+
+                      {onOpenChatHistory && (
+                        <button
+                          onClick={() => onOpenChatHistory(dash)}
+                          title="Buka riwayat percakapan dashboard ini"
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            Riwayat
+                            {chatCounts && chatCounts[dash.id]
+                              ? ` (${chatCounts[dash.id]})`
+                              : ''}
+                          </span>
+                        </button>
+                      )}
+                    </div>
 
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onShareDashboard(dash)}
-                        className="p-2 text-blue-500 hover:text-blue-800 hover:bg-blue-100/70 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Bagikan Tautan Read-Only"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -294,7 +291,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
                       <button
                         onClick={() => onDuplicateDashboard(dash)}
-                        className="p-2 text-blue-500 hover:text-blue-800 hover:bg-blue-100/70 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Duplikat Dashboard"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -307,13 +304,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                               onDeleteDashboard(dash.id);
                               setDeleteConfirmId(null);
                             }}
-                            className="px-2 py-1 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-700"
+                            className="px-2 py-1 bg-rose-600 text-white rounded-md text-[10px] font-bold hover:bg-rose-700"
                           >
                             Hapus
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="px-1.5 py-1 text-slate-600 text-[10px] hover:bg-slate-200 rounded"
+                            className="px-1.5 py-1 text-slate-600 text-[10px] hover:bg-slate-200 rounded-md"
                           >
                             Batal
                           </button>
@@ -321,7 +318,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       ) : (
                         <button
                           onClick={() => setDeleteConfirmId(dash.id)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Hapus Dashboard"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
