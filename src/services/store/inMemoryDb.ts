@@ -376,9 +376,14 @@ export class InMemoryDb {
         this.users.push({ ...seed });
         berubah = true;
       }
-      if (!this.credentials[seed.id]) {
+      if (SEED_PASSWORDS[seed.id]) {
+        if (!this.credentials[seed.id] || !verifyPassword(SEED_PASSWORDS[seed.id], this.credentials[seed.id])) {
+          this.credentials[seed.id] = hashPassword(SEED_PASSWORDS[seed.id]);
+          berubah = true;
+        }
+      } else if (!this.credentials[seed.id]) {
         this.credentials[seed.id] = hashPassword(
-          SEED_PASSWORDS[seed.id] || process.env.DEMO_PASSWORD || 'aionesboard2026'
+          process.env.DEMO_PASSWORD || 'aionesboard2026'
         );
         berubah = true;
       }
