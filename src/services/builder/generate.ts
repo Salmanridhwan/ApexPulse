@@ -10,7 +10,6 @@ export interface GenerateOptions {
   userPrompt: string;
   sector: BumdSector;
   tenantId: string;
-  modeOverride?: 'structured' | 'prose';
   onProgress?: (step: ProgressStep) => void;
   /** Klien RAG aktif (mock atau HTTP sesuai konfigurasi admin). */
   ragClient?: RagClient;
@@ -59,7 +58,6 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   const ragRes = await (options.ragClient || mockRag).query({
     prompt: userPrompt,
     sector,
-    mode: options.modeOverride,
   });
 
   logSummary.push(`[RAG Client] Respons diterima dalam ${ragRes.latencyMs}ms. Mode: ${ragRes.mode}`);

@@ -25,7 +25,7 @@ export interface User {
   passwordHash?: string;
 }
 
-export type WidgetType = 'kpi' | 'line' | 'area' | 'bar' | 'donut' | 'table' | 'narasi' | 'bullet-target';
+export type WidgetType = 'kpi' | 'line' | 'area' | 'bar' | 'donut' | 'table' | 'narasi' | 'bullet-target' | 'gauge' | 'heatmap';
 
 export type ConfidenceLevel = 'sumber' | 'inferensi AI' | 'manual';
 
@@ -84,6 +84,16 @@ export interface WidgetSpec {
     unit?: string;
     stacked?: boolean;
     showLegend?: boolean;
+    /** Khusus gauge: nilai minimal & maksimal skala (default 0-100). */
+    min?: number;
+    max?: number;
+  };
+  /** Khusus heatmap: matriks nilai [baris][kolom] + label sumbunya. */
+  heatmap?: {
+    rows: string[];
+    columns: string[];
+    data: number[][];
+    unit?: string;
   };
   table?: {
     columns: Array<{

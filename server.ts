@@ -1,3 +1,6 @@
+// Muat .env lebih dulu: tanpa ini file .env diabaikan dan hanya environment
+// variable asli yang terbaca (DATABASE/MySQL, RAG_*, dsb).
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import path from 'path';
@@ -5,11 +8,11 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
-import { mockRag } from './src/services/rag/mock';
-import { ConfigurableRagClient, maskKey } from './src/services/rag/http';
+import { ConfigurableRagClient, jelaskanError, maskKey } from './src/services/rag/http';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
+  hashPassword,
   parseSessionCookie,
   sessionCookieHeader,
   signSession,
@@ -62,17 +65,25 @@ async function startServer() {
     baseUrl: db.systemConfig.ragApiUrl,
     apiKey: db.systemConfig.ragApiKey,
     timeoutMs: db.systemConfig.ragTimeoutSeconds,
+    kbId: (db.systemConfig as any).ragKnowledgeBaseId || '',
+    useExtract: (db.systemConfig as any).ragUseExtract !== false,
   }));
   // Seed awal dari env (kalau ada) — admin tetap bisa override via panel.
   if (process.env.RAG_PROVIDER === 'http') db.systemConfig.ragProvider = 'http';
   if (process.env.RAG_API_URL) db.systemConfig.ragApiUrl = process.env.RAG_API_URL;
   if (process.env.RAG_API_KEY) db.systemConfig.ragApiKey = process.env.RAG_API_KEY;
+  if (process.env.RAG_KB_ID) (db.systemConfig as any).ragKnowledgeBaseId = process.env.RAG_KB_ID;
 
   app.use(express.json());
 
   // Health Check
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', db: true, timestamp: Date.now() });
+    res.json({
+      status: 'ok',
+      db: db.persistenceActive,
+      persistence: db.persistenceActive ? 'mysql' : 'file',
+      timestamp: Date.now(),
+    });
   });
 
   // ================= TENANT & AUTH ROUTES =================
@@ -253,11 +264,46 @@ async function startServer() {
   });
 
   // ================= CHAT & SSE STREAMING ROUTE =================
+  // Ambil data NYATA satu indikator untuk widget dari katalog preset.
+  // Tidak ada angka contoh: kalau dokumen tidak memuat indikatornya, balas 502.
+  app.post('/api/widgets/ambil-data', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const { query, tipe } = req.body || {};
+    if (!query || typeof query !== 'string' || query.trim().length < 10) {
+      return res.status(400).json({ error: 'Kueri indikator terlalu pendek (minimal 10 karakter).' });
+    }
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const sector = (req.body.sector || tenant?.sector || 'universal') as BumdSector;
+    const mulai = Date.now();
+    try {
+      const hasil = await ragClient.ambilDataWidget(String(query).trim(), sector, String(tipe || 'kpi'));
+      if (!hasil) {
+        return res.status(502).json({
+          error:
+            'Dokumen resmi tidak memuat indikator ini, atau layanan RAG tidak menjawab. Tidak ada angka contoh yang ditambahkan.',
+        });
+      }
+      return res.json({
+        widget: hasil.data,
+        judul: hasil.judul,
+        deskripsi: hasil.deskripsi,
+        sector,
+        latencyMs: Date.now() - mulai,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: jelaskanError(err) });
+    }
+  });
+
   app.post('/api/chat', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
 
-    const { prompt, activeDashboardId, modeOverride } = req.body;
+    const { prompt, activeDashboardId } = req.body;
     const sector = (req.body.sector || 'pdam') as BumdSector;
     const tenantId = effectiveTenantId(req, session);
 
@@ -377,7 +423,6 @@ async function startServer() {
         userPrompt: prompt,
         sector,
         tenantId,
-        modeOverride,
         onProgress,
         ragClient,
       });
@@ -412,24 +457,43 @@ async function startServer() {
   });
 
   // ================= RAG PROBE & DIAGNOSTICS =================
-  app.post('/api/rag-probe', async (_req: Request, res: Response) => {
+  app.post('/api/rag-probe', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
     const cfg = db.systemConfig;
     try {
       const probeRes = await ragClient.probe();
+      const sehat = probeRes.canOutputJson || probeRes.hasMetadata;
+      // Jebakan yang paling sering terjadi: Base URL & API key sudah diisi, tapi
+      // dropdown Provider masih "mock" -> aplikasi tetap memakai data contoh.
+      const konfigTapiMock =
+        cfg.ragProvider !== 'http' && !!(cfg.ragApiUrl || cfg.ragApiKey);
       res.json({
         timestamp: new Date().toISOString(),
-        status: 'healthy',
+        status: sehat ? 'healthy' : 'degraded',
         latencyMs: probeRes.latencyMs,
         modeDetected: probeRes.detectedMode,
         hasLlmStructuredJson: probeRes.canOutputJson,
         hasDocumentMetadata: probeRes.hasMetadata,
-        sampleChunksCount: 4,
-        zodValidationPassed: true,
+        sampleChunksCount: probeRes.sampleChunksCount,
+        zodValidationPassed: probeRes.canOutputJson,
+        baseDipakai: probeRes.baseDipakai,
+        providerAktif: cfg.ragProvider,
+        peringatan: konfigTapiMock
+          ? 'Provider masih "mock" padahal Base URL/API Key terisi. Pengaturan ini TIDAK dipakai aplikasi. Ubah Provider ke "HTTP" lalu Simpan.'
+          : undefined,
         details: [
           `RAG API Endpoint aktif dan merespons dalam ${probeRes.latencyMs}ms (provider: ${cfg.ragProvider})`,
-          `Mode saat ini: ${probeRes.detectedMode}`,
-          `Dukungan ekstraksi metadata dokumen: ${probeRes.hasMetadata ? 'Tersedia (periode, nilai, unit_kerja, kategori)' : 'Tidak tersedia'}`,
-          `Skema Zod ApexPulse: Validasi lulus 100%`,
+          ...(konfigTapiMock
+            ? ['PERINGATAN: provider masih "mock" — Base URL & API Key tersimpan tetapi tidak dipakai. Pilih provider "HTTP".']
+            : []),
+          ...(probeRes.baseDipakai ? [`Base URL aktif: ${probeRes.baseDipakai}${probeRes.baseDisesuaikan ? ' (disesuaikan otomatis)' : ''}`] : []),
+          `Mode yang terdeteksi dari sampel query: ${probeRes.detectedMode}`,
+          `Potongan dokumen terambil dari sampel: ${probeRes.sampleChunksCount}`,
+          `Jalur A (/extract) menyusun angka dari dokumen: ${cfg.ragProvider === 'http' && (db.systemConfig as any).ragUseExtract !== false ? 'aktif' : 'nonaktif'}`,
+          `Ketersediaan metadata angka per dokumen: ${probeRes.hasMetadata ? `${probeRes.sampleChunksCount} potongan siap diambil` : 'tidak ada'}`,
+          `Dukungan keluaran JSON terstruktur: ${probeRes.canOutputJson ? 'Tersedia' : 'Tidak tersedia'}`,
+          ...(probeRes.catatan || []),
         ],
       });
     } catch (err: any) {
@@ -449,15 +513,6 @@ async function startServer() {
         ],
       });
     }
-  });
-
-  app.post('/api/rag/set-mode', (req: Request, res: Response) => {
-    const { mode } = req.body;
-    if (mode === 'structured' || mode === 'prose') {
-      mockRag.setMode(mode);
-      return res.json({ success: true, activeMode: mockRag.getMode() });
-    }
-    res.status(400).json({ error: 'Mode harus structured atau prose.' });
   });
 
   // ================= ALERTS & NOTIFICATIONS =================
@@ -486,6 +541,7 @@ async function startServer() {
       isActive: true,
     };
     db.alertRules.push(newRule);
+    db.persist();
     res.status(201).json(newRule);
   });
 
@@ -513,6 +569,8 @@ async function startServer() {
       triggered.push(notif);
     });
 
+    if (triggered.length > 0) db.persist();
+
     res.json({
       evaluated: rules.length,
       triggeredCount: triggered.length,
@@ -528,10 +586,17 @@ async function startServer() {
   });
 
   app.post('/api/notifications/:id/read', (req: Request, res: Response) => {
-    const notif = db.notifications.find((n) => n.id === req.params.id);
-    if (notif) {
-      notif.isRead = true;
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const notif = db.notifications.find(
+      (n) => n.id === req.params.id && n.tenantId === tenantId
+    );
+    if (!notif) {
+      return res.status(404).json({ error: 'Notifikasi tidak ditemukan atau akses ditolak.' });
     }
+    notif.isRead = true;
+    db.persist();
     res.json({ success: true });
   });
 
@@ -604,7 +669,6 @@ async function startServer() {
       totalCitations,
       alertRulesCount: db.alertRules.length,
       auditLogsCount: db.auditLogs.length,
-      activeRagMode: mockRag.getMode(),
       ragProvider: db.systemConfig.ragProvider,
     });
   });
@@ -636,8 +700,10 @@ async function startServer() {
       tenantId: req.body.tenantId || 'tenant-pdam',
       avatar: req.body.role === 'admin' ? '👨‍💼' : req.body.role === 'direksi' ? '👔' : '👩‍💼',
     };
-    // Password awal user baru = password demo dari env (ganti via mekanisme masing-masing).
-    db.createUser(newUser, db.credentials[session.userId]);
+    // Password awal user baru = DEMO_PASSWORD dari env (default apexpulse2026).
+    // JANGAN menyalin hash password admin yang sedang login — itu membuat
+    // user baru bisa dibuka dengan kredensial admin.
+    db.createUser(newUser, hashPassword(process.env.DEMO_PASSWORD || 'apexpulse2026'));
     db.addAuditLog({
       tenantId: newUser.tenantId,
       userId: session.userId,
@@ -745,16 +811,20 @@ async function startServer() {
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
-    // API key jangan pernah tersimpan ter-mask sebagai nilai aktif: kalau admin
-    // tidak mengubah key (masih *********), pertahankan nilai lama.
+    // API key jangan pernah tersimpan ter-mask sebagai nilai aktif. Dua kasus:
+    // (a) nilai yang dikirim sama dengan mask key saat ini -> pertahankan key lama
+    // (b) nilai yang dikirim SUDAH BERBENTUK MASK (mis. panel dibuka sebelum key
+    //     diubah pihak lain, sehingga mask-nya basi) -> JANGAN simpan mask itu
+    //     sebagai key, karena akan merusak kredensial yang asli.
     const body = { ...req.body };
-    if (body.ragApiKey === maskKey(db.systemConfig.ragApiKey) || body.ragApiKey === '*********') {
+    const berbentukMask =
+      typeof body.ragApiKey === 'string' && /[*•·]{4,}/.test(body.ragApiKey);
+    if (berbentukMask || body.ragApiKey === maskKey(db.systemConfig.ragApiKey) || body.ragApiKey === '*********') {
       body.ragApiKey = db.systemConfig.ragApiKey;
     }
-    db.systemConfig = { ...db.systemConfig, ...body };
-    if (req.body.defaultRagMode) {
-      mockRag.setMode(req.body.defaultRagMode);
-    }
+    // Lewat updateSystemConfig() supaya langsung dicerminkan ke MySQL/data/db.json,
+    // bukan hanya tersimpan di memori.
+    db.updateSystemConfig(body);
     db.addAuditLog({
       tenantId: session.tenantId,
       userId: session.userId,

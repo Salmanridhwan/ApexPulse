@@ -90,6 +90,11 @@ interface PersistedState {
   auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
   systemConfig?: typeof InMemoryDb.prototype.systemConfig;
+  // Disertakan agar fallback file (saat MySQL mati) tetap lengkap —
+  // bukan lagi setengah data yang hilang saat restart.
+  users?: SafeUser[];
+  tenants?: Tenant[];
+  credentials?: Record<string, string>;
 }
 
 export class InMemoryDb {
@@ -255,8 +260,10 @@ export class InMemoryDb {
     ragProvider: 'mock' as 'mock' | 'http',
     ragApiUrl: 'https://api-rag-bumd.pemda.go.id/v1',
     ragApiKey: 'rag_live_sec_*********',
+    ragKnowledgeBaseId: '',
     ragTimeoutSeconds: 60,
-    defaultRagMode: 'structured' as 'structured' | 'prose',
+    /** Jalur A via endpoint /extract (angka nyata + halaman sumber) — default aktif. */
+    ragUseExtract: true,
     smtpHost: 'smtp.mailgun.org',
     smtpPort: 587,
     smtpUser: 'alert@bumd-pemda.go.id',
@@ -279,6 +286,7 @@ export class InMemoryDb {
   private snapshot(): DbSnapshot {
     return {
       dashboards: this.dashboards,
+      alertRules: this.alertRules,
       notifications: this.notifications,
       auditLogs: this.auditLogs.slice(0, 500),
       shareTokens: this.shareTokens,
@@ -287,6 +295,11 @@ export class InMemoryDb {
       credentials: this.credentials,
       tenants: this.tenants,
     };
+  }
+
+  /** true bila mirror MySQL aktif — dipakai endpoint /health agar tidak hardcode. */
+  public get persistenceActive(): boolean {
+    return this.mysql !== null;
   }
 
   /**
@@ -307,6 +320,9 @@ export class InMemoryDb {
       const loaded = await this.mysql.loadAll();
       if (loaded) {
         if (Array.isArray(loaded.dashboards)) this.dashboards = loaded.dashboards;
+        if (Array.isArray(loaded.alertRules) && loaded.alertRules.length > 0) {
+          this.alertRules = loaded.alertRules;
+        }
         if (Array.isArray(loaded.notifications)) this.notifications = loaded.notifications;
         if (Array.isArray(loaded.auditLogs)) this.auditLogs = loaded.auditLogs;
         if (Array.isArray(loaded.users)) this.users = loaded.users;
@@ -371,6 +387,9 @@ export class InMemoryDb {
       if (!existsSync(DB_FILE)) return;
       const parsed = JSON.parse(readFileSync(DB_FILE, 'utf-8')) as PersistedState;
       if (Array.isArray(parsed.dashboards)) this.dashboards = parsed.dashboards;
+      if (Array.isArray(parsed.alertRules) && parsed.alertRules.length > 0) {
+        this.alertRules = parsed.alertRules;
+      }
       if (Array.isArray(parsed.notifications)) this.notifications = parsed.notifications;
       if (Array.isArray(parsed.auditLogs)) this.auditLogs = [...parsed.auditLogs, ...this.auditLogs];
       if (parsed.shareTokens) this.shareTokens = parsed.shareTokens;
@@ -378,9 +397,26 @@ export class InMemoryDb {
       if (parsed.systemConfig) {
         this.systemConfig = { ...this.systemConfig, ...parsed.systemConfig };
       }
+      if (Array.isArray(parsed.users) && parsed.users.length > 0) this.users = parsed.users;
+      if (Array.isArray(parsed.tenants) && parsed.tenants.length > 0) this.tenants = parsed.tenants;
+      if (parsed.credentials) this.credentials = parsed.credentials;
+      // Jamin user seed tetap ada walau file fallback sudah usang.
+      this.ensureSeedUsers();
     } catch (err) {
       console.error('[ApexPulse DB] Gagal memuat data/db.json — memakai state seed:', err);
     }
+  }
+
+  /**
+   * Simpan perubahan systemConfig (provider RAG, base URL, API key, SMTP, dll).
+   * WAJIB lewat sini — bukan `db.systemConfig = {...}` langsung dari route —
+   * supaya perubahan benar-benar ditulis ke MySQL & data/db.json, bukan hanya
+   * hidup di memori sampai server di-restart.
+   */
+  public updateSystemConfig(partial: Record<string, unknown>) {
+    this.systemConfig = { ...this.systemConfig, ...(partial as object) };
+    this.persist();
+    return this.systemConfig;
   }
 
   /** Tulis state ke disk (jaring pengaman) + mirror ke MySQL bila tersedia. */
@@ -389,10 +425,14 @@ export class InMemoryDb {
       if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
       const state: PersistedState = {
         dashboards: this.dashboards,
+        alertRules: this.alertRules,
         notifications: this.notifications,
         auditLogs: this.auditLogs.slice(0, 500),
         shareTokens: this.shareTokens,
         systemConfig: this.systemConfig,
+        users: this.users,
+        tenants: this.tenants,
+        credentials: this.credentials,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {

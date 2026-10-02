@@ -3,35 +3,28 @@ import { MOCK_CHUNKS, MONTHS_12, SectorDocumentChunk } from './mockData';
 import { RagClient, RagQueryOptions, RagResult } from './types';
 
 export class MockRagClient implements RagClient {
-  private defaultMode: 'structured' | 'prose';
-
-  constructor(defaultMode: 'structured' | 'prose' = 'structured') {
-    this.defaultMode = defaultMode;
-  }
-
-  setMode(mode: 'structured' | 'prose') {
-    this.defaultMode = mode;
-  }
-
-  getMode() {
-    return this.defaultMode;
-  }
+  /** Jalur A diminta lebih dulu; generate.ts otomatis turun ke Jalur B bila JSON ditolak. */
+  private readonly defaultMode: 'structured' | 'prose' = 'structured';
 
   async probe(): Promise<{
     latencyMs: number;
     canOutputJson: boolean;
     hasMetadata: boolean;
+    sampleChunksCount: number;
     detectedMode: 'Jalur A' | 'Jalur B';
   }> {
     const start = Date.now();
     await new Promise((r) => setTimeout(r, 120));
     const latencyMs = Date.now() - start;
 
+    // Hitung potongan dokumen nyata dari kumpulan data mock (bukan angka statis).
+    const sampleChunks = MOCK_CHUNKS.filter((c) => c.sector === 'pdam');
     const isA = this.defaultMode === 'structured';
     return {
       latencyMs,
       canOutputJson: isA,
-      hasMetadata: true,
+      hasMetadata: sampleChunks.length > 0,
+      sampleChunksCount: sampleChunks.length,
       detectedMode: isA ? 'Jalur A' : 'Jalur B',
     };
   }
@@ -447,4 +440,4 @@ export class MockRagClient implements RagClient {
   }
 }
 
-export const mockRag = new MockRagClient('structured');
+export const mockRag = new MockRagClient();

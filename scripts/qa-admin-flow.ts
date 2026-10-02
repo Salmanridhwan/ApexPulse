@@ -1,11 +1,11 @@
 /**
  * QA alur admin via UI sungguhan:
  *   1. Login admin
- *   2. Buka Panel Admin (sidebar)
- *   3. Tab "Konfigurasi RAG & Probe"
+ *   2. Panel Admin terbuka otomatis (tanpa lewat workspace)
+ *   3. Tab "Konfigurasi RAG"
  *   4. Isi Base URL + API key, pilih provider HTTP, Simpan
  *   5. Verifikasi tersimpan + API key ter-mask
- *   6. Jalankan probe dari sidebar (endpoint mati -> error anggun)
+ *   6. Probe via API ke endpoint mati (endpoint mati -> status error anggun)
  *   7. Restore provider mock
  */
 import assert from 'node:assert';
@@ -59,10 +59,21 @@ async function main() {
 
   // ---- 1. Login admin ----
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle2', timeout: 60000 });
-  await page.click('input[type="email"]', { count: 3 } as any);
-  await page.type('input[type="email"]', 'admin@apexpulse.id');
-  await page.click('input[type="password"]', { count: 3 } as any);
-  await page.type('input[type="password"]', 'apexpulse2026');
+  await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+  // Isi form via native setter (field email sudah ter-prefill, triple-click + type
+  // bisa menyambung nilai lama sehingga login gagal).
+  await page.evaluate(() => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )!.set!;
+    const email = document.querySelector('input[type="email"]') as HTMLInputElement;
+    const pass = document.querySelector('input[type="password"]') as HTMLInputElement;
+    setter.call(email, 'admin@apexpulse.id');
+    email.dispatchEvent(new Event('input', { bubbles: true }));
+    setter.call(pass, 'apexpulse2026');
+    pass.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('button')].find((b) => /masuk/i.test(b.textContent || ''));
     (btn as HTMLElement)?.click();
@@ -70,20 +81,11 @@ async function main() {
   await page.waitForFunction(() => !!document.querySelector('aside'), { timeout: 20000 });
   console.log('✅ 1. Login admin berhasil');
 
-  // ---- 2. Buka Panel Admin dari sidebar ----
-  const klikAdmin = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) =>
-      /Panel Admin/i.test(b.textContent || '')
-    );
-    if (!btn) return false;
-    (btn as HTMLElement).click();
-    return true;
-  });
-  assert.ok(klikAdmin, 'tombol Panel Admin tidak ditemukan di sidebar');
+  // ---- 2. Panel Admin terbuka otomatis (admin langsung diarahkan ke panel) ----
   await page.waitForFunction(() => /Admin & Governance Center/i.test(document.body.innerText), {
     timeout: 10000,
   });
-  console.log('✅ 2. Panel Admin terbuka');
+  console.log('✅ 2. Panel Admin terbuka otomatis setelah login admin');
 
   // ---- 3. Tab Konfigurasi RAG & Probe ----
   const klikTab = await klikCocok('Konfigurasi RAG');
@@ -91,7 +93,7 @@ async function main() {
   await page.waitForFunction(() => /Konfigurasi Integrasi RAG API/i.test(document.body.innerText), {
     timeout: 8000,
   });
-  console.log('✅ 3. Tab Konfigurasi RAG & Probe terbuka');
+  console.log('✅ 3. Tab Konfigurasi RAG terbuka');
 
   // ---- 4. Isi Base URL + API key, pilih provider HTTP, simpan ----
   const urlUji = 'http://127.0.0.1:9/v1'; // port mati — sengaja, untuk uji probe
@@ -139,56 +141,30 @@ async function main() {
   assert.ok(cfg.ragApiKey.includes('*'), 'API key tidak ter-mask di respons');
   console.log(`✅ 5. Tersimpan & ter-mask: ${cfg.ragApiUrl} | key: ${cfg.ragApiKey}`);
 
-  // ---- 6. Jalankan probe dari sidebar -> error anggun (endpoint mati) ----
-  const tutup = await klikCocok('Ke Workspace');
-  assert.ok(tutup, 'tombol Ke Workspace tidak ditemukan');
-  const klikProbe = await klikCocok('RAG Probe');
-  assert.ok(klikProbe, 'tombol Diagnostik RAG Probe tidak ditemukan di sidebar');
-  await page.waitForFunction(() => /Uji Diagnostik API RAG/i.test(document.body.innerText), {
-    timeout: 8000,
+  // ---- 6. Probe (API) ke endpoint mati -> status error anggun (UI probe sudah dihapus) ----
+  const probe = await page.evaluate(async () => {
+    const res = await fetch('/api/rag-probe', { method: 'POST' });
+    return { status: res.status, body: await res.json() };
   });
-  await klikCocok('Jalankan Uji Probe');
-  const probeSelesai = await page.waitForFunction(
-    () => /tidak merespons/i.test(document.body.innerText),
-    { timeout: 15000 }
-  ).then(() => true).catch(() => false);
-  assert.ok(probeSelesai, 'probe tidak menampilkan hasil error yang anggun');
-  console.log('✅ 6. Probe endpoint mati -> pesan error anggun + arahan perbaikan');
+  assert.strictEqual(probe.status, 200, 'probe harus dibalas 200');
+  assert.strictEqual(probe.body.status, 'error', 'probe ke endpoint mati harusnya status error');
+  assert.ok(
+    (probe.body.details || []).some((d: string) =>
+      /tidak merespons|Host tidak dapat dihubungi|Endpoint tidak ditemukan/i.test(d)
+    ),
+    'pesan error probe tidak memuat arahan perbaikan'
+  );
+  console.log('✅ 6. Probe endpoint mati (API) -> status error + arahan perbaikan');
 
   // ---- 7. Restore provider mock ----
   await page.evaluate(() => {
-    const close = [...document.querySelectorAll('button')].find(
-      (b) => (b.textContent || '').trim() === 'Selesai'
-    );
-    (close as HTMLElement)?.click();
+    const selects = [...document.querySelectorAll('select')];
+    const sel = selects.find((s) => [...s.options].some((o) => o.value === 'mock')) as HTMLSelectElement;
+    sel.value = 'mock';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await new Promise((r) => setTimeout(r, 400));
-  const bukaAdmin2 = await klikCocok('Panel Admin');
-  if (bukaAdmin2) {
-    await page.waitForFunction(() => /Konfigurasi Integrasi RAG API/i.test(document.body.innerText) === false, {
-      timeout: 8000,
-    }).catch(() => {});
-    await klikCocok('Konfigurasi RAG');
-    await page.waitForFunction(() => /Konfigurasi Integrasi RAG API/i.test(document.body.innerText), {
-      timeout: 8000,
-    });
-    await page.evaluate(() => {
-      const selects = [...document.querySelectorAll('select')];
-      const sel = selects.find((s) => [...s.options].some((o) => o.value === 'mock')) as HTMLSelectElement;
-      sel.value = 'mock';
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await klikCocok('Simpan Konfigurasi');
-    await tungguTeks('berhasil disimpan', 8000);
-  } else {
-    await page.evaluate(async () => {
-      await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ragProvider: 'mock' }),
-      });
-    });
-  }
+  await klikCocok('Simpan Konfigurasi');
+  await tungguTeks('berhasil disimpan', 8000);
   const cfgAkhir = await page.evaluate(async () => {
     const res = await fetch('/api/admin/config');
     return res.json();

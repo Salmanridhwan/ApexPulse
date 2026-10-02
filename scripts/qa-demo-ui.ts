@@ -57,6 +57,19 @@ async function klikCocok(pola: string): Promise<boolean> {
   }, pola);
 }
 
+/** Buka menu "Aksi lain" (header) bila belum terbuka. */
+async function bukaMenuAksi(): Promise<void> {
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('title') === 'Aksi lain'
+    );
+    (btn as HTMLElement)?.click();
+  });
+  await page.waitForFunction(() => /Filter Dashboard/i.test(document.body.innerText), {
+    timeout: 8000,
+  });
+}
+
 async function tungguTeks(pola: string, timeoutMs = 15000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -287,9 +300,10 @@ async function main() {
 
   // ============ LANGKAH 6: EXPORT + SHARE ============
   await uji('6 — Export & share link read-only', async () => {
-    // --- 6a: Export
+    // --- 6a: Export (aksi kini ada di menu "Aksi lain")
+    await bukaMenuAksi();
     const klikExport = await klikCocok('Cetak / Ekspor');
-    assert.ok(klikExport, 'tombol Cetak / Ekspor tidak ditemukan');
+    assert.ok(klikExport, 'menu Cetak / Ekspor tidak ditemukan');
     await page.waitForFunction(() => /Laporan Eksekutif Resmi/i.test(document.body.innerText), {
       timeout: 8000,
     });
@@ -306,8 +320,9 @@ async function main() {
     });
 
     // --- 6b: Share (modal buka -> klik generate -> token muncul)
+    await bukaMenuAksi();
     const klikShare = await klikCocok('Bagikan|Share');
-    assert.ok(klikShare, 'tombol Bagikan tidak ditemukan');
+    assert.ok(klikShare, 'menu Bagikan tidak ditemukan');
     await page.waitForFunction(() => /Buat Tautan Berbagi/i.test(document.body.innerText), {
       timeout: 8000,
     });
@@ -497,9 +512,10 @@ async function main() {
     ).then(() => true).catch(() => false);
     assert.ok(tampil, 'dashboard sementara tidak menjadi dashboard aktif setelah reload');
 
-    // Klik Hapus -> konfirmasi inline -> Hapus
-    const klikHapus = await klikCocok('Hapus');
-    assert.ok(klikHapus, 'tombol Hapus tidak ditemukan di banner');
+    // Buka menu aksi -> Hapus Dashboard -> konfirmasi inline -> Hapus
+    await bukaMenuAksi();
+    const klikHapus = await klikCocok('Hapus Dashboard');
+    assert.ok(klikHapus, 'menu Hapus Dashboard tidak ditemukan');
     const konfirmMuncul = await page.waitForFunction(
       () => /Hapus dashboard ini\?/.test(document.body.innerText),
       { timeout: 5000 }
@@ -563,47 +579,75 @@ async function main() {
       !cfgAwal.data.ragApiKey || cfgAwal.data.ragApiKey.includes('*'),
       'API key dikirim ke browser tanpa masking'
     );
+    // Snapshot konfigurasi asli — langkah ini mengubah URL & key, jadi WAJIB
+    // dikembalikan di akhir supaya kredensial RAG asli tidak tertimpa nilai uji.
+    const cfgSnapshot = {
+      ragProvider: cfgAwal.data.ragProvider,
+      ragApiUrl: cfgAwal.data.ragApiUrl,
+      ragApiKey: cfgAwal.data.ragApiKey,
+      ragKnowledgeBaseId: cfgAwal.data.ragKnowledgeBaseId,
+      ragTimeoutSeconds: cfgAwal.data.ragTimeoutSeconds,
+    };
 
-    // (c) Set provider HTTP + URL/key teman -> tersimpan
-    await panggil(async () => {
+    // (c) Set provider HTTP + URL teman -> tersimpan. API key SENGAJA tidak
+    //     dikirim: kolom key berisi nilai ter-mask, dan menimpanya dengan nilai
+    //     dummy akan menghapus kredensial asli yang sudah diisi di panel.
+    await page.evaluate(async (url: string) => {
       await fetch('/api/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ragProvider: 'http',
-          ragApiUrl: 'http://127.0.0.1:9/v1',
-          ragApiKey: 'rag-key-uji-123456',
+          ragApiUrl: url,
         }),
       });
-    });
+    }, cfgSnapshot.ragApiUrl);
     const cfgBaru = await panggil(async () => {
       const res = await fetch('/api/admin/config');
       return res.json();
     });
     assert.strictEqual(cfgBaru.ragProvider, 'http', 'provider http tidak tersimpan');
-    assert.strictEqual(cfgBaru.ragApiUrl, 'http://127.0.0.1:9/v1', 'base url tidak tersimpan');
-    assert.ok(cfgBaru.ragApiKey.includes('*'), 'API key baru tidak ter-mask di respons');
+    assert.strictEqual(cfgBaru.ragApiUrl, cfgSnapshot.ragApiUrl, 'base url tidak tersimpan');
+    assert.strictEqual(
+      cfgBaru.ragApiKey,
+      cfgSnapshot.ragApiKey,
+      'API key berubah padahal tidak dikirim (seharusnya dipertahankan ter-mask)'
+    );
 
     // (d) Probe dengan endpoint mati -> status error yang anggun (bukan crash)
+    await page.evaluate(async () => {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ragProvider: 'http', ragApiUrl: 'http://127.0.0.1:9/v1' }),
+      });
+    });
     const probe = await panggil(async () => {
       const res = await fetch('/api/rag-probe', { method: 'POST' });
       return res.json();
     });
     assert.strictEqual(probe.status, 'error', 'probe ke endpoint mati harusnya status error');
 
-    // (e) Restore provider mock (URL/key tidak relevan saat mock)
-    await panggil(async () => {
+    // (e) Restore konfigurasi ASLI (bukan hanya provider) supaya kredensial RAG
+    //     yang sudah diisi di panel tidak hilang setelah QA dijalankan.
+    await page.evaluate(async (cfg: any) => {
       await fetch('/api/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ragProvider: 'mock' }),
+        body: JSON.stringify(cfg),
       });
-    });
+    }, cfgSnapshot);
     const cfgAkhir = await panggil(async () => {
       const res = await fetch('/api/admin/config');
       return res.json();
     });
-    assert.strictEqual(cfgAkhir.ragProvider, 'mock', 'provider tidak kembali ke mock');
+    assert.strictEqual(cfgAkhir.ragProvider, cfgSnapshot.ragProvider, 'provider tidak kembali ke nilai awal');
+    assert.strictEqual(cfgAkhir.ragApiUrl, cfgSnapshot.ragApiUrl, 'base URL tidak kembali ke nilai awal');
+    assert.strictEqual(
+      cfgAkhir.ragKnowledgeBaseId,
+      cfgSnapshot.ragKnowledgeBaseId,
+      'knowledge base id tidak kembali ke nilai awal'
+    );
   });
 
   // ============ RINGKASAN ============

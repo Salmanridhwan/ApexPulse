@@ -21,6 +21,7 @@ export interface MysqlConfig {
 
 export interface DbSnapshot {
   dashboards: Dashboard[];
+  alertRules: AlertRule[];
   notifications: NotificationItem[];
   auditLogs: AuditLog[];
   shareTokens: Record<string, string>;
@@ -32,6 +33,7 @@ export interface DbSnapshot {
 
 export interface LoadedState {
   dashboards?: Dashboard[];
+  alertRules?: AlertRule[];
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
@@ -119,6 +121,7 @@ export class MysqlStore {
       );
     }
     if (arrays.dashboards) hasil.dashboards = arrays.dashboards as Dashboard[];
+    if (arrays.alertRules) hasil.alertRules = arrays.alertRules as AlertRule[];
     if (arrays.notifications) hasil.notifications = arrays.notifications as NotificationItem[];
     if (arrays.auditLogs) hasil.auditLogs = arrays.auditLogs as AuditLog[];
     if (arrays.users) hasil.users = arrays.users as SafeUser[];
@@ -156,6 +159,10 @@ export class MysqlStore {
       await masukkan(
         'dashboards',
         s.dashboards.map((d) => ({ id: d.id, data: d }))
+      );
+      await masukkan(
+        'alertRules',
+        s.alertRules.map((a) => ({ id: a.id, data: a }))
       );
       await masukkan(
         'notifications',

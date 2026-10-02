@@ -36,6 +36,8 @@ export const WidgetTypeEnum = z.enum([
   'table',
   'narasi',
   'bullet-target',
+  'gauge',
+  'heatmap',
 ]);
 
 export const ConfidenceLevelEnum = z.enum(['sumber', 'inferensi AI', 'manual']);
@@ -62,6 +64,15 @@ export const ChartDataSchema = z.object({
   unit: z.string().optional(),
   stacked: z.boolean().optional(),
   showLegend: z.boolean().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
+
+export const HeatmapDataSchema = z.object({
+  rows: z.array(z.string()),
+  columns: z.array(z.string()),
+  data: z.array(z.array(z.number())),
+  unit: z.string().optional(),
 });
 
 export const TableDataSchema = z.object({
@@ -100,6 +111,7 @@ export const WidgetSpecSchema = z.object({
   grid: WidgetGridSchema,
   kpi: KpiDataSchema.optional(),
   chart: ChartDataSchema.optional(),
+  heatmap: HeatmapDataSchema.optional(),
   table: TableDataSchema.optional(),
   narasi: NarasiDataSchema.optional(),
   citations: z.array(CitationSchema).default([]),
@@ -110,7 +122,7 @@ export const WidgetSpecSchema = z.object({
 }).refine(
   (widget) => {
     // If it's a KPI or chart widget, it MUST have citations or be manual correction
-    if (['kpi', 'line', 'area', 'bar', 'donut', 'bullet-target'].includes(widget.type)) {
+    if (['kpi', 'line', 'area', 'bar', 'donut', 'bullet-target', 'gauge', 'heatmap'].includes(widget.type)) {
       if (widget.confidence === 'manual') return true;
       return widget.citations && widget.citations.length > 0;
     }
