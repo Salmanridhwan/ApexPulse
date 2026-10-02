@@ -1,6 +1,5 @@
-// Muat .env lebih dulu: tanpa ini file .env diabaikan dan hanya environment
-// variable asli yang terbaca (DATABASE/MySQL, RAG_*, dsb).
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 import express, { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import fs from 'fs';

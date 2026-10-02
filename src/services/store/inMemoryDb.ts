@@ -322,7 +322,11 @@ export class InMemoryDb {
         port: parseInt(process.env.MYSQL_PORT || '3306', 10),
         user: process.env.MYSQL_USER || 'root',
         password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'aionesboard',
+        database:
+          (process.env.MYSQL_DATABASE && process.env.MYSQL_DATABASE.trim()) ||
+          (process.env.DB_NAME && process.env.DB_NAME.trim()) ||
+          (process.env.DB_DATABASE && process.env.DB_DATABASE.trim()) ||
+          'bumd_aionesboard',
       });
       await this.mysql.init();
       const loaded = await this.mysql.loadAll();
