@@ -81,7 +81,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               <h2 className="text-sm font-semibold text-slate-800">
                 Pusat Peringatan & Ambang Batas (Alert System)
               </h2>
-              <p className="text-xs text-slate-500">Notifikasi In-App & Simulasi Dispatch Email SMTP</p>
+              <p className="text-xs text-slate-500">Notifikasi In-App & Email SMTP</p>
             </div>
           </div>
           <button
@@ -181,7 +181,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     {notif.sentEmail && (
                       <div className="mt-2 pt-2 border-t border-rose-200/50 flex items-center gap-1.5 text-[10px] text-rose-700">
                         <Mail className="w-3 h-3" />
-                        <span>Notifikasi telah disimulasikan terkirim ke email Direksi & BPKP</span>
+                        <span>Email notifikasi terkirim ke penerima terdaftar (SMTP)</span>
                       </div>
                     )}
                   </div>

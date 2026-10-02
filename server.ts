@@ -20,7 +20,9 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, Dashboard, ProgressStep, WidgetSpec } from './src/types';
+import { BumdSector, Dashboard, NotificationItem, ProgressStep, WidgetSpec } from './src/types';
+import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
+import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 
 // ============ AUTH HELPERS ============
 
@@ -545,28 +547,59 @@ async function startServer() {
     res.status(201).json(newRule);
   });
 
+  // Evaluasi ambang batas: aturan hanya menyala kalau nilai indikator dari dokumen
+  // benar-benar melanggar ambang. Aturan yang aman / tanpa data dilaporkan apa adanya
+  // di `tidakTerlampaui` — tidak ada notifikasi karangan.
   app.post('/api/alerts/evaluate', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const sector = (tenant?.sector || 'pdam') as BumdSector;
     const rules = db.alertRules.filter((r) => r.tenantId === tenantId && r.isActive);
-    const triggered: any[] = [];
+
+    const triggered: NotificationItem[] = [];
+    const terlewat: { ruleId: string; metricName: string; alasan: string }[] = [];
+    let emailDiantre = 0;
 
     rules.forEach((rule) => {
-      // Create notification
-      const notif = {
-        id: `notif-${Date.now()}-${rule.id}`,
-        tenantId,
-        alertRuleId: rule.id,
-        title: `Peringatan: ${rule.metricName} Melampaui Batas!`,
-        message: `Nilai terpantau telah melanggar ambang batas ${rule.operator} ${rule.threshold} ${rule.unit}. Segera tinjau laporan operasional.`,
-        severity: rule.severity,
-        timestamp: new Date().toISOString(),
-        isRead: false,
-        sentEmail: rule.channels.includes('email'),
-      };
+      const hasil = evaluasiAturan(rule, sector);
+      if (hasil.status !== 'terlampaui') {
+        terlewat.push({
+          ruleId: rule.id,
+          metricName: rule.metricName,
+          alasan:
+            hasil.status === 'tanpa-data'
+              ? hasil.alasan
+              : `Nilai ${hasil.indikator.nilai} ${hasil.indikator.satuan} masih di dalam ambang ${rule.operator} ${rule.threshold} ${rule.unit}.`,
+        });
+        return;
+      }
+
+      const { indikator } = hasil;
+      // `sentEmail` selalu false di sini — hanya callback mailer di bawah yang
+      // boleh menaikkannya, setelah SMTP benar-benar menerima email.
+      const notif = buatNotifikasi(rule, tenantId, indikator);
+
       db.notifications.unshift(notif);
       triggered.push(notif);
+      rule.lastTriggered = notif.timestamp;
+
+      if (rule.channels.includes('email')) {
+        emailDiantre++;
+        antreEmail({
+          subject: `[ApexPulse ${rule.severity.toUpperCase()}] ${notif.title}`,
+          text: `${notif.message}\n\nInstansi: ${tenant?.name || tenantId}\nWaktu: ${notif.timestamp}`,
+          html:
+            `<p><strong>${notif.title}</strong></p>` +
+            `<p>${notif.message}</p>` +
+            `<p>Instansi: ${tenant?.name || tenantId}<br/>Tingkat: ${rule.severity}<br/>Waktu: ${notif.timestamp}</p>`,
+          onSent: () => {
+            notif.sentEmail = true;
+            db.persist();
+          },
+        });
+      }
     });
 
     if (triggered.length > 0) db.persist();
@@ -575,6 +608,12 @@ async function startServer() {
       evaluated: rules.length,
       triggeredCount: triggered.length,
       notifications: triggered,
+      tidakTerlampaui: terlewat,
+      email: {
+        aktif: mailerAktif(),
+        penerima: penerimaAlert(),
+        diantre: emailDiantre,
+      },
     });
   });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, AlertTriangle, CheckCircle2, ShieldAlert, Plus, RefreshCw, Search } from 'lucide-react';
+import { Bell, AlertTriangle, CheckCircle2, ShieldAlert, Plus, RefreshCw, Search, Mail } from 'lucide-react';
 import { AlertRule, NotificationItem } from '../types';
 
 interface AlertsPageProps {
@@ -173,6 +173,12 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                               ? `Nilai ${item.metricValue} vs ambang ${item.threshold}`
                               : 'Sistem'}
                           </span>
+                          {item.sentEmail && (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                              <Mail className="w-3 h-3" />
+                              Email terkirim
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
