@@ -13,7 +13,7 @@ import {
   User,
   WidgetSpec,
 } from '../../types';
-import { hashPassword } from '../auth/session';
+import { hashPassword, verifyPassword } from '../auth/session';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 
 /**
