@@ -327,10 +327,11 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             },
             areaStyle: isArea
               ? {
+                opacity: 0.85,
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: `${baseColor}55` },
-                  { offset: 0.8, color: `${baseColor}05` },
-                  { offset: 1, color: 'transparent' },
+                  { offset: 0, color: `${baseColor}66` },
+                  { offset: 0.6, color: `${baseColor}1a` },
+                  { offset: 1, color: `${baseColor}00` },
                 ]),
               }
               : undefined,
