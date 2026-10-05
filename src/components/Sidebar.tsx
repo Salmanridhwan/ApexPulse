@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Activity,
   Bell,
@@ -7,12 +7,35 @@ import {
   LayoutGrid,
   LogOut,
   Plus,
+  Search,
   Shield,
   Building2,
   Sparkles,
 } from 'lucide-react';
 import { LogoTile, AvatarTile } from './BrandMark';
 import { Dashboard, Tenant, User } from '../types';
+
+/**
+ * Waktu relatif singkat untuk membedakan dashboard berjudul sama.
+ * Contoh: "baru saja", "5 mnt lalu", "2 jam lalu", "kemarin", "3 hari lalu",
+ * lalu jatuh ke tanggal absolut ("5 Okt 2026") untuk yang lebih lama.
+ */
+function waktuRelatif(iso?: string): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const selisih = Date.now() - t;
+  if (selisih < 0) return 'baru saja';
+  const menit = Math.floor(selisih / 60000);
+  if (menit < 1) return 'baru saja';
+  if (menit < 60) return `${menit} mnt lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  const hari = Math.floor(jam / 24);
+  if (hari === 1) return 'kemarin';
+  if (hari < 7) return `${hari} hari lalu`;
+  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -53,6 +76,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
 }) => {
+  // Pencarian dashboard — penting saat daftar panjang / judul mirip.
+  const [kueri, setKueri] = useState('');
+
+  const dashboardsTersaring = useMemo(() => {
+    const q = kueri.trim().toLowerCase();
+    if (!q) return dashboards;
+    return dashboards.filter(
+      (d) =>
+        d.title.toLowerCase().includes(q) ||
+        (d.sector || '').toLowerCase().includes(q)
+    );
+  }, [dashboards, kueri]);
+
+  // Dashboard berjudul identik perlu pembeda visual → tandai yang duplikat.
+  const judulDuplikat = useMemo(() => {
+    const hitung = new Map<string, number>();
+    dashboards.forEach((d) => hitung.set(d.title, (hitung.get(d.title) || 0) + 1));
+    return new Set(
+      Array.from(hitung.entries())
+        .filter(([, n]) => n > 1)
+        .map(([t]) => t)
+    );
+  }, [dashboards]);
+
   return (
     <aside
       className={`bg-shell border-r border-shell-line flex flex-col justify-between transition-all duration-200 z-40 shrink-0 select-none ${
@@ -187,6 +234,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
+            {/* Pencarian dashboard (hanya saat expanded & ada >4 dashboard) */}
+            {!isCollapsed && dashboards.length > 4 && (
+              <div className="relative mb-1.5">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-shell-ink-2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={kueri}
+                  onChange={(e) => setKueri(e.target.value)}
+                  placeholder="Cari dashboard..."
+                  className="w-full text-[11px] text-shell-ink bg-shell-2 border border-shell-line rounded-control pl-7 pr-2 py-1.5 placeholder:text-shell-ink-2 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition-colors [&::-webkit-search-cancel-button]:hidden"
+                  aria-label="Cari dashboard"
+                />
+              </div>
+            )}
+
             {/* Menu: Galeri / Semua Dashboard */}
             <button
               onClick={onOpenDashboardList}
@@ -218,8 +280,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* List Dashboard Tersimpan */}
             <div className="space-y-0.5">
-              {dashboards.map((d) => {
+              {dashboardsTersaring.map((d) => {
                 const isActive = currentView === 'workspace' && activeDashboard?.id === d.id;
+                const perluPembeda = judulDuplikat.has(d.title);
                 return (
                   <button
                     key={d.id}
@@ -231,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         ? 'bg-brand/20 text-white font-semibold'
                         : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
                     }`}
-                    title={`${d.title} (${d.widgets?.length || 0} widget)`}
+                    title={`${d.title} · ${d.widgets?.length || 0} widget · diperbarui ${waktuRelatif(d.updatedAt)}`}
                   >
                     {/* Aksen strip vertikal untuk item aktif */}
                     {isActive && (
@@ -244,22 +307,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     />
                     {!isCollapsed && (
-                      <>
-                        <span className="truncate flex-1 text-[12px]">{d.title}</span>
-                        <span
-                          className={`text-[10px] font-mono shrink-0 px-1 rounded-chip ${
-                            isActive
-                              ? 'text-indigo-200 bg-surface/10'
-                              : 'text-shell-ink-2'
-                          }`}
-                        >
-                          {d.widgets?.length || 0}
+                      <span className="flex-1 min-w-0">
+                        {/* Judul dapat lebar penuh (badge pindah ke baris meta). */}
+                        <span className="block truncate text-[12px] leading-tight">{d.title}</span>
+                        {/* Meta eksplisit: jumlah widget + waktu (pembeda bila judul sama). */}
+                        <span className="block text-[9px] leading-tight text-shell-ink-2/80 mt-0.5 truncate">
+                          {d.widgets?.length || 0} widget
+                          {perluPembeda && <> · {waktuRelatif(d.updatedAt)}</>}
                         </span>
-                      </>
+                      </span>
                     )}
                   </button>
                 );
               })}
+
+              {/* Hasil pencarian kosong */}
+              {dashboardsTersaring.length === 0 && !isCollapsed && dashboards.length > 0 && (
+                <div className="px-3 py-3 text-[11px] text-shell-ink-2 italic">
+                  Tidak ada dashboard cocok dengan "{kueri}".
+                </div>
+              )}
 
               {dashboards.length === 0 && !isCollapsed && (
                 <div className="px-3 py-2 text-[11px] text-shell-ink-2 italic">
