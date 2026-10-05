@@ -219,7 +219,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
       <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 h-full overflow-hidden bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col transition-all duration-200`}>
         <div>
           <div className={`h-14 border-b border-slate-800 flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-            <Shield className="w-4 h-4 text-sky-400 shrink-0" />
+            <Shield className="w-4 h-4 text-ink-3 shrink-0" />
             {!isNavCollapsed && (
               <span className="text-sm font-bold text-white tracking-tight">Admin Center</span>
             )}
@@ -242,7 +242,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   title={tab.label}
                   className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
                     } ${isActive
-                      ? 'bg-sky-600 text-white'
+                      ? 'bg-brand text-white'
                       : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                     }`}
                 >
@@ -269,7 +269,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </button>
               <div className="h-4 w-px bg-slate-200 hidden sm:block" />
               <div className="flex items-center gap-2 truncate">
-                <Shield className="w-4 h-4 text-sky-600 shrink-0" />
+                <Shield className="w-4 h-4 text-brand shrink-0" />
                 <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">
                   AionesBoard Admin & Governance Center
                 </h1>
@@ -313,7 +313,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Pengguna Aktif</span>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{users.length}</p>
-                  <span className="text-[10px] text-sky-600 font-medium">RBAC Terproteksi</span>
+                  <span className="text-[10px] text-brand font-medium">RBAC Terproteksi</span>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total Dashboard</span>
@@ -332,7 +332,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Provider RAG</span>
-                  <p className="text-base font-bold text-sky-700 mt-2 truncate">
+                  <p className="text-base font-bold text-brand-ink mt-2 truncate">
                     {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
                   </p>
                   <span className="text-[10px] text-emerald-600 font-medium">Sehat (Online)</span>
@@ -352,7 +352,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </div>
                   <button
                     onClick={() => setIsAddTenantOpen(true)}
-                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ Tambah Instansi BUMD</span>
@@ -363,7 +363,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   {tenants.map((t) => (
                     <div
                       key={t.id}
-                      className="p-3.5 border border-slate-200 rounded-xl hover:border-sky-300 transition-all bg-slate-50/50 flex items-start gap-3"
+                      className="p-3.5 border border-slate-200 rounded-xl hover:border-line-strong transition-all bg-slate-50/50 flex items-start gap-3"
                     >
                       <span className="text-2xl p-2 bg-white rounded-lg border border-slate-200 shrink-0">
                         {t.logo}
@@ -394,7 +394,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </h3>
                   <button
                     onClick={() => setActiveTab('audit')}
-                    className="text-xs text-sky-600 hover:underline font-medium"
+                    className="text-xs text-brand hover:underline font-medium"
                   >
                     Lihat Seluruh Log &rarr;
                   </button>
@@ -404,7 +404,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   {auditLogs.slice(0, 5).map((log) => (
                     <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
                         <div>
                           <span className="font-semibold text-slate-800">{log.action}: </span>
                           <span className="text-slate-600">{log.target}</span>
@@ -438,7 +438,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddUserOpen(true)}
-                  className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>+ Tambah Pengguna Baru</span>
@@ -473,7 +473,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                                   ? 'bg-slate-800 text-white'
                                   : u.role === 'direksi'
                                     ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-sky-100 text-sky-800'
+                                    : 'bg-surface-2 text-ink'
                                 }`}
                             >
                               {u.role === 'admin'
@@ -527,7 +527,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddTenantOpen(true)}
-                  className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Daftarkan BUMD Baru</span>
@@ -550,7 +550,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           <p className="text-xs text-slate-500">{t.city}</p>
                         </div>
                       </div>
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-800">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-surface-2 text-ink">
                         {t.code}
                       </span>
                     </div>
@@ -612,7 +612,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragProvider: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="mock">Mock — data demo lokal</option>
                       <option value="http">HTTP — API RAG eksternal</option>
@@ -632,7 +632,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
                     Sertakan prefix API-nya, mis. <span className="font-mono">https://rag.aiones.app/api/v1</span>.
@@ -651,7 +651,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
                     Daftar KB & dokumen bisa dilihat di layanan RAG teman (endpoint /api/v1/knowledge)
@@ -671,7 +671,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                       />
                       <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
                     </div>
@@ -688,7 +688,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragModel: e.target.value } as any)
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
                       Contoh: <span className="font-mono">gpt-4o-mini</span>, <span className="font-mono">gemini-1.5-flash</span>, <span className="font-mono">llama-3.1-70b</span>
@@ -710,7 +710,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           ragTimeoutSeconds: Number(e.target.value),
                         })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Standar PRD: maksimal 60 detik</p>
                   </div>
@@ -725,7 +725,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragUseExtract: e.target.checked })
                     }
-                    className="mt-0.5 w-4 h-4 accent-sky-600"
+                    className="mt-0.5 w-4 h-4 accent-brand"
                   />
                   <label htmlFor="ragUseExtract" className="text-[11px] text-slate-600 leading-relaxed">
                     <span className="font-semibold text-slate-800">
@@ -740,7 +740,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 {/* SMTP Settings */}
                 <div className="pt-4 border-t border-slate-200 space-y-3">
                   <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Server className="w-4 h-4 text-sky-600" />
+                    <Server className="w-4 h-4 text-brand" />
                     <span>Konfigurasi SMTP Email Dispatcher (Alert Ambang Batas)</span>
                   </h4>
 
@@ -773,7 +773,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="pt-3 flex items-center gap-3">
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-xs"
+                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium transition-colors shadow-xs"
                   >
                     Simpan Konfigurasi Sistem
                   </button>
@@ -785,7 +785,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <Radio className="w-4 h-4 text-sky-600" />
+                      <Radio className="w-4 h-4 text-brand" />
                       <span>Uji Koneksi RAG</span>
                     </h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
@@ -797,7 +797,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     type="button"
                     onClick={handleProbeRag}
                     disabled={probeLoading}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-sky-300 hover:bg-sky-50 text-sky-700 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-line-strong hover:bg-surface-2 text-brand-ink rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`w-4 h-4 ${probeLoading ? 'animate-spin' : ''}`} />
                     {probeLoading ? 'Menguji...' : 'Uji Koneksi Sekarang'}
@@ -989,7 +989,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="Contoh: Ahmad Fauzi, S.E."
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1001,7 +1001,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="ahmad@pdam-tirta.id"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1011,7 +1011,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <select
                     value={userRole}
                     onChange={(e) => setUserRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="analis">Analis Kinerja (Dapat membuat & mengedit dashboard)</option>
                     <option value="direksi">Direksi / Pengawas (Hak akses lihat & terima laporan)</option>
@@ -1024,7 +1024,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <select
                     value={userTenantId}
                     onChange={(e) => setUserTenantId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     {tenants.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1044,7 +1044,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium"
                   >
                     Daftarkan Pengguna
                   </button>
@@ -1074,7 +1074,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="Contoh: Perumda Pariwisata Tirta Graha"
                     value={tenantName}
                     onChange={(e) => setTenantName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1087,7 +1087,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Contoh: Perumda Graha"
                       value={tenantShortName}
                       onChange={(e) => setTenantShortName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
                   <div>
@@ -1097,7 +1097,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Contoh: PTG-01"
                       value={tenantCode}
                       onChange={(e) => setTenantCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 uppercase font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
                     />
                   </div>
                 </div>
@@ -1108,7 +1108,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     <select
                       value={tenantSector}
                       onChange={(e) => setTenantSector(e.target.value as BumdSector)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="pdam">PDAM (Air Minum)</option>
                       <option value="bank">Bank Daerah (BPD/BPR)</option>
@@ -1125,7 +1125,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Kota Mandiri"
                       value={tenantCity}
                       onChange={(e) => setTenantCity(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                       required
                     />
                   </div>
@@ -1141,7 +1141,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium"
                   >
                     Simpan BUMD
                   </button>

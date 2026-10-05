@@ -23,17 +23,17 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
   }, [tenantId]);
 
   return (
-    <div className="flex-1 bg-blue-50 min-h-screen flex flex-col">
+    <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
-        <div className="bg-white p-5 rounded-xl border border-blue-100 mb-6 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-800 flex items-center justify-center text-white shrink-0">
+        <div className="bg-white p-5 rounded-xl border border-line mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-ink flex items-center justify-center text-white shrink-0">
             <History className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-blue-900 flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-lg font-bold text-ink flex items-center gap-2.5 flex-wrap">
               Log Audit Sistem & Rekam Jejak Kepatuhan (F-14 & F-21)
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-2 text-brand-ink border border-line font-semibold">
                 {logs.length} Entri
               </span>
             </h1>
@@ -44,7 +44,7 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
         </div>
 
         {/* Tabel jejak audit */}
-        <div className="bg-white p-5 rounded-xl border border-blue-100">
+        <div className="bg-white p-5 rounded-xl border border-line">
           {isLoading ? (
             <div className="text-center py-12 text-xs text-slate-400">Memuat riwayat audit...</div>
           ) : logs.length === 0 ? (

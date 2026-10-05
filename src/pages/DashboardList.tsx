@@ -72,7 +72,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   );
 
   return (
-    <div className="flex-1 bg-gradient-to-b from-blue-50/60 via-slate-50 to-blue-50/40 min-h-screen flex flex-col">
+    <div className="flex-1 bg-gradient-to-b from-brand-soft/60 via-slate-50 to-brand-soft/40 min-h-screen flex flex-col">
       {/* Main Body */}
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1 space-y-6">
 
@@ -80,7 +80,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
         {/* Ringkasan Angka Metrik (Cards Grid) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
           <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-700 shrink-0">
+            <div className="p-2.5 rounded-xl bg-brand/10 text-brand-ink shrink-0">
               <LayoutGrid className="w-5 h-5" />
             </div>
             <div>
@@ -90,7 +90,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
           </div>
 
           <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-700 shrink-0">
+            <div className="p-2.5 rounded-xl bg-brand/10 text-brand-ink shrink-0">
               <Layers className="w-5 h-5" />
             </div>
             <div>
@@ -131,19 +131,19 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               placeholder="Cari dashboard berdasarkan judul atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
             <span className="text-xs text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
-              <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <Filter className="w-3.5 h-3.5 text-brand" />
               <span>Sektor:</span>
             </span>
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             >
               <option value="all">Semua Sektor BUMD</option>
               <option value="pdam">Air Minum (PDAM)</option>
@@ -159,7 +159,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
         {/* Dashboard Grid */}
         {filteredDashboards.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center max-w-lg mx-auto my-8 shadow-2xs">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-4 border border-blue-100">
+            <div className="w-12 h-12 rounded-2xl bg-surface-2 text-brand-ink flex items-center justify-center mx-auto mb-4 border border-line">
               <LayoutGrid className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 mb-1">Tidak Ada Dashboard yang Sesuai</h3>
@@ -171,7 +171,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2 text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl transition-all shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-white bg-ink hover:bg-ink rounded-xl transition-all shadow-xs"
               >
                 + Dashboard Baru
               </button>
@@ -195,13 +195,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               return (
                 <div
                   key={dash.id}
-                  className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 hover:border-blue-400/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
+                  className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 hover:border-line-strong/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
                 >
                   <div className="p-5 space-y-3.5">
                     {/* Top Tag & Sector */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 capitalize border border-blue-200/60">
-                        <Tag className="w-3 h-3 text-blue-600" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-2 text-brand-ink capitalize border border-line/60">
+                        <Tag className="w-3 h-3 text-brand" />
                         {dash.sector || currentTenant?.sector || 'BUMD'}
                       </span>
                       <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
@@ -218,7 +218,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div>
                       <h3
                         onClick={() => onSelectDashboard(dash)}
-                        className="text-base font-bold text-slate-900 group-hover:text-blue-700 cursor-pointer transition-colors line-clamp-1 tracking-tight"
+                        className="text-base font-bold text-slate-900 group-hover:text-brand-ink cursor-pointer transition-colors line-clamp-1 tracking-tight"
                         title={dash.title}
                       >
                         {dash.title}
@@ -235,12 +235,12 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         {dash.widgets.length} Total Widget
                       </span>
                       {kpiCount > 0 && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-sky-50 border border-sky-200/60 text-sky-700 rounded-lg">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-surface-2 border border-line/60 text-brand-ink rounded-lg">
                           {kpiCount} KPI
                         </span>
                       )}
                       {chartCount > 0 && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 border border-blue-200/60 text-blue-800 rounded-lg">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-surface-2 border border-line/60 text-ink rounded-lg">
                           {chartCount} Grafik
                         </span>
                       )}
@@ -257,7 +257,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onSelectDashboard(dash)}
-                        className="px-3.5 py-1.5 bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center gap-1.5"
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-brand via-brand-soft to-indigo-800 hover:from-brand-soft hover:to-indigo-900 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Buka Kanvas</span>
@@ -269,7 +269,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                           title="Buka riwayat percakapan dashboard ini"
                           className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          <Sparkles className="w-3.5 h-3.5 text-brand" />
                           <span>
                             Riwayat
                             {chatCounts && chatCounts[dash.id]
@@ -283,7 +283,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onShareDashboard(dash)}
-                        className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-brand-ink hover:bg-surface-2 rounded-lg transition-colors"
                         title="Bagikan Tautan Read-Only"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -291,7 +291,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
                       <button
                         onClick={() => onDuplicateDashboard(dash)}
-                        className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-brand-ink hover:bg-surface-2 rounded-lg transition-colors"
                         title="Duplikat Dashboard"
                       >
                         <Copy className="w-3.5 h-3.5" />

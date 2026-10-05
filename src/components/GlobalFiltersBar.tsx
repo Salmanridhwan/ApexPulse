@@ -41,8 +41,8 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
       </span>
 
       {opsiPeriode.length > 1 && (
-        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:border-sky-500`}>
-          <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand`}>
+          <Calendar className="w-3.5 h-3.5 text-brand shrink-0" />
           <span className="text-slate-500 font-medium shrink-0">Periode:</span>
           <select
             value={filters.periode}

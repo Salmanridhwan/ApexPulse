@@ -156,7 +156,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {/* Citation Bibliography */}
             <div>
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-sky-600" />
+                <BookOpen className="w-3.5 h-3.5 text-brand" />
                 <span>2. Lampiran Sitasi & Sumber Dokumen Resmi</span>
               </h3>
               <ul className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50/50">
@@ -206,7 +206,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </button>
             <button
               onClick={handlePrint}
-              className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Cetak / Simpan PDF</span>

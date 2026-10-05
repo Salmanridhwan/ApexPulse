@@ -28,7 +28,7 @@ export const ActiveChartFilterChip: React.FC = () => {
   if (!selected) return null;
   return (
     <div className="flex items-center gap-2 mb-3 flex-wrap" data-testid="chart-filter-chip">
-      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-sky-50 border border-sky-200 text-sky-800">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-2 border border-line text-ink">
         <span className="font-medium">Terfilter:</span>
         <span className="font-bold">{selected}</span>
       </span>

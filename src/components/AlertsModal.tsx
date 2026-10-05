@@ -107,7 +107,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('rules')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'rules'
-                ? 'border-sky-600 text-sky-700'
+                ? 'border-brand text-brand-ink'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
@@ -231,7 +231,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Peringatan NPL Bank melampaui batas OJK"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
@@ -245,7 +245,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Rasio NPL Gross atau Kehilangan Air NRW"
                   value={metricName}
                   onChange={(e) => setMetricName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
@@ -256,7 +256,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   <select
                     value={operator}
                     onChange={(e) => setOperator(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value=">=">&gt;= (Lebih atau sama)</option>
                     <option value="<=">&lt;= (Kurang atau sama)</option>
@@ -271,7 +271,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     step="any"
                     value={threshold}
                     onChange={(e) => setThreshold(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -281,7 +281,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     type="text"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
               </div>
@@ -292,7 +292,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     type="checkbox"
                     checked={emailNotification}
                     onChange={(e) => setEmailNotification(e.target.checked)}
-                    className="rounded text-sky-600 focus:ring-sky-500"
+                    className="rounded text-brand focus:ring-brand"
                   />
                   <span className="text-slate-700 font-medium">
                     Kirimkan juga salinan email notifikasi ke Direksi / BPKP (SMTP)

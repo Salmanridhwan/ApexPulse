@@ -66,7 +66,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
@@ -86,12 +86,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         {/* Content */}
         <div className="p-5 space-y-4 text-xs">
-          <div className="p-3.5 bg-sky-50 border border-sky-200 rounded-xl text-sky-900 space-y-1">
+          <div className="p-3.5 bg-surface-2 border border-line rounded-xl text-ink space-y-1">
             <div className="flex items-center gap-1.5 font-semibold">
-              <Globe className="w-4 h-4 text-sky-600" />
+              <Globe className="w-4 h-4 text-brand" />
               <span>Akses Tampilan Publik Aman</span>
             </div>
-            <p className="text-[11px] text-sky-800 leading-relaxed">
+            <p className="text-[11px] text-ink leading-relaxed">
               Tautan ini memungkinkan Dewan Pengawas, Kepala Daerah, atau auditor eksternal melihat dashboard tanpa perlu kredensial login atau hak akses edit.
             </p>
           </div>
@@ -101,7 +101,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-xl font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
                 <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi Baru'}</span>
@@ -134,7 +134,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   href={`/share/${shareToken}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sky-600 hover:underline flex items-center gap-1"
+                  className="text-brand hover:underline flex items-center gap-1"
                 >
                   <span>Buka Pratinjau</span>
                   <ExternalLink className="w-3 h-3" />
@@ -171,7 +171,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     href={`/embed/${shareToken}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sky-600 hover:underline flex items-center gap-1"
+                    className="text-brand hover:underline flex items-center gap-1"
                   >
                     <span>Pratinjau Embed</span>
                     <ExternalLink className="w-3 h-3" />

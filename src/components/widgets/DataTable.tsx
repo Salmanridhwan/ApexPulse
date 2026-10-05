@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Palet dot ala referensi — biru dominan sesuai tone aplikasi.
-const DOT_COLORS = ['#1d4ed8', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'];
+const DOT_COLORS = ['#4f46e5', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'];
 
 interface Column {
   key: string;
@@ -87,7 +87,7 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
             </tr>
           ) : (
             rows.map((row, i) => (
-              <tr key={i} className="hover:bg-blue-50/40 transition-colors">
+              <tr key={i} className="hover:bg-surface-2/40 transition-colors">
                 {columns.map((col) => (
                   <td
                     key={col.key}

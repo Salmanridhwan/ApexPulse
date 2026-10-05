@@ -90,7 +90,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   if (widgets.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-200">
-        <div className="w-16 h-16 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
+        <div className="w-16 h-16 rounded-lg bg-surface-2 flex items-center justify-center text-brand mb-4">
           <LayoutGrid className="w-8 h-8" />
         </div>
         <h3 className="text-base font-semibold text-slate-800">
@@ -102,7 +102,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenChat}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-ink rounded-lg shadow-sm transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             <span>Buat via Chat</span>
@@ -164,7 +164,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               setOverId(null);
             }}
             className={`${colSpan} ${tinggiMin} rounded-lg relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
-              } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-sky-400' : ''}`}
+              } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
           >
             <WidgetCard
               widget={widget}
@@ -180,7 +180,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                 data-resize={arah === -1 ? 'kiri' : 'kanan'}
                 onMouseDown={(e) => mulaiResize(e, widget, arah)}
                 className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${arah === -1 ? 'left-0' : 'right-0'
-                  } ${resizeId === widget.id ? 'bg-sky-400/70' : 'bg-transparent hover:bg-sky-400/40'
+                  } ${resizeId === widget.id ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
                   }`}
                 title="Tarik untuk ubah lebar widget"
               />

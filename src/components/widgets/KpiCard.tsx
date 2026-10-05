@@ -110,7 +110,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   const satuanAkhir = awalanRp ? unitTampil!.replace(/^rp\.?\s*/i, '') || undefined : unitTampil;
 
   // Warna garis sparkline mengikuti makna tren: baik (hijau), buruk (merah), netral (biru).
-  const warnaTren = deltaBad ? '#e11d48' : deltaGood ? '#059669' : '#1d4ed8';
+  const warnaTren = deltaBad ? '#e11d48' : deltaGood ? '#059669' : '#4f46e5';
   const jalur =
     sparkline && sparkline.length > 1 ? sparkPaths(sparkline) : null;
 
@@ -216,13 +216,13 @@ export const KpiCard: React.FC<KpiCardProps> = ({
                     {capaianPct}% {targetTercapai ? '✓' : ''}
                   </span>
                 ) : (
-                  <span className="font-semibold text-blue-800 shrink-0">Tercapai</span>
+                  <span className="font-semibold text-ink shrink-0">Tercapai</span>
                 )}
               </div>
               <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    targetTercapai ? 'bg-emerald-500' : 'bg-blue-600'
+                    targetTercapai ? 'bg-emerald-500' : 'bg-brand'
                   }`}
                   style={{ width: `${Math.min(100, capaianPct ?? 92)}%` }}
                 />

@@ -130,7 +130,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white">
               <Sliders className="w-4 h-4" />
             </div>
             <div>
@@ -153,7 +153,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           <button
             onClick={() => setActiveTab('config')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'config'
-                ? 'border-sky-600 text-sky-700'
+                ? 'border-brand text-brand-ink'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
@@ -189,7 +189,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
                 <div>
@@ -200,7 +200,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                     type="text"
                     value={subtitle}
                     onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
               </div>
@@ -222,7 +222,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                       type="button"
                       onClick={() => setType(ct.type)}
                       className={`p-2.5 rounded-xl border text-left transition-all ${type === ct.type
-                          ? 'border-sky-500 bg-sky-50/70 ring-1 ring-sky-500'
+                          ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
                           : 'border-slate-200 bg-white hover:bg-slate-50'
                         }`}
                     >
@@ -240,7 +240,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="Keuangan">Keuangan</option>
                     <option value="Operasional">Operasional</option>
@@ -253,7 +253,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   <select
                     value={periode}
                     onChange={(e) => setPeriode(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="2026-Q1">Triwulan I 2026 (Aktual)</option>
                     <option value="2026-Q2">Triwulan II 2026</option>
@@ -355,7 +355,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" />
             <span>Simpan Perubahan</span>

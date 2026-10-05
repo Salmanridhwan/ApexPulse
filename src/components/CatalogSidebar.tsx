@@ -30,13 +30,13 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
       <div className="bg-slate-950/90 text-white rounded-lg p-2.5 flex items-center justify-between border border-slate-800/80 my-2 shadow-inner">
         <div>
           <span className="text-[10px] text-slate-400 font-medium block">Estimasi Nilai ({preset.satuan})</span>
-          <div className="text-sm font-extrabold text-sky-400 tracking-tight flex items-baseline gap-1.5 mt-0.5">
+          <div className="text-sm font-extrabold text-ink-3 tracking-tight flex items-baseline gap-1.5 mt-0.5">
             <span>128.4</span>
             <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">+8.5% YoY</span>
           </div>
         </div>
         <div className="w-16 h-7 opacity-90">
-          <svg viewBox="0 0 60 25" className="w-full h-full text-sky-400">
+          <svg viewBox="0 0 60 25" className="w-full h-full text-ink-3">
             <path d="M0 20 Q15 5 30 15 T60 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
@@ -50,14 +50,14 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
         <div className="w-14 h-14 shrink-0 relative flex items-center justify-center">
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
             <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4.5" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeDasharray="45 100" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#818cf8" strokeWidth="4.5" strokeDasharray="45 100" />
             <circle cx="18" cy="18" r="14" fill="none" stroke="#34d399" strokeWidth="4.5" strokeDasharray="25 100" strokeDashoffset="-45" />
             <circle cx="18" cy="18" r="14" fill="none" stroke="#fbbf24" strokeWidth="4.5" strokeDasharray="18 100" strokeDashoffset="-70" />
           </svg>
           <span className="absolute text-[8px] font-bold text-slate-300">100%</span>
         </div>
         <div className="flex-1 space-y-1 text-[10px] pr-1">
-          <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block"/>Segmen Utama</span><span className="font-bold text-[10px]">45%</span></div>
+          <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-brand inline-block"/>Segmen Utama</span><span className="font-bold text-[10px]">45%</span></div>
           <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"/>Segmen Sekunder</span><span className="font-bold text-[10px]">25%</span></div>
           <div className="flex items-center justify-between text-slate-300"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"/>Lainnya</span><span className="font-bold text-[10px]">18%</span></div>
         </div>
@@ -70,19 +70,19 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
       <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
         <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
           <span>Tren Historis</span>
-          <span className="text-sky-400 font-semibold">{preset.satuan}</span>
+          <span className="text-ink-3 font-semibold">{preset.satuan}</span>
         </div>
         <div className="h-11 w-full pt-1">
           <svg viewBox="0 0 120 40" className="w-full h-full">
             <defs>
               <linearGradient id={`grad-${preset.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#818cf8" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.0" />
               </linearGradient>
             </defs>
             <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5 L 120 40 L 0 40 Z" fill={`url(#grad-${preset.id})`} />
-            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="120" cy="5" r="3" fill="#0284c7" stroke="#ffffff" strokeWidth="1.5" />
+            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="120" cy="5" r="3" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" />
           </svg>
         </div>
       </div>
@@ -112,14 +112,14 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
     <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
       <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
         <span>Visualisasi Perbandingan</span>
-        <span className="text-sky-400 font-semibold">{preset.satuan}</span>
+        <span className="text-ink-3 font-semibold">{preset.satuan}</span>
       </div>
       <div className="h-11 w-full flex items-end justify-between gap-1 px-1 pt-1">
-        <div className="w-full bg-sky-500/80 rounded-t h-[40%]" />
-        <div className="w-full bg-sky-500/80 rounded-t h-[65%]" />
-        <div className="w-full bg-sky-500/80 rounded-t h-[50%]" />
-        <div className="w-full bg-blue-600 rounded-t h-[85%]" />
-        <div className="w-full bg-sky-500/80 rounded-t h-[70%]" />
+        <div className="w-full bg-brand/80 rounded-t h-[40%]" />
+        <div className="w-full bg-brand/80 rounded-t h-[65%]" />
+        <div className="w-full bg-brand/80 rounded-t h-[50%]" />
+        <div className="w-full bg-brand rounded-t h-[85%]" />
+        <div className="w-full bg-brand/80 rounded-t h-[70%]" />
         <div className="w-full bg-indigo-500 rounded-t h-[95%]" />
       </div>
     </div>
@@ -228,7 +228,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow-xs">
+          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white shadow-xs">
             <Layers className="w-4 h-4" />
           </div>
           <div>
@@ -259,7 +259,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             placeholder="Cari preset ID, nama indikator, atau kata kunci..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-slate-50/50"
+            className="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-slate-50/50"
           />
         </div>
 
@@ -268,7 +268,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('current')}
             className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${sectorTab === 'current'
-                ? 'bg-white text-sky-700 shadow-xs'
+                ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
           >
@@ -277,7 +277,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('universal')}
             className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'universal'
-                ? 'bg-white text-sky-700 shadow-xs'
+                ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
           >
@@ -286,7 +286,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('all')}
             className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'all'
-                ? 'bg-white text-sky-700 shadow-xs'
+                ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
           >
@@ -301,7 +301,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`text-[11px] whitespace-nowrap px-2.5 py-0.5 rounded-full transition-colors ${selectedCategory === cat
-                  ? 'bg-sky-600 text-white font-medium'
+                  ? 'bg-brand text-white font-medium'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
@@ -324,11 +324,11 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             return (
               <div
                 key={preset.id}
-                className="bg-white border border-slate-200 rounded-xl p-3.5 hover:border-sky-300 hover:shadow-xs transition-all space-y-2 group"
+                className="bg-white border border-slate-200 rounded-xl p-3.5 hover:border-line-strong hover:shadow-xs transition-all space-y-2 group"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-surface-2 text-brand-ink border border-line">
                       {preset.id}
                     </span>
                     <span className="text-xs font-semibold text-slate-800">
@@ -359,7 +359,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                     disabled={isMemuat}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60 ${isAdded
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white'
+                        : 'bg-surface-2 text-brand-ink hover:bg-brand hover:text-white'
                       }`}
                   >
                     {isMemuat ? (

@@ -32,7 +32,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const isSource = widget.confidence === 'sumber' && !isManual;
 
   return (
-    <div className="relative bg-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col h-full overflow-hidden group">
+    <div className="relative bg-white rounded-xl border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -42,7 +42,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           {/* Subtitle disembunyikan untuk KPI yang punya target — badan kartu sudah
               menampilkan baris target di progress bar, jadi tidak dobel. */}
           {widget.subtitle && !(widget.type === 'kpi' && widget.kpi?.target !== undefined) && (
-            <p className="text-xs text-slate-500 truncate mt-0.5" title={widget.subtitle}>
+            <p className="text-xs text-ink-2 truncate mt-0.5" title={widget.subtitle}>
               {widget.subtitle}
             </p>
           )}
@@ -64,7 +64,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-1 rounded-md text-slate-400 hover:text-blue-800 hover:bg-blue-50 transition-colors"
+              className="p-1 rounded-md text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
               title="Menu Opsi Widget"
             >
               <MoreVertical className="w-4 h-4" />
@@ -73,10 +73,10 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-blue-100 py-1 z-30 text-xs text-slate-700">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-line py-1 z-30 text-xs text-slate-700">
                   {punyaDataChart(widget) && (
                     <>
-                      <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                      <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
                         Tipe Grafik
                       </div>
                       <div className="px-3 pb-1.5 flex gap-1">
@@ -87,15 +87,15 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                             onClick={() => onEdit({ ...widget, type: t })}
                             className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
                               widget.type === t
-                                ? 'bg-blue-800 text-white'
-                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                ? 'bg-ink text-white'
+                                : 'bg-surface-2 text-brand-ink hover:bg-surface-2'
                             }`}
                           >
                             {t === 'line' ? 'Garis' : t === 'bar' ? 'Batang' : 'Area'}
                           </button>
                         ))}
                       </div>
-                      <div className="border-t border-blue-50 my-1" />
+                      <div className="border-t border-line my-1" />
                     </>
                   )}
                   <button
@@ -103,9 +103,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       setShowMenu(false);
                       onEdit(widget);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2"
+                    className="w-full text-left px-3 py-1.5 hover:bg-surface-2 flex items-center gap-2"
                   >
-                    <Edit2 className="w-3.5 h-3.5 text-blue-500" />
+                    <Edit2 className="w-3.5 h-3.5 text-brand" />
                     <span>Ubah Visualisasi & Tipe</span>
                   </button>
                   <button
@@ -123,12 +123,12 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       setShowMenu(false);
                       onDuplicate(widget);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2"
+                    className="w-full text-left px-3 py-1.5 hover:bg-surface-2 flex items-center gap-2"
                   >
-                    <Copy className="w-3.5 h-3.5 text-blue-500" />
+                    <Copy className="w-3.5 h-3.5 text-brand" />
                     <span>Duplikat Widget</span>
                   </button>
-                  <div className="border-t border-blue-50 my-1" />
+                  <div className="border-t border-line my-1" />
                   <button
                     onClick={() => {
                       setShowMenu(false);

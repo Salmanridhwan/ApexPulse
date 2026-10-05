@@ -187,7 +187,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               progress: {
                 show: true,
                 width: 14,
-                itemStyle: { color: '#1d4ed8' },
+                itemStyle: { color: '#4f46e5' },
               },
               axisLine: { lineStyle: { width: 14, color: [[1, '#e2e8f0']] } },
               axisTick: { show: false },
@@ -234,7 +234,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             itemHeight: 60,
             itemWidth: 10,
             textStyle: { fontSize: 9, color: '#94a3b8' },
-            inRange: { color: ['#dbeafe', '#1d4ed8'] },
+            inRange: { color: ['#e0e7ff', '#4f46e5'] },
           },
           series: [
             {
@@ -250,8 +250,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         option = {
           tooltip: {
             trigger: 'item',
-            backgroundColor: '#1e3a8a',
-            borderColor: '#1e40af',
+            backgroundColor: '#3730c4',
+            borderColor: '#3730c4',
             borderRadius: 8,
             textStyle: { color: '#f8fafc', fontSize: 11 },
             formatter: (p: any) =>
@@ -289,14 +289,14 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               data: donutView,
             },
           ],
-          color: ['#1d4ed8', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'],
+          color: ['#4f46e5', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'],
         };
       } else {
         const isArea = type === 'area';
-        const paletSoft = ['#93c5fd', '#1d4ed8', '#7dd3fc', '#bfdbfe', '#38bdf8', '#dbeafe'];
+        const paletSoft = ['#a5b4fc', '#4f46e5', '#a5b4fc', '#c7d2fe', '#818cf8', '#e0e7ff'];
         const echartsSeries = seriesView.map((s, sIdx) => {
           // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
-          const baseColor = s.color || (sIdx === 0 ? (type === 'bar' ? '#93c5fd' : '#1d4ed8') : paletSoft[sIdx % paletSoft.length]);
+          const baseColor = s.color || (sIdx === 0 ? (type === 'bar' ? '#a5b4fc' : '#4f46e5') : paletSoft[sIdx % paletSoft.length]);
           return {
             name: s.name,
             type: (isArea ? 'line' : type) as any,
@@ -330,8 +330,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'line', lineStyle: { color: '#cbd5e1', type: 'dashed' } },
-            backgroundColor: '#1e3a8a',
-            borderColor: '#1e40af',
+            backgroundColor: '#3730c4',
+            borderColor: '#3730c4',
             borderRadius: 8,
             textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
             valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
@@ -474,7 +474,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           type="button"
           onClick={() => setShowData((v) => !v)}
           data-testid="chart-toggle-data"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-slate-500 hover:text-sky-700 hover:bg-sky-50 border border-transparent hover:border-sky-200 transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-medium text-ink-3 hover:text-brand-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
           title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
         >
           {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}

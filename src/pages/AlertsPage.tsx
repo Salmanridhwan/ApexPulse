@@ -45,16 +45,16 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
   );
 
   return (
-    <div className="flex-1 bg-blue-50 min-h-screen flex flex-col">
+    <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Page Header Header & Description */}
-        <div className="bg-white p-5 rounded-xl border border-blue-100 mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+        <div className="bg-white p-5 rounded-xl border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
               <Bell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-blue-900 flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-lg font-bold text-ink flex items-center gap-2.5 flex-wrap">
                 Ambang Batas & Peringatan Otomatis (Alerts)
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100 font-semibold">
                   {notifications.filter((n) => !n.isRead).length} Belum Dibaca
@@ -68,7 +68,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
 
           <button
             onClick={fetchAlertsData}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-surface-2 border border-line rounded-lg transition-colors shrink-0"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Segarkan</span>
@@ -76,7 +76,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
         </div>
 
         {/* Tab Navigation & Search */}
-        <div className="bg-white p-5 rounded-xl border border-blue-100 mb-6">
+        <div className="bg-white p-5 rounded-xl border border-line mb-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
             {/* Tabs */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -84,8 +84,8 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('notifications')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
                   activeTab === 'notifications'
-                    ? 'bg-blue-800 text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-800'
+                    ? 'bg-ink text-white shadow-sm'
+                    : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
                 }`}
               >
                 Notifikasi Masuk ({notifications.length})
@@ -94,8 +94,8 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('rules')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
                   activeTab === 'rules'
-                    ? 'bg-blue-800 text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-800'
+                    ? 'bg-ink text-white shadow-sm'
+                    : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
                 }`}
               >
                 Aturan Ambang Batas ({alertRules.length})
@@ -110,7 +110,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 placeholder="Cari notifikasi / aturan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 placeholder-slate-400"
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-slate-800 placeholder-slate-400"
               />
             </div>
           </div>
@@ -132,7 +132,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                           ? 'bg-rose-50/50 border-rose-200'
                           : item.severity === 'warning'
                           ? 'bg-amber-50/50 border-amber-200'
-                          : 'bg-blue-50/50 border-blue-100'
+                          : 'bg-surface-2/50 border-line'
                       }`}
                     >
                       <div
@@ -141,7 +141,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                             ? 'bg-rose-600'
                             : item.severity === 'warning'
                             ? 'bg-amber-500'
-                            : 'bg-blue-600'
+                            : 'bg-brand'
                         }`}
                       >
                         {item.severity === 'critical' ? (
@@ -216,7 +216,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                                   ? 'bg-rose-100 text-rose-800'
                                   : rule.severity === 'warning'
                                   ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-blue-100 text-blue-800'
+                                  : 'bg-surface-2 text-ink'
                               }`}
                             >
                               {rule.severity}

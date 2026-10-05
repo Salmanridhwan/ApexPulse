@@ -94,7 +94,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center animate-spin mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-brand/20 text-ink-3 flex items-center justify-center animate-spin mb-4">
           <Activity className="w-6 h-6" />
         </div>
         <h2 className="text-base font-bold text-white tracking-wide">Memuat Tampilan Dashboard...</h2>
@@ -127,7 +127,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           </div>
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-left text-[11px] text-slate-600 space-y-1.5">
             <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-              <Shield className="w-3.5 h-3.5 text-sky-600" />
+              <Shield className="w-3.5 h-3.5 text-brand" />
               <span>Protokol Keamanan Data</span>
             </div>
             <p className="text-slate-500 leading-normal">
