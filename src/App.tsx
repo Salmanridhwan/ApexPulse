@@ -678,10 +678,10 @@ export default function App() {
                     {/* Tombol Chat RAG */}
                     <button
                       onClick={() => setIsChatOpen(!isChatOpen)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border ${
                         isChatOpen
-                          ? 'bg-blue-700 text-white'
-                          : 'bg-blue-800 hover:bg-blue-900 text-white'
+                          ? 'bg-blue-100 text-blue-800 border-blue-200'
+                          : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-100'
                       }`}
                       title="Buka / Tutup Chat RAG Copilot"
                     >
@@ -964,9 +964,9 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => setIsShareOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
                         >
-                          <Share2 className="w-3 h-3" />
+                          <Share2 className="w-3 h-3 text-blue-400" />
                           Bagikan
                         </button>
                       </div>
