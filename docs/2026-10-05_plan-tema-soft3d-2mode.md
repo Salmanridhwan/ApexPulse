@@ -1,7 +1,21 @@
 # Plan Redesign Tema ApexPulse — "Soft 3D" 2 Mode (Terang & Gelap)
 
-Status: **PLAN** (belum dieksekusi)
+Status: **SELESAI** (Fase 0-6 dieksekusi)
 Referensi visual: `clip_20261005_213342_2.png` (dashboard dark-slate, kartu stat warna-warni, ring gauge 3D, area chart berlapis)
+
+## Ringkasan hasil eksekusi
+
+| Fase | Hasil | Commit |
+|---|---|---|
+| 0 — Checkpoint & audit | 22 file tema di-commit; **bug byte non-UTF-8 diperbaiki** (build sempat gagal) | `28b4f56` |
+| 1 — Token radius & bayangan | radius 6→14px; bayangan biru-gelap lebih lembut | `e3a6d43` |
+| 2 — Depth mode terang | kanvas lebih gelap dari kartu; border hairline tegas | `e3a6d43` |
+| 3 — Kartu stat beraksen | `.card-accent` + `.accent-{coral,violet,cyan,teal,amber}` | `ed770c7` |
+| 4 — Ring gauge 3D | `RingGauge3D` (SVG beveled), dipakai widget `gauge` | `ed770c7` |
+| 5 — Area chart berlapis | gradien translusen lebih halus | (fase5) |
+| 6 — Sapu & QA | 0 sisa indigo lama; **QA 12/12 lulus** | (fase6) |
+
+**Catatan penting:** `accent-*` HARUS di `@layer components` (bukan `@utility`) — Tailwind v4 men-tree-shake utility yang belum terpakai, padahal aksen dipilih dinamis dari data.
 
 ---
 

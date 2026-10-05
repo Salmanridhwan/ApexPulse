@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Palet dot ala referensi — biru dominan sesuai tone aplikasi.
-const DOT_COLORS = ['#4f46e5', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'];
+const DOT_COLORS = ['#38c6e2', '#8f90e4', '#2bb8a8', '#e0a020', '#b06be0', '#f2503a', '#5b9bd5'];
 
 interface Column {
   key: string;
