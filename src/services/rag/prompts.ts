@@ -16,7 +16,7 @@ Permintaan Pengguna: "${userQuery}"
 
 Aturan Wajib:
 1. Setiap widget angka WAJIB memiliki sitasi ke dokumen sumber (nama dokumen, halaman, kutipan teks/chunkSnippet).
-2. Keluarkan HANYA JSON murni yang sesuai dengan skema Zod AionesBoard tanpa format Markdown tambahan.
+2. Keluarkan HANYA JSON murni yang sesuai dengan skema Zod ApexPulse tanpa format Markdown tambahan.
 3. Gunakan preset ID katalog jika cocok: ${availableCatalogPresets}.
 4. Tetapkan confidence ke "sumber" jika angka langsung tertera di dokumen, atau "inferensi AI" jika melalui estimasi agregasi.
 5. Susun grid tata letak (w=4,6,12 dan h=3,4,5).

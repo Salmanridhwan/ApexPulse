@@ -591,7 +591,7 @@ export class InMemoryDb {
         {
           id: `msg-welcome-${Date.now()}`,
           sender: 'system',
-          text: 'Halo! Saya asisten orkestrator AionesBoard. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
+          text: 'Halo! Saya asisten orkestrator ApexPulse. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
           timestamp: now,
         },
       ],
