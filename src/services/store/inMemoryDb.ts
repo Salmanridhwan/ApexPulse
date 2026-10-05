@@ -360,6 +360,19 @@ export class InMemoryDb {
     }
   }
 
+  /**
+   * Tutup pool MySQL dengan rapi (dipakai graceful shutdown server).
+   * Aman dipanggil walau MySQL tidak pernah tersambung.
+   */
+  public async closeMysql(): Promise<void> {
+    if (!this.mysql) return;
+    try {
+      await this.mysql.close();
+    } finally {
+      this.mysql = null;
+    }
+  }
+
   /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
   private seedCredentials() {
     const demoPassword = process.env.DEMO_PASSWORD || 'aionesboard2026';

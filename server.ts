@@ -1224,9 +1224,36 @@ async function startServer() {
   // Persistence MySQL (Laragon) — muat state sebelum server menerima request.
   await db.initMysql();
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[ApexPulse Server] Berjalan pada port ${PORT}`);
   });
+
+  // Graceful shutdown: tutup server & pool MySQL saat menerima SIGINT/SIGTERM.
+  // Tanpa ini, proses tertinggal (orphan) ketika dijalankan lewat wrapper
+  // (mis. `tsx` dari skrip QA/CI) yang menerima sinyal kill lebih dulu.
+  let sedangTutup = false;
+  const tutup = async (sinyal: string) => {
+    if (sedangTutup) return;
+    sedangTutup = true;
+    console.log(`[ApexPulse Server] Menerima ${sinyal} — menutup dengan rapi...`);
+    // Berhenti menerima koneksi baru; paksa tutup setelah 5 dtk bila ada yang menggantung.
+    server.close(() => {
+      console.log('[ApexPulse Server] Koneksi HTTP ditutup.');
+    });
+    const paksa = setTimeout(() => {
+      console.warn('[ApexPulse Server] Batas waktu 5 dtk — keluar paksa.');
+      process.exit(0);
+    }, 5000);
+    paksa.unref();
+    try {
+      await db.closeMysql();
+    } catch (err) {
+      console.error('[ApexPulse Server] Gagal menutup pool MySQL:', err);
+    }
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void tutup('SIGINT'));
+  process.on('SIGTERM', () => void tutup('SIGTERM'));
 }
 
 startServer().catch((err) => {
