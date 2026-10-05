@@ -181,7 +181,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setCurrentSteps([
-      { id: 'step-0', title: 'Menghubungkan ke AionesBoard Orchestrator...', status: 'in_progress' },
+      { id: 'step-0', title: 'Menghubungkan ke ApexPulse Orchestrator...', status: 'in_progress' },
     ]);
 
     const streamStart = Date.now();
@@ -364,7 +364,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                   <>
                     <Bot className="w-3 h-3 text-brand" />
-                    <span>AionesBoard Orchestrator</span>
+                    <span>ApexPulse Orchestrator</span>
                   </>
                 )}
                 <span>•</span>
@@ -486,7 +486,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
                   </div>
                   <div>
-                    <span className="font-bold text-slate-800 text-[11px] block">AionesBoard Orchestrator</span>
+                    <span className="font-bold text-ink text-[11px] block">ApexPulse Orchestrator</span>
                     <span className="text-[10px] text-brand font-medium flex items-center gap-1">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                       Sedang memproses & menganalisis...

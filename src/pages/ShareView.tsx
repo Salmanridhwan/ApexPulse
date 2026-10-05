@@ -164,7 +164,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             )}
           </main>
           <div className="px-4 pb-4 text-center">
-            <span className="text-[10px] text-slate-400">Dibuat dengan AionesBoard</span>
+            <span className="text-[10px] text-slate-400">Dibuat dengan ApexPulse</span>
           </div>
         </div>
       </ChartSelectionProvider>
@@ -261,7 +261,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <p className="font-semibold text-slate-700">{namaInstansi}</p>
           <p className="text-[11px] text-slate-400 mt-1">
             Setiap angka terikat sitasi dokumen resmi. Dibuat &amp; dikelola dengan{' '}
-            <span className="text-slate-500 font-medium">AionesBoard</span>.
+            <span className="text-ink-3 font-medium">ApexPulse</span>.
           </p>
         </footer>
 

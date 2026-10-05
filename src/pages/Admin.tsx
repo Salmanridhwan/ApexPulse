@@ -271,7 +271,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <div className="flex items-center gap-2 truncate">
                 <Shield className="w-4 h-4 text-brand shrink-0" />
                 <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">
-                  AionesBoard Admin & Governance Center
+                  ApexPulse Admin & Governance Center
                 </h1>
               </div>
             </div>
