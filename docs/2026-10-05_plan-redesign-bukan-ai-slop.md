@@ -154,6 +154,26 @@ npm run build   # lalu refresh http://localhost:3000
 
 Screenshot verifikasi: `npx tsx scripts/tmp-capture-sidebar.ts`.
 
+### 4.1 Menjalankan QA suite resmi (`qa-demo-ui.ts`)
+
+QA suite butuh server sendiri di **`:3114`**. Tapi `dotenv.config({override:true})`
+membuat `.env` (PORT=3000) selalu menang → server gagal `EADDRINUSE`.
+
+**Resep (sudah terverifikasi):**
+```
+# Terminal 1 — server QA di port terpisah
+HONOR_SHELL_ENV=1 PORT=3114 npx tsx server.ts
+
+# Terminal 2 — jalankan QA (12 langkah)
+npx tsx scripts/qa-demo-ui.ts
+```
+
+`HONOR_SHELL_ENV=1` membuat dotenv tidak menimpa env shell → PORT dari shell menang.
+Tanpa flag ini, perilaku produksi TIDAK berubah. Hasil terakhir: **12/12 lulus**.
+
+> ⚠️ QA memakai DB yang sama dengan `:3000`. QA membersihkan dashboard ujinya
+> sendiri di Langkah 10 (terverifikasi: 0 sisa), tapi tetap cek data setelahnya.
+
 ---
 
 ## 5. Risiko
