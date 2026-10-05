@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
-import { Citation, WidgetSpec } from '../types';
+import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
 
 interface DashboardCanvasProps {
@@ -11,9 +11,10 @@ interface DashboardCanvasProps {
   onDuplicateWidget: (widget: WidgetSpec) => void;
   onReorderWidgets: (orderedIds: string[]) => void;
   onResizeWidget: (widgetId: string, w: number) => void;
-  onOpenCitation: (citation: Citation) => void;
   onOpenCatalog: () => void;
   onOpenChat: () => void;
+  /** Mode lihat-saja (mis. saat filter dashboard aktif): matikan drag & resize. */
+  readOnly?: boolean;
 }
 
 export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
@@ -24,9 +25,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onDuplicateWidget,
   onReorderWidgets,
   onResizeWidget,
-  onOpenCitation,
   onOpenCatalog,
   onOpenChat,
+  readOnly = false,
 }) => {
   // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -141,7 +142,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           <div
             key={widget.id}
             data-widget-id={widget.id}
-            draggable
+            draggable={!readOnly}
             onDragStart={(e) => {
               setDragId(widget.id);
               e.dataTransfer.effectAllowed = 'move';
@@ -171,10 +172,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               onManualCorrection={onManualCorrection}
               onDelete={onDeleteWidget}
               onDuplicate={onDuplicateWidget}
-              onOpenCitation={onOpenCitation}
             />
             {/* Resize handle: strip tipis di tepi kiri & kanan — tarik untuk ubah lebar. */}
-            {([-1, 1] as const).map((arah) => (
+            {!readOnly && ([-1, 1] as const).map((arah) => (
               <span
                 key={arah}
                 data-resize={arah === -1 ? 'kiri' : 'kanan'}

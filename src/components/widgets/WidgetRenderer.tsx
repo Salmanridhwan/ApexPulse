@@ -1,5 +1,5 @@
 import React from 'react';
-import { Citation, WidgetSpec } from '../../types';
+import { WidgetSpec } from '../../types';
 import { ChartEcharts } from './ChartEcharts';
 import { DataTable } from './DataTable';
 import { KpiCard } from './KpiCard';
@@ -7,13 +7,9 @@ import { NarasiCard } from './NarasiCard';
 
 interface WidgetRendererProps {
   widget: WidgetSpec;
-  onOpenCitation?: (citation: Citation) => void;
 }
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
-  widget,
-  onOpenCitation,
-}) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
   switch (widget.type) {
     case 'kpi':
       return (
@@ -63,8 +59,6 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
         <NarasiCard
           text={widget.narasi?.text || ''}
           bulletPoints={widget.narasi?.bulletPoints}
-          citations={widget.citations || []}
-          onOpenCitation={onOpenCitation}
         />
       );
 

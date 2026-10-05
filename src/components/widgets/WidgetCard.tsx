@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import {
   AlertTriangle,
-  BookOpen,
   Copy,
   Edit2,
-  FileCheck,
   MoreVertical,
-  Sparkles,
   Trash2,
   UserCheck,
 } from 'lucide-react';
-import { Citation, WidgetSpec } from '../../types';
+import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
+import { punyaDataChart } from '../../services/spec/widgetTypes';
 
 interface WidgetCardProps {
   widget: WidgetSpec;
@@ -19,7 +17,6 @@ interface WidgetCardProps {
   onManualCorrection: (widget: WidgetSpec) => void;
   onDelete: (widgetId: string) => void;
   onDuplicate: (widget: WidgetSpec) => void;
-  onOpenCitation: (citation: Citation) => void;
 }
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
@@ -28,7 +25,6 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   onManualCorrection,
   onDelete,
   onDuplicate,
-  onOpenCitation,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -53,31 +49,14 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Status sumber data — hanya tampil saat hover agar kartu bersih */}
-          {isManual ? (
+          {/* Hanya penanda koreksi manual yang tersisa — tanpa label provenans AI/sumber. */}
+          {isManual && (
             <span
               className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 cursor-help opacity-90 group-hover:opacity-100 transition-opacity"
               title={`Dikoreksi manual oleh ${widget.manualCorrection?.correctedBy || 'Analis'} (${widget.manualCorrection?.reason || 'Penyesuaian internal'}). Nilai asli: ${widget.manualCorrection?.originalValue}`}
             >
               <UserCheck className="w-3 h-3 text-amber-600" />
               <span>Koreksi Manual</span>
-            </span>
-          ) : isSource ? (
-            <button
-              onClick={() => widget.citations[0] && onOpenCitation(widget.citations[0])}
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all opacity-90 group-hover:opacity-100"
-              title={`Sumber Resmi (${widget.citations.length} sitasi dokumen) — klik untuk lihat`}
-            >
-              <FileCheck className="w-3 h-3 text-emerald-600" />
-              <span>Sumber Resmi</span>
-            </button>
-          ) : (
-            <span
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 opacity-90 group-hover:opacity-100 transition-opacity"
-              title="Disintesis melalui model inferensi RAG"
-            >
-              <Sparkles className="w-3 h-3 text-sky-600" />
-              <span>Inferensi AI</span>
             </span>
           )}
 
@@ -95,7 +74,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
                 <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-blue-100 py-1 z-30 text-xs text-slate-700">
-                  {['line', 'bar', 'area'].includes(widget.type) && (
+                  {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-slate-400">
                         Tipe Grafik
@@ -139,18 +118,6 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                     <span>Koreksi Angka Manual (F-14)</span>
                   </button>
-                  {widget.citations.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onOpenCitation(widget.citations[0]);
-                      }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2 text-blue-700"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Lihat Dokumen Sitasi ({widget.citations.length})</span>
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setShowMenu(false);
@@ -185,26 +152,8 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           ['line', 'bar', 'area', 'donut', 'table', 'heatmap'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
         }`}
       >
-        <WidgetRenderer widget={widget} onOpenCitation={onOpenCitation} />
+        <WidgetRenderer widget={widget} />
       </div>
-
-      {/* Footer sitasi — tampil saat hover saja */}
-      {widget.citations.length > 0 && (
-        <div className="px-5 py-2 border-t border-blue-50 flex items-center justify-between text-[11px] text-slate-500 transition-opacity">
-          <button
-            onClick={() => onOpenCitation(widget.citations[0])}
-            className="flex items-center gap-1.5 hover:text-blue-800 transition-colors truncate max-w-[85%]"
-          >
-            <BookOpen className="w-3 h-3 text-blue-400 shrink-0" />
-            <span className="truncate">
-              {widget.citations[0].docName} (Hal. {widget.citations[0].page})
-            </span>
-          </button>
-          <span className="text-[10px] text-blue-600 shrink-0 font-semibold">
-            {widget.periode || '2026'}
-          </span>
-        </div>
-      )}
     </div>
   );
 };

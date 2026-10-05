@@ -45,6 +45,17 @@ function log(msg: string) {
   console.log(msg);
 }
 
+async function bukaPanelChat(): Promise<boolean> {
+  return page.evaluate(() => {
+    const btn = [...document.querySelectorAll('header button')].find(
+      (b) => /Buka \/ Tutup Chat RAG Copilot/i.test(b.getAttribute('title') || '')
+    ) as HTMLElement | undefined;
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+}
+
 async function klikCocok(pola: string): Promise<boolean> {
   return page.evaluate((p: string) => {
     const re = new RegExp(p, 'i');
@@ -61,11 +72,12 @@ async function klikCocok(pola: string): Promise<boolean> {
 async function bukaMenuAksi(): Promise<void> {
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('button')].find(
-      (b) => b.getAttribute('title') === 'Aksi lain'
+      (b) => /^Aksi lainnya?$/.test(b.getAttribute('title') || '')
     );
     (btn as HTMLElement)?.click();
   });
-  await page.waitForFunction(() => /Filter Dashboard/i.test(document.body.innerText), {
+  // Penanda menu harus salah satu ISINYA, bukan label filter bar yang sudah berubah.
+  await page.waitForFunction(() => /Mode Presentasi/i.test(document.body.innerText), {
     timeout: 8000,
   });
 }
@@ -186,10 +198,57 @@ async function main() {
     }
   });
 
+  // ============ LANGKAH 1b: DASHBOARD KOSONG (basis uji) ============
+  // QA sebelumnya bisa saja meninggalkan dashboard berisi widget & riwayat chat.
+  // Tanpa langkah ini, "berhasil disintesis" dari run lalu sudah ada di layar
+  // sehingga LANGKAH 3 lulus seketika tanpa memanggil RAG sama sekali, dan
+  // LANGKAH 4 mengukur pengurangan widget pada data yang salah.
+  await uji('1b — Siapkan dashboard kosong & riwayat chat bersih', async () => {
+    const idBaru = await page.evaluate(async () => {
+      const res = await fetch('/api/dashboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: 'tenant-pdam',
+          title: 'Dashboard QA Demo',
+          description: 'dasar uji skenario demo',
+          sector: 'pdam',
+          widgets: [],
+        }),
+      });
+      return res.ok ? (await res.json()).id : null;
+    });
+    assert.ok(idBaru, 'gagal membuat dashboard kosong via API');
+    log(`  ℹ️ Dashboard uji: ${idBaru}`);
+
+    await page.reload({ waitUntil: 'networkidle2' });
+    const aktif = await page
+      .waitForFunction(() => /Dashboard QA Demo/.test(document.querySelector('h1')?.innerText || ''), {
+        timeout: 20000,
+      })
+      .then(() => true)
+      .catch(() => false);
+    assert.ok(aktif, 'dashboard uji kosong tidak menjadi dashboard aktif');
+
+    // Kosongkan riwayat chat dashboard ini supaya tidak ada teks sisa dari run sebelumnya.
+    const chat = await page.evaluate(async (id: string) => {
+      const r = await fetch(`/api/dashboards/${id}/chat`);
+      return r.ok ? await r.json() : null;
+    }, idBaru);
+    if (chat?.chat?.id) {
+      await page.evaluate(async (chatId: string) => {
+        await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+      }, chat.chat.id);
+      log('  ℹ️ Riwayat chat dashboard uji dihapus');
+    }
+    await page.reload({ waitUntil: 'networkidle2' });
+    await page.waitForFunction(() => !!document.querySelector('aside'), { timeout: 20000 });
+  });
+
   // ============ LANGKAH 2: TULIS DI CHAT ============
   await uji('2 — Tulis perintah di chat "buatkan dashboard kinerja PDAM 2026"', async () => {
-    const buka = await klikCocok('Chat RAG Copilot');
-    assert.ok(buka, 'tombol Chat RAG Copilot tidak ditemukan');
+    const buka = await bukaPanelChat();
+    assert.ok(buka, 'tombol Chat RAG Copilot di header tidak ditemukan');
     await page.waitForFunction(
       () => !!document.querySelector('textarea, input[placeholder*="ulkan"], input[type="text"]'),
       { timeout: 10000 }
@@ -210,9 +269,13 @@ async function main() {
     // Kirim chat dengan Enter
     await page.keyboard.press('Enter');
 
-    // Tunggu progres streaming selesai (tombol kembali aktif / pesan result muncul)
-    const selesai = await tungguTeks('berhasil dibuat|Berhasil dibuat|Dashboard berhasil', 45000);
-    assert.ok(selesai, 'chat tidak menghasilkan pesan sukses dalam 45 detik');
+    // Tunggu progres streaming selesai (pesan "result" dari server).
+    // Server mengirim "berhasil disintesis" (dashboard baru) atau "berhasil diperbarui"
+    // (dashboard aktif sudah ada) — bukan "berhasil dibuat".
+    // Timeout 90 detik mengikuti ragTimeoutSeconds di panel admin; RAG sungguhan
+    // butuh ~40 detik, jadi 45 detik lama sudah tidak aman saat lambat.
+    const selesai = await tungguTeks('berhasil disintesis|berhasil diperbarui|Dashboard berhasil', 90000);
+    assert.ok(selesai, 'chat tidak menghasilkan pesan sukses dalam 90 detik');
 
     // Dashboard baru otomatis aktif — tunggu widget terlihat di kanvas
     let jumlahWidget = 0;
@@ -234,7 +297,7 @@ async function main() {
     // --- 4a: hapus widget pertama yang mengandung "Tren"/"Pendapatan" via chat
     // Chat input = input[type=text] di panel fixed (bukan textarea).
     if (!(await page.evaluate(() => !!document.querySelector('div.fixed input[type="text"]')))) {
-      const buka = await klikCocok('Chat RAG Copilot');
+      const buka = await bukaPanelChat();
       assert.ok(buka, 'panel chat tertutup dan tombolnya tak ditemukan');
       await page.waitForFunction(() => !!document.querySelector('div.fixed input[type="text"]'), { timeout: 8000 });
     }
@@ -264,38 +327,56 @@ async function main() {
   });
 
   // ============ LANGKAH 5: SITASI ============
-  await uji('5 — Klik lihat sumber -> drawer chunk + dokumen muncul', async () => {
-    const klik = await page.evaluate(() => {
-      const btn = [...document.querySelectorAll('button')].find((b) =>
-        /lihat sumber|sumber/i.test(b.textContent || '')
-      );
-      if (!btn) return false;
-      (btn as HTMLElement).click();
-      return true;
+  // Badge sitasi per-widget sengaja dihapus dari kartu widget (kartu jadi bersih,
+  // tanpa label "Sumber Resmi"/"Inferensi AI"). Satu-satunya jalan auditable untuk
+  // sitasi sekarang adalah "Lampiran Sitasi & Sumber Dokumen Resmi" di modal Ekspor,
+  // jadi di sinilah sitasi diverifikasi.
+  await uji('5 — Sitasi resmi tampil di Lampiran modal Ekspor', async () => {
+    await bukaMenuAksi();
+    const klikExport = await klikCocok('Cetak / Ekspor');
+    assert.ok(klikExport, 'menu Cetak / Ekspor tidak ditemukan');
+    await page.waitForFunction(() => /Laporan Eksekutif Resmi/i.test(document.body.innerText), {
+      timeout: 8000,
     });
-    assert.ok(klik, 'tombol lihat sumber tidak ditemukan di widget manapun');
 
-    await page.waitForFunction(
-      () => /dokumen|chunk|halaman|sumber/i.test(
-        [...document.querySelectorAll('aside, [data-drawer], div.fixed')]
-          .map((d) => (d as HTMLElement).innerText)
-          .join(' ')
-      ),
-      { timeout: 10000 }
+    const lampiran = await page
+      .waitForFunction(() => /Lampiran Sitasi & Sumber Dokumen Resmi/i.test(document.body.innerText), {
+        timeout: 8000,
+      })
+      .then(() => true)
+      .catch(() => false);
+    assert.ok(lampiran, 'Lampiran Sitasi & Sumber Dokumen Resmi tidak ada di modal ekspor');
+
+    // Setiap entri lampiran harus menyebut nama dokumen + nomor halaman.
+    const entri = await page.evaluate(() => {
+      const semua = document.body.innerText || '';
+      const blok = semua.split(/Lampiran Sitasi & Sumber Dokumen Resmi/i)[1] || '';
+      const baris = blok
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => /\.pdf|\.docx|\.xlsx/i.test(s));
+      return {
+        total: baris.length,
+        adaHal: baris.filter((s) => /halaman\s*:?\s*\d+/i.test(s)).length,
+      };
+    });
+    log(`  ℹ️ Entri sitasi di lampiran: ${entri.total} (dengan halaman: ${entri.adaHal})`);
+    assert.ok(entri.total > 0, 'lampiran sitasi kosong padahal widget punya sitasi');
+    assert.ok(
+      entri.adaHal === entri.total,
+      `sitasi tanpa nomor halaman: ${entri.total - entri.adaHal} dari ${entri.total}`
     );
-    // Tutup drawer EKSPLISIT lewat tombol footernya "Tutup Panel" — regex
-    // generik /tutup|close|×/ bisa menekan tombol lain yang muncul lebih dulu.
+
+    // Tutup modal lewat tombol Tutup-nya (Escape tidak ditangani modal).
     await page.evaluate(() => {
       const btn = [...document.querySelectorAll('button')].find(
-        (b) => (b.textContent || '').trim() === 'Tutup Panel'
+        (b) => (b.textContent || '').trim() === 'Tutup'
       );
       (btn as HTMLElement)?.click();
     });
-    // Pastikan drawer benar-benar tertutup sebelum langkah berikutnya.
-    await page.waitForFunction(
-      () => !document.body.innerText.includes('Transparansi Dokumen Sumber'),
-      { timeout: 8000 }
-    );
+    await page.waitForFunction(() => !/Laporan Eksekutif Resmi/i.test(document.body.innerText), {
+      timeout: 8000,
+    });
   });
 
   // ============ LANGKAH 6: EXPORT + SHARE ============
@@ -521,12 +602,16 @@ async function main() {
       { timeout: 5000 }
     ).then(() => true).catch(() => false);
     assert.ok(konfirmMuncul, 'konfirmasi penghapusan tidak muncul');
-    await page.evaluate(() => {
-      const btn = [...document.querySelectorAll('button')].find(
-        (b) => (b.textContent || '').trim() === 'Hapus'
-      );
-      (btn as HTMLElement)?.click();
+    // Label tombol konfirmasi redesign 5 Okt: "Ya, Hapus" (bukan "Hapus").
+    const konfirmasiDitekan = await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('button')].find((b) =>
+        /^(Ya,\s*Hapus|Hapus)$/.test((b.textContent || '').trim())
+      ) as HTMLElement | undefined;
+      if (!btn) return false;
+      btn.click();
+      return true;
     });
+    assert.ok(konfirmasiDitekan, 'tombol konfirmasi hapus tidak diklik');
 
     // Banner kembali ke dashboard lain + API tak lagi memuat id tsb
     const ganti = await page.waitForFunction(

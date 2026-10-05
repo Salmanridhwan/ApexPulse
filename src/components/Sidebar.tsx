@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Activity,
   Bell,
-  ChevronDown,
   History,
   Layers,
   LayoutGrid,
@@ -126,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         const found = tenants.find((t) => t.id === e.target.value);
                         if (found) onSelectTenant(found);
                       }}
-                      className="w-full text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50/80 border border-slate-200/90 rounded-lg px-2.5 py-1.5 cursor-pointer focus:outline-none focus:ring-1.5 focus:ring-sky-500 transition-all appearance-none pr-7 truncate shadow-2xs"
+                      className="w-full text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50/80 border border-slate-200/90 rounded-lg px-2.5 py-1.5 cursor-pointer focus:outline-none focus:ring-1.5 focus:ring-sky-500 transition-all appearance-none truncate shadow-2xs"
                       title="Pilih instansi aktif"
                     >
                       {tenants.map((t) => (
@@ -135,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+                    
                   </>
                 ) : (
                   <div

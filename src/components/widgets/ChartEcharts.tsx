@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ECharts, EChartsOption } from 'echarts';
+import { Table2, BarChart3 } from 'lucide-react';
+import { useChartSelection } from './ChartSelection';
 
 // echarts (~1 MB) hanya dimuat saat widget chart pertama dirender —
 // tidak ikut bundle awal. Promise di-cache supaya import sekali saja.
@@ -105,12 +107,48 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
+  const { selected, setSelected } = useChartSelection();
+  const [showData, setShowData] = useState(false);
 
   // ── Normalisasi satuan SEBELUM render ─────────────────────────────────────
-  // Bila ada seri dengan satuan berbeda (mis. triliun vs miliar), konversi semua
-  // ke satuan terkecil yang masuk akal (miliar) agar bar proporsional.
-  const { normalizedSeries, displayUnit } = normalizeSeriesData(series, unit);
-  // ──────────────────────────────────────────────────────────────────────────
+  const { normalizedSeries, displayUnit } = useMemo(
+    () => normalizeSeriesData(series, unit),
+    [series, unit]
+  );
+
+  const isCartesian = type === 'line' || type === 'area' || type === 'bar';
+
+  // ── Turunkan data tampilan berdasarkan seleksi (cross-filter ala Tableau) ──
+  const view = useMemo(() => {
+    let xView = xAxis;
+    let seriesView: Array<{ name: string; data: number[]; color?: string }> = normalizedSeries;
+    if (isCartesian && selected && xAxis.includes(selected)) {
+      const i = xAxis.indexOf(selected);
+      xView = [selected];
+      seriesView = normalizedSeries.map((s) => ({ ...s, data: [s.data[i] ?? 0] }));
+    }
+
+    let donutView = xAxis.map((label, idx) => ({
+      name: label,
+      value: normalizedSeries[0]?.data[idx] || 0,
+    }));
+    if (type === 'donut' && selected) {
+      const cocok = donutView.filter((d) => d.name === selected);
+      if (cocok.length) donutView = cocok;
+    }
+
+    let heatCols = xAxis;
+    let heatRows = normalizedSeries.map((s) => s.name);
+    let heatMatriks =
+      heatmapData ?? normalizedSeries.map((s) => heatCols.map((_, c) => s.data[c] ?? 0));
+    if (type === 'heatmap' && selected && heatCols.includes(selected)) {
+      const ci = heatCols.indexOf(selected);
+      heatCols = [selected];
+      heatMatriks = heatMatriks.map((r) => [r[ci] ?? 0]);
+    }
+
+    return { xView, seriesView, donutView, heatCols, heatRows, heatMatriks };
+  }, [type, xAxis, normalizedSeries, heatmapData, selected, isCartesian]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -118,6 +156,9 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     let disposed = false;
     let resizeObserver: ResizeObserver | null = null;
     const handleResize = () => chartInstanceRef.current?.resize();
+    // Elemen & handler klik dipakai lintas callback (didaftarkan di then, dibuang di cleanup).
+    let container: HTMLElement | null = null;
+    let handleDomClick: ((ev: MouseEvent) => void) | null = null;
 
     loadEcharts().then((echarts) => {
       if (disposed || !chartRef.current) return;
@@ -126,14 +167,14 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
+      const { xView, seriesView, donutView, heatCols, heatRows, heatMatriks } = view;
 
       let option: EChartsOption = {};
 
       if (type === 'gauge') {
-        const nilai = normalizedSeries[0]?.data?.[0] ?? 0;
+        const nilai = seriesView[0]?.data?.[0] ?? 0;
         const gMin = min ?? 0;
         const gMax = max ?? 100;
-        const persen = Math.max(0, Math.min(1, (nilai - gMin) / (gMax - gMin || 1)));
         option = {
           series: [
             {
@@ -163,25 +204,24 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
                 offsetCenter: [0, '10%'],
                 formatter: (v: number) => `${v}${displayUnit ? ' ' + displayUnit : ''}`,
               },
-              data: [{ value: nilai, name: normalizedSeries[0]?.name || '' }],
+              data: [{ value: nilai, name: seriesView[0]?.name || '' }],
             },
           ],
         };
       } else if (type === 'heatmap') {
-        // Konvensi: xAxis = label kolom (bawah), nama seri = label baris (kiri).
-        const cols = xAxis;
-        const rows = normalizedSeries.map((s) => s.name);
-        // Matriks [baris][kolom]: heatmapData eksplisit, atau series[r].data[kolom-c].
-        const matriks = heatmapData ?? normalizedSeries.map((s) => cols.map((_, c) => s.data[c] ?? 0));
-        const semuaNilai = (heatmapData ?? []).flat();
+        const cols = heatCols;
+        const rows = heatRows;
+        const matriks = heatMatriks;
+        const semuaNilai = matriks.flat();
         const vMin = semuaNilai.length ? Math.min(...semuaNilai) : 0;
         const vMax = semuaNilai.length ? Math.max(...semuaNilai) : 100;
         option = {
           tooltip: {
             position: 'top',
-            formatter: (p: any) => `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${displayUnit ? ' ' + displayUnit : ''}`,
+            formatter: (p: any) =>
+              `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${displayUnit ? ' ' + displayUnit : ''}`,
           },
-          grid: { left: 10, right: 10, top: 10, bottom: 30, containLabel: true },
+          grid: { left: 10, right: 10, top: 24, bottom: 30, containLabel: true },
           xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#64748b', fontSize: 10 } },
           yAxis: { type: 'category', data: rows, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#64748b', fontSize: 10 } },
           visualMap: {
@@ -207,15 +247,15 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           ],
         };
       } else if (type === 'donut') {
-        const pieData = xAxis.map((label, idx) => ({
-          name: label,
-          value: normalizedSeries[0]?.data[idx] || 0,
-        }));
-
         option = {
           tooltip: {
             trigger: 'item',
-            formatter: `{b}: <b>{c}</b> {a} ({d}%)`,
+            backgroundColor: '#1e3a8a',
+            borderColor: '#1e40af',
+            borderRadius: 8,
+            textStyle: { color: '#f8fafc', fontSize: 11 },
+            formatter: (p: any) =>
+              `${p.name}: <b>${p.value}${displayUnit ? ' ' + displayUnit : ''}</b> (${p.percent}%)`,
           },
           legend: showLegend
             ? {
@@ -246,7 +286,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
                   fontWeight: 'bold',
                 },
               },
-              data: pieData,
+              data: donutView,
             },
           ],
           color: ['#1d4ed8', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'],
@@ -254,7 +294,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       } else {
         const isArea = type === 'area';
         const paletSoft = ['#93c5fd', '#1d4ed8', '#7dd3fc', '#bfdbfe', '#38bdf8', '#dbeafe'];
-        const echartsSeries = normalizedSeries.map((s, sIdx) => {
+        const echartsSeries = seriesView.map((s, sIdx) => {
           // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
           const baseColor = s.color || (sIdx === 0 ? (type === 'bar' ? '#93c5fd' : '#1d4ed8') : paletSoft[sIdx % paletSoft.length]);
           return {
@@ -296,9 +336,10 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
             valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
           },
-          legend: showLegend && normalizedSeries.length > 1
+          legend: showLegend && seriesView.length > 1
             ? {
               top: 0,
+              left: 0,
               icon: 'circle',
               itemWidth: 8,
               itemHeight: 8,
@@ -309,12 +350,12 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             left: '3%',
             right: '4%',
             bottom: '3%',
-            top: normalizedSeries.length > 1 && showLegend ? '15%' : '10%',
+            top: seriesView.length > 1 && showLegend ? '15%' : '10%',
             containLabel: true,
           },
           xAxis: {
             type: 'category',
-            data: xAxis,
+            data: xView,
             axisLine: { lineStyle: { color: '#e2e8f0' } },
             axisTick: { show: false },
             axisLabel: { color: '#94a3b8', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
@@ -341,6 +382,41 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 
       chart.setOption(option, true);
 
+      // Klik area grafik → seleksi kategori lintas-chart (klik lagi = batal).
+      // Catatan: event 'click' level-ECharts tidak terpetakan di lingkungan ini
+      // (target zrender selalu null), jadi dipakai listener DOM + convertFromPixel.
+      container = chartRef.current;
+      handleDomClick = (ev: MouseEvent) => {
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const x = ev.clientX - rect.left;
+        const y = ev.clientY - rect.top;
+        let nilai: string | null = null;
+
+        if (type === 'donut') {
+          const hover: any = (chart as any).getZr()?.handler?.findHover?.(x, y);
+          const el = hover?.topTarget || hover?.target;
+          const di = el?.__ecData?.dataIndex;
+          nilai = typeof di === 'number' ? xAxis[di] ?? null : null;
+        } else if (type === 'gauge') {
+          return;
+        } else {
+          let idx = -1;
+          try {
+            const px: any = (chart as any).convertFromPixel({ seriesIndex: 0 }, [x, y]);
+            idx = Math.round(Array.isArray(px) ? px[0] : px);
+          } catch {
+            idx = -1;
+          }
+          const kolom = type === 'heatmap' ? heatCols : xView;
+          if (idx >= 0 && idx < kolom.length) nilai = kolom[idx];
+        }
+
+        if (!nilai) return;
+        setSelected(selected === nilai ? null : nilai);
+      };
+      container.addEventListener('click', handleDomClick);
+
       window.addEventListener('resize', handleResize);
       resizeObserver = new ResizeObserver(() => {
         chartInstanceRef.current?.resize();
@@ -351,9 +427,10 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     return () => {
       disposed = true;
       window.removeEventListener('resize', handleResize);
+      if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, xAxis, series, unit, stacked, showLegend, min, max, heatmapData, normalizedSeries, displayUnit]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {
@@ -363,5 +440,85 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     };
   }, []);
 
-  return <div ref={chartRef} className="w-full h-full min-h-[220px]" />;
+  // ── Tabel "lihat data" dari data yang sedang tampil ───────────────────────
+  const tabel = useMemo(() => {
+    const { xView, seriesView, donutView, heatCols, heatRows, heatMatriks } = view;
+    if (type === 'donut') {
+      return {
+        kolom: ['Kategori', `Nilai${displayUnit ? ` (${displayUnit})` : ''}`],
+        baris: donutView.map((d) => [d.name, d.value] as (string | number)[]),
+      };
+    }
+    if (type === 'heatmap') {
+      return {
+        kolom: ['Baris', ...heatCols],
+        baris: heatRows.map((r, ri) => [r, ...heatCols.map((_, ci) => heatMatriks[ri]?.[ci] ?? 0)] as (string | number)[]),
+      };
+    }
+    if (type === 'gauge') {
+      return {
+        kolom: ['Metrik', 'Nilai'],
+        baris: [[seriesView[0]?.name || 'Nilai', seriesView[0]?.data?.[0] ?? 0] as (string | number)[]],
+      };
+    }
+    return {
+      kolom: ['Kategori', ...seriesView.map((s) => s.name)],
+      baris: xView.map((x, i) => [x, ...seriesView.map((s) => s.data[i] ?? '')] as (string | number)[]),
+    };
+  }, [view, type, displayUnit]);
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex justify-end mb-1">
+        <button
+          type="button"
+          onClick={() => setShowData((v) => !v)}
+          data-testid="chart-toggle-data"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-slate-500 hover:text-sky-700 hover:bg-sky-50 border border-transparent hover:border-sky-200 transition-colors"
+          title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
+        >
+          {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
+          <span>{showData ? 'Grafik' : 'Lihat data'}</span>
+        </button>
+      </div>
+
+      <div className="relative flex-1 min-h-[190px]">
+        <div
+          ref={chartRef}
+          className={`absolute inset-0 ${showData ? 'invisible' : ''}`}
+        />
+        {showData && (
+          <div className="absolute inset-0 overflow-auto" data-testid="chart-data-table">
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr>
+                  {tabel.kolom.map((k) => (
+                    <th
+                      key={k}
+                      className="text-left font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 sticky top-0"
+                    >
+                      {k}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tabel.baris.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 ? 'bg-slate-50/50' : ''}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="text-slate-700 border border-slate-200 px-2 py-1 font-mono">
+                        {typeof cell === 'number'
+                          ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
+                          : cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };

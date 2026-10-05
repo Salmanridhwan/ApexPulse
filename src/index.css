@@ -38,6 +38,47 @@
   }
 }
 
+/* Animasi masuk kartu KPI: angka naik-fade, sparkline menggambar dari kiri ke kanan. */
+@keyframes kpi-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes kpi-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes kpi-area-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .kpi-enter {
+    animation: kpi-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .kpi-spark-line {
+    stroke-dasharray: 1;
+    animation: kpi-draw 0.9s ease-out both;
+  }
+  .kpi-spark-area {
+    animation: kpi-area-in 0.9s ease-out both;
+  }
+}
+
 /* Hormati preferensi pengguna: matikan animasi/transisi non-esensial. */
 @media (prefers-reduced-motion: reduce) {
   *,

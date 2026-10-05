@@ -134,18 +134,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                         {String(w.kpi?.value ?? w.chart?.series[0]?.data.slice(-1)[0] ?? '-')} {w.kpi?.unit || ''}
                       </td>
                       <td className="p-2">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${w.manualCorrection?.isCorrected
-                            ? 'bg-amber-100 text-amber-800'
-                            : w.confidence === 'sumber'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-sky-100 text-sky-800'
-                          }`}>
-                          {w.manualCorrection?.isCorrected
-                            ? 'Dikoreksi Manual'
-                            : w.confidence === 'sumber'
-                              ? 'Dokumen Resmi'
-                              : 'Inferensi AI'}
-                        </span>
+                        {/* Tanpa label provenans (mis. "Inferensi AI"): hanya penanda koreksi manual. */}
+                        {w.manualCorrection?.isCorrected ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800">
+                            Dikoreksi Manual
+                          </span>
+                        ) : w.confidence === 'sumber' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
+                            Dokumen Resmi
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

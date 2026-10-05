@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { WidgetSpec, WidgetType } from '../types';
+import { tipeKompatibel } from '../services/spec/widgetTypes';
 
 interface WidgetEditorModalProps {
   isOpen: boolean;
@@ -61,15 +62,9 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
 
   if (!isOpen || !widget) return null;
 
-  const chartTypes: Array<{ type: WidgetType; label: string; desc: string }> = [
-    { type: 'kpi', label: 'KPI Card', desc: 'Angka ringkas dengan delta & target' },
-    { type: 'line', label: 'Diagram Garis', desc: 'Visualisasi tren waktu berkala' },
-    { type: 'area', label: 'Area Chart', desc: 'Akumulasi volume dan distribusi' },
-    { type: 'bar', label: 'Diagram Batang', desc: 'Komparasi kategori atau bulanan' },
-    { type: 'donut', label: 'Diagram Donat', desc: 'Struktur proporsi persentase' },
-    { type: 'table', label: 'Tabel Rekap', desc: 'Matriks tabular sortable' },
-    { type: 'narasi', label: 'Narasi Eksekutif', desc: 'Teks sintesis temuan penting' },
-  ];
+  // Hanya tipe yang datanya tersedia di widget ini — supaya tak ada pilihan
+  // yang berujung kartu kosong (mis. beralih ke Tabel pada widget garis).
+  const chartTypes = tipeKompatibel(widget);
 
   const handleSave = () => {
     const updated: WidgetSpec = {
@@ -215,6 +210,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                 <label className="block text-slate-700 font-medium mb-2">
                   Pilih Tipe Visualisasi Chart
                 </label>
+                {chartTypes.length === 1 && (
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Widget ini hanya punya data untuk tipe ini.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {chartTypes.map((ct) => (
                     <button
