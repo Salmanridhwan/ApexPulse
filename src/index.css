@@ -149,6 +149,23 @@
   background-color: var(--color-surface-2);
   color: var(--color-ink-2);
 }
+/* Kartu stat beraksen (solid 1 warna, seperti referensi). Teks selalu putih
+   agar lulus kontras; warna via accent-*. Ditaruh di @layer components (bukan
+   @utility) karena aksen dipilih DINAMIS dari data — tidak boleh di-tree-shake. */
+@layer components {
+  .card-accent {
+    border-radius: var(--radius-card);
+    color: #fff;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    box-shadow: var(--elev-card);
+    background-image: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  }
+  .accent-coral { --accent-a: #f2503a; --accent-b: #c7321f; }
+  .accent-violet { --accent-a: #8f90e4; --accent-b: #6f6bc4; }
+  .accent-cyan { --accent-a: #38c6e2; --accent-b: #1e96b4; }
+  .accent-teal { --accent-a: #2bb8a8; --accent-b: #1a8f84; }
+  .accent-amber { --accent-a: #e0a020; --accent-b: #b87d10; }
+}
 @utility shadow-soft {
   box-shadow: var(--elev-card);
 }

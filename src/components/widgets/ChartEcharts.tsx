@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ECharts, EChartsOption } from 'echarts';
 import { Table2, BarChart3 } from 'lucide-react';
 import { useChartSelection } from './ChartSelection';
+import { RingGauge3D } from './RingGauge3D';
 import { useThemeMode } from '../../theme';
 
 /** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
@@ -476,6 +477,65 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       baris: xView.map((x, i) => [x, ...seriesView.map((s) => s.data[i] ?? '')] as (string | number)[]),
     };
   }, [view, type, displayUnit]);
+
+  // Widget gauge: pakai RingGauge3D (soft-3D) alih-alih gauge ECharts,
+  // agar sesuai referensi. Toggle "Lihat data" tetap didukung.
+  if (type === 'gauge') {
+    const nilai = view.seriesView[0]?.data?.[0] ?? 0;
+    return (
+      <div className="w-full h-full flex flex-col">
+        <div className="flex justify-end mb-1">
+          <button
+            type="button"
+            onClick={() => setShowData((v) => !v)}
+            data-testid="chart-toggle-data"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-medium text-ink-3 hover:text-brand-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
+            title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
+          >
+            {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
+            <span>{showData ? 'Grafik' : 'Lihat data'}</span>
+          </button>
+        </div>
+        <div className="relative flex-1 min-h-[190px] flex items-center justify-center">
+          {showData ? (
+            <div className="absolute inset-0 overflow-auto" data-testid="chart-data-table">
+              <table className="w-full text-[11px] border-collapse">
+                <thead>
+                  <tr>
+                    {tabel.kolom.map((k) => (
+                      <th key={k} className="text-left font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-1 sticky top-0">
+                        {k}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabel.baris.map((row, ri) => (
+                    <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
+                          {typeof cell === 'number'
+                            ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
+                            : cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <RingGauge3D
+              value={nilai}
+              max={max ?? 100}
+              unit={displayUnit}
+              label={view.seriesView[0]?.name}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col">
