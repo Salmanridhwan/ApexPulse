@@ -9,12 +9,12 @@
    Mode gelap menimpa variabel yang sama di [data-theme='dark'].
    ============================================================ */
 @theme {
-  --color-canvas: #e4e8ef;
-  --color-surface: #f6f8fb;
-  --color-surface-2: #e9edf3;
+  --color-canvas: #dfe4ec;
+  --color-surface: #fbfcfe;
+  --color-surface-2: #eaeef5;
 
-  --color-line: #d3d9e3;
-  --color-line-strong: #bcc5d3;
+  --color-line: #cbd3e0;
+  --color-line-strong: #aab5c7;
 
   --color-ink: #232a38;
   --color-ink-2: #4a5468;
@@ -39,12 +39,12 @@
   --color-shell-hover: rgb(31 166 204 / 0.12);
   --color-shell-active: #c9d1de;
 
-  --radius-card: 6px;
-  --radius-control: 5px;
+  --radius-card: 14px;
+  --radius-control: 10px;
   --radius-chip: 999px;
 
-  --shadow-pop: 0 20px 40px rgb(35 42 56 / 0.28);
-  --shadow-pop-sm: 0 4px 12px rgb(35 42 56 / 0.16);
+  --shadow-pop: 0 20px 44px rgb(35 42 56 / 0.22);
+  --shadow-pop-sm: 0 6px 16px rgb(35 42 56 / 0.12);
 }
 
 /* Mode gelap — slate kebiruan seperti referensi */
@@ -83,18 +83,18 @@
   --shadow-pop-sm: 0 4px 14px rgb(8 10 16 / 0.45);
 }
 
-/* Elevasi: bayangan jatuh panjang & lembut seperti ubin melayang. */
+/* Elevasi: bayangan jatuh lembut, warna biru-gelap (bukan hitam murni). */
 :root {
-  --elev-card: 0 16px 28px rgb(35 42 56 / 0.18), 0 3px 6px rgb(35 42 56 / 0.1);
-  --elev-card-hover: 0 24px 40px rgb(35 42 56 / 0.28), 0 6px 10px rgb(35 42 56 / 0.12);
-  --elev-inset: inset 0 3px 8px rgb(35 42 56 / 0.25);
-  --glow-brand: 0 8px 20px rgb(31 166 204 / 0.4);
+  --elev-card: 0 10px 24px rgb(35 42 56 / 0.10), 0 2px 6px rgb(35 42 56 / 0.06);
+  --elev-card-hover: 0 18px 34px rgb(35 42 56 / 0.16), 0 4px 10px rgb(35 42 56 / 0.10);
+  --elev-inset: inset 0 2px 6px rgb(35 42 56 / 0.18);
+  --glow-brand: 0 8px 20px rgb(31 166 204 / 0.35);
   --bg-app: linear-gradient(135deg, #eef1f6 0%, #dfe4ec 55%, #d5dbe6 100%);
 }
 [data-theme='dark'] {
-  --elev-card: 0 18px 32px rgb(8 10 16 / 0.5), 0 3px 6px rgb(8 10 16 / 0.35);
-  --elev-card-hover: 0 28px 46px rgb(8 10 16 / 0.62), 0 6px 10px rgb(8 10 16 / 0.4);
-  --elev-inset: inset 0 3px 9px rgb(8 10 16 / 0.6);
+  --elev-card: 0 12px 28px rgb(4 6 12 / 0.45), 0 2px 6px rgb(4 6 12 / 0.30);
+  --elev-card-hover: 0 20px 40px rgb(4 6 12 / 0.55), 0 4px 10px rgb(4 6 12 / 0.38);
+  --elev-inset: inset 0 2px 7px rgb(4 6 12 / 0.55);
   --glow-brand: 0 8px 22px rgb(56 198 226 / 0.4);
   --bg-app: linear-gradient(135deg, #4a5263 0%, #353b48 45%, #2a2f3a 100%);
 }
