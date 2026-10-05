@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config({ override: true });
+// Default produksi: .env menang atas variabel shell (perilaku lama, dipakai Kroombox).
+// Untuk skrip QA lokal yang butuh port lain: set HONOR_SHELL_ENV=1 agar PORT dari shell menang.
+dotenv.config({ override: process.env.HONOR_SHELL_ENV !== '1' });
 import express, { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import fs from 'fs';
