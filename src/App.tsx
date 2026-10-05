@@ -122,6 +122,8 @@ export default function App() {
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Drawer navigasi mobile: sidebar disembunyikan di <md, dibuka sebagai overlay.
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [hapusKonfirmasi, setHapusKonfirmasi] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   // Jumlah pesan riwayat per dashboardId — indikator di kartu DashboardList.
@@ -583,32 +585,63 @@ export default function App() {
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-row font-sans antialiased overflow-hidden h-screen">
       {/* ================= LEFT SIDEBAR (disembunyikan di mode presentasi & admin) ================= */}
+      {/* Mobile: sidebar jadi drawer overlay. Desktop (>=md): selalu tampil (kecuali collapsed). */}
       {!isPresentationMode && viewMode !== 'admin' && (
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          tenants={tenants}
-          currentTenant={currentTenant}
-          onSelectTenant={handleSelectTenant}
-          dashboards={dashboards}
-          activeDashboard={activeDashboard}
-          onSelectDashboard={(d) => {
-            setViewMode('workspace');
-            handleSelectDashboard(d);
-          }}
-          onCreateDashboard={() => {
-            setViewMode('workspace');
-            handleCreateDashboard();
-          }}
-          onOpenDashboardList={() => setViewMode('dashboards')}
-          onOpenAudit={() => setViewMode('audit')}
-          onOpenAlerts={() => setViewMode('alerts')}
-          unreadAlertsCount={unreadCount}
-          currentView={viewMode}
-          onOpenAdmin={() => setViewMode('admin')}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-        />
+        <>
+          {/* Backdrop mobile — tutup drawer saat diklik */}
+          {isMobileNavOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-ink/40 md:hidden"
+              onClick={() => setIsMobileNavOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+          <div
+            className={`fixed md:static inset-y-0 left-0 z-50 md:z-40 h-full transition-transform duration-200 ${
+              isMobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            }`}
+          >
+            <Sidebar
+              isCollapsed={isMobileNavOpen ? false : isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              tenants={tenants}
+              currentTenant={currentTenant}
+              onSelectTenant={handleSelectTenant}
+              dashboards={dashboards}
+              activeDashboard={activeDashboard}
+              onSelectDashboard={(d) => {
+                setViewMode('workspace');
+                handleSelectDashboard(d);
+                setIsMobileNavOpen(false);
+              }}
+              onCreateDashboard={() => {
+                setViewMode('workspace');
+                handleCreateDashboard();
+                setIsMobileNavOpen(false);
+              }}
+              onOpenDashboardList={() => {
+                setViewMode('dashboards');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenAudit={() => {
+                setViewMode('audit');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenAlerts={() => {
+                setViewMode('alerts');
+                setIsMobileNavOpen(false);
+              }}
+              unreadAlertsCount={unreadCount}
+              currentView={viewMode}
+              onOpenAdmin={() => {
+                setViewMode('admin');
+                setIsMobileNavOpen(false);
+              }}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            />
+          </div>
+        </>
       )}
 
       {/* ================= MAIN CONTENT VIEWPORT ================= */}
@@ -630,10 +663,18 @@ export default function App() {
                   {/* ── Kiri: toggle sidebar + judul halaman ── */}
                   <div className="flex items-center gap-3 min-w-0">
                     <button
-                      onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                      onClick={() => {
+                        // Mobile (<768px): buka drawer overlay. Desktop: collapse sidebar.
+                        if (window.matchMedia('(max-width: 767px)').matches) {
+                          setIsMobileNavOpen(true);
+                        } else {
+                          setIsSidebarCollapsed(!isSidebarCollapsed);
+                        }
+                      }}
                       className="p-1.5 rounded-control text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
                       title="Buka / Tutup Sidebar"
                       aria-label="Buka atau tutup sidebar"
+                      aria-expanded={isMobileNavOpen}
                     >
                       <Menu className="w-4 h-4" />
                     </button>
