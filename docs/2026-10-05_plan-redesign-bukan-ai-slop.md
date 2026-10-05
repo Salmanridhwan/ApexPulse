@@ -174,6 +174,27 @@ Tanpa flag ini, perilaku produksi TIDAK berubah. Hasil terakhir: **12/12 lulus**
 > ⚠️ QA memakai DB yang sama dengan `:3000`. QA membersihkan dashboard ujinya
 > sendiri di Langkah 10 (terverifikasi: 0 sisa), tapi tetap cek data setelahnya.
 
+### 4.2 Jebakan: server dev "orphan" di Windows
+
+`npx tsx server.ts` membuat **rantai proses**: `spawn → npx → tsx → node.exe`.
+Sinyal yang dikirim ke wrapper (`npx`/`tsx`) **tidak sampai** ke proses node
+asli → server tetap LISTENING walau wrapper-nya sudah mati (orphan).
+
+Gejala: `Error: listen EADDRINUSE: address already in use 0.0.0.0:3114`
+padahal tak ada terminal yang terbuka.
+
+Cara menemukan PID asli & membersihkan:
+```
+netstat -ano | findstr :3114        # lihat PID yang LISTENING
+powershell -Command "Get-CimInstance Win32_Process -Filter 'ProcessId=<PID>' | Select CommandLine"
+powershell -Command "Stop-Process -Id <PID> -Force"
+```
+
+Cara menghindari orphan: jalankan proses node **langsung** (bukan lewat npx),
+lalu kill PID itu. Di Linux/macOS `SIGTERM`/`SIGINT` sampai ke handler
+`server.ts` (graceful shutdown + `db.closeMysql()`); di Windows `process.kill`
+mematikan proses seketika sehingga handler tak sempat jalan.
+
 ---
 
 ## 5. Risiko
