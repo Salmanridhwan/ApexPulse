@@ -32,11 +32,11 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const isSource = widget.confidence === 'sumber' && !isManual;
 
   return (
-    <div className="relative bg-white rounded-card border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
+    <div className="relative bg-surface rounded-card border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-bold text-slate-900 truncate" title={widget.title}>
+          <h3 className="text-[15px] font-bold text-ink truncate" title={widget.title}>
             {widget.title}
           </h3>
           {/* Subtitle disembunyikan untuk KPI yang punya target — badan kartu sudah
@@ -73,7 +73,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-control shadow-lg border border-line py-1 z-30 text-xs text-slate-700">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-control shadow-lg border border-line py-1 z-30 text-xs text-ink-2">
                   {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">

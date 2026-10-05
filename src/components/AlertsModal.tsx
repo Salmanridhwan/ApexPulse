@@ -70,35 +70,35 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-xl bg-white rounded-card shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-control bg-rose-600 flex items-center justify-center text-white">
               <Bell className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-ink">
                 Pusat Peringatan & Ambang Batas (Alert System)
               </h2>
-              <p className="text-xs text-slate-500">Notifikasi In-App & Email SMTP</p>
+              <p className="text-xs text-ink-2">Notifikasi In-App & Email SMTP</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-chip text-ink-3 hover:text-ink-2 hover:bg-line transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-4 text-xs font-medium">
+        <div className="flex border-b border-line bg-surface-2/50 px-4 gap-4 text-xs font-medium">
           <button
             onClick={() => setActiveTab('notifications')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'notifications'
                 ? 'border-rose-600 text-rose-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
             <AlertCircle className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
             onClick={() => setActiveTab('rules')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'rules'
                 ? 'border-brand text-brand-ink'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -118,7 +118,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
             onClick={() => setActiveTab('create')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'create'
                 ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -130,8 +130,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
           {activeTab === 'notifications' ? (
             <>
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-slate-500">Peringatan yang dipicu evaluasi metrik dokumen:</span>
+              <div className="flex items-center justify-between pb-2 border-b border-line">
+                <span className="text-ink-2">Peringatan yang dipicu evaluasi metrik dokumen:</span>
                 <button
                   onClick={onTriggerEvaluate}
                   className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-control text-xs font-medium transition-colors flex items-center gap-1"
@@ -142,7 +142,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               </div>
 
               {notifications.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
+                <div className="text-center py-8 text-ink-3">
                   Semua indikator berada dalam batas aman. Belum ada peringatan aktif.
                 </div>
               ) : (
@@ -153,7 +153,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                         ? 'bg-rose-50/60 border-rose-200 text-rose-900'
                         : notif.severity === 'warning'
                           ? 'bg-amber-50/60 border-amber-200 text-amber-900'
-                          : 'bg-slate-50 border-slate-200 text-slate-800'
+                          : 'bg-surface-2 border-line text-ink'
                       }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -193,10 +193,10 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               {alertRules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="p-3 bg-white border border-slate-200 rounded-card space-y-1.5 hover:border-slate-300"
+                  className="p-3 bg-surface border border-line rounded-card space-y-1.5 hover:border-line-strong"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">{rule.title}</span>
+                    <span className="font-semibold text-ink">{rule.title}</span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${rule.severity === 'critical'
                           ? 'bg-rose-100 text-rose-800'
@@ -207,12 +207,12 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     </span>
                   </div>
 
-                  <p className="text-slate-500">
+                  <p className="text-ink-2">
                     Kondisi: <strong>{rule.metricName}</strong> {rule.operator} {rule.threshold}{' '}
                     {rule.unit}
                   </p>
 
-                  <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-3 pt-1 text-[11px] text-ink-3">
                     <span>Kanal: {rule.channels.join(', ')}</span>
                     <span>•</span>
                     <span className="text-emerald-600 font-medium">Status: Aktif</span>
@@ -223,7 +223,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           ) : (
             <form onSubmit={handleCreateRule} className="space-y-3">
               <div>
-                <label className="block text-slate-700 font-medium mb-1">
+                <label className="block text-ink-2 font-medium mb-1">
                   Judul Peringatan
                 </label>
                 <input
@@ -231,13 +231,13 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Peringatan NPL Bank melampaui batas OJK"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-medium mb-1">
+                <label className="block text-ink-2 font-medium mb-1">
                   Nama Indikator / Metrik
                 </label>
                 <input
@@ -245,18 +245,18 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Rasio NPL Gross atau Kehilangan Air NRW"
                   value={metricName}
                   onChange={(e) => setMetricName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Operator</label>
+                  <label className="block text-ink-2 font-medium mb-1">Operator</label>
                   <select
                     value={operator}
                     onChange={(e) => setOperator(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value=">=">&gt;= (Lebih atau sama)</option>
                     <option value="<=">&lt;= (Kurang atau sama)</option>
@@ -265,23 +265,23 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Nilai Batas</label>
+                  <label className="block text-ink-2 font-medium mb-1">Nilai Batas</label>
                   <input
                     type="number"
                     step="any"
                     value={threshold}
                     onChange={(e) => setThreshold(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Satuan</label>
+                  <label className="block text-ink-2 font-medium mb-1">Satuan</label>
                   <input
                     type="text"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
               </div>
@@ -294,7 +294,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     onChange={(e) => setEmailNotification(e.target.checked)}
                     className="rounded text-brand focus:ring-brand"
                   />
-                  <span className="text-slate-700 font-medium">
+                  <span className="text-ink-2 font-medium">
                     Kirimkan juga salinan email notifikasi ke Direksi / BPKP (SMTP)
                   </span>
                 </label>
@@ -313,8 +313,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-[11px] text-slate-400">
+        <div className="p-4 border-t border-line bg-surface-2 flex items-center justify-between">
+          <span className="text-[11px] text-ink-3">
             Monitoring Kepatuhan Regulasi BUMD
           </span>
           <button

@@ -37,26 +37,26 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
     return (
       <div className="flex flex-col h-full space-y-1 overflow-y-auto">
         {items.length === 0 && (
-          <div className="text-center py-8 text-xs text-slate-400">Belum ada data.</div>
+          <div className="text-center py-8 text-xs text-ink-3">Belum ada data.</div>
         )}
         {items.map((it, i) => (
           <div
             key={i}
-            className="flex items-center gap-2.5 py-2 border-b border-slate-100 last:border-0 group"
+            className="flex items-center gap-2.5 py-2 border-b border-line last:border-0 group"
           >
             <span
               className="w-2.5 h-2.5 rounded-full shrink-0"
               style={{ backgroundColor: it.color }}
             />
-            <span className="text-xs font-medium text-slate-700 truncate flex-1">{it.label}</span>
+            <span className="text-xs font-medium text-ink-2 truncate flex-1">{it.label}</span>
             {/* Bar mini proporsional (halus, ala referensi) */}
-            <span className="hidden sm:block w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden shrink-0">
+            <span className="hidden sm:block w-16 h-1.5 rounded-full bg-surface-2 overflow-hidden shrink-0">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${Math.round(((it.n ?? 0) / max) * 100)}%`, backgroundColor: it.color }}
               />
             </span>
-            <span className="text-sm font-bold text-slate-900 tabular-nums w-16 text-right shrink-0">
+            <span className="text-sm font-bold text-ink tabular-nums w-16 text-right shrink-0">
               {String(it.value)}
             </span>
           </div>
@@ -67,9 +67,9 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
 
   // Fallback: tabel ringkas tanpa toolbar (kolom nilai > 1).
   return (
-    <div className="overflow-x-auto overflow-y-auto flex-1 border border-slate-100 rounded-control max-h-[300px]">
+    <div className="overflow-x-auto overflow-y-auto flex-1 border border-line rounded-control max-h-[300px]">
       <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-100">
+        <thead className="bg-surface-2 text-ink-2 sticky top-0 border-b border-line">
           <tr>
             {columns.map((col) => (
               <th key={col.key} className="px-3 py-2 font-semibold">
@@ -78,10 +78,10 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 text-slate-700">
+        <tbody className="divide-y divide-line text-ink-2">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-6 text-center text-slate-400">
+              <td colSpan={columns.length} className="px-3 py-6 text-center text-ink-3">
                 Belum ada data
               </td>
             </tr>
@@ -92,7 +92,7 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
                   <td
                     key={col.key}
                     className={`px-3 py-2 whitespace-nowrap ${
-                      col !== labelCol ? 'font-semibold text-slate-900 tabular-nums' : 'font-medium'
+                      col !== labelCol ? 'font-semibold text-ink tabular-nums' : 'font-medium'
                     }`}
                   >
                     {row[col.key] !== undefined && row[col.key] !== null ? String(row[col.key]) : '-'}

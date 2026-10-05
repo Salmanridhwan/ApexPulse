@@ -35,7 +35,7 @@ export const ActiveChartFilterChip: React.FC = () => {
       <button
         type="button"
         onClick={() => setSelected(null)}
-        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-card text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-card text-xs font-medium bg-surface border border-line text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
         title="Hapus filter kategori"
       >
         <FilterX className="w-3.5 h-3.5" />

@@ -79,7 +79,7 @@ export default function App() {
 
   if (shareToken) {
     return (
-      <React.Suspense fallback={<div className="min-h-screen bg-slate-100" />}>
+      <React.Suspense fallback={<div className="min-h-screen bg-surface-2" />}>
         <ShareView token={shareToken} embed={isEmbed} />
       </React.Suspense>
     );
@@ -575,7 +575,7 @@ export default function App() {
 
   // Fallback untuk halaman yang di-lazy-load di bawah.
   const pageFallback = (
-    <div className="flex-1 flex items-center justify-center h-screen text-sm text-slate-500">
+    <div className="flex-1 flex items-center justify-center h-screen text-sm text-ink-2">
       Memuat modul...
     </div>
   );

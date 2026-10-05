@@ -48,7 +48,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
     <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Page Header Header & Description */}
-        <div className="bg-white p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+        <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-control bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
               <Bell className="w-5 h-5" />
@@ -60,7 +60,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                   {notifications.filter((n) => !n.isRead).length} Belum Dibaca
                 </span>
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5">
+              <p className="text-xs sm:text-sm text-ink-2 mt-1.5">
                 Pemantauan ambang batas indikator kualitatif/kuantitatif secara real-time dan notifikasi potensi risiko
               </p>
             </div>
@@ -76,8 +76,8 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
         </div>
 
         {/* Tab Navigation & Search */}
-        <div className="bg-white p-5 rounded-card border border-line mb-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="bg-surface p-5 rounded-card border border-line mb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-line">
             {/* Tabs */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
@@ -85,7 +85,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'notifications'
                     ? 'bg-ink text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
+                    : 'bg-surface-2 text-ink-2 hover:bg-surface-2 hover:text-ink'
                 }`}
               >
                 Notifikasi Masuk ({notifications.length})
@@ -95,7 +95,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'rules'
                     ? 'bg-ink text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
+                    : 'bg-surface-2 text-ink-2 hover:bg-surface-2 hover:text-ink'
                 }`}
               >
                 Aturan Ambang Batas ({alertRules.length})
@@ -104,13 +104,13 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
 
             {/* Search Box */}
             <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-ink-3" />
               <input
                 type="text"
                 placeholder="Cari notifikasi / aturan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-control pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-slate-800 placeholder-slate-400"
+                className="w-full text-xs bg-surface-2 border border-line rounded-control pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-ink placeholder-slate-400"
               />
             </div>
           </div>
@@ -118,10 +118,10 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
           {/* Content Area */}
           <div className="pt-4">
             {isLoading ? (
-              <div className="text-center py-12 text-xs text-slate-400">Memuat data ambang batas...</div>
+              <div className="text-center py-12 text-xs text-ink-3">Memuat data ambang batas...</div>
             ) : activeTab === 'notifications' ? (
               filteredNotifications.length === 0 ? (
-                <div className="text-center py-12 text-xs text-slate-400">Tidak ada notifikasi ditemukan.</div>
+                <div className="text-center py-12 text-xs text-ink-3">Tidak ada notifikasi ditemukan.</div>
               ) : (
                 <div className="space-y-3">
                   {filteredNotifications.map((item) => (
@@ -155,20 +155,20 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <h3 className="text-xs font-bold text-slate-900 truncate">{item.title}</h3>
-                          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                          <h3 className="text-xs font-bold text-ink truncate">{item.title}</h3>
+                          <span className="text-[10px] font-mono text-ink-3 shrink-0">
                             {new Date(item.timestamp).toLocaleString('id-ID', {
                               dateStyle: 'short',
                               timeStyle: 'short',
                             })}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600 leading-relaxed mb-2">{item.message}</p>
+                        <p className="text-xs text-ink-2 leading-relaxed mb-2">{item.message}</p>
                         <div className="flex items-center gap-2 text-[10px]">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold uppercase">
+                          <span className="px-2 py-0.5 rounded bg-surface-2 text-ink-2 font-semibold uppercase">
                             {item.severity}
                           </span>
-                          <span className="text-slate-400">
+                          <span className="text-ink-3">
                             {item.metricValue !== undefined && item.threshold !== undefined
                               ? `Nilai ${item.metricValue} vs ambang ${item.threshold}`
                               : 'Sistem'}
@@ -188,11 +188,11 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
             ) : (
               /* Rules Tab */
               filteredRules.length === 0 ? (
-                <div className="text-center py-12 text-xs text-slate-400">Tidak ada aturan ambang batas.</div>
+                <div className="text-center py-12 text-xs text-ink-3">Tidak ada aturan ambang batas.</div>
               ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-card">
+                <div className="overflow-x-auto border border-line rounded-card">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                    <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                       <tr>
                         <th className="p-3">Metrik Indikator</th>
                         <th className="p-3">Kondisi Ambang Batas</th>
@@ -201,14 +201,14 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                         <th className="p-3">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                    <tbody className="divide-y divide-line text-ink-2">
                       {filteredRules.map((rule) => (
-                        <tr key={rule.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="p-3 font-semibold text-slate-900">{rule.metricName}</td>
-                          <td className="p-3 font-mono text-[11px] text-slate-600">
+                        <tr key={rule.id} className="hover:bg-surface-2/60 transition-colors">
+                          <td className="p-3 font-semibold text-ink">{rule.metricName}</td>
+                          <td className="p-3 font-mono text-[11px] text-ink-2">
                             {rule.metricName} {rule.operator} {rule.threshold} {rule.unit}
                           </td>
-                          <td className="p-3 text-slate-600">{rule.channels.join(' & ')}</td>
+                          <td className="p-3 text-ink-2">{rule.channels.join(' & ')}</td>
                           <td className="p-3">
                             <span
                               className={`px-2 py-0.5 rounded font-semibold text-[10px] uppercase ${

@@ -179,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Dashboard</span>
                 <button
                   onClick={onCreateDashboard}
-                  className="p-0.5 text-shell-ink-2 hover:text-shell-ink hover:bg-white/5 rounded-chip transition-colors"
+                  className="p-0.5 text-shell-ink-2 hover:text-shell-ink hover:bg-surface/5 rounded-chip transition-colors"
                   title="Buat Dashboard Baru"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -194,8 +194,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 isCollapsed ? 'justify-center px-0' : ''
               } ${
                 currentView === 'dashboards'
-                  ? 'bg-white/10 text-shell-ink font-semibold'
-                  : 'text-shell-ink-2 hover:bg-white/5 hover:text-shell-ink font-medium'
+                  ? 'bg-surface/10 text-shell-ink font-semibold'
+                  : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
               }`}
               title={`Semua Dashboard (${dashboards.length})`}
             >
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!isCollapsed && (
                 <>
                   <span className="flex-1 truncate">Galeri Semua</span>
-                  <span className="text-[10px] font-mono text-shell-ink-2 bg-white/5 px-1.5 rounded-chip shrink-0">
+                  <span className="text-[10px] font-mono text-shell-ink-2 bg-surface/5 px-1.5 rounded-chip shrink-0">
                     {dashboards.length}
                   </span>
                 </>
@@ -229,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     } ${
                       isActive
                         ? 'bg-brand/20 text-white font-semibold'
-                        : 'text-shell-ink-2 hover:bg-white/5 hover:text-shell-ink font-medium'
+                        : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
                     }`}
                     title={`${d.title} (${d.widgets?.length || 0} widget)`}
                   >
@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span
                           className={`text-[10px] font-mono shrink-0 px-1 rounded-chip ${
                             isActive
-                              ? 'text-indigo-200 bg-white/10'
+                              ? 'text-indigo-200 bg-surface/10'
                               : 'text-shell-ink-2'
                           }`}
                         >
@@ -285,8 +285,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   isCollapsed ? 'justify-center px-0' : ''
                 } ${
                   currentView === 'audit'
-                    ? 'bg-white/10 text-shell-ink font-semibold'
-                    : 'text-shell-ink-2 hover:bg-white/5 hover:text-shell-ink font-medium'
+                    ? 'bg-surface/10 text-shell-ink font-semibold'
+                    : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
                 }`}
                 title="Jejak Audit & Kepatuhan Regulasi"
               >
@@ -307,8 +307,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   isCollapsed ? 'justify-center px-0' : ''
                 } ${
                   currentView === 'alerts'
-                    ? 'bg-white/10 text-shell-ink font-semibold'
-                    : 'text-shell-ink-2 hover:bg-white/5 hover:text-shell-ink font-medium'
+                    ? 'bg-surface/10 text-shell-ink font-semibold'
+                    : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
                 }`}
                 title={`Ambang Batas & Alert (${unreadAlertsCount} peringatan baru)`}
               >
@@ -341,8 +341,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     isCollapsed ? 'justify-center px-0' : ''
                   } ${
                     currentView === 'admin'
-                      ? 'bg-white/10 text-shell-ink font-semibold'
-                      : 'text-shell-ink-2 hover:bg-white/5 hover:text-shell-ink font-medium'
+                      ? 'bg-surface/10 text-shell-ink font-semibold'
+                      : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink font-medium'
                   }`}
                   title="Panel Admin & Pengaturan Studio"
                 >
@@ -356,7 +356,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!isCollapsed && (
                     <>
                       <span className="flex-1 truncate">Panel Admin</span>
-                      <span className="text-[9px] font-semibold text-shell-ink-2 uppercase bg-white/5 px-1 py-0.5 rounded-chip">
+                      <span className="text-[9px] font-semibold text-shell-ink-2 uppercase bg-surface/5 px-1 py-0.5 rounded-chip">
                         Admin
                       </span>
                     </>
@@ -396,7 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={onLogout}
-              className="p-1.5 rounded-control text-shell-ink-2 hover:text-rose-400 hover:bg-white/5 transition-colors shrink-0"
+              className="p-1.5 rounded-control text-shell-ink-2 hover:text-rose-400 hover:bg-surface/5 transition-colors shrink-0"
               title="Keluar dari Sistem (Logout)"
               aria-label="Logout"
             >

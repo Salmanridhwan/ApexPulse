@@ -47,7 +47,7 @@ const categoryColor: Record<string, string> = {
   Pelanggan: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 const getCategoryClass = (cat: string) =>
-  categoryColor[cat] || 'bg-slate-50 text-slate-600 border-slate-200';
+  categoryColor[cat] || 'bg-surface-2 text-ink-2 border-line';
 
 // Recommendation cards component
 const RecommendationCards: React.FC<{
@@ -61,7 +61,7 @@ const RecommendationCards: React.FC<{
         key={rec.id}
         disabled={isStreaming}
         onClick={() => onSelect(rec.prompt)}
-        className="group text-left w-full bg-white border border-slate-200 hover:border-line-strong hover:shadow-md rounded-card p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="group text-left w-full bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ animationDelay: `${i * 60}ms` }}
       >
         <div className="flex items-start gap-2.5">
@@ -71,18 +71,18 @@ const RecommendationCards: React.FC<{
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span className="text-xs font-semibold text-slate-800 leading-tight">{rec.name}</span>
+              <span className="text-xs font-semibold text-ink leading-tight">{rec.name}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getCategoryClass(rec.category)}`}>
                 {rec.category}
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-snug line-clamp-2 mb-2">{rec.description}</p>
+            <p className="text-[11px] text-ink-2 leading-snug line-clamp-2 mb-2">{rec.description}</p>
             {/* chart type pills */}
             <div className="flex items-center gap-1 flex-wrap">
               {rec.chartTypes.slice(0, 3).map((ct) => (
                 <span
                   key={ct}
-                  className="inline-flex items-center gap-0.5 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono"
+                  className="inline-flex items-center gap-0.5 text-[10px] bg-surface-2 text-ink-2 px-1.5 py-0.5 rounded font-mono"
                 >
                   <ChartIcon type={ct} className="w-2.5 h-2.5" />
                   {ct}
@@ -91,7 +91,7 @@ const RecommendationCards: React.FC<{
             </div>
           </div>
           {/* CTA arrow */}
-          <div className="shrink-0 mt-1 text-slate-300 group-hover:text-brand transition-colors">
+          <div className="shrink-0 mt-1 text-ink-3 group-hover:text-brand transition-colors">
             <Plus className="w-4 h-4" />
           </div>
         </div>
@@ -295,18 +295,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-white border-l border-slate-200 shadow-2xl flex flex-col">
+    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-surface border-l border-line shadow-2xl flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+      <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2/70">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white shadow-xs">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
               <span>Chat Orchestrator RAG</span>
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-2">
               {chatId && dashboardId ? `Riwayat tersimpan · ${messages.length} pesan` : 'Tanya dokumen resmi atau buat dashboard BUMD'}
             </p>
           </div>
@@ -329,14 +329,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 }
               }}
               title="Hapus riwayat chat (dashboard tetap ada)"
-              className="p-1 rounded-chip text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              className="p-1 rounded-chip text-ink-3 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            className="p-1 rounded-chip text-ink-3 hover:text-ink-2 hover:bg-line/60 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -354,7 +354,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               className={`max-w-[92%] rounded-card p-3.5 text-xs leading-relaxed shadow-xs ${
                 msg.sender === 'user'
                   ? 'bg-brand text-white rounded-tr-none'
-                  : 'bg-slate-50 border border-slate-200/80 text-slate-800 rounded-tl-none'
+                  : 'bg-surface-2 border border-line/80 text-ink rounded-tl-none'
               }`}
             >
               {/* Sender & time */}
@@ -384,7 +384,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     return codeParts.map((cp, ci) => {
                       if (ci % 2 === 1) {
                         return (
-                          <code key={ci} className="px-1 py-0.5 rounded bg-slate-200 text-slate-800 text-[11px] font-mono">
+                          <code key={ci} className="px-1 py-0.5 rounded bg-line text-ink text-[11px] font-mono">
                             {cp}
                           </code>
                         );
@@ -392,24 +392,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       // split by **bold**
                       const boldParts = cp.split(/\*\*(.*?)\*\*/g);
                       return boldParts.map((bp, bi) =>
-                        bi % 2 === 1 ? <strong key={`${ci}-${bi}`} className="font-semibold text-slate-900">{bp}</strong> : <span key={`${ci}-${bi}`}>{bp}</span>
+                        bi % 2 === 1 ? <strong key={`${ci}-${bi}`} className="font-semibold text-ink">{bp}</strong> : <span key={`${ci}-${bi}`}>{bp}</span>
                       );
                     });
                   };
 
                   // Heading: ## or ###
                   if (line.startsWith('### ')) {
-                    return <h4 key={li} className="font-bold text-slate-800 text-xs mt-2">{renderInline(line.replace(/^###\s+/, ''))}</h4>;
+                    return <h4 key={li} className="font-bold text-ink text-xs mt-2">{renderInline(line.replace(/^###\s+/, ''))}</h4>;
                   }
                   if (line.startsWith('## ')) {
-                    return <h3 key={li} className="font-bold text-slate-900 text-xs mt-2.5 border-b border-slate-200/80 pb-0.5">{renderInline(line.replace(/^##\s+/, ''))}</h3>;
+                    return <h3 key={li} className="font-bold text-ink text-xs mt-2.5 border-b border-line/80 pb-0.5">{renderInline(line.replace(/^##\s+/, ''))}</h3>;
                   }
 
                   // Bullet list
                   const isBullet = line.startsWith('•') || line.startsWith('- ');
                   if (isBullet) {
                     return (
-                      <div key={li} className="flex items-start gap-1.5 pl-1.5 text-slate-700">
+                      <div key={li} className="flex items-start gap-1.5 pl-1.5 text-ink-2">
                         <span className="text-brand font-bold leading-tight">•</span>
                         <span className="flex-1">{renderInline(line.replace(/^[•\-]\s*/, ''))}</span>
                       </div>
@@ -425,7 +425,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   if (line.startsWith('|') && line.endsWith('|')) {
                     const cells = line.slice(1, -1).split('|').map((c) => c.trim());
                     return (
-                      <div key={li} className="grid grid-flow-col auto-cols-fr gap-2 py-0.5 px-1 bg-white/70 rounded text-[11px] font-mono border-b border-slate-200/50">
+                      <div key={li} className="grid grid-flow-col auto-cols-fr gap-2 py-0.5 px-1 bg-surface/70 rounded text-[11px] font-mono border-b border-line/50">
                         {cells.map((cell, ci) => (
                           <span key={ci} className="truncate">{renderInline(cell)}</span>
                         ))}
@@ -434,7 +434,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   }
 
                   return (
-                    <p key={li} className="text-slate-800">
+                    <p key={li} className="text-ink">
                       {renderInline(line)}
                     </p>
                   );
@@ -452,9 +452,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
               {/* Mode & Citations Metadata Pill */}
               {(msg.modeUsed || msg.citationsCount) && (
-                <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-2 text-[10px]">
+                <div className="mt-2.5 pt-2 border-t border-line/60 flex items-center gap-2 text-[10px]">
                   {msg.modeUsed && (
-                    <span className="inline-flex items-center gap-1 text-slate-600 font-medium bg-white px-2 py-0.5 rounded border border-slate-200">
+                    <span className="inline-flex items-center gap-1 text-ink-2 font-medium bg-surface px-2 py-0.5 rounded border border-line">
                       <Layers className="w-3 h-3 text-brand" />
                       {msg.modeUsed}
                     </span>
@@ -475,7 +475,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {isStreaming && (
           <div className="flex flex-col items-start space-y-2 animate-fadeIn">
             {/* Assistant Bubble Skeleton & Typing Indicator */}
-            <div className="max-w-[95%] w-full bg-white border border-line/90 rounded-card rounded-tl-none p-4 text-xs shadow-md space-y-3">
+            <div className="max-w-[95%] w-full bg-surface border border-line/90 rounded-card rounded-tl-none p-4 text-xs shadow-md space-y-3">
               {/* Header Indicator */}
               <div className="flex items-center justify-between border-b border-line pb-2.5">
                 <div className="flex items-center gap-2">
@@ -514,8 +514,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         isCurrent
                           ? 'bg-surface-2 border border-line/80 text-ink font-semibold shadow-2xs'
                           : isDone
-                            ? 'text-slate-700 bg-slate-50/70 border border-transparent'
-                            : 'text-slate-400 opacity-60'
+                            ? 'text-ink-2 bg-surface-2/70 border border-transparent'
+                            : 'text-ink-3 opacity-60'
                       }`}
                     >
                       {isDone ? (
@@ -523,7 +523,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       ) : isCurrent ? (
                         <Loader2 className="w-4 h-4 text-brand animate-spin shrink-0" />
                       ) : (
-                        <Clock className="w-4 h-4 text-slate-300 shrink-0" />
+                        <Clock className="w-4 h-4 text-ink-3 shrink-0" />
                       )}
                       <span className="flex-1 truncate">{step.title}</span>
                       {isCurrent && (
@@ -537,7 +537,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </div>
 
               {/* Progress Line Bar */}
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+              <div className="w-full bg-surface-2 h-1.5 rounded-full overflow-hidden mt-1">
                 <div
                   className="bg-gradient-to-r from-brand to-brand h-full transition-all duration-500 rounded-full animate-pulse"
                   style={{
@@ -564,13 +564,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       {/* Suggested Quick Prompts */}
-      <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100 flex gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="px-4 py-2 bg-surface-2/50 border-t border-line flex gap-1.5 overflow-x-auto no-scrollbar">
         {quickPrompts.map((qp, idx) => (
           <button
             key={idx}
             disabled={isStreaming}
             onClick={() => handleSendMessage(qp)}
-            className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-full text-slate-600 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-surface hover:bg-surface-2 border border-line rounded-full text-ink-2 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {qp}
           </button>
@@ -578,7 +578,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       {/* Input Form */}
-      <div className="p-3 border-t border-slate-200 bg-white">
+      <div className="p-3 border-t border-line bg-surface">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -596,7 +596,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             disabled={isStreaming}
-            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-card focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-surface-2 border border-line rounded-card focus:outline-none focus:ring-2 focus:ring-brand focus:bg-surface transition-all disabled:bg-surface-2 disabled:text-ink-3 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
@@ -610,7 +610,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </button>
         </form>
-        <p className="text-[10px] text-slate-400 text-center mt-1.5">
+        <p className="text-[10px] text-ink-3 text-center mt-1.5">
           Didukung Orkestrator Node.js + Validasi Zod + Dual Jalur RAG BUMD
         </p>
       </div>

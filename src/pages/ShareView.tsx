@@ -98,7 +98,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <Activity className="w-6 h-6" />
         </div>
         <h2 className="text-base font-bold text-white tracking-wide">Memuat Tampilan Dashboard...</h2>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+        <p className="text-xs text-ink-3 mt-1 max-w-sm">
           Mengambil spesifikasi visualisasi dan memverifikasi sitasi dokumen resmi instansi.
         </p>
       </div>
@@ -109,28 +109,28 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
     return (
       <div
         className={`${
-          embed ? 'bg-slate-50 p-4' : 'min-h-screen bg-slate-50 p-6'
-        } flex flex-col items-center justify-center text-slate-800`}
+          embed ? 'bg-surface-2 p-4' : 'min-h-screen bg-surface-2 p-6'
+        } flex flex-col items-center justify-center text-ink`}
       >
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-8 text-center space-y-5">
+        <div className="w-full max-w-md bg-surface rounded-3xl shadow-xl border border-line/80 p-8 text-center space-y-5">
           <div className="w-14 h-14 rounded-card bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200/60">
             <Lock className="w-7 h-7" />
           </div>
           <div className="space-y-2">
-            <span className="text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+            <span className="text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-surface-2 text-ink-2 border border-line">
               Akses Ditolak / Tidak Ditemukan
             </span>
-            <h1 className="text-lg font-extrabold text-slate-900">Tautan Dashboard Tidak Valid</h1>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <h1 className="text-lg font-extrabold text-ink">Tautan Dashboard Tidak Valid</h1>
+            <p className="text-xs text-ink-2 leading-relaxed">
               {error || 'Dashboard yang Anda cari tidak tersedia.'}
             </p>
           </div>
-          <div className="p-3.5 bg-slate-50 rounded-card border border-slate-200 text-left text-[11px] text-slate-600 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+          <div className="p-3.5 bg-surface-2 rounded-card border border-line text-left text-[11px] text-ink-2 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-semibold text-ink">
               <Shield className="w-3.5 h-3.5 text-brand" />
               <span>Protokol Keamanan Data</span>
             </div>
-            <p className="text-slate-500 leading-normal">
+            <p className="text-ink-2 leading-normal">
               Setiap instansi diisolasi. Tautan read-only dapat dibatasi durasi berlakunya atau dicabut sewaktu-waktu.
             </p>
           </div>
@@ -143,16 +143,16 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   if (embed) {
     return (
       <ChartSelectionProvider>
-        <div className="min-h-screen bg-slate-100 flex flex-col">
+        <div className="min-h-screen bg-surface-2 flex flex-col">
           {filterBar && (
-            <div className="bg-white/95 border-b border-slate-200/80 px-4 py-3 sticky top-0 z-20">
+            <div className="bg-surface/95 border-b border-line/80 px-4 py-3 sticky top-0 z-20">
               {filterBar}
             </div>
           )}
           <main className="w-full p-4 flex-1">
             <ActiveChartFilterChip />
             {widgetsTampil.length === 0 ? (
-              <div className="bg-white rounded-card border border-slate-200 p-12 text-center text-slate-500 text-xs">
+              <div className="bg-surface rounded-card border border-line p-12 text-center text-ink-2 text-xs">
                 Tidak ada widget yang cocok dengan filter ini.
               </div>
             ) : (
@@ -164,7 +164,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             )}
           </main>
           <div className="px-4 pb-4 text-center">
-            <span className="text-[10px] text-slate-400">Dibuat dengan ApexPulse</span>
+            <span className="text-[10px] text-ink-3">Dibuat dengan ApexPulse</span>
           </div>
         </div>
       </ChartSelectionProvider>
@@ -174,14 +174,14 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   // ---------- MODE HALAMAN PENUH (link share untuk klien) ----------
   return (
     <ChartSelectionProvider>
-      <div className="min-h-screen bg-slate-100 flex flex-col">
+      <div className="min-h-screen bg-surface-2 flex flex-col">
         {/* Top Read-Only Banner */}
         <div className="bg-slate-900 border-b border-slate-800 text-white px-4 sm:px-6 py-2 flex items-center justify-between text-xs sticky top-0 z-30 shadow-md">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-semibold text-slate-200">Portal Tinjauan Eksekutif</span>
-            <span className="hidden sm:inline text-slate-500">•</span>
-            <span className="hidden sm:inline text-slate-400 text-[11px]">Mode Publik Read-Only</span>
+            <span className="hidden sm:inline text-ink-2">•</span>
+            <span className="hidden sm:inline text-ink-3 text-[11px]">Mode Publik Read-Only</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -196,12 +196,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         </div>
 
         {/* Official Header — white-label instansi klien (K3) */}
-        <header className="bg-white border-b border-slate-200/90 shadow-2xs px-6 py-6">
+        <header className="bg-surface border-b border-line/90 shadow-2xs px-6 py-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-start gap-4">
               <LogoTile name={tenant?.name} id={tenant?.id} size="lg" />
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-[11px] text-ink-2 font-semibold uppercase tracking-wider">
                   <span>{namaInstansi}</span>
                   {tenant?.city && (
                     <>
@@ -210,10 +210,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
                     </>
                   )}
                 </div>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">
                   {dashboard.title}
                 </h1>
-                <p className="text-xs text-slate-600 max-w-3xl leading-relaxed">
+                <p className="text-xs text-ink-2 max-w-3xl leading-relaxed">
                   {dashboard.description ||
                     'Dashboard intelijensi dan monitoring kinerja berbasis dokumen resmi instansi.'}
                 </p>
@@ -233,7 +233,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         </header>
 
         {filterBar && (
-          <div className="bg-white border-b border-slate-200/80 px-6 py-3">
+          <div className="bg-surface border-b border-line/80 px-6 py-3">
             <div className="max-w-7xl mx-auto">{filterBar}</div>
           </div>
         )}
@@ -242,7 +242,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         <main className="max-w-7xl mx-auto w-full p-6 flex-1">
           <ActiveChartFilterChip />
           {widgetsTampil.length === 0 ? (
-            <div className="bg-white rounded-card border border-slate-200 p-12 text-center text-slate-500 text-xs">
+            <div className="bg-surface rounded-card border border-line p-12 text-center text-ink-2 text-xs">
               {widgets.length === 0
                 ? 'Dashboard ini belum memiliki widget yang dikonfigurasi.'
                 : 'Tidak ada widget yang cocok dengan filter ini.'}
@@ -257,9 +257,9 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         </main>
 
         {/* Official Footer — powered by (K3) */}
-        <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-          <p className="font-semibold text-slate-700">{namaInstansi}</p>
-          <p className="text-[11px] text-slate-400 mt-1">
+        <footer className="bg-surface border-t border-line py-6 text-center text-xs text-ink-2">
+          <p className="font-semibold text-ink-2">{namaInstansi}</p>
+          <p className="text-[11px] text-ink-3 mt-1">
             Setiap angka terikat sitasi dokumen resmi. Dibuat &amp; dikelola dengan{' '}
             <span className="text-ink-3 font-medium">ApexPulse</span>.
           </p>
@@ -286,17 +286,17 @@ const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget }) => {
   return (
     <div
       data-widget-id={widget.id}
-      className={`bg-white rounded-card border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
+      className={`bg-surface rounded-card border border-line/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
         isWide ? 'md:col-span-2' : ''
       }`}
     >
       <div className="p-4 sm:p-5 flex-1 flex flex-col">
-        <div className="flex items-start justify-between gap-3 mb-3 border-b border-slate-100 pb-3">
+        <div className="flex items-start justify-between gap-3 mb-3 border-b border-line pb-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 leading-snug">{widget.title}</h3>
-            {widget.subtitle && <p className="text-xs text-slate-500 mt-0.5">{widget.subtitle}</p>}
+            <h3 className="text-sm font-bold text-ink leading-snug">{widget.title}</h3>
+            {widget.subtitle && <p className="text-xs text-ink-2 mt-0.5">{widget.subtitle}</p>}
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase shrink-0 font-medium">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-2 text-ink-2 uppercase shrink-0 font-medium">
             {widget.type}
           </span>
         </div>

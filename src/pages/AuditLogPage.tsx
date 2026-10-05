@@ -26,7 +26,7 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
     <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
-        <div className="bg-white p-5 rounded-card border border-line mb-6 flex items-start gap-3">
+        <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start gap-3">
           <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-white shrink-0">
             <History className="w-5 h-5" />
           </div>
@@ -37,22 +37,22 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
                 {logs.length} Entri
               </span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 mt-1.5">
+            <p className="text-xs sm:text-sm text-ink-2 mt-1.5">
               Seluruh pembuatan, perubahan widget, dan koreksi manual tercatat secara permanen
             </p>
           </div>
         </div>
 
         {/* Tabel jejak audit */}
-        <div className="bg-white p-5 rounded-card border border-line">
+        <div className="bg-surface p-5 rounded-card border border-line">
           {isLoading ? (
-            <div className="text-center py-12 text-xs text-slate-400">Memuat riwayat audit...</div>
+            <div className="text-center py-12 text-xs text-ink-3">Memuat riwayat audit...</div>
           ) : logs.length === 0 ? (
-            <div className="text-center py-12 text-xs text-slate-400">Belum ada aktivitas tercatat.</div>
+            <div className="text-center py-12 text-xs text-ink-3">Belum ada aktivitas tercatat.</div>
           ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-card">
+            <div className="overflow-x-auto border border-line rounded-card">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                   <tr>
                     <th className="p-3">Waktu</th>
                     <th className="p-3">Aksi</th>
@@ -61,23 +61,23 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
                     <th className="p-3">Detail Keterangan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-line text-ink-2">
                   {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-3 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                    <tr key={log.id} className="hover:bg-surface-2/60 transition-colors">
+                      <td className="p-3 whitespace-nowrap text-ink-3 font-mono text-[11px]">
                         {new Date(log.timestamp).toLocaleString('id-ID', {
                           dateStyle: 'short',
                           timeStyle: 'medium',
                         })}
                       </td>
-                      <td className="p-3 font-semibold text-slate-900">{log.action}</td>
+                      <td className="p-3 font-semibold text-ink">{log.action}</td>
                       <td className="p-3">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                        <span className="px-2 py-0.5 rounded bg-surface-2 text-ink-2 font-medium">
                           {log.target}
                         </span>
                       </td>
-                      <td className="p-3 font-medium text-slate-800">{log.userName}</td>
-                      <td className="p-3 text-slate-600 max-w-xs truncate" title={log.details}>
+                      <td className="p-3 font-medium text-ink">{log.userName}</td>
+                      <td className="p-3 text-ink-2 max-w-xs truncate" title={log.details}>
                         {log.details}
                       </td>
                     </tr>

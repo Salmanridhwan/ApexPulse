@@ -79,7 +79,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
 
     default:
       return (
-        <div className="p-4 text-center text-xs text-slate-400">
+        <div className="p-4 text-center text-xs text-ink-3">
           Tipe widget {widget.type} tidak dikenali
         </div>
       );

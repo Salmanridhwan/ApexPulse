@@ -62,23 +62,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col">
+      <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-ink">
                 Bagikan Dashboard (Read-Only)
               </h2>
-              <p className="text-xs text-slate-500 truncate max-w-xs">{dashboard.title}</p>
+              <p className="text-xs text-ink-2 truncate max-w-xs">{dashboard.title}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-chip text-ink-3 hover:text-ink-2 hover:bg-line transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -109,13 +109,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="block text-slate-700 font-medium">Tautan Publik Read-Only:</label>
+              <label className="block text-ink-2 font-medium">Tautan Publik Read-Only:</label>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
                   readOnly
                   value={fullShareUrl}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control bg-slate-50 text-xs font-mono select-all focus:outline-none"
+                  className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono select-all focus:outline-none"
                 />
                 <button
                   onClick={copyToClipboard}
@@ -126,7 +126,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 </button>
               </div>
 
-              <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="pt-2 flex items-center justify-between text-[11px] text-ink-3">
                 <span className="flex items-center gap-1">
                   <Lock className="w-3 h-3" /> Dilindungi Token Enkripsi
                 </span>
@@ -142,12 +142,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               </div>
 
               {/* Embed untuk website instansi klien */}
-              <div className="pt-3 mt-1 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                  <Code2 className="w-3.5 h-3.5 text-slate-500" />
+              <div className="pt-3 mt-1 border-t border-line space-y-2">
+                <div className="flex items-center gap-1.5 text-ink-2 font-medium">
+                  <Code2 className="w-3.5 h-3.5 text-ink-2" />
                   <span>Embed di website instansi</span>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
+                <p className="text-[11px] text-ink-2 leading-relaxed">
                   Tempel kode berikut untuk menampilkan dashboard langsung di halaman web instansi.
                 </p>
                 <div className="flex items-start gap-1.5">
@@ -155,7 +155,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     readOnly
                     value={embedSnippet}
                     rows={3}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-slate-50 text-[11px] font-mono resize-none focus:outline-none"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-[11px] font-mono resize-none focus:outline-none"
                   />
                   <button
                     onClick={copyEmbedSnippet}
@@ -165,7 +165,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <div className="flex items-center justify-between text-[11px] text-ink-3">
                   <span>Mode kanvas telanjang, tanpa menu internal</span>
                   <a
                     href={`/embed/${shareToken}`}
@@ -183,7 +183,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <div className="p-4 border-t border-line bg-surface-2 flex justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-control transition-colors"

@@ -17,8 +17,8 @@ function opsiUnik(nilai: (string | undefined)[]): string[] {
 }
 
 const chipDasar =
-  'inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-card px-3 py-1.5 transition-all';
-const selectDasar = 'bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer pr-1';
+  'inline-flex items-center gap-1.5 bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card px-3 py-1.5 transition-all';
+const selectDasar = 'bg-transparent font-bold text-ink focus:outline-none cursor-pointer pr-1';
 
 /** Bar filter dashboard: Periode / Unit Kerja / Kategori, dipakai di workspace internal & halaman publik. */
 export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
@@ -36,14 +36,14 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
 
   return (
     <div className="flex items-center gap-2.5 flex-wrap text-xs" data-testid="dashboard-filter-bar">
-      <span className="inline-flex items-center px-3 py-1.5 font-semibold text-slate-700 bg-slate-100/90 border border-slate-200/80 rounded-card">
+      <span className="inline-flex items-center px-3 py-1.5 font-semibold text-ink-2 bg-surface-2/90 border border-line/80 rounded-card">
         {shownCount}/{widgets.length} Widget
       </span>
 
       {opsiPeriode.length > 1 && (
         <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand`}>
           <Calendar className="w-3.5 h-3.5 text-brand shrink-0" />
-          <span className="text-slate-500 font-medium shrink-0">Periode:</span>
+          <span className="text-ink-2 font-medium shrink-0">Periode:</span>
           <select
             value={filters.periode}
             onChange={(e) => onChange({ ...filters, periode: e.target.value })}
@@ -61,7 +61,7 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
       {opsiUnit.length > 1 && (
         <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500`}>
           <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="text-slate-500 font-medium shrink-0">Unit Kerja:</span>
+          <span className="text-ink-2 font-medium shrink-0">Unit Kerja:</span>
           <select
             value={filters.unitKerja}
             onChange={(e) => onChange({ ...filters, unitKerja: e.target.value })}
@@ -79,7 +79,7 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
       {opsiKategori.length > 1 && (
         <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500`}>
           <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-          <span className="text-slate-500 font-medium shrink-0">Kategori:</span>
+          <span className="text-ink-2 font-medium shrink-0">Kategori:</span>
           <select
             value={filters.kategori}
             onChange={(e) => onChange({ ...filters, kategori: e.target.value })}

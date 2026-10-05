@@ -495,7 +495,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
                   {tabel.kolom.map((k) => (
                     <th
                       key={k}
-                      className="text-left font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 sticky top-0"
+                      className="text-left font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-1 sticky top-0"
                     >
                       {k}
                     </th>
@@ -504,9 +504,9 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               </thead>
               <tbody>
                 {tabel.baris.map((row, ri) => (
-                  <tr key={ri} className={ri % 2 ? 'bg-slate-50/50' : ''}>
+                  <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
                     {row.map((cell, ci) => (
-                      <td key={ci} className="text-slate-700 border border-slate-200 px-2 py-1 font-mono">
+                      <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
                         {typeof cell === 'number'
                           ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
                           : cell}

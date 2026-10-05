@@ -13,7 +13,7 @@ export const NarasiCard: React.FC<NarasiCardProps> = ({ text, bulletPoints }) =>
         <div className="space-y-1.5">
           <ul className="space-y-1.5">
             {bulletPoints.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm text-slate-800 font-medium">
+              <li key={idx} className="flex items-start gap-2 text-sm text-ink font-medium">
                 <span className="mt-0.5 w-4 h-4 rounded-full bg-surface-2 text-brand-ink flex items-center justify-center text-[9px] font-bold shrink-0">
                   {idx + 1}
                 </span>
@@ -25,7 +25,7 @@ export const NarasiCard: React.FC<NarasiCardProps> = ({ text, bulletPoints }) =>
       )}
 
       {text && (
-        <div className="prose prose-sm max-w-none text-xs text-slate-600 leading-relaxed">
+        <div className="prose prose-sm max-w-none text-xs text-ink-2 leading-relaxed">
           <p className="whitespace-pre-line">{text}</p>
         </div>
       )}

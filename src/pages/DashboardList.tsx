@@ -72,50 +72,50 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   );
 
   return (
-    <div className="flex-1 bg-gradient-to-b from-brand-soft/60 via-slate-50 to-brand-soft/40 min-h-screen flex flex-col">
+    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
       {/* Main Body */}
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1 space-y-6">
 
 
         {/* Ringkasan Angka Metrik (Cards Grid) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
-          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
             <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
               <LayoutGrid className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 font-semibold">Total Dashboard</p>
-              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{dashboards.length}</p>
+              <p className="text-[11px] text-ink-2 font-semibold">Total Dashboard</p>
+              <p className="text-xl font-extrabold text-ink mt-0.5">{dashboards.length}</p>
             </div>
           </div>
 
-          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
             <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 font-semibold">Total Widget Aktif</p>
-              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{totalWidgets}</p>
+              <p className="text-[11px] text-ink-2 font-semibold">Total Widget Aktif</p>
+              <p className="text-xl font-extrabold text-ink mt-0.5">{totalWidgets}</p>
             </div>
           </div>
 
-          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
             <div className="p-2.5 rounded-card bg-indigo-500/10 text-indigo-700 shrink-0">
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 font-semibold">Kartu KPI / Metrik</p>
-              <p className="text-xl font-extrabold text-slate-900 mt-0.5">{totalKpis}</p>
+              <p className="text-[11px] text-ink-2 font-semibold">Kartu KPI / Metrik</p>
+              <p className="text-xl font-extrabold text-ink mt-0.5">{totalKpis}</p>
             </div>
           </div>
 
-          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
+          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
             <div className="p-2.5 rounded-card bg-emerald-500/10 text-emerald-700 shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 font-semibold">Sektor BUMD</p>
-              <p className="text-base font-bold text-slate-900 capitalize truncate max-w-[120px] mt-0.5">
+              <p className="text-[11px] text-ink-2 font-semibold">Sektor BUMD</p>
+              <p className="text-base font-bold text-ink capitalize truncate max-w-[120px] mt-0.5">
                 {currentTenant?.sector || 'Multi'}
               </p>
             </div>
@@ -123,27 +123,27 @@ export const DashboardList: React.FC<DashboardListProps> = ({
         </div>
 
         {/* Search & Filter Toolbar */}
-        <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-card border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3.5">
+        <div className="bg-surface/95 backdrop-blur-md p-3.5 sm:p-4 rounded-card border border-line/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3.5">
           <div className="relative w-full sm:w-96">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+            <Search className="w-4 h-4 text-ink-3 absolute left-3.5 top-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Cari dashboard berdasarkan judul atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-card text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card text-xs font-medium text-ink placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-            <span className="text-xs text-slate-500 font-semibold flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-ink-2 font-semibold flex items-center gap-1.5 shrink-0">
               <Filter className="w-3.5 h-3.5 text-brand" />
               <span>Sektor:</span>
             </span>
             <select
               value={selectedSector}
               onChange={(e) => setSelectedSector(e.target.value)}
-              className="text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-card px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              className="text-xs font-bold text-ink bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             >
               <option value="all">Semua Sektor BUMD</option>
               <option value="pdam">Air Minum (PDAM)</option>
@@ -158,12 +158,12 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
         {/* Dashboard Grid */}
         {filteredDashboards.length === 0 ? (
-          <div className="bg-white rounded-card border border-dashed border-slate-300 p-12 text-center max-w-lg mx-auto my-8 shadow-2xs">
+          <div className="bg-surface rounded-card border border-dashed border-line-strong p-12 text-center max-w-lg mx-auto my-8 shadow-2xs">
             <div className="w-12 h-12 rounded-card bg-surface-2 text-brand-ink flex items-center justify-center mx-auto mb-4 border border-line">
               <LayoutGrid className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900 mb-1">Tidak Ada Dashboard yang Sesuai</h3>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            <h3 className="text-base font-bold text-ink mb-1">Tidak Ada Dashboard yang Sesuai</h3>
+            <p className="text-xs text-ink-2 mb-6 leading-relaxed">
               {searchQuery
                 ? 'Tidak ditemukan dashboard dengan kata kunci pencarian tersebut. Coba periksa kembali ejaan Anda.'
                 : 'Belum ada dashboard di kategori ini. Anda dapat membuat dashboard baru atau meminta bantuan AI RAG Copilot.'}
@@ -177,7 +177,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               </button>
               <button
                 onClick={onOpenChat}
-                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-card transition-all border border-slate-200"
+                className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
               >
                 Gunakan AI RAG
               </button>
@@ -195,7 +195,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               return (
                 <div
                   key={dash.id}
-                  className="bg-white/95 backdrop-blur-md rounded-card border border-slate-200/80 hover:border-line-strong/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
+                  className="bg-surface/95 backdrop-blur-md rounded-card border border-line/80 hover:border-line-strong/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
                 >
                   <div className="p-5 space-y-3.5">
                     {/* Top Tag & Sector */}
@@ -204,8 +204,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         <Tag className="w-3 h-3 text-brand" />
                         {dash.sector || currentTenant?.sector || 'BUMD'}
                       </span>
-                      <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[11px] font-medium text-ink-3 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-ink-3" />
                         {new Date(dash.updatedAt || Date.now()).toLocaleDateString('id-ID', {
                           day: 'numeric',
                           month: 'short',
@@ -218,12 +218,12 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div>
                       <h3
                         onClick={() => onSelectDashboard(dash)}
-                        className="text-base font-bold text-slate-900 group-hover:text-brand-ink cursor-pointer transition-colors line-clamp-1 tracking-tight"
+                        className="text-base font-bold text-ink group-hover:text-brand-ink cursor-pointer transition-colors line-clamp-1 tracking-tight"
                         title={dash.title}
                       >
                         {dash.title}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed font-medium">
+                      <p className="text-xs text-ink-2 mt-1 line-clamp-2 leading-relaxed font-medium">
                         {dash.description ||
                           'Dashboard intelijensi dan monitoring kinerja berbasis dokumen RAG BUMD.'}
                       </p>
@@ -231,7 +231,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
                     {/* Widget Composition Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-slate-100 border border-slate-200/80 text-slate-700 rounded-control">
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-surface-2 border border-line/80 text-ink-2 rounded-control">
                         {dash.widgets.length} Total Widget
                       </span>
                       {kpiCount > 0 && (
@@ -245,7 +245,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         </span>
                       )}
                       {tableCount > 0 && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-control">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-surface-2 border border-line text-ink-2 rounded-control">
                           {tableCount} Tabel
                         </span>
                       )}
@@ -253,7 +253,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   </div>
 
                   {/* Card Bottom Action Bar */}
-                  <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="px-4 py-3 bg-surface-2/70 border-t border-line flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onSelectDashboard(dash)}
@@ -267,7 +267,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         <button
                           onClick={() => onOpenChatHistory(dash)}
                           title="Buka riwayat percakapan dashboard ini"
-                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-card text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
+                          className="px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-2 border border-line rounded-card text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
                         >
                           <Sparkles className="w-3.5 h-3.5 text-brand" />
                           <span>
@@ -283,7 +283,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onShareDashboard(dash)}
-                        className="p-1.5 text-slate-500 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
+                        className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
                         title="Bagikan Tautan Read-Only"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -291,7 +291,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
                       <button
                         onClick={() => onDuplicateDashboard(dash)}
-                        className="p-1.5 text-slate-500 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
+                        className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
                         title="Duplikat Dashboard"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="px-1.5 py-1 text-slate-600 text-[10px] hover:bg-slate-200 rounded-chip"
+                            className="px-1.5 py-1 text-ink-2 text-[10px] hover:bg-line rounded-chip"
                           >
                             Batal
                           </button>
@@ -318,7 +318,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       ) : (
                         <button
                           onClick={() => setDeleteConfirmId(dash.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-control transition-colors"
+                          className="p-1.5 text-ink-3 hover:text-rose-600 hover:bg-rose-50 rounded-control transition-colors"
                           title="Hapus Dashboard"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

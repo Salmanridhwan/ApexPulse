@@ -214,14 +214,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-slate-100/70 text-slate-800 font-sans">
+    <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-canvas text-ink font-sans">
       {/* Sidebar Panel Admin — menu navigasi vertikal */}
-      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 h-full overflow-hidden bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col transition-all duration-200`}>
+      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 h-full overflow-hidden bg-shell text-shell-ink-2 border-r border-shell-line flex flex-col transition-all duration-200`}>
         <div>
-          <div className={`h-14 border-b border-slate-800 flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-            <Shield className="w-4 h-4 text-ink-3 shrink-0" />
+          <div className={`h-14 border-b border-shell-line flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+            <Shield className="w-4 h-4 text-shell-ink-2 shrink-0" />
             {!isNavCollapsed && (
-              <span className="text-sm font-bold text-white tracking-tight">Admin Center</span>
+              <span className="text-sm font-bold text-shell-ink tracking-tight">Admin Center</span>
             )}
           </div>
           <nav className={`p-3 space-y-1 text-xs font-medium ${isNavCollapsed ? 'px-2' : ''}`}>
@@ -243,7 +243,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   className={`w-full flex items-center gap-2.5 py-2 rounded-control text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
                     } ${isActive
                       ? 'bg-brand text-white'
-                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                      : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink'
                     }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -257,39 +257,39 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
       {/* Kolom kanan: header + konten */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-        <header className="shrink-0 z-30 bg-white border-b border-slate-200/80 shadow-2xs">
+        <header className="shrink-0 z-30 bg-surface border-b border-line shadow-2xs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => setIsNavCollapsed((v) => !v)}
-                className="p-1.5 rounded-control text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+                className="p-1.5 rounded-control text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
                 title={isNavCollapsed ? 'Tampilkan Sidebar Admin' : 'Sembunyikan Sidebar Admin'}
               >
                 <Menu className="w-4 h-4" />
               </button>
-              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+              <div className="h-4 w-px bg-line hidden sm:block" />
               <div className="flex items-center gap-2 truncate">
                 <Shield className="w-4 h-4 text-brand shrink-0" />
-                <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">
+                <h1 className="text-sm font-bold tracking-tight text-ink truncate">
                   ApexPulse Admin & Governance Center
                 </h1>
               </div>
             </div>
 
             <div className="flex items-center gap-3 text-xs shrink-0">
-              <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
-                Admin: <strong className="text-slate-800">{currentUser?.name || 'Administrator'}</strong>
+              <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-surface-2 border border-line text-ink-2">
+                Admin: <strong className="text-ink">{currentUser?.name || 'Administrator'}</strong>
               </span>
               <button
                 onClick={loadData}
-                className="p-2 rounded-control border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
+                className="p-2 rounded-control border border-line hover:bg-surface-2 text-ink-2 hover:text-ink transition-colors"
                 title="Segarkan Data"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
                 onClick={onLogout}
-                className="p-2 rounded-control border border-slate-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
+                className="p-2 rounded-control border border-line hover:bg-rose-50 text-ink-2 hover:text-rose-600 transition-colors"
                 title="Keluar"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -305,33 +305,33 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
             <div className="space-y-6">
               {/* Top Stat Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Total BUMD</span>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.tenantsCount ?? 6}</p>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Total BUMD</span>
+                  <p className="text-2xl font-bold text-ink mt-1">{stats?.tenantsCount ?? 6}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">6 Sektor Aktif</span>
                 </div>
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Pengguna Aktif</span>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{users.length}</p>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Pengguna Aktif</span>
+                  <p className="text-2xl font-bold text-ink mt-1">{users.length}</p>
                   <span className="text-[10px] text-brand font-medium">RBAC Terproteksi</span>
                 </div>
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Dashboard</span>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.dashboardsCount ?? 6}</p>
-                  <span className="text-[10px] text-slate-500 font-medium">{stats?.totalWidgets ?? 34} Widget</span>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Total Dashboard</span>
+                  <p className="text-2xl font-bold text-ink mt-1">{stats?.dashboardsCount ?? 6}</p>
+                  <span className="text-[10px] text-ink-2 font-medium">{stats?.totalWidgets ?? 34} Widget</span>
                 </div>
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Sitasi Resmi</span>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Sitasi Resmi</span>
                   <p className="text-2xl font-bold text-emerald-700 mt-1">{stats?.totalCitations ?? 42}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">100% Tervalidasi</span>
                 </div>
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Aturan Ambang</span>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Aturan Ambang</span>
                   <p className="text-2xl font-bold text-amber-700 mt-1">{alertRules.length}</p>
                   <span className="text-[10px] text-amber-600 font-medium">Evaluasi Otomatis</span>
                 </div>
-                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Provider RAG</span>
+                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-ink-3">Provider RAG</span>
                   <p className="text-base font-bold text-brand-ink mt-2 truncate">
                     {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
                   </p>
@@ -340,13 +340,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Quick Sektor BUMD Grid */}
-              <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
+                    <h3 className="text-sm font-bold text-ink">
                       Instansi BUMD Terhubung (Multi-Tenant Isolation)
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-ink-2">
                       Setiap instansi memiliki isolasi data dan pangkalan retrieval dokumen mandiri
                     </p>
                   </div>
@@ -363,20 +363,20 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   {tenants.map((t) => (
                     <div
                       key={t.id}
-                      className="p-3.5 border border-slate-200 rounded-card hover:border-line-strong transition-all bg-slate-50/50 flex items-start gap-3"
+                      className="p-3.5 border border-line rounded-card hover:border-line-strong transition-all bg-surface-2/50 flex items-start gap-3"
                     >
-                      <span className="text-2xl p-2 bg-white rounded-control border border-slate-200 shrink-0">
+                      <span className="text-2xl p-2 bg-surface rounded-control border border-line shrink-0">
                         {t.logo}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-bold text-slate-900 truncate">{t.name}</h4>
+                          <h4 className="text-xs font-bold text-ink truncate">{t.name}</h4>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {t.city} • Kode: <strong className="font-mono text-slate-700">{t.code}</strong>
+                        <p className="text-[11px] text-ink-2 mt-0.5">
+                          {t.city} • Kode: <strong className="font-mono text-ink-2">{t.code}</strong>
                         </p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
-                          <span className="uppercase font-semibold text-slate-600">{t.sector}</span>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-line text-[10px] text-ink-3">
+                          <span className="uppercase font-semibold text-ink-2">{t.sector}</span>
                           <span>{t.documentCount} Berkas Terindeks</span>
                         </div>
                       </div>
@@ -386,9 +386,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Recent Audit Activities */}
-              <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-3">
+              <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-ink flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     <span>Aktivitas & Log Audit Terakhir</span>
                   </h3>
@@ -400,18 +400,18 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-100 text-xs">
+                <div className="divide-y divide-line text-xs">
                   {auditLogs.slice(0, 5).map((log) => (
                     <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
                         <div>
-                          <span className="font-semibold text-slate-800">{log.action}: </span>
-                          <span className="text-slate-600">{log.target}</span>
-                          <span className="text-slate-400 block text-[11px] mt-0.5">{log.details}</span>
+                          <span className="font-semibold text-ink">{log.action}: </span>
+                          <span className="text-ink-2">{log.target}</span>
+                          <span className="text-ink-3 block text-[11px] mt-0.5">{log.details}</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 text-[11px] text-slate-400">
+                      <div className="text-right shrink-0 text-[11px] text-ink-3">
                         <span>{log.userName}</span>
                         <span className="block text-[10px]">
                           {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -426,13 +426,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 2: USERS & RBAC ================= */}
           {activeTab === 'users' && (
-            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-bold text-ink">
                     Manajemen Pengguna & Hak Akses Berbasis Peran (RBAC)
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-2">
                     Kelola staf BUMD: Administrator, Analis Kinerja, dan Dewan Direksi / Pengawas
                   </p>
                 </div>
@@ -446,9 +446,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Table */}
-              <div className="overflow-x-auto border border-slate-200 rounded-card">
+              <div className="overflow-x-auto border border-line rounded-card">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                     <tr>
                       <th className="p-3">Nama Pengguna</th>
                       <th className="p-3">Email Instansi</th>
@@ -457,20 +457,20 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       <th className="p-3 text-right">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                  <tbody className="divide-y divide-line text-ink-2">
                     {users.map((u) => {
                       const assignedTenant = tenants.find((t) => t.id === u.tenantId);
                       return (
-                        <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                        <tr key={u.id} className="hover:bg-surface-2/60 transition-colors">
                           <td className="p-3 font-medium flex items-center gap-2">
                             <AvatarTile name={u.name} id={u.id} size="sm" />
                             <span>{u.name}</span>
                           </td>
-                          <td className="p-3 text-slate-500">{u.email}</td>
+                          <td className="p-3 text-ink-2">{u.email}</td>
                           <td className="p-3">
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
-                                  ? 'bg-slate-800 text-white'
+                                  ? 'bg-ink text-white'
                                   : u.role === 'direksi'
                                     ? 'bg-amber-100 text-amber-800'
                                     : 'bg-surface-2 text-ink'
@@ -485,12 +485,12 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           </td>
                           <td className="p-3">
                             {assignedTenant ? (
-                              <span className="inline-flex items-center gap-1 font-medium text-slate-800">
+                              <span className="inline-flex items-center gap-1 font-medium text-ink">
                                 <span>{assignedTenant.logo}</span>
                                 <span>{assignedTenant.shortName}</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400">Lintas Instansi</span>
+                              <span className="text-ink-3">Lintas Instansi</span>
                             )}
                           </td>
                           <td className="p-3 text-right">
@@ -515,13 +515,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 3: TENANTS ================= */}
           {activeTab === 'tenants' && (
-            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-bold text-ink">
                     Daftar BUMD & Konfigurasi Multi-Tenant
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-2">
                     Kelola identitas resmi, kode BUMD, dan pangkalan dokumen retrieval
                   </p>
                 </div>
@@ -538,16 +538,16 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 {tenants.map((t) => (
                   <div
                     key={t.id}
-                    className="p-4 bg-slate-50 border border-slate-200 rounded-card space-y-3"
+                    className="p-4 bg-surface-2 border border-line rounded-card space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-3xl p-1.5 bg-white rounded-control border border-slate-200">
+                        <span className="text-3xl p-1.5 bg-surface rounded-control border border-line">
                           {t.logo}
                         </span>
                         <div>
-                          <h4 className="text-sm font-bold text-slate-900">{t.name}</h4>
-                          <p className="text-xs text-slate-500">{t.city}</p>
+                          <h4 className="text-sm font-bold text-ink">{t.name}</h4>
+                          <p className="text-xs text-ink-2">{t.city}</p>
                         </div>
                       </div>
                       <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-surface-2 text-ink">
@@ -555,11 +555,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200/70">
-                      <div className="text-slate-500">
-                        Sektor: <strong className="text-slate-700 capitalize">{t.sector}</strong>
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-line/70">
+                      <div className="text-ink-2">
+                        Sektor: <strong className="text-ink-2 capitalize">{t.sector}</strong>
                       </div>
-                      <div className="text-slate-500">
+                      <div className="text-ink-2">
                         Berkas RAG: <strong className="text-emerald-700">{t.documentCount} LRA & RKAP</strong>
                       </div>
                     </div>
@@ -571,12 +571,12 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 4: RAG CONFIG ================= */}
           {activeTab === 'rag' && systemConfig && (
-            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-5">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-ink">
                   Konfigurasi Integrasi RAG API
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-2">
                   Tempel Base URL & API Key RAG dari penyedia layanan, pilih provider
                   <strong> HTTP</strong>, lalu simpan.
                 </p>
@@ -604,7 +604,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <form onSubmit={handleSaveConfig} className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
+                    <label className="block text-ink-2 font-semibold mb-1">
                       Provider RAG API
                     </label>
                     <select
@@ -612,7 +612,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragProvider: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="mock">Mock — data demo lokal</option>
                       <option value="http">HTTP — API RAG eksternal</option>
@@ -622,7 +622,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">
+                  <label className="block text-ink-2 font-semibold mb-1">
                     Base URL RAG
                   </label>
                   <input
@@ -632,17 +632,17 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-ink-3 mt-1">
                     Sertakan prefix API-nya, mis. <span className="font-mono">https://rag.aiones.app/api/v1</span>.
                     Kalau hanya domain, aplikasi mencoba menambahkan <span className="font-mono">/api/v1</span> otomatis.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">
-                    Knowledge Base ID <span className="font-normal text-slate-400">(opsional — jika layanan RAG menskopkan retrieval per KB)</span>
+                  <label className="block text-ink-2 font-semibold mb-1">
+                    Knowledge Base ID <span className="font-normal text-ink-3">(opsional — jika layanan RAG menskopkan retrieval per KB)</span>
                   </label>
                   <input
                     type="text"
@@ -651,16 +651,16 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-ink-3 mt-1">
                     Daftar KB & dokumen bisa dilihat di layanan RAG teman (endpoint /api/v1/knowledge)
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
+                    <label className="block text-ink-2 font-semibold mb-1">
                       API Key LLM / RAG
                     </label>
                     <div className="relative">
@@ -671,15 +671,15 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                        className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                       />
-                      <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                      <Key className="w-4 h-4 text-ink-3 absolute right-3 top-2.5" />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
-                      Model LLM <span className="font-normal text-slate-400">(untuk Chat Orchestrator)</span>
+                    <label className="block text-ink-2 font-semibold mb-1">
+                      Model LLM <span className="font-normal text-ink-3">(untuk Chat Orchestrator)</span>
                     </label>
                     <input
                       type="text"
@@ -688,9 +688,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragModel: e.target.value } as any)
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">
+                    <p className="text-[10px] text-ink-3 mt-1">
                       Contoh: <span className="font-mono">gpt-4o-mini</span>, <span className="font-mono">gemini-1.5-flash</span>, <span className="font-mono">llama-3.1-70b</span>
                     </p>
                   </div>
@@ -698,7 +698,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
+                    <label className="block text-ink-2 font-semibold mb-1">
                       Batas Waktu Respons (Detik)
                     </label>
                     <input
@@ -710,14 +710,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           ragTimeoutSeconds: Number(e.target.value),
                         })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">Standar PRD: maksimal 60 detik</p>
+                    <p className="text-[10px] text-ink-3 mt-1">Standar PRD: maksimal 60 detik</p>
                   </div>
                 </div>
 
 
-                <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-card">
+                <div className="flex items-start gap-2 p-3 bg-surface-2 border border-line rounded-card">
                   <input
                     id="ragUseExtract"
                     type="checkbox"
@@ -727,8 +727,8 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     }
                     className="mt-0.5 w-4 h-4 accent-brand"
                   />
-                  <label htmlFor="ragUseExtract" className="text-[11px] text-slate-600 leading-relaxed">
-                    <span className="font-semibold text-slate-800">
+                  <label htmlFor="ragUseExtract" className="text-[11px] text-ink-2 leading-relaxed">
+                    <span className="font-semibold text-ink">
                       Jalur A — pakai endpoint /extract
                     </span>{' '}
                     (disarankan). Angka dashboard diambil langsung dari dokumen beserta halaman
@@ -738,33 +738,33 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
 
                 {/* SMTP Settings */}
-                <div className="pt-4 border-t border-slate-200 space-y-3">
-                  <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                <div className="pt-4 border-t border-line space-y-3">
+                  <h4 className="font-bold text-ink flex items-center gap-1.5">
                     <Server className="w-4 h-4 text-brand" />
                     <span>Konfigurasi SMTP Email Dispatcher (Alert Ambang Batas)</span>
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-600 mb-1">Host SMTP</label>
+                      <label className="block text-ink-2 mb-1">Host SMTP</label>
                       <input
                         type="text"
                         value={systemConfig.smtpHost}
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, smtpHost: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-control font-mono"
+                        className="w-full px-3 py-2 border border-line rounded-control font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-600 mb-1">Alamat Pengirim (MAIL_FROM)</label>
+                      <label className="block text-ink-2 mb-1">Alamat Pengirim (MAIL_FROM)</label>
                       <input
                         type="text"
                         value={systemConfig.smtpFrom}
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, smtpFrom: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-control"
+                        className="w-full px-3 py-2 border border-line rounded-control"
                       />
                     </div>
                   </div>
@@ -781,14 +781,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </form>
 
               {/* ===== UJI KONEKSI RAG ===== */}
-              <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="pt-4 border-t border-line space-y-3">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <h4 className="font-bold text-ink flex items-center gap-1.5">
                       <Radio className="w-4 h-4 text-brand" />
                       <span>Uji Koneksi RAG</span>
                     </h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-[11px] text-ink-2 mt-0.5">
                       Kirim sampel query ke layanan RAG aktif untuk memastikan koneksi, metadata,
                       dan keluaran JSON terstruktur berjalan dengan baik.
                     </p>
@@ -797,7 +797,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     type="button"
                     onClick={handleProbeRag}
                     disabled={probeLoading}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`w-4 h-4 ${probeLoading ? 'animate-spin' : ''}`} />
                     {probeLoading ? 'Menguji...' : 'Uji Koneksi Sekarang'}
@@ -848,14 +848,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       ) : null
                     )}
                     {probeResult.modeDetected && (
-                      <p className="text-slate-600">
+                      <p className="text-ink-2">
                         Mode terdeteksi: <strong>{probeResult.modeDetected}</strong>
                         {typeof probeResult.sampleChunksCount === 'number' && (
                           <> • Potongan dokumen terambil: <strong>{probeResult.sampleChunksCount}</strong></>
                         )}
                       </p>
                     )}
-                    <ul className="list-disc list-inside text-slate-600 space-y-0.5">
+                    <ul className="list-disc list-inside text-ink-2 space-y-0.5">
                       {(probeResult.details || []).map((d: string, i: number) => (
                         <li key={i}>{d}</li>
                       ))}
@@ -868,12 +868,12 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 5: ALERTS ================= */}
           {activeTab === 'alerts' && (
-            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-ink">
                   Daftar Aturan Ambang Batas & Peringatan Otomatis (Global)
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-2">
                   Peringatan dini bagi Direksi dan Pengawas saat indikator melanggar batasan regulasi
                 </p>
               </div>
@@ -884,11 +884,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   return (
                     <div
                       key={rule.id}
-                      className="p-4 bg-slate-50 border border-slate-200 rounded-card flex items-center justify-between gap-3 text-xs"
+                      className="p-4 bg-surface-2 border border-line rounded-card flex items-center justify-between gap-3 text-xs"
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800">{rule.title}</span>
+                          <span className="font-bold text-ink">{rule.title}</span>
                           <span
                             className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${rule.severity === 'critical'
                                 ? 'bg-rose-100 text-rose-800'
@@ -898,10 +898,10 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                             {rule.severity.toUpperCase()}
                           </span>
                         </div>
-                        <p className="text-slate-600 mt-1">
+                        <p className="text-ink-2 mt-1">
                           Kondisi: <strong>{rule.metricName}</strong> {rule.operator} {rule.threshold} {rule.unit}
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-ink-3 mt-0.5">
                           Instansi: {tenant?.name || 'Semua BUMD'} • Kanal: {rule.channels.join(' & ')}
                         </p>
                       </div>
@@ -920,19 +920,19 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 6: AUDIT TRAIL ================= */}
           {activeTab === 'audit' && (
-            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-ink">
                   Log Audit Sistem & Rekam Jejak Kepatuhan (F-14 & F-21)
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-2">
                   Seluruh pembuatan, perubahan widget, dan koreksi manual tercatat secara permanen
                 </p>
               </div>
 
-              <div className="overflow-x-auto border border-slate-200 rounded-card">
+              <div className="overflow-x-auto border border-line rounded-card">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                     <tr>
                       <th className="p-3">Waktu</th>
                       <th className="p-3">Aksi</th>
@@ -941,23 +941,23 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       <th className="p-3">Detail Keterangan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                  <tbody className="divide-y divide-line text-ink-2">
                     {auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="p-3 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                      <tr key={log.id} className="hover:bg-surface-2/60 transition-colors">
+                        <td className="p-3 whitespace-nowrap text-ink-3 font-mono text-[11px]">
                           {new Date(log.timestamp).toLocaleString('id-ID', {
                             dateStyle: 'short',
                             timeStyle: 'medium',
                           })}
                         </td>
-                        <td className="p-3 font-semibold text-slate-900">{log.action}</td>
+                        <td className="p-3 font-semibold text-ink">{log.action}</td>
                         <td className="p-3">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
+                          <span className="px-2 py-0.5 rounded bg-surface-2 text-ink-2 font-medium">
                             {log.target}
                           </span>
                         </td>
-                        <td className="p-3 font-medium text-slate-800">{log.userName}</td>
-                        <td className="p-3 text-slate-600 max-w-xs truncate" title={log.details}>
+                        <td className="p-3 font-medium text-ink">{log.userName}</td>
+                        <td className="p-3 text-ink-2 max-w-xs truncate" title={log.details}>
                           {log.details}
                         </td>
                       </tr>
@@ -972,46 +972,46 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {/* ================= MODAL TAMBAH PENGGUNA ================= */}
         {isAddUserOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
-            <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-sm text-slate-800">Tambah Pengguna BUMD Baru</h3>
-                <button onClick={() => setIsAddUserOpen(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="fixed inset-0 bg-shell/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
+            <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <h3 className="font-bold text-sm text-ink">Tambah Pengguna BUMD Baru</h3>
+                <button onClick={() => setIsAddUserOpen(false)} className="text-ink-3 hover:text-ink-2">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleCreateUser} className="space-y-3">
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Nama Lengkap</label>
+                  <label className="block text-ink-2 font-medium mb-1">Nama Lengkap</label>
                   <input
                     type="text"
                     placeholder="Contoh: Ahmad Fauzi, S.E."
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Email Resmi</label>
+                  <label className="block text-ink-2 font-medium mb-1">Email Resmi</label>
                   <input
                     type="email"
                     placeholder="ahmad@pdam-tirta.id"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Peran Hak Akses (Role)</label>
+                  <label className="block text-ink-2 font-medium mb-1">Peran Hak Akses (Role)</label>
                   <select
                     value={userRole}
                     onChange={(e) => setUserRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="analis">Analis Kinerja (Dapat membuat & mengedit dashboard)</option>
                     <option value="direksi">Direksi / Pengawas (Hak akses lihat & terima laporan)</option>
@@ -1020,11 +1020,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Penugasan Instansi BUMD</label>
+                  <label className="block text-ink-2 font-medium mb-1">Penugasan Instansi BUMD</label>
                   <select
                     value={userTenantId}
                     onChange={(e) => setUserTenantId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     {tenants.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1038,7 +1038,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setIsAddUserOpen(false)}
-                    className="px-4 py-2 border border-slate-200 rounded-control text-slate-600 hover:bg-slate-50"
+                    className="px-4 py-2 border border-line rounded-control text-ink-2 hover:bg-surface-2"
                   >
                     Batal
                   </button>
@@ -1057,58 +1057,58 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {/* ================= MODAL TAMBAH TENANT BUMD ================= */}
         {isAddTenantOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
-            <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-sm text-slate-800">Daftarkan Instansi BUMD Baru</h3>
-                <button onClick={() => setIsAddTenantOpen(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="fixed inset-0 bg-shell/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
+            <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <h3 className="font-bold text-sm text-ink">Daftarkan Instansi BUMD Baru</h3>
+                <button onClick={() => setIsAddTenantOpen(false)} className="text-ink-3 hover:text-ink-2">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleCreateTenant} className="space-y-3">
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Nama Resmi BUMD</label>
+                  <label className="block text-ink-2 font-medium mb-1">Nama Resmi BUMD</label>
                   <input
                     type="text"
                     placeholder="Contoh: Perumda Pariwisata Tirta Graha"
                     value={tenantName}
                     onChange={(e) => setTenantName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1">Nama Singkat</label>
+                    <label className="block text-ink-2 font-medium mb-1">Nama Singkat</label>
                     <input
                       type="text"
                       placeholder="Contoh: Perumda Graha"
                       value={tenantShortName}
                       onChange={(e) => setTenantShortName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1">Kode Instansi</label>
+                    <label className="block text-ink-2 font-medium mb-1">Kode Instansi</label>
                     <input
                       type="text"
                       placeholder="Contoh: PTG-01"
                       value={tenantCode}
                       onChange={(e) => setTenantCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1">Sektor</label>
+                    <label className="block text-ink-2 font-medium mb-1">Sektor</label>
                     <select
                       value={tenantSector}
                       onChange={(e) => setTenantSector(e.target.value as BumdSector)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="pdam">PDAM (Air Minum)</option>
                       <option value="bank">Bank Daerah (BPD/BPR)</option>
@@ -1119,13 +1119,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1">Kota / Kabupaten</label>
+                    <label className="block text-ink-2 font-medium mb-1">Kota / Kabupaten</label>
                     <input
                       type="text"
                       placeholder="Kota Mandiri"
                       value={tenantCity}
                       onChange={(e) => setTenantCity(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                       required
                     />
                   </div>
@@ -1135,7 +1135,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setIsAddTenantOpen(false)}
-                    className="px-4 py-2 border border-slate-200 rounded-control text-slate-600 hover:bg-slate-50"
+                    className="px-4 py-2 border border-line rounded-control text-ink-2 hover:bg-surface-2"
                   >
                     Batal
                   </button>

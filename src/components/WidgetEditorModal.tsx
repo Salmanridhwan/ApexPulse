@@ -126,35 +126,35 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-xl bg-white rounded-card shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white">
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-sm font-semibold text-ink">
                 Pengaturan & Kustomisasi Widget
               </h2>
-              <p className="text-xs text-slate-500 truncate max-w-xs">{widget.title}</p>
+              <p className="text-xs text-ink-2 truncate max-w-xs">{widget.title}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-chip text-ink-3 hover:text-ink-2 hover:bg-line transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Nav */}
-        <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 gap-4 text-xs font-medium">
+        <div className="flex border-b border-line bg-surface-2/50 px-4 gap-4 text-xs font-medium">
           <button
             onClick={() => setActiveTab('config')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'config'
                 ? 'border-brand text-brand-ink'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -164,7 +164,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
             onClick={() => setActiveTab('correction')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'correction'
                 ? 'border-amber-600 text-amber-800'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
@@ -182,36 +182,36 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               {/* Judul & Subtitle */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">
+                  <label className="block text-ink-2 font-medium mb-1">
                     Judul Widget
                   </label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">
+                  <label className="block text-ink-2 font-medium mb-1">
                     Keterangan / Subtitle
                   </label>
                   <input
                     type="text"
                     value={subtitle}
                     onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
               </div>
 
               {/* Tipe Visualisasi Grid */}
               <div>
-                <label className="block text-slate-700 font-medium mb-2">
+                <label className="block text-ink-2 font-medium mb-2">
                   Pilih Tipe Visualisasi Chart
                 </label>
                 {chartTypes.length === 1 && (
-                  <p className="text-[11px] text-slate-500 mb-2">
+                  <p className="text-[11px] text-ink-2 mb-2">
                     Widget ini hanya punya data untuk tipe ini.
                   </p>
                 )}
@@ -223,11 +223,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                       onClick={() => setType(ct.type)}
                       className={`p-2.5 rounded-card border text-left transition-all ${type === ct.type
                           ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                          : 'border-line bg-surface hover:bg-surface-2'
                         }`}
                     >
-                      <p className="font-semibold text-slate-800">{ct.label}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{ct.desc}</p>
+                      <p className="font-semibold text-ink">{ct.label}</p>
+                      <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{ct.desc}</p>
                     </button>
                   ))}
                 </div>
@@ -236,11 +236,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               {/* Kategori & Periode */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Kategori</label>
+                  <label className="block text-ink-2 font-medium mb-1">Kategori</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="Keuangan">Keuangan</option>
                     <option value="Operasional">Operasional</option>
@@ -249,11 +249,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-700 font-medium mb-1">Periode Data</label>
+                  <label className="block text-ink-2 font-medium mb-1">Periode Data</label>
                   <select
                     value={periode}
                     onChange={(e) => setPeriode(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="2026-Q1">Triwulan I 2026 (Aktual)</option>
                     <option value="2026-Q2">Triwulan II 2026</option>
@@ -280,17 +280,17 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-control">
-                <span className="text-[10px] uppercase font-semibold text-slate-500">
+              <div className="p-3 bg-surface-2 border border-line rounded-control">
+                <span className="text-[10px] uppercase font-semibold text-ink-2">
                   Nilai Asli dari Dokumen RAG:
                 </span>
-                <p className="text-base font-bold text-slate-800 mt-0.5">
+                <p className="text-base font-bold text-ink mt-0.5">
                   {String(widget.manualCorrection?.originalValue || currentVal)}
                 </p>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-medium mb-1">
+                <label className="block text-ink-2 font-medium mb-1">
                   Nilai Baru Hasil Koreksi (Override)
                 </label>
                 <input
@@ -300,32 +300,32 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                     setCorrectedValue(e.target.value);
                     setIsApplyingCorrection(true);
                   }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-sm"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-sm"
                   placeholder="Contoh: Rp 45,20 M"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-medium mb-1">
+                <label className="block text-ink-2 font-medium mb-1">
                   Nama Petugas Pengoreksi
                 </label>
                 <input
                   type="text"
                   value={correctedBy}
                   onChange={(e) => setCorrectedBy(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-medium mb-1">
+                <label className="block text-ink-2 font-medium mb-1">
                   Alasan & Dasar Koreksi (Wajib untuk Audit)
                 </label>
                 <textarea
                   rows={3}
                   value={correctionReason}
                   onChange={(e) => setCorrectionReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs"
                   placeholder="Contoh: Penyesuaian saldo piutang berdasarkan Surat Keputusan Direksi No. 42/2026..."
                 />
               </div>
@@ -346,10 +346,10 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 border-t border-line bg-surface-2 flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 rounded-control text-slate-600 hover:bg-slate-100 text-xs font-medium transition-colors"
+            className="px-4 py-2 border border-line rounded-control text-ink-2 hover:bg-surface-2 text-xs font-medium transition-colors"
           >
             Batal
           </button>

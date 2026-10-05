@@ -18,7 +18,7 @@
   /* Teks */
   --color-ink: #0f1729;         /* judul */
   --color-ink-2: #4a5568;       /* isi */
-  --color-ink-3: #94a3b8;       /* keterangan */
+  --color-ink-3: #667085;       /* keterangan — gelap cukup utk AA di atas putih */
 
   /* Aksen — dipakai HEMAT: CTA, nav aktif, link */
   --color-brand: #4f46e5;       /* indigo elektrik */
