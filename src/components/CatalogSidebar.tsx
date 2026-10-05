@@ -27,7 +27,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
 
   if (primaryType === 'kpi') {
     return (
-      <div className="bg-slate-950/90 text-white rounded-lg p-2.5 flex items-center justify-between border border-slate-800/80 my-2 shadow-inner">
+      <div className="bg-slate-950/90 text-white rounded-control p-2.5 flex items-center justify-between border border-slate-800/80 my-2 shadow-inner">
         <div>
           <span className="text-[10px] text-slate-400 font-medium block">Estimasi Nilai ({preset.satuan})</span>
           <div className="text-sm font-extrabold text-ink-3 tracking-tight flex items-baseline gap-1.5 mt-0.5">
@@ -46,7 +46,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
 
   if (primaryType === 'donut') {
     return (
-      <div className="bg-slate-950/90 text-white rounded-lg p-2 flex items-center justify-between gap-2 border border-slate-800/80 my-2">
+      <div className="bg-slate-950/90 text-white rounded-control p-2 flex items-center justify-between gap-2 border border-slate-800/80 my-2">
         <div className="w-14 h-14 shrink-0 relative flex items-center justify-center">
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
             <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" strokeWidth="4.5" />
@@ -67,7 +67,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
 
   if (primaryType === 'line' || primaryType === 'area') {
     return (
-      <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
+      <div className="bg-slate-950/90 text-white rounded-control p-2 border border-slate-800/80 my-2 space-y-1">
         <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
           <span>Tren Historis</span>
           <span className="text-ink-3 font-semibold">{preset.satuan}</span>
@@ -91,7 +91,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
 
   if (primaryType === 'gauge') {
     return (
-      <div className="bg-slate-950/90 text-white rounded-lg p-2 flex items-center justify-between border border-slate-800/80 my-2">
+      <div className="bg-slate-950/90 text-white rounded-control p-2 flex items-center justify-between border border-slate-800/80 my-2">
         <div className="w-16 h-11 relative flex items-center justify-center">
           <svg viewBox="0 0 40 25" className="w-full h-full">
             <path d="M 5 22 A 15 15 0 0 1 35 22" fill="none" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
@@ -109,7 +109,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
 
   // Default: Bar chart preview
   return (
-    <div className="bg-slate-950/90 text-white rounded-lg p-2 border border-slate-800/80 my-2 space-y-1">
+    <div className="bg-slate-950/90 text-white rounded-control p-2 border border-slate-800/80 my-2 space-y-1">
       <div className="flex justify-between items-center text-[10px] text-slate-400 px-0.5">
         <span>Visualisasi Perbandingan</span>
         <span className="text-ink-3 font-semibold">{preset.satuan}</span>
@@ -228,7 +228,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white shadow-xs">
+          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white shadow-xs">
             <Layers className="w-4 h-4" />
           </div>
           <div>
@@ -243,7 +243,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+          className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -259,15 +259,15 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             placeholder="Cari preset ID, nama indikator, atau kata kunci..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand bg-slate-50/50"
+            className="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand bg-slate-50/50"
           />
         </div>
 
         {/* Sector Tabs */}
-        <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg text-xs">
+        <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-control text-xs">
           <button
             onClick={() => setSectorTab('current')}
-            className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-all ${sectorTab === 'current'
+            className={`flex-1 py-1 px-2 rounded-chip font-medium text-center transition-all ${sectorTab === 'current'
                 ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -276,7 +276,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           </button>
           <button
             onClick={() => setSectorTab('universal')}
-            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'universal'
+            className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'universal'
                 ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -285,7 +285,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           </button>
           <button
             onClick={() => setSectorTab('all')}
-            className={`py-1 px-2.5 rounded-md font-medium text-center transition-all ${sectorTab === 'all'
+            className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'all'
                 ? 'bg-white text-brand-ink shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -324,7 +324,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             return (
               <div
                 key={preset.id}
-                className="bg-white border border-slate-200 rounded-xl p-3.5 hover:border-line-strong hover:shadow-xs transition-all space-y-2 group"
+                className="bg-white border border-slate-200 rounded-card p-3.5 hover:border-line-strong hover:shadow-xs transition-all space-y-2 group"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -357,7 +357,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                   <button
                     onClick={() => handleAdd(preset)}
                     disabled={isMemuat}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60 ${isAdded
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-control text-xs font-medium transition-all disabled:opacity-60 ${isAdded
                         ? 'bg-emerald-600 text-white'
                         : 'bg-surface-2 text-brand-ink hover:bg-brand hover:text-white'
                       }`}
@@ -382,7 +382,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                 </div>
 
                 {galat[preset.id] && (
-                  <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                  <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-control px-2 py-1.5 leading-relaxed">
                     {galat[preset.id]}
                   </p>
                 )}

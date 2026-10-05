@@ -61,7 +61,7 @@ const RecommendationCards: React.FC<{
         key={rec.id}
         disabled={isStreaming}
         onClick={() => onSelect(rec.prompt)}
-        className="group text-left w-full bg-white border border-slate-200 hover:border-line-strong hover:shadow-md rounded-xl p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="group text-left w-full bg-white border border-slate-200 hover:border-line-strong hover:shadow-md rounded-card p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ animationDelay: `${i * 60}ms` }}
       >
         <div className="flex items-start gap-2.5">
@@ -299,7 +299,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white shadow-xs">
+          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white shadow-xs">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -329,14 +329,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 }
               }}
               title="Hapus riwayat chat (dashboard tetap ada)"
-              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              className="p-1 rounded-chip text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -351,7 +351,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[92%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-xs ${
+              className={`max-w-[92%] rounded-card p-3.5 text-xs leading-relaxed shadow-xs ${
                 msg.sender === 'user'
                   ? 'bg-brand text-white rounded-tr-none'
                   : 'bg-slate-50 border border-slate-200/80 text-slate-800 rounded-tl-none'
@@ -475,13 +475,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {isStreaming && (
           <div className="flex flex-col items-start space-y-2 animate-fadeIn">
             {/* Assistant Bubble Skeleton & Typing Indicator */}
-            <div className="max-w-[95%] w-full bg-white border border-line/90 rounded-2xl rounded-tl-none p-4 text-xs shadow-md space-y-3">
+            <div className="max-w-[95%] w-full bg-white border border-line/90 rounded-card rounded-tl-none p-4 text-xs shadow-md space-y-3">
               {/* Header Indicator */}
               <div className="flex items-center justify-between border-b border-line pb-2.5">
                 <div className="flex items-center gap-2">
                   <div className="relative flex items-center justify-center">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
-                    <div className="w-6 h-6 rounded-lg bg-brand text-white flex items-center justify-center relative z-10 shadow-xs">
+                    <div className="w-6 h-6 rounded-control bg-brand text-white flex items-center justify-center relative z-10 shadow-xs">
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
                   </div>
@@ -510,7 +510,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   return (
                     <div
                       key={step.id}
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-300 ${
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-control text-xs transition-all duration-300 ${
                         isCurrent
                           ? 'bg-surface-2 border border-line/80 text-ink font-semibold shadow-2xs'
                           : isDone
@@ -596,12 +596,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             disabled={isStreaming}
-            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+            className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-card focus:outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
             disabled={!inputPrompt.trim() || isStreaming}
-            className="absolute right-1.5 p-1.5 rounded-lg bg-brand hover:bg-brand-ink text-white disabled:opacity-40 disabled:hover:bg-brand transition-colors"
+            className="absolute right-1.5 p-1.5 rounded-control bg-brand hover:bg-brand-ink text-white disabled:opacity-40 disabled:hover:bg-brand transition-colors"
           >
             {isStreaming ? (
               <Loader2 className="w-4 h-4 animate-spin" />

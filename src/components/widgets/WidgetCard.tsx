@@ -32,7 +32,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const isSource = widget.confidence === 'sumber' && !isManual;
 
   return (
-    <div className="relative bg-white rounded-xl border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
+    <div className="relative bg-white rounded-card border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -64,7 +64,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-1 rounded-md text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              className="p-1 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
               title="Menu Opsi Widget"
             >
               <MoreVertical className="w-4 h-4" />
@@ -73,7 +73,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-line py-1 z-30 text-xs text-slate-700">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-control shadow-lg border border-line py-1 z-30 text-xs text-slate-700">
                   {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
@@ -85,7 +85,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                             key={t}
                             type="button"
                             onClick={() => onEdit({ ...widget, type: t })}
-                            className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                            className={`flex-1 px-1.5 py-1 rounded-chip text-[11px] font-semibold transition-colors ${
                               widget.type === t
                                 ? 'bg-ink text-white'
                                 : 'bg-surface-2 text-brand-ink hover:bg-surface-2'

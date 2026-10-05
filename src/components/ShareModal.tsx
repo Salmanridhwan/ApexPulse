@@ -62,11 +62,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col">
+      <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
@@ -78,7 +78,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -86,7 +86,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         {/* Content */}
         <div className="p-5 space-y-4 text-xs">
-          <div className="p-3.5 bg-surface-2 border border-line rounded-xl text-ink space-y-1">
+          <div className="p-3.5 bg-surface-2 border border-line rounded-card text-ink space-y-1">
             <div className="flex items-center gap-1.5 font-semibold">
               <Globe className="w-4 h-4 text-brand" />
               <span>Akses Tampilan Publik Aman</span>
@@ -101,7 +101,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-xl font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-card font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
                 <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi Baru'}</span>
@@ -115,11 +115,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   type="text"
                   readOnly
                   value={fullShareUrl}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-mono select-all focus:outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-control bg-slate-50 text-xs font-mono select-all focus:outline-none"
                 />
                 <button
                   onClick={copyToClipboard}
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors shrink-0 flex items-center gap-1"
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                 >
                   {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
@@ -155,11 +155,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     readOnly
                     value={embedSnippet}
                     rows={3}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-[11px] font-mono resize-none focus:outline-none"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-slate-50 text-[11px] font-mono resize-none focus:outline-none"
                   />
                   <button
                     onClick={copyEmbedSnippet}
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors shrink-0 flex items-center gap-1"
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
                     {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
@@ -186,7 +186,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg transition-colors"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

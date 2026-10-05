@@ -26,8 +26,8 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
     <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
-        <div className="bg-white p-5 rounded-xl border border-line mb-6 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-ink flex items-center justify-center text-white shrink-0">
+        <div className="bg-white p-5 rounded-card border border-line mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-white shrink-0">
             <History className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -44,13 +44,13 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
         </div>
 
         {/* Tabel jejak audit */}
-        <div className="bg-white p-5 rounded-xl border border-line">
+        <div className="bg-white p-5 rounded-card border border-line">
           {isLoading ? (
             <div className="text-center py-12 text-xs text-slate-400">Memuat riwayat audit...</div>
           ) : logs.length === 0 ? (
             <div className="text-center py-12 text-xs text-slate-400">Belum ada aktivitas tercatat.</div>
           ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <div className="overflow-x-auto border border-slate-200 rounded-card">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>

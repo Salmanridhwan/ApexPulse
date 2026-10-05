@@ -94,7 +94,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-12 h-12 rounded-2xl bg-brand/20 text-ink-3 flex items-center justify-center animate-spin mb-4">
+        <div className="w-12 h-12 rounded-card bg-brand/20 text-ink-3 flex items-center justify-center animate-spin mb-4">
           <Activity className="w-6 h-6" />
         </div>
         <h2 className="text-base font-bold text-white tracking-wide">Memuat Tampilan Dashboard...</h2>
@@ -113,7 +113,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         } flex flex-col items-center justify-center text-slate-800`}
       >
         <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-8 text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200/60">
+          <div className="w-14 h-14 rounded-card bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200/60">
             <Lock className="w-7 h-7" />
           </div>
           <div className="space-y-2">
@@ -125,7 +125,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
               {error || 'Dashboard yang Anda cari tidak tersedia.'}
             </p>
           </div>
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-left text-[11px] text-slate-600 space-y-1.5">
+          <div className="p-3.5 bg-slate-50 rounded-card border border-slate-200 text-left text-[11px] text-slate-600 space-y-1.5">
             <div className="flex items-center gap-1.5 font-semibold text-slate-800">
               <Shield className="w-3.5 h-3.5 text-brand" />
               <span>Protokol Keamanan Data</span>
@@ -152,7 +152,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <main className="w-full p-4 flex-1">
             <ActiveChartFilterChip />
             {widgetsTampil.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 text-xs">
+              <div className="bg-white rounded-card border border-slate-200 p-12 text-center text-slate-500 text-xs">
                 Tidak ada widget yang cocok dengan filter ini.
               </div>
             ) : (
@@ -186,7 +186,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors flex items-center gap-1.5 text-[11px]"
+              className="px-3 py-1 rounded-control bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors flex items-center gap-1.5 text-[11px]"
               title="Cetak / Simpan PDF"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -221,7 +221,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 self-start md:self-center shrink-0">
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-3.5 py-2 text-xs space-y-0.5">
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-card px-3.5 py-2 text-xs space-y-0.5">
                 <div className="flex items-center gap-1.5 font-bold">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span>Terverifikasi Sumber Resmi</span>
@@ -242,7 +242,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         <main className="max-w-7xl mx-auto w-full p-6 flex-1">
           <ActiveChartFilterChip />
           {widgetsTampil.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 text-xs">
+            <div className="bg-white rounded-card border border-slate-200 p-12 text-center text-slate-500 text-xs">
               {widgets.length === 0
                 ? 'Dashboard ini belum memiliki widget yang dikonfigurasi.'
                 : 'Tidak ada widget yang cocok dengan filter ini.'}
@@ -286,7 +286,7 @@ const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget }) => {
   return (
     <div
       data-widget-id={widget.id}
-      className={`bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
+      className={`bg-white rounded-card border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
         isWide ? 'md:col-span-2' : ''
       }`}
     >

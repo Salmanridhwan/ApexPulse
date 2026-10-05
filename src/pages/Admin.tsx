@@ -240,7 +240,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   title={tab.label}
-                  className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
+                  className={`w-full flex items-center gap-2.5 py-2 rounded-control text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
                     } ${isActive
                       ? 'bg-brand text-white'
                       : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
@@ -262,7 +262,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => setIsNavCollapsed((v) => !v)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+                className="p-1.5 rounded-control text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
                 title={isNavCollapsed ? 'Tampilkan Sidebar Admin' : 'Sembunyikan Sidebar Admin'}
               >
                 <Menu className="w-4 h-4" />
@@ -282,14 +282,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </span>
               <button
                 onClick={loadData}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
+                className="p-2 rounded-control border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
                 title="Segarkan Data"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
                 onClick={onLogout}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
+                className="p-2 rounded-control border border-slate-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors"
                 title="Keluar"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -305,32 +305,32 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
             <div className="space-y-6">
               {/* Top Stat Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total BUMD</span>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.tenantsCount ?? 6}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">6 Sektor Aktif</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Pengguna Aktif</span>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{users.length}</p>
                   <span className="text-[10px] text-brand font-medium">RBAC Terproteksi</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total Dashboard</span>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.dashboardsCount ?? 6}</p>
                   <span className="text-[10px] text-slate-500 font-medium">{stats?.totalWidgets ?? 34} Widget</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Sitasi Resmi</span>
                   <p className="text-2xl font-bold text-emerald-700 mt-1">{stats?.totalCitations ?? 42}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">100% Tervalidasi</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Aturan Ambang</span>
                   <p className="text-2xl font-bold text-amber-700 mt-1">{alertRules.length}</p>
                   <span className="text-[10px] text-amber-600 font-medium">Evaluasi Otomatis</span>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="bg-white p-4 rounded-card border border-slate-200/80 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Provider RAG</span>
                   <p className="text-base font-bold text-brand-ink mt-2 truncate">
                     {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
@@ -340,7 +340,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Quick Sektor BUMD Grid */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
@@ -352,7 +352,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </div>
                   <button
                     onClick={() => setIsAddTenantOpen(true)}
-                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ Tambah Instansi BUMD</span>
@@ -363,9 +363,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   {tenants.map((t) => (
                     <div
                       key={t.id}
-                      className="p-3.5 border border-slate-200 rounded-xl hover:border-line-strong transition-all bg-slate-50/50 flex items-start gap-3"
+                      className="p-3.5 border border-slate-200 rounded-card hover:border-line-strong transition-all bg-slate-50/50 flex items-start gap-3"
                     >
-                      <span className="text-2xl p-2 bg-white rounded-lg border border-slate-200 shrink-0">
+                      <span className="text-2xl p-2 bg-white rounded-control border border-slate-200 shrink-0">
                         {t.logo}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -386,7 +386,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Recent Audit Activities */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+              <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -426,7 +426,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 2: USERS & RBAC ================= */}
           {activeTab === 'users' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
@@ -438,7 +438,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddUserOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>+ Tambah Pengguna Baru</span>
@@ -446,7 +446,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {/* Table */}
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <div className="overflow-x-auto border border-slate-200 rounded-card">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                     <tr>
@@ -515,7 +515,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 3: TENANTS ================= */}
           {activeTab === 'tenants' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
@@ -527,7 +527,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddTenantOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Daftarkan BUMD Baru</span>
@@ -538,11 +538,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 {tenants.map((t) => (
                   <div
                     key={t.id}
-                    className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3"
+                    className="p-4 bg-slate-50 border border-slate-200 rounded-card space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-3xl p-1.5 bg-white rounded-lg border border-slate-200">
+                        <span className="text-3xl p-1.5 bg-white rounded-control border border-slate-200">
                           {t.logo}
                         </span>
                         <div>
@@ -571,7 +571,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 4: RAG CONFIG ================= */}
           {activeTab === 'rag' && systemConfig && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-5">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   Konfigurasi Integrasi RAG API
@@ -583,7 +583,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {saveSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-card text-emerald-800 text-xs flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Pengaturan sistem berhasil disimpan dan diperbarui!</span>
                 </div>
@@ -591,7 +591,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
               {/* Jebakan paling sering: URL & key sudah diisi, provider masih Mock. */}
               {systemConfig.ragProvider !== 'http' && (systemConfig.ragApiUrl || systemConfig.ragApiKey) && (
-                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-start gap-2">
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-card text-amber-900 text-xs flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <span>
                     Provider masih <strong>Mock</strong>, jadi Base URL &amp; API Key di bawah{' '}
@@ -612,7 +612,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragProvider: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="mock">Mock — data demo lokal</option>
                       <option value="http">HTTP — API RAG eksternal</option>
@@ -632,7 +632,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
                     Sertakan prefix API-nya, mis. <span className="font-mono">https://rag.aiones.app/api/v1</span>.
@@ -651,7 +651,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) =>
                       setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
                     Daftar KB & dokumen bisa dilihat di layanan RAG teman (endpoint /api/v1/knowledge)
@@ -671,7 +671,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                       />
                       <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
                     </div>
@@ -688,7 +688,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       onChange={(e) =>
                         setSystemConfig({ ...systemConfig, ragModel: e.target.value } as any)
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
                       Contoh: <span className="font-mono">gpt-4o-mini</span>, <span className="font-mono">gemini-1.5-flash</span>, <span className="font-mono">llama-3.1-70b</span>
@@ -710,14 +710,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           ragTimeoutSeconds: Number(e.target.value),
                         })
                       }
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Standar PRD: maksimal 60 detik</p>
                   </div>
                 </div>
 
 
-                <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-card">
                   <input
                     id="ragUseExtract"
                     type="checkbox"
@@ -753,7 +753,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, smtpHost: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-control font-mono"
                       />
                     </div>
                     <div>
@@ -764,7 +764,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, smtpFrom: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-control"
                       />
                     </div>
                   </div>
@@ -773,7 +773,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="pt-3 flex items-center gap-3">
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium transition-colors shadow-xs"
+                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-control font-medium transition-colors shadow-xs"
                   >
                     Simpan Konfigurasi Sistem
                   </button>
@@ -797,7 +797,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     type="button"
                     onClick={handleProbeRag}
                     disabled={probeLoading}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-line-strong hover:bg-surface-2 text-brand-ink rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`w-4 h-4 ${probeLoading ? 'animate-spin' : ''}`} />
                     {probeLoading ? 'Menguji...' : 'Uji Koneksi Sekarang'}
@@ -806,7 +806,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
                 {probeResult && (
                   <div
-                    className={`p-4 rounded-xl border text-xs space-y-2 ${
+                    className={`p-4 rounded-card border text-xs space-y-2 ${
                       probeResult.status === 'healthy'
                         ? 'bg-emerald-50 border-emerald-200'
                         : probeResult.status === 'degraded'
@@ -868,7 +868,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 5: ALERTS ================= */}
           {activeTab === 'alerts' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   Daftar Aturan Ambang Batas & Peringatan Otomatis (Global)
@@ -884,7 +884,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   return (
                     <div
                       key={rule.id}
-                      className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                      className="p-4 bg-slate-50 border border-slate-200 rounded-card flex items-center justify-between gap-3 text-xs"
                     >
                       <div>
                         <div className="flex items-center gap-2">
@@ -907,7 +907,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       </div>
 
                       <div className="shrink-0 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded-chip border border-emerald-200">
                           <Check className="w-3 h-3" /> Aktif
                         </span>
                       </div>
@@ -920,7 +920,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
           {/* ================= TAB 6: AUDIT TRAIL ================= */}
           {activeTab === 'audit' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+            <div className="bg-white p-5 rounded-card border border-slate-200/80 shadow-2xs space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   Log Audit Sistem & Rekam Jejak Kepatuhan (F-14 & F-21)
@@ -930,7 +930,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </p>
               </div>
 
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <div className="overflow-x-auto border border-slate-200 rounded-card">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                     <tr>
@@ -973,7 +973,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {isAddUserOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
-            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
+            <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-sm text-slate-800">Tambah Pengguna BUMD Baru</h3>
                 <button onClick={() => setIsAddUserOpen(false)} className="text-slate-400 hover:text-slate-600">
@@ -989,7 +989,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="Contoh: Ahmad Fauzi, S.E."
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1001,7 +1001,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="ahmad@pdam-tirta.id"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1011,7 +1011,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <select
                     value={userRole}
                     onChange={(e) => setUserRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value="analis">Analis Kinerja (Dapat membuat & mengedit dashboard)</option>
                     <option value="direksi">Direksi / Pengawas (Hak akses lihat & terima laporan)</option>
@@ -1024,7 +1024,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <select
                     value={userTenantId}
                     onChange={(e) => setUserTenantId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     {tenants.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1038,13 +1038,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setIsAddUserOpen(false)}
-                    className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                    className="px-4 py-2 border border-slate-200 rounded-control text-slate-600 hover:bg-slate-50"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-control font-medium"
                   >
                     Daftarkan Pengguna
                   </button>
@@ -1058,7 +1058,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {isAddTenantOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
-            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
+            <div className="relative w-full max-w-md bg-white rounded-card shadow-2xl border border-slate-200 p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-sm text-slate-800">Daftarkan Instansi BUMD Baru</h3>
                 <button onClick={() => setIsAddTenantOpen(false)} className="text-slate-400 hover:text-slate-600">
@@ -1074,7 +1074,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     placeholder="Contoh: Perumda Pariwisata Tirta Graha"
                     value={tenantName}
                     onChange={(e) => setTenantName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -1087,7 +1087,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Contoh: Perumda Graha"
                       value={tenantShortName}
                       onChange={(e) => setTenantShortName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
                   <div>
@@ -1097,7 +1097,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Contoh: PTG-01"
                       value={tenantCode}
                       onChange={(e) => setTenantCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
                     />
                   </div>
                 </div>
@@ -1108,7 +1108,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     <select
                       value={tenantSector}
                       onChange={(e) => setTenantSector(e.target.value as BumdSector)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                     >
                       <option value="pdam">PDAM (Air Minum)</option>
                       <option value="bank">Bank Daerah (BPD/BPR)</option>
@@ -1125,7 +1125,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       placeholder="Kota Mandiri"
                       value={tenantCity}
                       onChange={(e) => setTenantCity(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                       required
                     />
                   </div>
@@ -1135,13 +1135,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setIsAddTenantOpen(false)}
-                    className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                    className="px-4 py-2 border border-slate-200 rounded-control text-slate-600 hover:bg-slate-50"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-lg font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-control font-medium"
                   >
                     Simpan BUMD
                   </button>

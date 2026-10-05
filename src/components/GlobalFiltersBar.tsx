@@ -17,7 +17,7 @@ function opsiUnik(nilai: (string | undefined)[]): string[] {
 }
 
 const chipDasar =
-  'inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-1.5 transition-all';
+  'inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-card px-3 py-1.5 transition-all';
 const selectDasar = 'bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer pr-1';
 
 /** Bar filter dashboard: Periode / Unit Kerja / Kategori, dipakai di workspace internal & halaman publik. */
@@ -36,7 +36,7 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
 
   return (
     <div className="flex items-center gap-2.5 flex-wrap text-xs" data-testid="dashboard-filter-bar">
-      <span className="inline-flex items-center px-3 py-1.5 font-semibold text-slate-700 bg-slate-100/90 border border-slate-200/80 rounded-xl">
+      <span className="inline-flex items-center px-3 py-1.5 font-semibold text-slate-700 bg-slate-100/90 border border-slate-200/80 rounded-card">
         {shownCount}/{widgets.length} Widget
       </span>
 

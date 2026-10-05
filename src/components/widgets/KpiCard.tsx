@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { ArrowDownRight, ArrowUpRight, Minus, Target } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Check, Minus, Target } from 'lucide-react';
 
 interface KpiCardProps {
   value: string | number;
@@ -171,7 +171,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
             <div className="flex items-center gap-1.5 min-w-0">
               {delta !== undefined && (
                 <span
-                  className={`inline-flex items-center px-1.5 py-0.5 rounded-md ${chipKelas} font-bold tabular-nums shrink-0 ${
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums shrink-0 ${
                     deltaGood
                       ? 'bg-emerald-50 text-emerald-700'
                       : deltaBad
@@ -209,11 +209,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({
                 </span>
                 {capaianPct !== undefined ? (
                   <span
-                    className={`font-bold tabular-nums shrink-0 ${
+                    className={`font-bold tabular-nums shrink-0 inline-flex items-center gap-1 ${
                       targetTercapai ? 'text-emerald-700' : 'text-amber-700'
                     }`}
                   >
-                    {capaianPct}% {targetTercapai ? '✓' : ''}
+                    {capaianPct}%
+                    {targetTercapai && <Check className="w-3 h-3" aria-label="Target tercapai" />}
                   </span>
                 ) : (
                   <span className="font-semibold text-ink shrink-0">Tercapai</span>

@@ -79,6 +79,18 @@
     background-color: var(--color-canvas);
   }
 
+  /* Fokus terlihat (aksesibilitas) — konsisten di semua elemen interaktif. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: var(--radius-chip);
+  }
+
+  /* Satu durasi & easing untuk transisi hover (hindari transisi tak seragam). */
+  a, button, [role='button'], input, select, textarea {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
   .font-mono, code, pre, .tabular-nums {
     font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;

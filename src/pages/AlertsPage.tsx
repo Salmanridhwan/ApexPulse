@@ -48,9 +48,9 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
     <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Page Header Header & Description */}
-        <div className="bg-white p-5 rounded-xl border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+        <div className="bg-white p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-control bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
               <Bell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
@@ -68,7 +68,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
 
           <button
             onClick={fetchAlertsData}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-surface-2 border border-line rounded-lg transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-surface-2 border border-line rounded-control transition-colors shrink-0"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Segarkan</span>
@@ -76,13 +76,13 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
         </div>
 
         {/* Tab Navigation & Search */}
-        <div className="bg-white p-5 rounded-xl border border-line mb-6">
+        <div className="bg-white p-5 rounded-card border border-line mb-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
             {/* Tabs */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab('notifications')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'notifications'
                     ? 'bg-ink text-white shadow-sm'
                     : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
@@ -92,7 +92,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
               </button>
               <button
                 onClick={() => setActiveTab('rules')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'rules'
                     ? 'bg-ink text-white shadow-sm'
                     : 'bg-slate-50 text-slate-600 hover:bg-surface-2 hover:text-ink'
@@ -110,7 +110,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 placeholder="Cari notifikasi / aturan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-slate-800 placeholder-slate-400"
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-control pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-slate-800 placeholder-slate-400"
               />
             </div>
           </div>
@@ -127,7 +127,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                   {filteredNotifications.map((item) => (
                     <div
                       key={item.id}
-                      className={`p-4 rounded-xl border transition-colors flex items-start gap-3.5 ${
+                      className={`p-4 rounded-card border transition-colors flex items-start gap-3.5 ${
                         item.severity === 'critical'
                           ? 'bg-rose-50/50 border-rose-200'
                           : item.severity === 'warning'
@@ -136,7 +136,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                       }`}
                     >
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white mt-0.5 ${
+                        className={`w-8 h-8 rounded-control flex items-center justify-center shrink-0 text-white mt-0.5 ${
                           item.severity === 'critical'
                             ? 'bg-rose-600'
                             : item.severity === 'warning'
@@ -190,7 +190,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
               filteredRules.length === 0 ? (
                 <div className="text-center py-12 text-xs text-slate-400">Tidak ada aturan ambang batas.</div>
               ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <div className="overflow-x-auto border border-slate-200 rounded-card">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                       <tr>

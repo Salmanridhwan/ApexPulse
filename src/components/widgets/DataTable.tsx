@@ -67,7 +67,7 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
 
   // Fallback: tabel ringkas tanpa toolbar (kolom nilai > 1).
   return (
-    <div className="overflow-x-auto overflow-y-auto flex-1 border border-slate-100 rounded-lg max-h-[300px]">
+    <div className="overflow-x-auto overflow-y-auto flex-1 border border-slate-100 rounded-control max-h-[300px]">
       <table className="w-full text-left text-xs">
         <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-100">
           <tr>

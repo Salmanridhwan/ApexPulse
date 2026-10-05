@@ -89,8 +89,8 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   };
   if (widgets.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-200">
-        <div className="w-16 h-16 rounded-lg bg-surface-2 flex items-center justify-center text-brand mb-4">
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 rounded-control border-2 border-dashed border-slate-200">
+        <div className="w-16 h-16 rounded-control bg-surface-2 flex items-center justify-center text-brand mb-4">
           <LayoutGrid className="w-8 h-8" />
         </div>
         <h3 className="text-base font-semibold text-slate-800">
@@ -102,14 +102,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenChat}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-ink rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             <span>Buat via Chat</span>
           </button>
           <button
             onClick={onOpenCatalog}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-control shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Pilih dari Katalog</span>
@@ -163,7 +163,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               setDragId(null);
               setOverId(null);
             }}
-            className={`${colSpan} ${tinggiMin} rounded-lg relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
+            className={`${colSpan} ${tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
               } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
           >
             <WidgetCard

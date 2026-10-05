@@ -70,11 +70,11 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-xl bg-white rounded-card shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-rose-600 flex items-center justify-center text-white">
               <Bell className="w-4 h-4" />
             </div>
             <div>
@@ -86,7 +86,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-chip text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -134,7 +134,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                 <span className="text-slate-500">Peringatan yang dipicu evaluasi metrik dokumen:</span>
                 <button
                   onClick={onTriggerEvaluate}
-                  className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                  className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-control text-xs font-medium transition-colors flex items-center gap-1"
                 >
                   <Radio className="w-3 h-3 text-rose-600 animate-pulse" />
                   <span>Jalankan Evaluasi Ambang Sekarang</span>
@@ -149,7 +149,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                 notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`p-3.5 rounded-xl border transition-all ${notif.severity === 'critical'
+                    className={`p-3.5 rounded-card border transition-all ${notif.severity === 'critical'
                         ? 'bg-rose-50/60 border-rose-200 text-rose-900'
                         : notif.severity === 'warning'
                           ? 'bg-amber-50/60 border-amber-200 text-amber-900'
@@ -193,7 +193,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               {alertRules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="p-3 bg-white border border-slate-200 rounded-xl space-y-1.5 hover:border-slate-300"
+                  className="p-3 bg-white border border-slate-200 rounded-card space-y-1.5 hover:border-slate-300"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-800">{rule.title}</span>
@@ -231,7 +231,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Peringatan NPL Bank melampaui batas OJK"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
@@ -245,7 +245,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   placeholder="Contoh: Rasio NPL Gross atau Kehilangan Air NRW"
                   value={metricName}
                   onChange={(e) => setMetricName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   required
                 />
               </div>
@@ -256,7 +256,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   <select
                     value={operator}
                     onChange={(e) => setOperator(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                   >
                     <option value=">=">&gt;= (Lebih atau sama)</option>
                     <option value="<=">&lt;= (Kurang atau sama)</option>
@@ -271,7 +271,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     step="any"
                     value={threshold}
                     onChange={(e) => setThreshold(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                     required
                   />
                 </div>
@@ -281,7 +281,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     type="text"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                 </div>
               </div>
@@ -303,7 +303,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-control font-medium transition-colors"
                 >
                   Simpan Aturan Ambang Batas
                 </button>
@@ -319,7 +319,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg transition-colors"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

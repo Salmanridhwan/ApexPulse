@@ -37,7 +37,7 @@ export const LogoTile: React.FC<LogoTileProps> = ({ name, id, size = 'md', class
       : 'w-8 h-8 text-xs';
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-lg font-bold tracking-wide text-white select-none shrink-0 ${ukuran} ${className}`}
+      className={`inline-flex items-center justify-center rounded-control font-bold tracking-wide text-white select-none shrink-0 ${ukuran} ${className}`}
       style={{ backgroundColor: warnaTile(id || name || 'AP') }}
       title={name}
     >
