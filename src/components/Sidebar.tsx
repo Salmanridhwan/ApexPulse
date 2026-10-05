@@ -3,8 +3,6 @@ import {
   Activity,
   Bell,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   History,
   Layers,
   LayoutGrid,
@@ -91,24 +89,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <div
-              className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shadow-xs ring-1 ring-slate-800 cursor-pointer"
-              onClick={onToggleCollapse}
-              title="ApexPulse Studio — Klik untuk membuka sidebar"
+              className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shadow-xs ring-1 ring-slate-800"
+              title="ApexPulse Studio"
             >
               <Activity className="w-4 h-4 text-sky-400" />
             </div>
           )}
 
-          {!isCollapsed && (
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-              title="Ciutkan Sidebar (Ctrl+B)"
-              aria-label="Ciutkan Sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          )}
+
         </div>
 
         {/* Tenant Selector (Instansi BUMD) */}
@@ -422,14 +410,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <AvatarTile name={currentUser?.name} id={currentUser?.id} size="sm" />
               <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
             </div>
-            <button
-              onClick={onToggleCollapse}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-              title="Buka Sidebar"
-              aria-label="Buka Sidebar"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
         )}
       </div>
