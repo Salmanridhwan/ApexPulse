@@ -113,7 +113,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         } flex flex-col items-center justify-center text-ink`}
       >
         <div className="w-full max-w-md bg-surface rounded-3xl shadow-xl border border-line/80 p-8 text-center space-y-5">
-          <div className="w-14 h-14 rounded-card bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200/60">
+          <div className="w-14 h-14 rounded-card bg-warn/15 text-warn flex items-center justify-center mx-auto border border-warn/30/60">
             <Lock className="w-7 h-7" />
           </div>
           <div className="space-y-2">
@@ -178,7 +178,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         {/* Top Read-Only Banner */}
         <div className="bg-slate-900 border-b border-slate-800 text-white px-4 sm:px-6 py-2 flex items-center justify-between text-xs sticky top-0 z-30 shadow-md">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-pos animate-pulse" />
             <span className="font-semibold text-slate-200">Portal Tinjauan Eksekutif</span>
             <span className="hidden sm:inline text-ink-2">•</span>
             <span className="hidden sm:inline text-ink-3 text-[11px]">Mode Publik Read-Only</span>
@@ -221,12 +221,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 self-start md:self-center shrink-0">
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-card px-3.5 py-2 text-xs space-y-0.5">
+              <div className="bg-pos/15 border border-pos/30 text-pos rounded-card px-3.5 py-2 text-xs space-y-0.5">
                 <div className="flex items-center gap-1.5 font-bold">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <ShieldCheck className="w-4 h-4 text-pos" />
                   <span>Terverifikasi Sumber Resmi</span>
                 </div>
-                <p className="text-[10px] text-emerald-700">Setiap metrik terikat sitasi dokumen resmi</p>
+                <p className="text-[10px] text-pos">Setiap metrik terikat sitasi dokumen resmi</p>
               </div>
             </div>
           </div>

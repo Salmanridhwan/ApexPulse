@@ -50,13 +50,13 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
         {/* Page Header Header & Description */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-control bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-control bg-neg flex items-center justify-center text-white shrink-0 shadow-sm">
               <Bell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-ink flex items-center gap-2.5 flex-wrap">
                 Ambang Batas & Peringatan Otomatis (Alerts)
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100 font-semibold">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-neg/15 text-neg border border-neg/30 font-semibold">
                   {notifications.filter((n) => !n.isRead).length} Belum Dibaca
                 </span>
               </h1>
@@ -129,18 +129,18 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                       key={item.id}
                       className={`p-4 rounded-card border transition-colors flex items-start gap-3.5 ${
                         item.severity === 'critical'
-                          ? 'bg-rose-50/50 border-rose-200'
+                          ? 'bg-neg/15/50 border-neg/30'
                           : item.severity === 'warning'
-                          ? 'bg-amber-50/50 border-amber-200'
+                          ? 'bg-warn/15/50 border-warn/30'
                           : 'bg-surface-2/50 border-line'
                       }`}
                     >
                       <div
                         className={`w-8 h-8 rounded-control flex items-center justify-center shrink-0 text-white mt-0.5 ${
                           item.severity === 'critical'
-                            ? 'bg-rose-600'
+                            ? 'bg-neg'
                             : item.severity === 'warning'
-                            ? 'bg-amber-500'
+                            ? 'bg-warn'
                             : 'bg-brand'
                         }`}
                       >
@@ -174,7 +174,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                               : 'Sistem'}
                           </span>
                           {item.sentEmail && (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                            <span className="inline-flex items-center gap-1 text-pos font-semibold">
                               <Mail className="w-3 h-3" />
                               Email terkirim
                             </span>
@@ -213,9 +213,9 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                             <span
                               className={`px-2 py-0.5 rounded font-semibold text-[10px] uppercase ${
                                 rule.severity === 'critical'
-                                  ? 'bg-rose-100 text-rose-800'
+                                  ? 'bg-neg/15 text-neg'
                                   : rule.severity === 'warning'
-                                  ? 'bg-amber-100 text-amber-800'
+                                  ? 'bg-warn/15 text-warn'
                                   : 'bg-surface-2 text-ink'
                               }`}
                             >
@@ -223,7 +223,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                             </span>
                           </td>
                           <td className="p-3">
-                            <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold text-[11px]">
+                            <span className="inline-flex items-center gap-1 text-pos font-semibold text-[11px]">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Aktif
                             </span>

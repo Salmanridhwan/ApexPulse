@@ -9,6 +9,8 @@ import {
   Mail,
 } from 'lucide-react';
 import { Tenant, User } from '../types';
+import { ThemeToggle } from '../components/ThemeToggle';
+const Hero3D = React.lazy(() => import('../components/Hero3D').then((m) => ({ default: m.Hero3D })));
 
 interface LoginProps {
   onLoginSuccess: (user: User, token: string) => void;
@@ -61,9 +63,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col justify-between font-sans antialiased text-ink">
+    <div className="min-h-screen flex flex-col justify-between font-sans antialiased text-ink">
       {/* Header */}
-      <header className="bg-surface border-b border-line px-6 py-3.5">
+      <header className="bg-surface/80 backdrop-blur-md border-b border-line px-6 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-control bg-brand text-white flex items-center justify-center font-bold text-sm tracking-wider">
@@ -77,15 +79,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
             </span>
           </div>
 
-          <span className="hidden md:block font-mono text-[11px] text-ink-3">v2026.1</span>
+          <div className="flex items-center gap-3"><span className="hidden md:block font-mono text-[11px] text-ink-3">v2026.1</span><ThemeToggle /></div>
         </div>
       </header>
 
       {/* Login Card */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-4xl bg-surface rounded-card border border-line overflow-hidden grid grid-cols-1 md:grid-cols-12">
+        <div className="w-full max-w-4xl card overflow-hidden grid grid-cols-1 md:grid-cols-12">
           {/* Left: konteks singkat — panel gelap senada sidebar */}
-          <div className="md:col-span-5 bg-shell p-6 sm:p-8 border-b md:border-b-0 md:border-r border-shell-line flex flex-col justify-center space-y-5">
+          <div className="md:col-span-5 relative bg-shell p-6 sm:p-8 border-b md:border-b-0 md:border-r border-shell-line flex flex-col justify-center space-y-5">`r`n            <div className="hidden sm:block h-40 -mt-2 -mb-1">`r`n              <React.Suspense fallback={null}>`r`n                <Hero3D className="w-full h-full" />`r`n              </React.Suspense>`r`n            </div>
             <div>
               <h1 className="text-lg font-bold text-shell-ink tracking-tight leading-snug">
                 Masuk ke Portal ApexPulse
@@ -97,15 +99,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
 
             <ul className="space-y-2.5 text-xs text-shell-ink-2 border-t border-shell-line pt-4">
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-300 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>Data tervalidasi dengan sitasi dokumen sumber</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-300 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>Sesuai standar pelaporan Kemendagri &amp; BPKP</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-300 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>Semua aktivitas tercatat di jejak audit</span>
               </li>
             </ul>
@@ -119,8 +121,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
             </div>
 
             {errorMessage && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-rose-800 text-xs flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-neg/15 border border-neg/30 rounded-control text-neg text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{errorMessage}</span>
               </div>
             )}
@@ -184,7 +186,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 px-4 bg-brand hover:bg-brand-ink disabled:opacity-50 text-white rounded-control text-xs font-semibold tracking-wide transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
+                className="btn-primary w-full py-2.5 px-4 disabled:opacity-50 text-xs font-semibold tracking-wide flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
                 {isLoading ? (
                   <span>Memverifikasi...</span>

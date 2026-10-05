@@ -40,9 +40,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const previewWRef = useRef<number | null>(null);
 
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
-  const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : 4);
+  const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
   /** Diskritkan lebar mentah ke bucket yang dikenali pemetaan colSpan. */
-  const bucket = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : 4);
+  const bucket = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
 
   /** arah: 1 = tepi kanan (geser kanan = melebar), -1 = tepi kiri (geser kiri = melebar). */
   const mulaiResize = (e: React.MouseEvent, widget: WidgetSpec, arah: 1 | -1) => {
@@ -125,18 +125,23 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         // Map grid.w to responsive Tailwind column span
         // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
         const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
-        let colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
+        let colSpan = 'col-span-1 md:col-span-4 lg:col-span-2';
         if (wAktif >= 10) {
-          colSpan = 'col-span-1 md:col-span-6 lg:col-span-12';
+          colSpan = 'col-span-1 md:col-span-12 lg:col-span-12';
         } else if (wAktif >= 7) {
-          colSpan = 'col-span-1 md:col-span-6 lg:col-span-8';
+          colSpan = 'col-span-1 md:col-span-12 lg:col-span-8';
         } else if (wAktif >= 5) {
           colSpan = 'col-span-1 md:col-span-6 lg:col-span-6';
+        } else if (wAktif >= 4) {
+          colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
+        } else if (wAktif >= 3) {
+          colSpan = 'col-span-1 md:col-span-4 lg:col-span-3';
         }
+        
         // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
         const tinggiMin = ['line', 'bar', 'area', 'donut', 'table', 'heatmap'].includes(widget.type)
           ? 'min-h-[248px]'
-          : 'min-h-[148px]';
+          : 'min-h-[110px]';
 
         return (
           <div

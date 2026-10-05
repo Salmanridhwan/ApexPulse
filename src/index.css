@@ -1,69 +1,147 @@
 @import "tailwindcss";
 
+/* Varian `dark:` mengikuti atribut data-theme pada <html>. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 /* ============================================================
-   DESIGN TOKEN — "Midnight Indigo"
-   Satu sumber kebenaran warna/radius/elevasi. Jangan tulis
-   warna mentah (sky-500, blue-600) langsung di JSX lagi.
+   DESIGN TOKEN — "Soft 3D" (terang & gelap)
+   Nilai default (:root via @theme) = MODE TERANG.
+   Mode gelap menimpa variabel yang sama di [data-theme='dark'].
    ============================================================ */
 @theme {
-  /* Permukaan */
-  --color-canvas: #f7f8fa;      /* latar aplikasi — netral, bukan biru */
-  --color-surface: #ffffff;
-  --color-surface-2: #f9fafb;
+  --color-canvas: #e4e8ef;
+  --color-surface: #f6f8fb;
+  --color-surface-2: #e9edf3;
 
-  /* Garis */
-  --color-line: #e5e8ee;        /* hairline kartu */
-  --color-line-strong: #d3d8e0; /* pemisah tegas */
+  --color-line: #d3d9e3;
+  --color-line-strong: #bcc5d3;
 
-  /* Teks */
-  --color-ink: #0f1729;         /* judul */
-  --color-ink-2: #4a5568;       /* isi */
-  --color-ink-3: #667085;       /* keterangan — gelap cukup utk AA di atas putih */
+  --color-ink: #232a38;
+  --color-ink-2: #4a5468;
+  --color-ink-3: #667187;
 
-  /* Aksen — dipakai HEMAT: CTA, nav aktif, link */
-  --color-brand: #4f46e5;       /* indigo elektrik */
-  --color-brand-ink: #3730c4;
-  --color-brand-soft: #eef0ff;
+  --color-brand: #1fa6cc;       /* cyan */
+  --color-brand-ink: #167f9e;
+  --color-brand-soft: #d6eff7;
+  --color-violet: #7f80d8;      /* periwinkle */
+  --color-coral: #ee4b32;       /* merah-oranye */
 
-  /* Semantik data */
-  --color-pos: #059669;
-  --color-neg: #e11d48;
-  --color-warn: #d97706;
+  --color-pos: #0f9d6b;
+  --color-neg: #e0392b;
+  --color-warn: #d98a12;
 
-  /* Shell (sidebar gelap) */
-  --color-shell: #0b1220;
-  --color-shell-2: #131c2e;
-  --color-shell-line: #24314a;
-  --color-shell-ink: #e6eaf2;
-  --color-shell-ink-2: #8794ad;
+  /* Shell (sidebar) */
+  --color-shell: #dfe4ec;
+  --color-shell-2: #d3d9e3;
+  --color-shell-line: #c4ccd9;
+  --color-shell-ink: #232a38;
+  --color-shell-ink-2: #566074;
+  --color-shell-hover: rgb(31 166 204 / 0.12);
+  --color-shell-active: #c9d1de;
 
-  /* Radius */
-  --radius-card: 12px;
-  --radius-control: 8px;
-  --radius-chip: 6px;
+  --radius-card: 6px;
+  --radius-control: 5px;
+  --radius-chip: 999px;
 
-  /* Elevasi — HANYA elemen melayang (dropdown/modal), bukan kartu diam */
-  --shadow-pop: 0 8px 24px rgb(15 23 41 / 0.12);
-  --shadow-pop-sm: 0 2px 8px rgb(15 23 41 / 0.08);
+  --shadow-pop: 0 20px 40px rgb(35 42 56 / 0.28);
+  --shadow-pop-sm: 0 4px 12px rgb(35 42 56 / 0.16);
 }
 
-/* Kelas komponen siap pakai — ganti kartu/tombol manual yang berulang. */
+/* Mode gelap — slate kebiruan seperti referensi */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #2d333f;
+  --color-surface: #3a4150;
+  --color-surface-2: #444c5d;
+
+  --color-line: #4d5667;
+  --color-line-strong: #5f6a7e;
+
+  --color-ink: #f1f4f9;
+  --color-ink-2: #cbd2df;
+  --color-ink-3: #9aa4b8;
+
+  --color-brand: #38c6e2;
+  --color-brand-ink: #7fdcf0;
+  --color-brand-soft: #2c4f5f;
+  --color-violet: #8f90e4;
+  --color-coral: #f2503a;
+
+  --color-pos: #3fd29a;
+  --color-neg: #ff6b5b;
+  --color-warn: #ffb547;
+
+  --color-shell: #2a2f3a;
+  --color-shell-2: #323845;
+  --color-shell-line: #3d4452;
+  --color-shell-ink: #eef1f7;
+  --color-shell-ink-2: #98a2b6;
+  --color-shell-hover: rgb(255 255 255 / 0.05);
+  --color-shell-active: #1d2129;
+
+  --shadow-pop: 0 22px 46px rgb(8 10 16 / 0.6);
+  --shadow-pop-sm: 0 4px 14px rgb(8 10 16 / 0.45);
+}
+
+/* Elevasi: bayangan jatuh panjang & lembut seperti ubin melayang. */
+:root {
+  --elev-card: 0 16px 28px rgb(35 42 56 / 0.18), 0 3px 6px rgb(35 42 56 / 0.1);
+  --elev-card-hover: 0 24px 40px rgb(35 42 56 / 0.28), 0 6px 10px rgb(35 42 56 / 0.12);
+  --elev-inset: inset 0 3px 8px rgb(35 42 56 / 0.25);
+  --glow-brand: 0 8px 20px rgb(31 166 204 / 0.4);
+  --bg-app: linear-gradient(135deg, #eef1f6 0%, #dfe4ec 55%, #d5dbe6 100%);
+}
+[data-theme='dark'] {
+  --elev-card: 0 18px 32px rgb(8 10 16 / 0.5), 0 3px 6px rgb(8 10 16 / 0.35);
+  --elev-card-hover: 0 28px 46px rgb(8 10 16 / 0.62), 0 6px 10px rgb(8 10 16 / 0.4);
+  --elev-inset: inset 0 3px 9px rgb(8 10 16 / 0.6);
+  --glow-brand: 0 8px 22px rgb(56 198 226 / 0.4);
+  --bg-app: linear-gradient(135deg, #4a5263 0%, #353b48 45%, #2a2f3a 100%);
+}
+/* Kelas komponen siap pakai. */
 @utility card {
   border-radius: var(--radius-card);
   border: 1px solid var(--color-line);
   background-color: var(--color-surface);
+  box-shadow: var(--elev-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+@utility card-lift {
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--elev-card-hover);
+  }
 }
 @utility btn-primary {
   border-radius: var(--radius-control);
-  background-color: var(--color-brand);
+  background-image: linear-gradient(135deg, var(--color-brand), var(--color-violet));
   color: #fff;
   font-weight: 600;
+  box-shadow: var(--glow-brand);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  &:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+  }
+  &:active {
+    transform: translateY(1px);
+    box-shadow: var(--elev-inset);
+  }
 }
 @utility btn-ghost {
   border-radius: var(--radius-control);
   border: 1px solid var(--color-line);
   background-color: var(--color-surface);
   color: var(--color-ink-2);
+  box-shadow: var(--shadow-pop-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  &:hover {
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(1px);
+    box-shadow: var(--elev-inset);
+  }
 }
 @utility chip {
   border-radius: var(--radius-chip);
@@ -71,12 +149,24 @@
   background-color: var(--color-surface-2);
   color: var(--color-ink-2);
 }
+@utility shadow-soft {
+  box-shadow: var(--elev-card);
+}
+@utility shadow-inset {
+  box-shadow: var(--elev-inset);
+}
+@utility glow-brand {
+  box-shadow: var(--glow-brand);
+}
+
 
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: var(--color-ink);
-    background-color: var(--color-canvas);
+    background: var(--bg-app);
+    background-attachment: fixed;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   /* Fokus terlihat (aksesibilitas) — konsisten di semua elemen interaktif. */
@@ -175,3 +265,29 @@
   }
 }
 
+
+/* Tilt 3D: kilau cahaya mengikuti kursor. */
+.tilt-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease-out;
+  will-change: transform;
+}
+.tilt-3d::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(260px circle at var(--gx, 50%) var(--gy, 50%), rgb(255 255 255 / 0.22), transparent 60%);
+  transition: opacity 0.2s ease;
+}
+.tilt-3d:hover::after { opacity: 1; }
+
+/* Masuk bertahap untuk kartu/widget. */
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.card-rise { animation: card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }

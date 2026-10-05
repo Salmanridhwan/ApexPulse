@@ -121,7 +121,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   onClick={copyToClipboard}
                   className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                 >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
                 </button>
               </div>
@@ -161,7 +161,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     onClick={copyEmbedSnippet}
                     className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
-                    {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
                   </button>
                 </div>

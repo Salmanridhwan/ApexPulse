@@ -74,7 +74,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-rose-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-neg flex items-center justify-center text-white">
               <Bell className="w-4 h-4" />
             </div>
             <div>
@@ -97,7 +97,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('notifications')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'notifications'
-                ? 'border-rose-600 text-rose-700'
+                ? 'border-neg text-neg'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
@@ -117,7 +117,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('create')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'create'
-                ? 'border-emerald-600 text-emerald-700'
+                ? 'border-pos text-pos'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
@@ -134,9 +134,9 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                 <span className="text-ink-2">Peringatan yang dipicu evaluasi metrik dokumen:</span>
                 <button
                   onClick={onTriggerEvaluate}
-                  className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-control text-xs font-medium transition-colors flex items-center gap-1"
+                  className="px-2.5 py-1 bg-neg/15 text-neg hover:bg-neg/10 border border-neg/30 rounded-control text-xs font-medium transition-colors flex items-center gap-1"
                 >
-                  <Radio className="w-3 h-3 text-rose-600 animate-pulse" />
+                  <Radio className="w-3 h-3 text-neg animate-pulse" />
                   <span>Jalankan Evaluasi Ambang Sekarang</span>
                 </button>
               </div>
@@ -150,9 +150,9 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   <div
                     key={notif.id}
                     className={`p-3.5 rounded-card border transition-all ${notif.severity === 'critical'
-                        ? 'bg-rose-50/60 border-rose-200 text-rose-900'
+                        ? 'bg-neg/15/60 border-neg/30 text-neg'
                         : notif.severity === 'warning'
-                          ? 'bg-amber-50/60 border-amber-200 text-amber-900'
+                          ? 'bg-warn/15/60 border-warn/30 text-warn'
                           : 'bg-surface-2 border-line text-ink'
                       }`}
                   >
@@ -160,8 +160,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                       <div className="flex items-center gap-2">
                         <ShieldAlert
                           className={`w-4 h-4 ${notif.severity === 'critical'
-                              ? 'text-rose-600'
-                              : 'text-amber-600'
+                              ? 'text-neg'
+                              : 'text-warn'
                             }`}
                         />
                         <h4 className="font-semibold">{notif.title}</h4>
@@ -179,7 +179,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     </p>
 
                     {notif.sentEmail && (
-                      <div className="mt-2 pt-2 border-t border-rose-200/50 flex items-center gap-1.5 text-[10px] text-rose-700">
+                      <div className="mt-2 pt-2 border-t border-neg/30/50 flex items-center gap-1.5 text-[10px] text-neg">
                         <Mail className="w-3 h-3" />
                         <span>Email notifikasi terkirim ke penerima terdaftar (SMTP)</span>
                       </div>
@@ -199,8 +199,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     <span className="font-semibold text-ink">{rule.title}</span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${rule.severity === 'critical'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
+                          ? 'bg-neg/15 text-neg'
+                          : 'bg-warn/15 text-warn'
                         }`}
                     >
                       {rule.severity.toUpperCase()}
@@ -215,7 +215,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   <div className="flex items-center gap-3 pt-1 text-[11px] text-ink-3">
                     <span>Kanal: {rule.channels.join(', ')}</span>
                     <span>•</span>
-                    <span className="text-emerald-600 font-medium">Status: Aktif</span>
+                    <span className="text-pos font-medium">Status: Aktif</span>
                   </div>
                 </div>
               ))}
@@ -303,7 +303,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-control font-medium transition-colors"
+                  className="w-full py-2 bg-pos hover:bg-pos text-white rounded-control font-medium transition-colors"
                 >
                   Simpan Aturan Ambang Batas
                 </button>

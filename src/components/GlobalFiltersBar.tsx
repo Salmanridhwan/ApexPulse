@@ -59,8 +59,8 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
       )}
 
       {opsiUnit.length > 1 && (
-        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500`}>
-          <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-pos`}>
+          <MapPin className="w-3.5 h-3.5 text-pos shrink-0" />
           <span className="text-ink-2 font-medium shrink-0">Unit Kerja:</span>
           <select
             value={filters.unitKerja}
@@ -77,8 +77,8 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
       )}
 
       {opsiKategori.length > 1 && (
-        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500`}>
-          <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+        <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-warn`}>
+          <Layers className="w-3.5 h-3.5 text-warn shrink-0" />
           <span className="text-ink-2 font-medium shrink-0">Kategori:</span>
           <select
             value={filters.kategori}

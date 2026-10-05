@@ -136,11 +136,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       <td className="p-2">
                         {/* Tanpa label provenans (mis. "Inferensi AI"): hanya penanda koreksi manual. */}
                         {w.manualCorrection?.isCorrected ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-warn/15 text-warn">
                             Dikoreksi Manual
                           </span>
                         ) : w.confidence === 'sumber' ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-pos/15 text-pos">
                             Dokumen Resmi
                           </span>
                         ) : (

@@ -32,11 +32,11 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
           <span className="text-[10px] text-shell-ink-2 font-medium block">Estimasi Nilai ({preset.satuan})</span>
           <div className="text-sm font-extrabold text-shell-ink tracking-tight flex items-baseline gap-1.5 mt-0.5">
             <span>128.4</span>
-            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">+8.5% YoY</span>
+            <span className="text-[10px] font-semibold text-pos bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">+8.5% YoY</span>
           </div>
         </div>
         <div className="w-16 h-7 opacity-90">
-          <svg viewBox="0 0 60 25" className="w-full h-full text-indigo-300">
+          <svg viewBox="0 0 60 25" className="w-full h-full text-brand-ink">
             <path d="M0 20 Q15 5 30 15 T60 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
@@ -58,8 +58,8 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
         </div>
         <div className="flex-1 space-y-1 text-[10px] pr-1">
           <div className="flex items-center justify-between text-shell-ink-2"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-brand inline-block"/>Segmen Utama</span><span className="font-bold text-[10px]">45%</span></div>
-          <div className="flex items-center justify-between text-shell-ink-2"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"/>Segmen Sekunder</span><span className="font-bold text-[10px]">25%</span></div>
-          <div className="flex items-center justify-between text-shell-ink-2"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"/>Lainnya</span><span className="font-bold text-[10px]">18%</span></div>
+          <div className="flex items-center justify-between text-shell-ink-2"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-pos inline-block"/>Segmen Sekunder</span><span className="font-bold text-[10px]">25%</span></div>
+          <div className="flex items-center justify-between text-shell-ink-2"><span className="flex items-center gap-1 text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-warn inline-block"/>Lainnya</span><span className="font-bold text-[10px]">18%</span></div>
         </div>
       </div>
     );
@@ -97,11 +97,11 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
             <path d="M 5 22 A 15 15 0 0 1 35 22" fill="none" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
             <path d="M 5 22 A 15 15 0 0 1 28 9" fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" />
           </svg>
-          <span className="absolute text-[10px] font-extrabold text-emerald-400 top-4">84%</span>
+          <span className="absolute text-[10px] font-extrabold text-pos top-4">84%</span>
         </div>
         <div className="text-right text-[10px] pr-1">
           <span className="text-ink-3 block">Status Capaian</span>
-          <span className="text-emerald-400 font-bold text-xs">Sangat Baik</span>
+          <span className="text-pos font-bold text-xs">Sangat Baik</span>
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
         <div className="w-full bg-brand/80 rounded-t h-[50%]" />
         <div className="w-full bg-brand rounded-t h-[85%]" />
         <div className="w-full bg-brand/80 rounded-t h-[70%]" />
-        <div className="w-full bg-indigo-500 rounded-t h-[95%]" />
+        <div className="w-full bg-brand rounded-t h-[95%]" />
       </div>
     </div>
   );
@@ -358,7 +358,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                     onClick={() => handleAdd(preset)}
                     disabled={isMemuat}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-control text-xs font-medium transition-all disabled:opacity-60 ${isAdded
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-pos text-white'
                         : 'bg-surface-2 text-brand-ink hover:bg-brand hover:text-white'
                       }`}
                   >
@@ -382,7 +382,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                 </div>
 
                 {galat[preset.id] && (
-                  <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded-control px-2 py-1.5 leading-relaxed">
+                  <p className="text-[11px] text-neg bg-neg/15 border border-neg/30 rounded-control px-2 py-1.5 leading-relaxed">
                     {galat[preset.id]}
                   </p>
                 )}

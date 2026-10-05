@@ -289,7 +289,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </button>
               <button
                 onClick={onLogout}
-                className="p-2 rounded-control border border-line hover:bg-rose-50 text-ink-2 hover:text-rose-600 transition-colors"
+                className="p-2 rounded-control border border-line hover:bg-neg/10 text-ink-2 hover:text-neg transition-colors"
                 title="Keluar"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -308,7 +308,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-ink-3">Total BUMD</span>
                   <p className="text-2xl font-bold text-ink mt-1">{stats?.tenantsCount ?? 6}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">6 Sektor Aktif</span>
+                  <span className="text-[10px] text-pos font-medium">6 Sektor Aktif</span>
                 </div>
                 <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-ink-3">Pengguna Aktif</span>
@@ -322,20 +322,20 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-ink-3">Sitasi Resmi</span>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">{stats?.totalCitations ?? 42}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">100% Tervalidasi</span>
+                  <p className="text-2xl font-bold text-pos mt-1">{stats?.totalCitations ?? 42}</p>
+                  <span className="text-[10px] text-pos font-medium">100% Tervalidasi</span>
                 </div>
                 <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-ink-3">Aturan Ambang</span>
-                  <p className="text-2xl font-bold text-amber-700 mt-1">{alertRules.length}</p>
-                  <span className="text-[10px] text-amber-600 font-medium">Evaluasi Otomatis</span>
+                  <p className="text-2xl font-bold text-warn mt-1">{alertRules.length}</p>
+                  <span className="text-[10px] text-warn font-medium">Evaluasi Otomatis</span>
                 </div>
                 <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-ink-3">Provider RAG</span>
                   <p className="text-base font-bold text-brand-ink mt-2 truncate">
                     {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
                   </p>
-                  <span className="text-[10px] text-emerald-600 font-medium">Sehat (Online)</span>
+                  <span className="text-[10px] text-pos font-medium">Sehat (Online)</span>
                 </div>
               </div>
 
@@ -389,7 +389,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-ink flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <ShieldCheck className="w-4 h-4 text-pos" />
                     <span>Aktivitas & Log Audit Terakhir</span>
                   </h3>
                   <button
@@ -472,7 +472,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
                                   ? 'bg-ink text-white'
                                   : u.role === 'direksi'
-                                    ? 'bg-amber-100 text-amber-800'
+                                    ? 'bg-warn/15 text-warn'
                                     : 'bg-surface-2 text-ink'
                                 }`}
                             >
@@ -497,7 +497,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                             {u.id !== 'user-admin' && (
                               <button
                                 onClick={() => handleDeleteUser(u.id)}
-                                className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                                className="p-1 rounded text-neg hover:text-neg hover:bg-neg/10 transition-colors"
                                 title="Hapus Pengguna"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -560,7 +560,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         Sektor: <strong className="text-ink-2 capitalize">{t.sector}</strong>
                       </div>
                       <div className="text-ink-2">
-                        Berkas RAG: <strong className="text-emerald-700">{t.documentCount} LRA & RKAP</strong>
+                        Berkas RAG: <strong className="text-pos">{t.documentCount} LRA & RKAP</strong>
                       </div>
                     </div>
                   </div>
@@ -583,16 +583,16 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               {saveSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-card text-emerald-800 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div className="p-3 bg-pos/15 border border-pos/30 rounded-card text-pos text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-pos" />
                   <span>Pengaturan sistem berhasil disimpan dan diperbarui!</span>
                 </div>
               )}
 
               {/* Jebakan paling sering: URL & key sudah diisi, provider masih Mock. */}
               {systemConfig.ragProvider !== 'http' && (systemConfig.ragApiUrl || systemConfig.ragApiKey) && (
-                <div className="p-3 bg-amber-50 border border-amber-300 rounded-card text-amber-900 text-xs flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="p-3 bg-warn/15 border border-warn/30 rounded-card text-warn text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
                   <span>
                     Provider masih <strong>Mock</strong>, jadi Base URL &amp; API Key di bawah{' '}
                     <strong>tidak dipakai</strong> — dashboard tetap disusun dari data contoh. Ubah
@@ -808,43 +808,43 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <div
                     className={`p-4 rounded-card border text-xs space-y-2 ${
                       probeResult.status === 'healthy'
-                        ? 'bg-emerald-50 border-emerald-200'
+                        ? 'bg-pos/15 border-pos/30'
                         : probeResult.status === 'degraded'
-                          ? 'bg-amber-50 border-amber-200'
-                          : 'bg-rose-50 border-rose-200'
+                          ? 'bg-warn/15 border-warn/30'
+                          : 'bg-neg/15 border-neg/30'
                     }`}
                   >
                     <div className="flex items-center gap-2 font-bold">
                       {probeResult.status === 'healthy' ? (
                         <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span className="text-emerald-800">
+                          <CheckCircle2 className="w-4 h-4 text-pos" />
+                          <span className="text-pos">
                             RAG Berjalan Normal ({probeResult.latencyMs} ms)
                           </span>
                         </>
                       ) : probeResult.status === 'degraded' ? (
                         <>
-                          <AlertTriangle className="w-4 h-4 text-amber-600" />
-                          <span className="text-amber-800">
+                          <AlertTriangle className="w-4 h-4 text-warn" />
+                          <span className="text-warn">
                             RAG Merespons, Tapi Terbatas ({probeResult.latencyMs} ms)
                           </span>
                         </>
                       ) : (
                         <>
-                          <AlertTriangle className="w-4 h-4 text-rose-600" />
-                          <span className="text-rose-800">Koneksi RAG Gagal</span>
+                          <AlertTriangle className="w-4 h-4 text-neg" />
+                          <span className="text-neg">Koneksi RAG Gagal</span>
                         </>
                       )}
                     </div>
                     {probeResult.peringatan && (
-                      <p className="text-amber-800 font-semibold flex items-start gap-1.5">
+                      <p className="text-warn font-semibold flex items-start gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                         <span>{probeResult.peringatan}</span>
                       </p>
                     )}
                     {(probeResult.details || []).map((d: string, i: number) =>
                       /^PERINGATAN/i.test(d) ? (
-                        <p key={i} className="text-amber-800 font-semibold">{d}</p>
+                        <p key={i} className="text-warn font-semibold">{d}</p>
                       ) : null
                     )}
                     {probeResult.modeDetected && (
@@ -891,8 +891,8 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           <span className="font-bold text-ink">{rule.title}</span>
                           <span
                             className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${rule.severity === 'critical'
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-amber-100 text-amber-800'
+                                ? 'bg-neg/15 text-neg'
+                                : 'bg-warn/15 text-warn'
                               }`}
                           >
                             {rule.severity.toUpperCase()}
@@ -907,7 +907,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       </div>
 
                       <div className="shrink-0 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded-chip border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-pos font-medium bg-pos/15 px-2 py-1 rounded-chip border border-pos/30">
                           <Check className="w-3 h-3" /> Aktif
                         </span>
                       </div>

@@ -32,7 +32,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const isSource = widget.confidence === 'sumber' && !isManual;
 
   return (
-    <div className="relative bg-surface rounded-card border border-line shadow-sm hover:shadow-md hover:border-line transition-all flex flex-col h-full overflow-hidden group">
+    <div className="relative card card-lift flex flex-col h-full overflow-hidden group">
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -52,10 +52,10 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           {/* Hanya penanda koreksi manual yang tersisa — tanpa label provenans AI/sumber. */}
           {isManual && (
             <span
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 cursor-help opacity-90 group-hover:opacity-100 transition-opacity"
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warn/15 text-warn border border-warn/30 cursor-help opacity-90 group-hover:opacity-100 transition-opacity"
               title={`Dikoreksi manual oleh ${widget.manualCorrection?.correctedBy || 'Analis'} (${widget.manualCorrection?.reason || 'Penyesuaian internal'}). Nilai asli: ${widget.manualCorrection?.originalValue}`}
             >
-              <UserCheck className="w-3 h-3 text-amber-600" />
+              <UserCheck className="w-3 h-3 text-warn" />
               <span>Koreksi Manual</span>
             </span>
           )}
@@ -73,7 +73,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-control shadow-lg border border-line py-1 z-30 text-xs text-ink-2">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-control shadow-pop border border-line py-1 z-30 text-xs text-ink-2">
                   {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
@@ -87,7 +87,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                             onClick={() => onEdit({ ...widget, type: t })}
                             className={`flex-1 px-1.5 py-1 rounded-chip text-[11px] font-semibold transition-colors ${
                               widget.type === t
-                                ? 'bg-ink text-white'
+                                ? 'bg-gradient-to-r from-brand to-violet text-white'
                                 : 'bg-surface-2 text-brand-ink hover:bg-surface-2'
                             }`}
                           >
@@ -113,9 +113,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       setShowMenu(false);
                       onManualCorrection(widget);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-amber-50 flex items-center gap-2 text-amber-700"
+                    className="w-full text-left px-3 py-1.5 hover:bg-warn/10 flex items-center gap-2 text-warn"
                   >
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn" />
                     <span>Koreksi Angka Manual (F-14)</span>
                   </button>
                   <button
@@ -134,9 +134,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       setShowMenu(false);
                       onDelete(widget.id);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-rose-50 flex items-center gap-2 text-rose-600"
+                    className="w-full text-left px-3 py-1.5 hover:bg-neg/10 flex items-center gap-2 text-neg"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    <Trash2 className="w-3.5 h-3.5 text-neg" />
                     <span>Hapus dari Dashboard</span>
                   </button>
                 </div>

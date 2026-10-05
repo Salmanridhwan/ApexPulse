@@ -2,6 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ECharts, EChartsOption } from 'echarts';
 import { Table2, BarChart3 } from 'lucide-react';
 import { useChartSelection } from './ChartSelection';
+import { useThemeMode } from '../../theme';
+
+/** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
+function chartTheme(mode: 'light' | 'dark') {
+  return mode === 'dark'
+    ? { series: ['#8f90e4', '#38c6e2', '#f2503a', '#ffb547', '#3fd29a', '#b58cf0'], accent: '#8f90e4', accentSoft: '#38c6e2', track: '#4d5667', tick: '#5f6a7e', muted: '#9aa4b8', strong: '#f1f4f9', text2: '#cbd2df', grid: '#4d5667', tipBg: '#1d2129', surface: '#3a4150', heatLow: '#444c5d' }
+    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#667187', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', surface: '#f6f8fb', heatLow: '#d6eff7' };
+}
 
 // echarts (~1 MB) hanya dimuat saat widget chart pertama dirender —
 // tidak ikut bundle awal. Promise di-cache supaya import sekali saja.
@@ -108,6 +116,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
   const { selected, setSelected } = useChartSelection();
+  const themeMode = useThemeMode();
   const [showData, setShowData] = useState(false);
 
   // ── Normalisasi satuan SEBELUM render ─────────────────────────────────────
@@ -167,6 +176,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
+      const T = chartTheme(themeMode);
       const { xView, seriesView, donutView, heatCols, heatRows, heatMatriks } = view;
 
       let option: EChartsOption = {};
@@ -187,12 +197,12 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               progress: {
                 show: true,
                 width: 14,
-                itemStyle: { color: '#4f46e5' },
+                itemStyle: { color: T.accent },
               },
-              axisLine: { lineStyle: { width: 14, color: [[1, '#e2e8f0']] } },
+              axisLine: { lineStyle: { width: 14, color: [[1, T.track]] } },
               axisTick: { show: false },
-              splitLine: { length: 6, distance: 4, lineStyle: { color: '#cbd5e1', width: 1 } },
-              axisLabel: { color: '#94a3b8', fontSize: 10, distance: 18 },
+              splitLine: { length: 6, distance: 4, lineStyle: { color: T.tick, width: 1 } },
+              axisLabel: { color: T.muted, fontSize: 10, distance: 18 },
               pointer: { show: false },
               anchor: { show: false },
               title: { show: false },
@@ -200,7 +210,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
                 valueAnimation: true,
                 fontSize: 30,
                 fontWeight: 'bold' as any,
-                color: '#0f172a',
+                color: T.strong,
                 offsetCenter: [0, '10%'],
                 formatter: (v: number) => `${v}${displayUnit ? ' ' + displayUnit : ''}`,
               },
@@ -222,8 +232,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${displayUnit ? ' ' + displayUnit : ''}`,
           },
           grid: { left: 10, right: 10, top: 24, bottom: 30, containLabel: true },
-          xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#64748b', fontSize: 10 } },
-          yAxis: { type: 'category', data: rows, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#64748b', fontSize: 10 } },
+          xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
+          yAxis: { type: 'category', data: rows, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
           visualMap: {
             min: vMin,
             max: vMax,
@@ -233,15 +243,15 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             bottom: -6,
             itemHeight: 60,
             itemWidth: 10,
-            textStyle: { fontSize: 9, color: '#94a3b8' },
-            inRange: { color: ['#e0e7ff', '#4f46e5'] },
+            textStyle: { fontSize: 9, color: T.muted },
+            inRange: { color: [T.heatLow, T.accent] },
           },
           series: [
             {
               type: 'heatmap',
               data: matriks.flatMap((baris, rIdx) => baris.map((v, cIdx) => [cIdx, rIdx, v])),
-              label: { show: true, fontSize: 10, color: '#334155', formatter: (p: any) => `${p.value[2]}` },
-              itemStyle: { borderColor: '#ffffff', borderWidth: 2, borderRadius: 4 },
+              label: { show: true, fontSize: 10, color: T.strong, formatter: (p: any) => `${p.value[2]}` },
+              itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 },
               emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(29,78,216,0.35)' } },
             },
           ],
@@ -250,8 +260,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         option = {
           tooltip: {
             trigger: 'item',
-            backgroundColor: '#3730c4',
-            borderColor: '#3730c4',
+            backgroundColor: T.tipBg,
+            borderColor: T.tipBg,
             borderRadius: 8,
             textStyle: { color: '#f8fafc', fontSize: 11 },
             formatter: (p: any) =>
@@ -261,7 +271,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             ? {
               bottom: 0,
               icon: 'circle',
-              textStyle: { fontSize: 11, color: '#64748b' },
+              textStyle: { fontSize: 11, color: T.muted },
             }
             : undefined,
           series: [
@@ -272,7 +282,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               avoidLabelOverlap: false,
               itemStyle: {
                 borderRadius: 6,
-                borderColor: '#ffffff',
+                borderColor: T.surface,
                 borderWidth: 2,
               },
               label: {
@@ -289,14 +299,14 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               data: donutView,
             },
           ],
-          color: ['#4f46e5', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'],
+          color: T.series,
         };
       } else {
         const isArea = type === 'area';
-        const paletSoft = ['#a5b4fc', '#4f46e5', '#a5b4fc', '#c7d2fe', '#818cf8', '#e0e7ff'];
+        const paletSoft = T.series;
         const echartsSeries = seriesView.map((s, sIdx) => {
           // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
-          const baseColor = s.color || (sIdx === 0 ? (type === 'bar' ? '#a5b4fc' : '#4f46e5') : paletSoft[sIdx % paletSoft.length]);
+          const baseColor = s.color || paletSoft[sIdx % paletSoft.length];
           return {
             name: s.name,
             type: (isArea ? 'line' : type) as any,
@@ -329,9 +339,9 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         option = {
           tooltip: {
             trigger: 'axis',
-            axisPointer: { type: 'line', lineStyle: { color: '#cbd5e1', type: 'dashed' } },
-            backgroundColor: '#3730c4',
-            borderColor: '#3730c4',
+            axisPointer: { type: 'line', lineStyle: { color: T.tick, type: 'dashed' } },
+            backgroundColor: T.tipBg,
+            borderColor: T.tipBg,
             borderRadius: 8,
             textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
             valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
@@ -343,7 +353,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
               icon: 'circle',
               itemWidth: 8,
               itemHeight: 8,
-              textStyle: { fontSize: 11, color: '#475569', fontFamily: 'Plus Jakarta Sans' },
+              textStyle: { fontSize: 11, color: T.text2, fontFamily: 'Plus Jakarta Sans' },
             }
             : undefined,
           grid: {
@@ -356,15 +366,15 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           xAxis: {
             type: 'category',
             data: xView,
-            axisLine: { lineStyle: { color: '#e2e8f0' } },
+            axisLine: { lineStyle: { color: T.track } },
             axisTick: { show: false },
-            axisLabel: { color: '#94a3b8', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
+            axisLabel: { color: T.muted, fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
           },
           yAxis: {
             type: 'value',
-            splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+            splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
             axisLabel: {
-              color: '#94a3b8',
+              color: T.muted,
               fontSize: 11,
               fontFamily: 'JetBrains Mono',
               formatter: (v: number) => {
@@ -430,7 +440,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {

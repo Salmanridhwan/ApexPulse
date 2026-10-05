@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Check, Minus, Target } from 'lucide-react';
 
 interface KpiCardProps {
@@ -31,6 +31,45 @@ function sparkPaths(vals: number[], pad = 8): { line: string; area: string } {
   };
 }
 
+
+/**
+ * Animasi hitung-naik untuk angka pertama di dalam teks KPI ("94,8%", "Rp 1.250").
+ * Format asli dipertahankan (koma desimal, titik ribuan); bila hasil format ulang
+ * tidak identik dengan teks asli, animasi dilewati dan teks ditampilkan apa adanya.
+ */
+function useCountUp(teks: string, durasi = 900): string {
+  const [tampil, setTampil] = useState(teks);
+
+  useEffect(() => {
+    setTampil(teks);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const m = teks.match(/\d[\d.,]*/);
+    if (!m) return;
+    const token = m[0];
+    const desimal = token.includes(',') ? token.length - token.indexOf(',') - 1 : 0;
+    const target = parseFloat(token.replace(/\./g, '').replace(',', '.'));
+    if (!Number.isFinite(target) || target === 0) return;
+    const fmt = (n: number) =>
+      n.toLocaleString('id-ID', { minimumFractionDigits: desimal, maximumFractionDigits: desimal });
+    if (fmt(target) !== token) return;
+
+    const awal = m.index ?? 0;
+    const pre = teks.slice(0, awal);
+    const post = teks.slice(awal + token.length);
+    const mulai = performance.now();
+    let raf = 0;
+    const langkah = (now: number) => {
+      const p = Math.min(1, (now - mulai) / durasi);
+      const e = 1 - Math.pow(1 - p, 3);
+      setTampil(p >= 1 ? teks : `${pre}${fmt(target * e)}${post}`);
+      if (p < 1) raf = requestAnimationFrame(langkah);
+    };
+    raf = requestAnimationFrame(langkah);
+    return () => cancelAnimationFrame(raf);
+  }, [teks, durasi]);
+
+  return tampil;
+}
 export const KpiCard: React.FC<KpiCardProps> = ({
   value,
   unit,
@@ -45,6 +84,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   const gradId = useId().replace(/:/g, '');
   const hero = variant === 'hero';
+  const nilaiTampil = useCountUp(String(value));
 
   const isPositive = delta !== undefined && delta > 0;
   const isNegative = delta !== undefined && delta < 0;
@@ -110,7 +150,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   const satuanAkhir = awalanRp ? unitTampil!.replace(/^rp\.?\s*/i, '') || undefined : unitTampil;
 
   // Warna garis sparkline mengikuti makna tren: baik (hijau), buruk (merah), netral (biru).
-  const warnaTren = deltaBad ? '#e11d48' : deltaGood ? '#059669' : '#4f46e5';
+  const warnaTren = deltaBad ? 'var(--color-neg)' : deltaGood ? 'var(--color-pos)' : 'var(--color-brand)';
   const jalur =
     sparkline && sparkline.length > 1 ? sparkPaths(sparkline) : null;
 
@@ -127,15 +167,15 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         >
           <defs>
             <linearGradient id={`spk-${gradId}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={warnaTren} stopOpacity={sparkOpasitas} />
-              <stop offset="100%" stopColor={warnaTren} stopOpacity="0" />
+              <stop offset="0%" style={{ stopColor: warnaTren }} stopOpacity={sparkOpasitas * 1.6} />
+              <stop offset="100%" style={{ stopColor: warnaTren }} stopOpacity="0" />
             </linearGradient>
           </defs>
           <path d={jalur.area} fill={`url(#spk-${gradId})`} className="kpi-spark-area" />
           <path
             d={jalur.line}
             fill="none"
-            stroke={warnaTren}
+            style={{ stroke: warnaTren, filter: `drop-shadow(0 3px 4px ${warnaTren})` }}
             strokeWidth={sparkTebal}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -156,7 +196,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           <span
             data-testid="kpi-value"
             className={`kpi-enter ${angkaKelas} leading-none font-extrabold tracking-tight tabular-nums ${
-              isCorrected ? 'text-amber-800' : 'text-ink'
+              isCorrected ? 'text-warn' : 'text-ink'
             }`}
           >
             {value}
@@ -173,9 +213,9 @@ export const KpiCard: React.FC<KpiCardProps> = ({
                 <span
                   className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums shrink-0 ${
                     deltaGood
-                      ? 'bg-emerald-50 text-emerald-700'
+                      ? 'bg-pos/15 text-pos'
                       : deltaBad
-                        ? 'bg-rose-50 text-rose-700'
+                        ? 'bg-neg/15 text-neg'
                         : 'bg-surface-2 text-ink-2'
                   }`}
                   title={lowerIsBetter ? 'Metrik ini semakin kecil semakin baik' : undefined}
@@ -210,7 +250,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
                 {capaianPct !== undefined ? (
                   <span
                     className={`font-bold tabular-nums shrink-0 inline-flex items-center gap-1 ${
-                      targetTercapai ? 'text-emerald-700' : 'text-amber-700'
+                      targetTercapai ? 'text-pos' : 'text-warn'
                     }`}
                   >
                     {capaianPct}%
@@ -223,7 +263,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
               <div className="w-full bg-surface-2 rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    targetTercapai ? 'bg-emerald-500' : 'bg-brand'
+                    targetTercapai ? 'bg-pos' : 'bg-gradient-to-r from-brand to-violet'
                   }`}
                   style={{ width: `${Math.min(100, capaianPct ?? 92)}%` }}
                 />

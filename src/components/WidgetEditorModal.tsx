@@ -163,14 +163,14 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           <button
             onClick={() => setActiveTab('correction')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'correction'
-                ? 'border-amber-600 text-amber-800'
+                ? 'border-warn text-warn'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <AlertTriangle className="w-3.5 h-3.5 text-warn" />
             <span>Koreksi Manual Angka (Fitur F-14)</span>
             {widget.manualCorrection?.isCorrected && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 ml-1" />
+              <span className="w-2 h-2 rounded-full bg-warn ml-1" />
             )}
           </button>
         </div>
@@ -266,14 +266,14 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           ) : (
             /* TAB KOREKSI MANUAL (F-14 PRD) */
             <div className="space-y-4">
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-card text-amber-900 leading-relaxed">
+              <div className="p-3.5 bg-warn/15 border border-warn/30 rounded-card text-warn leading-relaxed">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-warn mt-0.5 shrink-0" />
                   <div>
-                    <h4 className="font-semibold text-xs text-amber-900">
+                    <h4 className="font-semibold text-xs text-warn">
                       Standar Kepatuhan Koreksi Angka BUMD
                     </h4>
-                    <p className="text-[11px] text-amber-800 mt-0.5">
+                    <p className="text-[11px] text-warn mt-0.5">
                       Pengguna dapat menimpa angka jika terjadi revisi pembukuan resmi. Nilai asli tetap tersimpan di audit trail, dan kartu widget akan ditandai dengan badge "Dikoreksi Manual".
                     </p>
                   </div>
@@ -335,7 +335,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   <button
                     type="button"
                     onClick={handleResetCorrection}
-                    className="text-xs text-rose-600 hover:text-rose-700 font-medium underline"
+                    className="text-xs text-neg hover:text-neg font-medium underline"
                   >
                     Kembalikan ke Nilai Asli RAG (Batalkan Koreksi)
                   </button>

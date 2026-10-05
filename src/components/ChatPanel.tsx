@@ -40,11 +40,11 @@ const ChartIcon: React.FC<{ type: string; className?: string }> = ({ type, class
 
 // Category color map
 const categoryColor: Record<string, string> = {
-  Keuangan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Keuangan: 'bg-pos/15 text-pos border-pos/30',
   Operasional: 'bg-surface-2 text-brand-ink border-line',
-  'Kepatuhan & Risiko': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Kepatuhan & Risiko': 'bg-warn/15 text-warn border-warn/30',
   SDM: 'bg-violet-50 text-violet-700 border-violet-200',
-  Pelanggan: 'bg-rose-50 text-rose-700 border-rose-200',
+  Pelanggan: 'bg-neg/15 text-neg border-neg/30',
 };
 const getCategoryClass = (cat: string) =>
   categoryColor[cat] || 'bg-surface-2 text-ink-2 border-line';
@@ -329,7 +329,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 }
               }}
               title="Hapus riwayat chat (dashboard tetap ada)"
-              className="p-1 rounded-chip text-ink-3 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              className="p-1 rounded-chip text-ink-3 hover:text-neg hover:bg-neg/10 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -460,8 +460,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </span>
                   )}
                   {msg.citationsCount !== undefined && (
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      <FileCheck className="w-3 h-3 text-emerald-600" />
+                    <span className="inline-flex items-center gap-1 text-pos font-medium bg-pos/15 px-2 py-0.5 rounded border border-pos/30">
+                      <FileCheck className="w-3 h-3 text-pos" />
                       {msg.citationsCount} Sitasi
                     </span>
                   )}
@@ -519,7 +519,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       }`}
                     >
                       {isDone ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-pos shrink-0" />
                       ) : isCurrent ? (
                         <Loader2 className="w-4 h-4 text-brand animate-spin shrink-0" />
                       ) : (

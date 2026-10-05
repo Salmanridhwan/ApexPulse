@@ -1,3 +1,4 @@
+import { Tilt } from '../components/Tilt';
 import React, { useState } from 'react';
 import {
   Activity,
@@ -100,7 +101,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
           </div>
 
           <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-indigo-500/10 text-indigo-700 shrink-0">
+            <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
               <Activity className="w-5 h-5" />
             </div>
             <div>
@@ -110,7 +111,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
           </div>
 
           <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-emerald-500/10 text-emerald-700 shrink-0">
+            <div className="p-2.5 rounded-card bg-pos/10 text-pos shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
@@ -193,9 +194,9 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               const tableCount = dash.widgets.filter((w) => w.type === 'table').length;
 
               return (
+                <Tilt key={dash.id} className="h-full">
                 <div
-                  key={dash.id}
-                  className="bg-surface/95 backdrop-blur-md rounded-card border border-line/80 hover:border-line-strong/80 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5"
+                  className="card flex flex-col justify-between overflow-hidden group h-full"
                 >
                   <div className="p-5 space-y-3.5">
                     {/* Top Tag & Sector */}
@@ -257,7 +258,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onSelectDashboard(dash)}
-                        className="px-3.5 py-1.5 bg-gradient-to-r from-brand via-brand-soft to-indigo-800 hover:from-brand-soft hover:to-indigo-900 text-white rounded-card text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center gap-1.5"
+                        className="btn-primary px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Buka Kanvas</span>
@@ -298,13 +299,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       </button>
 
                       {deleteConfirmId === dash.id ? (
-                        <div className="flex items-center gap-1 bg-rose-50 p-0.5 rounded-control border border-rose-200">
+                        <div className="flex items-center gap-1 bg-neg/15 p-0.5 rounded-control border border-neg/30">
                           <button
                             onClick={() => {
                               onDeleteDashboard(dash.id);
                               setDeleteConfirmId(null);
                             }}
-                            className="px-2 py-1 bg-rose-600 text-white rounded-chip text-[10px] font-bold hover:bg-rose-700"
+                            className="px-2 py-1 bg-neg text-white rounded-chip text-[10px] font-bold hover:bg-neg"
                           >
                             Hapus
                           </button>
@@ -318,7 +319,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       ) : (
                         <button
                           onClick={() => setDeleteConfirmId(dash.id)}
-                          className="p-1.5 text-ink-3 hover:text-rose-600 hover:bg-rose-50 rounded-control transition-colors"
+                          className="p-1.5 text-ink-3 hover:text-neg hover:bg-neg/10 rounded-control transition-colors"
                           title="Hapus Dashboard"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -327,6 +328,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     </div>
                   </div>
                 </div>
+                </Tilt>
               );
             })}
           </div>
