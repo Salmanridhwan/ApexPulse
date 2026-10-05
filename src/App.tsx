@@ -581,7 +581,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-blue-50 text-slate-800 flex flex-row font-sans antialiased overflow-hidden h-screen">
+    <div className="min-h-screen bg-canvas text-ink flex flex-row font-sans antialiased overflow-hidden h-screen">
       {/* ================= LEFT SIDEBAR (disembunyikan di mode presentasi & admin) ================= */}
       {!isPresentationMode && viewMode !== 'admin' && (
         <Sidebar
@@ -624,35 +624,36 @@ export default function App() {
           <>
             {/* ================= TOP HEADER (ringkas, seragam seluruh halaman) ================= */}
             {!isPresentationMode && (
-              <header className="sticky top-0 z-30 bg-white border-b border-blue-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <header className="sticky top-0 z-30 bg-surface border-b border-line">
                 <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
 
                   {/* ── Kiri: toggle sidebar + judul halaman ── */}
                   <div className="flex items-center gap-3 min-w-0">
                     <button
                       onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                      className="p-1.5 rounded-lg text-blue-500 hover:text-blue-900 hover:bg-blue-50 transition-colors shrink-0"
+                      className="p-1.5 rounded-control text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
                       title="Buka / Tutup Sidebar"
+                      aria-label="Buka atau tutup sidebar"
                     >
                       <Menu className="w-4 h-4" />
                     </button>
 
-                    <div className="h-5 w-px bg-blue-100 shrink-0 hidden sm:block" />
+                    <div className="h-5 w-px bg-line shrink-0 hidden sm:block" />
 
                     <div className="min-w-0">
                       {/* Breadcrumb: nama tenant → halaman aktif */}
-                      <div className="flex items-center gap-1.5 text-[10px] text-blue-400 font-medium uppercase tracking-wider truncate">
-                        <Building2 className="w-3 h-3 shrink-0 text-blue-300" />
+                      <div className="flex items-center gap-1.5 text-[10px] text-ink-3 font-medium uppercase tracking-wider truncate">
+                        <Building2 className="w-3 h-3 shrink-0 text-ink-3" />
                         <span className="truncate max-w-[18vw]">{currentTenant?.name || 'BUMD'}</span>
-                        <span className="text-blue-200">/</span>
-                        <span className="text-blue-600">
+                        <span className="text-ink-3">/</span>
+                        <span className="text-brand">
                           {viewMode === 'dashboards' ? 'Galeri'
                             : viewMode === 'audit' ? 'Audit'
                             : viewMode === 'alerts' ? 'Alert'
                             : 'Workspace'}
                         </span>
                       </div>
-                      <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-blue-900 leading-tight mt-0.5">
+                      <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-ink leading-tight mt-0.5">
                         {viewMode === 'dashboards'
                           ? 'Galeri Dashboard'
                           : viewMode === 'audit'
@@ -665,7 +666,7 @@ export default function App() {
 
                     {/* Widget count badge — hanya di workspace */}
                     {viewMode === 'workspace' && activeDashboard && (
-                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-mono text-blue-600 shrink-0">
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-chip bg-surface-2 border border-line text-[10px] font-mono text-ink-3 shrink-0">
                         <LayoutGrid className="w-2.5 h-2.5" />
                         {activeDashboard.widgets?.length || 0} widget
                       </span>
@@ -678,10 +679,10 @@ export default function App() {
                     {/* Tombol Chat RAG */}
                     <button
                       onClick={() => setIsChatOpen(!isChatOpen)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-control transition-colors border ${
                         isChatOpen
-                          ? 'bg-blue-100 text-blue-800 border-blue-200'
-                          : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-100'
+                          ? 'bg-brand text-white border-brand'
+                          : 'bg-surface hover:bg-surface-2 text-ink-2 border-line'
                       }`}
                       title="Buka / Tutup Chat RAG Copilot"
                     >
@@ -689,16 +690,16 @@ export default function App() {
                       <span className="hidden sm:inline">RAG Copilot</span>
                     </button>
 
-                    <div className="h-5 w-px bg-blue-100 shrink-0" />
+                    <div className="h-5 w-px bg-line shrink-0" />
 
                     {/* Tambah dashboard baru (hanya di galeri) */}
                     {viewMode === 'dashboards' && (
                       <button
                         onClick={() => { setViewMode('workspace'); handleCreateDashboard(); }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
                         title="Buat dashboard baru"
                       >
-                        <Plus className="w-3.5 h-3.5 text-blue-700" />
+                        <Plus className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Baru</span>
                       </button>
                     )}
@@ -707,10 +708,10 @@ export default function App() {
                     {viewMode === 'workspace' && activeDashboard && (
                       <button
                         onClick={() => setIsCatalogOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
                         title="Tambah widget dari katalog preset"
                       >
-                        <TrendingUp className="w-3.5 h-3.5 text-blue-700" />
+                        <TrendingUp className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Katalog</span>
                       </button>
                     )}
@@ -720,7 +721,7 @@ export default function App() {
                       <div className="relative">
                         <button
                           onClick={() => setIsMoreMenuOpen((v) => !v)}
-                          className="p-1.5 rounded-lg border border-blue-100 text-blue-700 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded-control border border-line text-ink-2 hover:bg-surface-2 transition-colors"
                           title="Aksi lainnya"
                         >
                           <EllipsisVertical className="w-4 h-4" />
@@ -729,52 +730,52 @@ export default function App() {
                         {isMoreMenuOpen && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
-                            <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-blue-100/90 rounded-xl shadow-lg shadow-blue-900/5 z-50 p-1 text-xs overflow-hidden">
+                            <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface border border-line rounded-card shadow-pop z-50 p-1 text-xs overflow-hidden">
 
-                              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-blue-400 uppercase tracking-wider">
+                              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-ink-3 uppercase tracking-wider">
                                 Tampilan
                               </div>
                               <button
                                 onClick={() => { setIsMoreMenuOpen(false); setIsPresentationMode(true); }}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-blue-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                               >
-                                <Maximize2 className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                                <Maximize2 className="w-3.5 h-3.5 shrink-0 text-ink-3" />
                                 <span>Mode Presentasi</span>
                               </button>
 
-                              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-blue-400 uppercase tracking-wider mt-0.5">
+                              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-ink-3 uppercase tracking-wider mt-0.5">
                                 Ekspor & Bagikan
                               </div>
                               <button
                                 onClick={() => { setIsMoreMenuOpen(false); setIsExportOpen(true); }}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-blue-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                               >
-                                <Printer className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                                <Printer className="w-3.5 h-3.5 shrink-0 text-ink-3" />
                                 <span>Cetak / Ekspor</span>
                               </button>
                               <button
                                 onClick={() => { setIsMoreMenuOpen(false); setIsShareOpen(true); }}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-blue-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                               >
-                                <Share2 className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                                <Share2 className="w-3.5 h-3.5 shrink-0 text-ink-3" />
                                 <span>Bagikan Tautan</span>
                               </button>
 
                               {activeDashboard && (
-                                <div className="mt-1 pt-1 border-t border-blue-100">
+                                <div className="mt-1 pt-1 border-t border-line">
                                   {hapusKonfirmasi ? (
-                                    <div className="mx-1 my-1 p-2.5 rounded-lg bg-rose-50 border border-rose-100">
+                                    <div className="mx-1 my-1 p-2.5 rounded-control bg-rose-50 border border-rose-100">
                                       <p className="text-[11px] text-rose-700 font-medium mb-2">Hapus dashboard ini?</p>
                                       <div className="flex gap-1.5">
                                         <button
                                           onClick={() => { setHapusKonfirmasi(false); setIsMoreMenuOpen(false); handleDeleteDashboard(activeDashboard.id); }}
-                                          className="flex-1 px-2 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold transition-colors"
+                                          className="flex-1 px-2 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-control text-[11px] font-bold transition-colors"
                                         >
                                           Ya, Hapus
                                         </button>
                                         <button
                                           onClick={() => setHapusKonfirmasi(false)}
-                                          className="flex-1 px-2 py-1.5 bg-white text-blue-700 hover:bg-blue-50 border border-blue-100 rounded-lg text-[11px] transition-colors"
+                                          className="flex-1 px-2 py-1.5 bg-surface text-ink-2 hover:bg-surface-2 border border-line rounded-control text-[11px] transition-colors"
                                         >
                                           Batal
                                         </button>
@@ -783,7 +784,7 @@ export default function App() {
                                   ) : (
                                     <button
                                       onClick={() => setHapusKonfirmasi(true)}
-                                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-rose-600 hover:bg-rose-50 transition-colors"
                                     >
                                       <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                       <span>Hapus Dashboard</span>
@@ -851,33 +852,33 @@ export default function App() {
               <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
                 {/* Executive Presentation Top Header with Title when Active */}
                 {isPresentationMode && activeDashboard && (
-                  <div className="mb-6 bg-white/95 backdrop-blur-md text-blue-900 rounded-2xl p-5 shadow-sm border border-blue-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+                  <div className="mb-6 bg-surface text-ink rounded-card p-5 border border-line flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-500/50" />
-                        <span className="text-xs uppercase font-bold tracking-wider text-blue-600">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-xs uppercase font-bold tracking-wider text-brand">
                           {currentTenant?.name || 'Laporan Eksekutif'} • Mode Presentasi
                         </span>
                       </div>
-                      <h1 className="text-xl sm:text-2xl font-extrabold text-blue-900 tracking-tight">
+                      <h1 className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">
                         {activeDashboard.title}
                       </h1>
                       {activeDashboard.description && (
-                        <p className="text-xs sm:text-sm text-blue-700 mt-1 max-w-3xl leading-relaxed font-medium">
+                        <p className="text-xs sm:text-sm text-ink-2 mt-1 max-w-3xl leading-relaxed font-medium">
                           {activeDashboard.description}
                         </p>
                       )}
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                      <span className="text-xs text-blue-700 font-semibold px-2.5 py-1 bg-blue-50 rounded-lg border border-blue-100/80 hidden sm:inline-block">
+                      <span className="text-xs text-ink-2 font-semibold px-2.5 py-1 bg-surface-2 rounded-control border border-line hidden sm:inline-block">
                         {activeDashboard.widgets.length} Widget
                       </span>
                       <button
                         onClick={() => setIsPresentationMode(false)}
-                        className="px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100/80 text-blue-700 hover:text-blue-900 border border-blue-100/90 transition-all flex items-center gap-1.5 text-xs font-bold shadow-2xs active:scale-[0.98]"
+                        className="px-3.5 py-1.5 rounded-control bg-surface-2 hover:bg-line/50 text-ink-2 hover:text-ink border border-line transition-all flex items-center gap-1.5 text-xs font-bold active:scale-[0.98]"
                       >
-                        <Minimize2 className="w-4 h-4 text-blue-600" />
+                        <Minimize2 className="w-4 h-4 text-ink-2" />
                         <span>Keluar Presentasi</span>
                       </button>
                     </div>
@@ -886,31 +887,31 @@ export default function App() {
 
                 {/* Visual Header & Toolbar Card */}
                 {activeDashboard && !isPresentationMode && (
-                  <div className="mb-5 bg-white border border-blue-100/90 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                  <div className="mb-5 card">
                     {/* Baris atas: info dashboard */}
                     <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="min-w-0">
                         {/* Label sektor */}
                         {currentTenant?.sector && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-blue-400 mb-1.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3 mb-1.5">
                             <Building2 className="w-3 h-3" />
                             {currentTenant.sector}
                             {currentTenant.city && <> · {currentTenant.city}</>}
                           </span>
                         )}
                         {/* Deskripsi / sub judul */}
-                        <h2 className="text-sm sm:text-[15px] font-bold text-blue-900 leading-snug truncate max-w-2xl">
+                        <h2 className="text-sm sm:text-[15px] font-bold text-ink leading-snug truncate max-w-2xl">
                           {activeDashboard.description ||
                             `${currentTenant?.name || ''} — Dashboard Kinerja`}
                         </h2>
                         {/* Metadata baris bawah */}
                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100/70 px-2 py-0.5 rounded-full">
-                            <LayoutGrid className="w-3 h-3 text-blue-400" />
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
+                            <LayoutGrid className="w-3 h-3 text-ink-3" />
                             {activeDashboard.widgets.length} widget
                           </span>
-                          <span className="text-blue-200 text-xs">·</span>
-                          <span className="inline-flex items-center gap-1 text-[11px] text-blue-400">
+                          <span className="text-line-strong text-xs">·</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-3">
                             <Clock className="w-3 h-3" />
                             {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
                               day: 'numeric',
@@ -918,8 +919,8 @@ export default function App() {
                               year: 'numeric',
                             })}
                           </span>
-                          <span className="text-blue-200 text-xs">·</span>
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full">
+                          <span className="text-line-strong text-xs">·</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-chip">
                             <Radio className="w-2.5 h-2.5" />
                             RAG Aktif
                           </span>
@@ -929,19 +930,19 @@ export default function App() {
                       {/* Tombol Mode Presentasi */}
                       <button
                         onClick={() => setIsPresentationMode(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors shrink-0 self-start sm:self-center"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors shrink-0 self-start sm:self-center"
                       >
-                        <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
+                        <Maximize2 className="w-3.5 h-3.5 text-ink-3" />
                         <span>Presentasi</span>
                       </button>
                     </div>
 
                     {/* Divider + Toolbar bawah */}
-                    <div className="border-t border-blue-100 px-4 sm:px-5 py-2.5 flex items-center justify-between gap-2 bg-blue-50/30 rounded-b-xl">
+                    <div className="border-t border-line px-4 sm:px-5 py-2.5 flex items-center justify-between gap-2 bg-surface-2 rounded-b-card">
                       {/* Kiri: status filter aktif (placeholder) */}
                       <div className="flex items-center gap-1.5">
-                        <FileCheck className="w-3.5 h-3.5 text-blue-300" />
-                        <span className="text-[11px] text-blue-400 font-medium">
+                        <FileCheck className="w-3.5 h-3.5 text-ink-3" />
+                        <span className="text-[11px] text-ink-3 font-medium">
                           {currentTenant?.name || 'Dashboard aktif'}
                         </span>
                       </div>
@@ -950,23 +951,23 @@ export default function App() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setIsCatalogOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
                         >
-                          <Plus className="w-3 h-3 text-blue-400" />
+                          <Plus className="w-3 h-3 text-ink-3" />
                           Tambah Widget
                         </button>
                         <button
                           onClick={() => setIsExportOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-50 border border-blue-100 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
                         >
-                          <Download className="w-3 h-3 text-blue-400" />
+                          <Download className="w-3 h-3 text-ink-3" />
                           Ekspor
                         </button>
                         <button
                           onClick={() => setIsShareOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-brand hover:bg-brand-ink rounded-control transition-colors"
                         >
-                          <Share2 className="w-3 h-3 text-blue-400" />
+                          <Share2 className="w-3 h-3" />
                           Bagikan
                         </button>
                       </div>

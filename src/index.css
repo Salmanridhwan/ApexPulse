@@ -1,10 +1,82 @@
 @import "tailwindcss";
 
+/* ============================================================
+   DESIGN TOKEN — "Midnight Indigo"
+   Satu sumber kebenaran warna/radius/elevasi. Jangan tulis
+   warna mentah (sky-500, blue-600) langsung di JSX lagi.
+   ============================================================ */
+@theme {
+  /* Permukaan */
+  --color-canvas: #f7f8fa;      /* latar aplikasi — netral, bukan biru */
+  --color-surface: #ffffff;
+  --color-surface-2: #f9fafb;
+
+  /* Garis */
+  --color-line: #e5e8ee;        /* hairline kartu */
+  --color-line-strong: #d3d8e0; /* pemisah tegas */
+
+  /* Teks */
+  --color-ink: #0f1729;         /* judul */
+  --color-ink-2: #4a5568;       /* isi */
+  --color-ink-3: #94a3b8;       /* keterangan */
+
+  /* Aksen — dipakai HEMAT: CTA, nav aktif, link */
+  --color-brand: #4f46e5;       /* indigo elektrik */
+  --color-brand-ink: #3730c4;
+  --color-brand-soft: #eef0ff;
+
+  /* Semantik data */
+  --color-pos: #059669;
+  --color-neg: #e11d48;
+  --color-warn: #d97706;
+
+  /* Shell (sidebar gelap) */
+  --color-shell: #0b1220;
+  --color-shell-2: #131c2e;
+  --color-shell-line: #24314a;
+  --color-shell-ink: #e6eaf2;
+  --color-shell-ink-2: #8794ad;
+
+  /* Radius */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+
+  /* Elevasi — HANYA elemen melayang (dropdown/modal), bukan kartu diam */
+  --shadow-pop: 0 8px 24px rgb(15 23 41 / 0.12);
+  --shadow-pop-sm: 0 2px 8px rgb(15 23 41 / 0.08);
+}
+
+/* Kelas komponen siap pakai — ganti kartu/tombol manual yang berulang. */
+@utility card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background-color: var(--color-surface);
+}
+@utility btn-primary {
+  border-radius: var(--radius-control);
+  background-color: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+}
+@utility btn-ghost {
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-line);
+  background-color: var(--color-surface);
+  color: var(--color-ink-2);
+}
+@utility chip {
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--color-line);
+  background-color: var(--color-surface-2);
+  color: var(--color-ink-2);
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: #0f172a;
-    background-color: #eff6ff;
+    color: var(--color-ink);
+    background-color: var(--color-canvas);
   }
 
   .font-mono, code, pre, .tabular-nums {
