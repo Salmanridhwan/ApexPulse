@@ -23,7 +23,7 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
   }, [tenantId]);
 
   return (
-    <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
+    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start gap-3">

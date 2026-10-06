@@ -68,7 +68,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
       <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[85vh]">
         {/* Header */}
@@ -319,7 +319,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-ink hover:bg-ink/90 text-white text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

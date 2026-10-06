@@ -590,7 +590,7 @@ export default function App() {
         <>
           {isMobileNavOpen && (
             <div
-              className="fixed inset-0 z-40 bg-ink/40 md:hidden"
+              className="fixed inset-0 z-40 bg-scrim/40 md:hidden"
               onClick={() => setIsMobileNavOpen(false)}
               aria-hidden="true"
             />

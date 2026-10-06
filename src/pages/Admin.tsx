@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { AvatarTile } from '../components/BrandMark';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 interface AdminProps {
@@ -240,13 +241,14 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   title={tab.label}
-                  className={`w-full flex items-center gap-2.5 py-2 rounded-control text-left transition-colors ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
+                  className={`w-full flex items-center gap-2.5 py-2 rounded-control text-left transition-colors relative overflow-hidden ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
                     } ${isActive
-                      ? 'bg-brand text-white'
-                      : 'text-shell-ink-2 hover:bg-surface/5 hover:text-shell-ink'
+                      ? 'bg-shell-active text-shell-ink font-bold shadow-inset'
+                      : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'
                     }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-brand' : 'text-shell-ink-2'}`} />
                   {!isNavCollapsed && <span className="truncate">{tab.label}</span>}
                 </button>
               );
@@ -280,6 +282,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-surface-2 border border-line text-ink-2">
                 Admin: <strong className="text-ink">{currentUser?.name || 'Administrator'}</strong>
               </span>
+              <ThemeToggle />
               <button
                 onClick={loadData}
                 className="p-2 rounded-control border border-line hover:bg-surface-2 text-ink-2 hover:text-ink transition-colors"
@@ -470,7 +473,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                           <td className="p-3">
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
-                                  ? 'bg-ink text-white'
+                                  ? 'bg-brand/15 text-brand-ink border border-brand/30'
                                   : u.role === 'direksi'
                                     ? 'bg-warn/15 text-warn'
                                     : 'bg-surface-2 text-ink'
@@ -972,7 +975,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {/* ================= MODAL TAMBAH PENGGUNA ================= */}
         {isAddUserOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-shell/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
+            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
             <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="font-bold text-sm text-ink">Tambah Pengguna BUMD Baru</h3>
@@ -1057,7 +1060,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {/* ================= MODAL TAMBAH TENANT BUMD ================= */}
         {isAddTenantOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-shell/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
+            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
             <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 className="font-bold text-sm text-ink">Daftarkan Instansi BUMD Baru</h3>

@@ -60,7 +60,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
       <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col">
         {/* Header */}
@@ -119,7 +119,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 />
                 <button
                   onClick={copyToClipboard}
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
+                  className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                 >
                   {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
@@ -159,7 +159,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   />
                   <button
                     onClick={copyEmbedSnippet}
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
+                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
                     {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
@@ -186,7 +186,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <div className="p-4 border-t border-line bg-surface-2 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-ink hover:bg-ink/90 text-white text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

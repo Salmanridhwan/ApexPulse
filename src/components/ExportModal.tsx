@@ -49,13 +49,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
       <div className="relative w-full max-w-2xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-slate-800 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-ink flex items-center justify-center text-white">
               <Printer className="w-4 h-4" />
             </div>
             <div>

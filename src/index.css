@@ -45,6 +45,9 @@
 
   --shadow-pop: 0 20px 44px rgb(35 42 56 / 0.22);
   --shadow-pop-sm: 0 6px 16px rgb(35 42 56 / 0.12);
+
+  /* Scrim (latar gelap di belakang modal/drawer) — gelap di KEDUA mode. */
+  --color-scrim: #10141d;
 }
 
 /* Mode gelap — slate kebiruan seperti referensi */

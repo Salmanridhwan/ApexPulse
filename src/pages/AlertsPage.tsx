@@ -45,7 +45,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
   );
 
   return (
-    <div className="flex-1 bg-surface-2 min-h-screen flex flex-col">
+    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Page Header Header & Description */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
@@ -68,7 +68,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
 
           <button
             onClick={fetchAlertsData}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-surface-2 border border-line rounded-control transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-brand/10 border border-line rounded-control transition-colors shrink-0"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Segarkan</span>
@@ -84,8 +84,8 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('notifications')}
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'notifications'
-                    ? 'bg-ink text-white shadow-sm'
-                    : 'bg-surface-2 text-ink-2 hover:bg-surface-2 hover:text-ink'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'bg-surface-2 text-ink-2 hover:bg-brand/10 hover:text-brand-ink'
                 }`}
               >
                 Notifikasi Masuk ({notifications.length})
@@ -94,8 +94,8 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('rules')}
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'rules'
-                    ? 'bg-ink text-white shadow-sm'
-                    : 'bg-surface-2 text-ink-2 hover:bg-surface-2 hover:text-ink'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'bg-surface-2 text-ink-2 hover:bg-brand/10 hover:text-brand-ink'
                 }`}
               >
                 Aturan Ambang Batas ({alertRules.length})
@@ -110,7 +110,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 placeholder="Cari notifikasi / aturan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-surface-2 border border-line rounded-control pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-ink placeholder-slate-400"
+                className="w-full text-xs bg-surface-2 border border-line rounded-control pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand text-ink placeholder:text-ink-3"
               />
             </div>
           </div>

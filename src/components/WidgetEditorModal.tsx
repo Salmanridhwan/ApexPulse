@@ -123,7 +123,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
       {/* Modal Dialog */}
       <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">

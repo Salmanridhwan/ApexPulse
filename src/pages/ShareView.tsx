@@ -93,11 +93,11 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-12 h-12 rounded-card bg-brand/20 text-ink-3 flex items-center justify-center animate-spin mb-4">
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-ink text-center">
+        <div className="w-12 h-12 rounded-card bg-brand/20 text-brand flex items-center justify-center animate-spin mb-4">
           <Activity className="w-6 h-6" />
         </div>
-        <h2 className="text-base font-bold text-white tracking-wide">Memuat Tampilan Dashboard...</h2>
+        <h2 className="text-base font-bold text-ink tracking-wide">Memuat Tampilan Dashboard...</h2>
         <p className="text-xs text-ink-3 mt-1 max-w-sm">
           Mengambil spesifikasi visualisasi dan memverifikasi sitasi dokumen resmi instansi.
         </p>
@@ -176,17 +176,17 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
     <ChartSelectionProvider>
       <div className="min-h-screen bg-surface-2 flex flex-col">
         {/* Top Read-Only Banner */}
-        <div className="bg-slate-900 border-b border-slate-800 text-white px-4 sm:px-6 py-2 flex items-center justify-between text-xs sticky top-0 z-30 shadow-md">
+        <div className="bg-shell border-b border-shell-line text-shell-ink px-4 sm:px-6 py-2 flex items-center justify-between text-xs sticky top-0 z-30 shadow-md">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-pos animate-pulse" />
-            <span className="font-semibold text-slate-200">Portal Tinjauan Eksekutif</span>
-            <span className="hidden sm:inline text-ink-2">•</span>
-            <span className="hidden sm:inline text-ink-3 text-[11px]">Mode Publik Read-Only</span>
+            <span className="font-semibold text-shell-ink">Portal Tinjauan Eksekutif</span>
+            <span className="hidden sm:inline text-shell-ink-2">•</span>
+            <span className="hidden sm:inline text-shell-ink-2 text-[11px]">Mode Publik Read-Only</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-1 rounded-control bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-colors flex items-center gap-1.5 text-[11px]"
+              className="px-3 py-1 rounded-control bg-shell-hover hover:bg-shell-active text-shell-ink border border-shell-line transition-colors flex items-center gap-1.5 text-[11px]"
               title="Cetak / Simpan PDF"
             >
               <Printer className="w-3.5 h-3.5" />
