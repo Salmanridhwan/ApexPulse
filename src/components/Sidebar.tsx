@@ -10,6 +10,7 @@ import {
   Search,
   Shield,
   Building2,
+  ChevronDown,
 } from 'lucide-react';
 import { LogoTile, AvatarTile } from './BrandMark';
 import { Dashboard, Tenant, User } from '../types';
@@ -123,27 +124,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[9px] font-normal lowercase tracking-normal">{currentTenant?.city || 'BUMD'}</span>
             </div>
             <div className="relative">
-              {currentUser?.role === 'admin' ? (
-                <select
-                  value={currentTenant?.id || ''}
-                  onChange={(e) => {
-                    const found = tenants.find((t) => t.id === e.target.value);
-                    if (found) onSelectTenant(found);
-                  }}
-                  className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control px-2.5 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand transition-all appearance-none truncate"
-                  title="Pilih instansi aktif"
-                >
-                  {tenants.map((t) => (
-                    <option key={t.id} value={t.id} className="bg-shell-2 text-shell-ink">{t.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control px-2.5 py-1.5 truncate" title="Instansi Anda saat ini">{currentTenant?.name}</div>
-              )}
+              <select
+                value={currentTenant?.id || ''}
+                onChange={(e) => {
+                  const found = tenants.find((t) => t.id === e.target.value);
+                  if (found) onSelectTenant(found);
+                }}
+                className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand transition-all appearance-none truncate"
+                title="Pilih instansi aktif (klien / instansi lain)"
+                aria-label="Pilih instansi aktif"
+              >
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-shell-2 text-shell-ink">
+                    {t.name}{t.documentCount ? ` · ${t.documentCount} dok RAG` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-shell-ink-2 pointer-events-none" />
             </div>
             <div className="flex items-center justify-between text-[10px] px-0.5">
               <span className="capitalize font-medium text-shell-ink-2 truncate max-w-[140px]">{currentTenant?.sector || 'Sektor Publik'}</span>
-              <span className="text-[9px] text-pos bg-pos/15 px-1 rounded-chip font-medium">RAG Aktif</span>
+              <span className="text-[9px] text-pos bg-pos/15 px-1 rounded-chip font-medium" title="Basis dokumen RAG instansi ini">
+                RAG{currentTenant?.documentCount ? ` · ${currentTenant.documentCount} dok` : ' Aktif'}
+              </span>
             </div>
           </div>
         ) : (

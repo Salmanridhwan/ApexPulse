@@ -300,8 +300,8 @@ export default function App() {
 
   // Handlers for Tenant Switcher
   const handleSelectTenant = (tenant: Tenant) => {
-    // Isolasi tenant: hanya admin yang boleh pindah konteks instansi.
-    if (currentUser?.role !== 'admin') return;
+    // Ganti konteks instansi: semua peran boleh berpindah agar bisa melihat
+    // dokumen RAG & dashboard milik instansi lain.
     setCurrentTenant(tenant);
   };
 

@@ -97,6 +97,14 @@ async function tungguTeks(pola: string, timeoutMs = 15000): Promise<boolean> {
 
 let page: any;
 
+/**
+ * Dashboard yang dibuat selama QA berjalan. Skrip WAJIB menghapusnya di akhir:
+ * dashboard uji dibuat di tenant-pdam, lalu judulnya ikut berubah saat RAG mock
+ * menyintesis data — kalau ditinggal, tiap run menumpuk satu dashboard sampah
+ * di instansi nyata.
+ */
+const dashboardsDibuat: string[] = [];
+
 /** Hitung widget sungguhan di kanvas: kartu yang berisi heading judul + bukan bagian banner/metric-bar. */
 async function hitungWidgetKanvas(): Promise<number> {
   return page.evaluate(() => {
@@ -219,6 +227,7 @@ async function main() {
       return res.ok ? (await res.json()).id : null;
     });
     assert.ok(idBaru, 'gagal membuat dashboard kosong via API');
+    if (idBaru) dashboardsDibuat.push(idBaru);
     log(`  ℹ️ Dashboard uji: ${idBaru}`);
 
     await page.reload({ waitUntil: 'networkidle2' });
@@ -583,6 +592,7 @@ async function main() {
       return res.ok ? (await res.json()).id : null;
     });
     assert.ok(idBaru, 'gagal membuat dashboard sementara via API');
+    if (idBaru) dashboardsDibuat.push(idBaru);
 
     // Reload -> dashboard terbaru jadi aktif pertama
     await page.reload({ waitUntil: 'networkidle2' });
@@ -733,6 +743,23 @@ async function main() {
       cfgSnapshot.ragKnowledgeBaseId,
       'knowledge base id tidak kembali ke nilai awal'
     );
+  });
+
+  // ============ PEMBERSIHAN: hapus dashboard uji yang dibuat QA ============
+  // Tanpa ini, setiap run meninggalkan dashboard sampah di instansi nyata
+  // (judulnya berubah jadi "Kinerja bank bjb ..." setelah RAG mock menyintesis).
+  await uji('Pembersihan — hapus dashboard uji yang dibuat selama QA', async () => {
+    let dihapus = 0;
+    for (const id of dashboardsDibuat) {
+      const ok = await page.evaluate(async (dashId: string) => {
+        const res = await fetch(`/api/dashboards/${dashId}?tenantId=tenant-pdam`, {
+          method: 'DELETE',
+        });
+        return res.ok;
+      }, id);
+      if (ok) dihapus++;
+    }
+    log(`  ℹ️ Dashboard uji dibersihkan: ${dihapus}/${dashboardsDibuat.length}`);
   });
 
   // ============ RINGKASAN ============

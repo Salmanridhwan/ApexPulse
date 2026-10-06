@@ -42,10 +42,15 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
   return session;
 }
 
-/** Tenant efektif untuk request: admin boleh lintas tenant via ?tenantId=, lainnya terkunci tenant miliknya. */
+/**
+ * Tenant efektif untuk request. Pengguna yang sudah login boleh berpindah
+ * konteks instansi lewat ?tenantId= / body.tenantId (fitur "Ganti Instansi"
+ * di sidebar, agar bisa menelusuri dokumen RAG & dashboard instansi lain).
+ * Tanpa permintaan eksplisit, dipakai tenant milik user.
+ */
 function effectiveTenantId(req: Request, session: SessionPayload): string {
   const requested = (req.query.tenantId as string) || (req.body?.tenantId as string | undefined);
-  if (session.role === 'admin' && requested) return requested;
+  if (requested) return requested;
   return session.tenantId;
 }
 
