@@ -223,11 +223,16 @@
 
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: var(--color-ink);
     background: var(--bg-app);
     background-attachment: fixed;
     transition: background-color 0.3s ease, color 0.3s ease;
+    /* Angka rapi & rata (tabular) seperti dashboard referensi. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
   }
 
   /* Fokus terlihat (aksesibilitas) — konsisten di semua elemen interaktif. */
@@ -242,8 +247,11 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .font-mono, code, pre, .tabular-nums {
+  .font-mono, code, pre {
     font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 }
