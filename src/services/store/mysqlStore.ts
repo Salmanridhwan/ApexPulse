@@ -26,6 +26,8 @@ export interface DbSnapshot {
   notifications: NotificationItem[];
   auditLogs: AuditLog[];
   shareTokens: Record<string, string>;
+  /** token -> hash PIN (scrypt) untuk mode edit pada tautan publik. */
+  sharePins: Record<string, string>;
   systemConfig: unknown;
   users: SafeUser[];
   credentials: Record<string, string>;
@@ -39,6 +41,7 @@ export interface LoadedState {
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
+  sharePins?: Record<string, string>;
   systemConfig?: unknown;
   users?: SafeUser[];
   credentials?: Record<string, string>;
@@ -135,6 +138,7 @@ export class MysqlStore {
       ada = true;
       const val = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
       if (row.k === 'shareTokens') hasil.shareTokens = val;
+      if (row.k === 'sharePins') hasil.sharePins = val;
       if (row.k === 'systemConfig') hasil.systemConfig = val;
       if (row.k === 'credentials') hasil.credentials = val;
     }
@@ -190,6 +194,7 @@ export class MysqlStore {
 
       const kv: Array<[string, string]> = [
         ['shareTokens', JSON.stringify(s.shareTokens)],
+        ['sharePins', JSON.stringify(s.sharePins)],
         ['systemConfig', JSON.stringify(s.systemConfig)],
         ['credentials', JSON.stringify(s.credentials)],
       ];

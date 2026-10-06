@@ -993,7 +993,102 @@ async function startServer() {
     if (!dash) {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
-    res.json(dash);
+    // Jangan bocorkan hash PIN ke klien — cukup flag apakah PIN sudah diatur.
+    res.json({ ...dash, hasEditPin: !!db.sharePins[req.params.token] });
+  });
+
+  /**
+   * Atur / ganti PIN mode edit untuk tautan publik.
+   * Butuh sesi login (hanya pemilik dashboard yang bisa mengaktifkan).
+   * PIN kosong = matikan mode edit (hapus PIN).
+   */
+  app.post('/api/share/:token/pin', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const dashId = db.shareTokens[req.params.token];
+    if (!dashId) {
+      return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
+    }
+    const dash = db.dashboards.find((d) => d.id === dashId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
+    // Pastikan sesi berhak atas tenant dashboard ini.
+    if (dash.tenantId && dash.tenantId !== effectiveTenantId(req, session)) {
+      return res.status(403).json({ error: 'Tidak berhak mengubah tautan ini.' });
+    }
+    const pin = String(req.body?.pin ?? '').trim();
+    if (!pin) {
+      delete db.sharePins[req.params.token];
+      db.persist();
+      return res.json({ hasEditPin: false });
+    }
+    if (!/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN harus berupa 4-8 angka.' });
+    }
+    db.sharePins[req.params.token] = hashPassword(pin);
+    db.persist();
+    res.json({ hasEditPin: true });
+  });
+
+  /** Verifikasi PIN mode edit (tanpa mengubah data) — untuk membuka kunci editor. */
+  app.post('/api/share/:token/verify-pin', (req: Request, res: Response) => {
+    const stored = db.sharePins[req.params.token];
+    if (!stored) {
+      return res.status(400).json({ error: 'Tautan ini tidak mengaktifkan mode edit.' });
+    }
+    const pin = String(req.body?.pin ?? '');
+    if (!verifyPassword(pin, stored)) {
+      return res.status(401).json({ error: 'PIN salah.' });
+    }
+    res.json({ ok: true });
+  });
+
+  /**
+   * Edit widget lewat tautan publik (mode edit ber-PIN).
+   * Body: { pin, widgets } — hanya field aman yang diterapkan; dashboard asli diperbarui.
+   */
+  app.patch('/api/share/:token', (req: Request, res: Response) => {
+    const token = req.params.token;
+    const dashId = db.shareTokens[token];
+    if (!dashId) {
+      return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
+    }
+    const stored = db.sharePins[token];
+    if (!stored) {
+      return res.status(403).json({ error: 'Mode edit tidak aktif untuk tautan ini.' });
+    }
+    const pin = String(req.body?.pin ?? '');
+    if (!verifyPassword(pin, stored)) {
+      return res.status(401).json({ error: 'PIN salah.' });
+    }
+    const dash = db.dashboards.find((d) => d.id === dashId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
+
+    const widgets = req.body?.widgets as WidgetSpec[] | undefined;
+    if (!Array.isArray(widgets)) {
+      return res.status(400).json({ error: 'Field "widgets" wajib berupa array.' });
+    }
+    // Hanya izinkan memperbarui widget yang memang ada di dashboard ini (cegah injeksi).
+    const idSet = new Set(dash.widgets.map((w) => w.id));
+    const aman = widgets.filter((w) => w && idSet.has(w.id));
+    if (aman.length === 0) {
+      return res.status(400).json({ error: 'Tidak ada widget valid untuk diperbarui.' });
+    }
+    const updated = db.updateDashboard(dashId, { widgets: aman }, dash.tenantId);
+    if (!updated) return res.status(500).json({ error: 'Gagal menyimpan perubahan.' });
+
+    // Catat jejak audit: perubahan lewat tautan publik.
+    db.auditLogs.unshift({
+      id: `audit_${randomBytes(8).toString('hex')}`,
+      tenantId: dash.tenantId,
+      userId: 'public-link',
+      userName: 'Editor Tautan Publik',
+      action: 'UPDATE',
+      target: `Dashboard "${dash.title}" via tautan publik (${aman.length} widget)`,
+      timestamp: new Date().toISOString(),
+    } as (typeof db.auditLogs)[number]);
+    db.persist();
+
+    res.json({ ...updated, hasEditPin: true });
   });
 
   // ================= AUDIT LOGS =================

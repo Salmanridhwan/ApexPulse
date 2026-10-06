@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Code2, Copy, ExternalLink, Globe, Lock, Share2, X } from 'lucide-react';
+import { Check, Code2, Copy, ExternalLink, Globe, Lock, Pencil, Share2, X } from 'lucide-react';
 import { Dashboard } from '../types';
 
 interface ShareModalProps {
@@ -18,6 +18,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [isCopiedEmbed, setIsCopiedEmbed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Mode edit ber-PIN.
+  const [hasEditPin, setHasEditPin] = useState(false);
+  const [pinDraft, setPinDraft] = useState('');
+  const [pinMsg, setPinMsg] = useState<string | null>(null);
+  const [pinSaving, setPinSaving] = useState(false);
+
   if (!isOpen || !dashboard) return null;
 
   const handleGenerateShareLink = async () => {
@@ -34,6 +40,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       console.error('Failed to create share link:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /** Aktifkan / matikan mode edit ber-PIN untuk token ini. */
+  const handleSavePin = async (pin: string) => {
+    if (!shareToken) return;
+    setPinSaving(true);
+    setPinMsg(null);
+    try {
+      const res = await fetch(`/api/share/${shareToken}/pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan PIN.');
+      setHasEditPin(!!data.hasEditPin);
+      setPinDraft('');
+      setPinMsg(data.hasEditPin ? 'Mode edit aktif dengan PIN.' : 'Mode edit dimatikan.');
+    } catch (err: any) {
+      setPinMsg(err.message || 'Gagal menyimpan PIN.');
+    } finally {
+      setPinSaving(false);
     }
   };
 
@@ -177,6 +206,44 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
+              </div>
+
+              {/* Mode Edit ber-PIN (opsional) */}
+              <div className="pt-3 mt-1 border-t border-line space-y-2">
+                <div className="flex items-center gap-1.5 text-ink-2 font-medium">
+                  <Pencil className="w-3.5 h-3.5 text-ink-2" />
+                  <span>Mode Edit lewat Tautan (opsional)</span>
+                </div>
+                <p className="text-[11px] text-ink-2 leading-relaxed">
+                  Atur PIN agar penerima tautan bisa mengedit widget langsung. Kosongkan PIN untuk menonaktifkan.
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={pinDraft}
+                    onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder={hasEditPin ? 'PIN aktif — isi untuk ganti' : '4-8 angka'}
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                  <button
+                    onClick={() => handleSavePin(pinDraft)}
+                    disabled={pinSaving || (pinDraft.length > 0 && pinDraft.length < 4)}
+                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 disabled:opacity-40"
+                  >
+                    {pinSaving ? '...' : hasEditPin ? 'Perbarui' : 'Aktifkan'}
+                  </button>
+                </div>
+                {hasEditPin && (
+                  <button
+                    onClick={() => handleSavePin('')}
+                    disabled={pinSaving}
+                    className="text-[11px] text-neg hover:underline disabled:opacity-40"
+                  >
+                    Matikan mode edit
+                  </button>
+                )}
+                {pinMsg && <p className="text-[11px] text-ink-2">{pinMsg}</p>}
               </div>
             </div>
           )}

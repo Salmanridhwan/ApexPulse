@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Lock, Printer, Shield, ShieldCheck } from 'lucide-react';
+import { Activity, Lock, Pencil, Printer, Shield, ShieldCheck, X } from 'lucide-react';
 import { LogoTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GlobalFiltersBar } from '../components/GlobalFiltersBar';
 import { ActiveChartFilterChip, ChartSelectionProvider } from '../components/widgets/ChartSelection';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
+import { WidgetEditorModal } from '../components/WidgetEditorModal';
 import { Dashboard, GlobalFilters, Tenant, WidgetSpec } from '../types';
 
 interface ShareViewProps {
@@ -24,6 +25,18 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   // Filter interaktif sisi klien (K4). Menyaring widget yang tampil — tidak mengarang angka baru.
   const [filters, setFilters] = useState<GlobalFilters>(FILTER_DEFAULT);
 
+  // Mode edit ber-PIN pada tautan publik.
+  const [hasEditPin, setHasEditPin] = useState(false);
+  const [isEditUnlocked, setIsEditUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [editingWidget, setEditingWidget] = useState<WidgetSpec | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  /** PIN yang sudah diverifikasi disimpan di memori (tidak ke localStorage) untuk autentikasi PATCH. */
+  const [unlockedPin, setUnlockedPin] = useState('');
+
   useEffect(() => {
     async function loadSharedDashboard() {
       setIsLoading(true);
@@ -36,8 +49,9 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           }
           throw new Error(`Gagal memuat dashboard (Status: ${res.status})`);
         }
-        const dashData: Dashboard = await res.json();
+        const dashData: Dashboard & { hasEditPin?: boolean } = await res.json();
         setDashboard(dashData);
+        setHasEditPin(!!dashData.hasEditPin);
 
         if (dashData.tenantId) {
           const tenantRes = await fetch('/api/tenants');
@@ -79,6 +93,61 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
 
   const handlePrint = () => {
     window.print();
+  };
+
+  /** Verifikasi PIN → buka mode edit. */
+  const handleVerifyPin = async () => {
+    setPinError(null);
+    try {
+      const res = await fetch(`/api/share/${token}/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInput }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'PIN salah.');
+      }
+      setUnlockedPin(pinInput);
+      setIsEditUnlocked(true);
+      setShowPinDialog(false);
+      setPinInput('');
+    } catch (err: any) {
+      setPinError(err.message || 'PIN salah.');
+    }
+  };
+
+  const handleLockEdit = () => {
+    setIsEditUnlocked(false);
+    setUnlockedPin('');
+    setEditingWidget(null);
+  };
+
+  /** Simpan perubahan satu widget → PATCH ke dashboard asli (permanen). */
+  const handleSaveWidget = async (updatedWidget: WidgetSpec) => {
+    if (!dashboard) return;
+    const updatedWidgets = dashboard.widgets.map((w) =>
+      w.id === updatedWidget.id ? updatedWidget : w
+    );
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/share/${token}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: unlockedPin, widgets: updatedWidgets }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan perubahan.');
+      }
+      const saved: Dashboard = await res.json();
+      setDashboard(saved);
+      setEditingWidget(null);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan perubahan.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const namaInstansi = tenant?.name || 'Instansi';
@@ -182,9 +251,32 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             <div className="w-2 h-2 rounded-full bg-pos animate-pulse" />
             <span className="font-semibold text-shell-ink">Portal Tinjauan Eksekutif</span>
             <span className="hidden sm:inline text-shell-ink-2">•</span>
-            <span className="hidden sm:inline text-shell-ink-2 text-[11px]">Mode Publik Read-Only</span>
+            <span className="hidden sm:inline text-shell-ink-2 text-[11px]">
+              {isEditUnlocked ? 'Mode Edit Aktif' : 'Mode Publik Read-Only'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
+            {hasEditPin && (
+              isEditUnlocked ? (
+                <button
+                  onClick={handleLockEdit}
+                  className="px-3 py-1 rounded-control bg-warn/20 hover:bg-warn/30 text-shell-ink border border-shell-line transition-colors flex items-center gap-1.5 text-[11px]"
+                  title="Kunci kembali mode edit"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Kunci Edit</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setShowPinDialog(true); setPinError(null); }}
+                  className="px-3 py-1 rounded-control bg-brand text-white hover:opacity-90 transition-opacity flex items-center gap-1.5 text-[11px] font-semibold"
+                  title="Masukkan PIN untuk mengedit"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Mode Edit</span>
+                </button>
+              )
+            )}
             <ThemeToggle />
             <button
               onClick={handlePrint}
@@ -252,7 +344,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {widgetsTampil.map((widget) => (
-                <ShareWidgetCard key={widget.id} widget={widget} />
+                <ShareWidgetCard
+                  key={widget.id}
+                  widget={widget}
+                  canEdit={isEditUnlocked}
+                  onEdit={() => setEditingWidget(widget)}
+                />
               ))}
             </div>
           )}
@@ -267,6 +364,67 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           </p>
         </footer>
 
+        {/* Dialog PIN mode edit */}
+        {showPinDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/50 p-4">
+            <div className="w-full max-w-sm bg-surface rounded-card border border-line shadow-pop p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-card bg-brand/15 text-brand-ink flex items-center justify-center">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">Mode Edit Tautan Publik</h3>
+                    <p className="text-[11px] text-ink-3">Masukkan PIN untuk mengedit widget.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowPinDialog(false); setPinError(null); setPinInput(''); }}
+                  className="text-ink-3 hover:text-ink p-1"
+                  aria-label="Tutup"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-medium text-ink-2">PIN Mode Edit</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoFocus
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyPin(); }}
+                  placeholder="4-8 angka"
+                  className="w-full px-3 py-2 rounded-control border border-line bg-surface text-ink text-center text-base tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+              {pinError && <p className="text-[11px] text-neg font-medium">{pinError}</p>}
+              <button
+                onClick={handleVerifyPin}
+                disabled={pinInput.length < 4}
+                className="w-full py-2.5 rounded-control bg-ink text-surface text-sm font-semibold disabled:opacity-40 transition-opacity"
+              >
+                Buka Mode Edit
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Editor widget (reusable dari workspace) */}
+        <WidgetEditorModal
+          isOpen={!!editingWidget}
+          onClose={() => setEditingWidget(null)}
+          widget={editingWidget}
+          onSave={handleSaveWidget}
+        />
+
+        {savingEdit && (
+          <div className="fixed bottom-4 right-4 z-50 bg-ink text-surface text-xs px-3 py-2 rounded-control shadow-pop flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 animate-spin" />
+            Menyimpan perubahan...
+          </div>
+        )}
       </div>
     </ChartSelectionProvider>
   );
@@ -274,10 +432,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
 
 interface ShareWidgetCardProps {
   widget: WidgetSpec;
+  canEdit?: boolean;
+  onEdit?: () => void;
 }
 
-/** Kartu widget read-only untuk tampilan publik/embed. */
-const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget }) => {
+/** Kartu widget untuk tampilan publik/embed (opsional dapat diedit bila mode edit ber-PIN aktif). */
+const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget, canEdit = false, onEdit }) => {
   const isWide =
     widget.grid.w >= 8 ||
     widget.type === 'line' ||
@@ -298,9 +458,21 @@ const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget }) => {
             <h3 className="text-sm font-bold text-ink leading-snug">{widget.title}</h3>
             {widget.subtitle && <p className="text-xs text-ink-2 mt-0.5">{widget.subtitle}</p>}
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-2 text-ink-2 uppercase shrink-0 font-medium">
-            {widget.type}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {canEdit && onEdit && (
+              <button
+                onClick={onEdit}
+                className="p-1.5 rounded-control text-brand-ink hover:bg-brand/10 transition-colors"
+                title="Edit widget ini"
+                aria-label="Edit widget"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-2 text-ink-2 uppercase font-medium">
+              {widget.type}
+            </span>
+          </div>
         </div>
 
         <div className="flex-1 min-h-[160px]">

@@ -92,6 +92,7 @@ interface PersistedState {
   notifications?: NotificationItem[];
   auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
+  sharePins?: Record<string, string>;
   systemConfig?: typeof InMemoryDb.prototype.systemConfig;
   // Disertakan agar fallback file (saat MySQL mati) tetap lengkap —
   // bukan lagi setengah data yang hilang saat restart.
@@ -279,6 +280,8 @@ export class InMemoryDb {
   };
 
   public shareTokens: Record<string, string> = {}; // token -> dashboardId
+  /** token -> hash PIN (scrypt) untuk mode edit pada tautan publik. */
+  public sharePins: Record<string, string> = {};
 
   constructor() {
     this.seedCredentials();
@@ -298,6 +301,7 @@ export class InMemoryDb {
       notifications: this.notifications,
       auditLogs: this.auditLogs.slice(0, 500),
       shareTokens: this.shareTokens,
+      sharePins: this.sharePins,
       systemConfig: this.systemConfig,
       users: this.users,
       credentials: this.credentials,
@@ -341,6 +345,7 @@ export class InMemoryDb {
         if (Array.isArray(loaded.users)) this.users = loaded.users;
         if (Array.isArray(loaded.tenants)) this.tenants = loaded.tenants;
         if (loaded.shareTokens) this.shareTokens = loaded.shareTokens;
+        if (loaded.sharePins) this.sharePins = loaded.sharePins;
         if (loaded.credentials) this.credentials = loaded.credentials;
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
@@ -425,6 +430,7 @@ export class InMemoryDb {
       if (Array.isArray(parsed.notifications)) this.notifications = parsed.notifications;
       if (Array.isArray(parsed.auditLogs)) this.auditLogs = [...parsed.auditLogs, ...this.auditLogs];
       if (parsed.shareTokens) this.shareTokens = parsed.shareTokens;
+      if (parsed.sharePins) this.sharePins = parsed.sharePins;
       // Konfigurasi sistem (termasuk RAG provider/url/key dari panel admin)
       if (parsed.systemConfig) {
         this.systemConfig = { ...this.systemConfig, ...parsed.systemConfig };
@@ -462,6 +468,7 @@ export class InMemoryDb {
         notifications: this.notifications,
         auditLogs: this.auditLogs.slice(0, 500),
         shareTokens: this.shareTokens,
+        sharePins: this.sharePins,
         systemConfig: this.systemConfig,
         users: this.users,
         tenants: this.tenants,
