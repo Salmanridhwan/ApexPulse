@@ -1,8 +1,20 @@
 # Plan Rombak Tampilan Dashboard — "Clean Grid" (mengikuti referensi Plecto)
 
-Status: **PLAN — menunggu persetujuan**
+Status: **✅ SELESAI — dieksekusi 2026-10-06**
 Referensi visual: `clip_20261006_161156_2.png` (dashboard CRM light-theme: kartu putih, font grotesk, segmented toggle hitam, donut, bar chart dengan 1 bar highlight, list progress, tabel dengan baris dotted highlight)
 Keluhan user: *"tampilan dashboard seperti gambar, dan fontnya juga ikuti karena yang sekarang terlihat kurang clean"*
+
+## Hasil akhir (ringkas)
+
+Tema **Clean Grid** menggantikan **Soft 3D** di kedua mode, diterapkan ke **seluruh aplikasi**:
+- **Font Inter** (grotesk netral) + tabular-nums global — menggantikan Plus Jakarta Sans.
+- **Mode terang:** kanvas `#f4f6f8`, kartu putih, border tipis `#e8ecf1`, shadow sangat lembut, radius 12px.
+- **Mode gelap:** near-black netral `#0f1115` (bukan navy), kartu `#171a1f`.
+- **Kontras WCAG AA lulus** di kedua mode (dihitung via skrip).
+- **Segmented control** (pil aktif gelap) gaya referensi; sapu seluruh sisa Soft 3D (chart, KPI, toggle, table, brand, katalog SVG).
+- QA resmi **12/12 lulus**; build & TSC hijau.
+
+Commit: `d25219d` (font) · `4cc698b` (palet) · `ea197d5` (sapu + segmented) · docs ini.
 
 ---
 
@@ -109,8 +121,10 @@ Setiap fase = **1 commit** (jangan `git add -A`).
 
 ---
 
-## 7. Pertanyaan terbuka (perlu jawaban user sebelum Fase 1)
+## 7. Keputusan user (SUDAH DIJAWAB — 2026-10-06)
 
-1. **Font:** setuju **Inter**, atau mau saya siapkan 2–3 opsi font untuk dibandingkan dulu?
-2. **Cakupan:** rombak **hanya halaman workspace/kanvas dashboard**, atau **seluruh aplikasi** (sidebar, admin, katalog, dll) ikut gaya baru ini?
-3. **Nasib tema "Soft 3D":** gaya baru ini **menggantikan** arah Soft 3D (kanvas gelap-navy, shadow tebal), atau **hanya mode terang** yang diubah dan mode gelap tetap Soft 3D?
+1. **Font:** ✅ **Inter** (grotesk netral).
+2. **Cakupan:** ✅ **Seluruh aplikasi** — sidebar, header, admin, katalog, widget, login, share.
+3. **Nasib Soft 3D:** ✅ **Ganti arah** — "Clean Grid" menggantikan Soft 3D di **kedua mode** (terang & gelap).
+
+> Implikasi: plan ini **menggantikan** arah tema Soft 3D. Kanvas navy + shadow tebal dibuang; kartu jadi putih/abu muda, border tipis, shadow sangat lembut, font Inter, di kedua mode.
