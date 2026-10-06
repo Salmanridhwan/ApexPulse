@@ -1,7 +1,24 @@
 # Plan Redesign Tema ApexPulse — "Soft 3D" 2 Mode (Terang & Gelap)
 
-Status: **SELESAI** (Fase 0-6 dieksekusi)
+Status: **SELESAI** (Fase 0-6 dieksekusi + Fase 7 "penyeragaman UI")
 Referensi visual: `clip_20261005_213342_2.png` (dashboard dark-slate, kartu stat warna-warni, ring gauge 3D, area chart berlapis)
+
+## Fase 7 — Penyeragaman UI (toggle tema & tab aktif sidebar)
+
+Keluhan user: *"thema uinya masih belom seragam semua"*. Audit menemukan & memperbaiki:
+
+| Temuan | Perbaikan |
+|---|---|
+| Panel Admin tanpa tombol toggle tema | `ThemeToggle` ditambahkan di header Admin |
+| Tab aktif sidebar Admin = blok solid `bg-brand` | Disamakan ke gaya sidebar utama: **strip kiri brand 4px** + `bg-shell-active` + ikon brand |
+| Tab Alerts aktif `bg-ink` (hitam) | → `bg-brand text-white` |
+| Badge peran "Administrator" `bg-ink` | → `bg-brand/15 text-brand-ink` (pola badge seragam) |
+| Latar Alerts/Audit `bg-surface-2` | → `bg-canvas` (samakan DashboardList/Admin) |
+| ShareView banner & loading `bg-slate-900/800/700` | → token `shell` / `bg-canvas` |
+| 4 modal overlay `bg-slate-900/50` | → token `--color-scrim` |
+| **BUG KRITIS:** overlay `bg-ink/50` jadi TERANG di mode gelap | Token baru `--color-scrim: #10141d` (gelap di kedua mode) |
+
+**Verifikasi:** DOM membuktikan toggle ada & strip tab aktif = 1 di Admin/Audit/Ambang/Workspace (vision "tanpa strip" = false positive, strip 4px tak terlihat di skala screenshot). Scrim terverifikasi `rgb(16,20,28)` gelap di kedua mode. 0 sisa `slate-*`. QA 12/12. Commit `0cb0515`.
 
 ## Ringkasan hasil eksekusi
 
