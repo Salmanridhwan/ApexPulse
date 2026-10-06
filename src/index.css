@@ -149,6 +149,32 @@
   background-color: var(--color-surface-2);
   color: var(--color-ink-2);
 }
+
+/* Segmented control (gaya referensi: pil aktif gelap di dalam wadah abu). */
+@utility segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-chip);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+}
+@utility segmented-item {
+  border-radius: var(--radius-chip);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-2);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  &:hover {
+    color: var(--color-ink);
+  }
+}
+@utility segmented-item-active {
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+}
 /* Kartu stat beraksen (solid 1 warna, seperti referensi). Teks selalu putih
    agar lulus kontras; warna via accent-*. Ditaruh di @layer components (bukan
    @utility) karena aksen dipilih DINAMIS dari data — tidak boleh di-tree-shake. */

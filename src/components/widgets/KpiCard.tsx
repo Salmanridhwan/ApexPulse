@@ -263,7 +263,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
               <div className="w-full bg-surface-2 rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    targetTercapai ? 'bg-pos' : 'bg-gradient-to-r from-brand to-violet'
+                    targetTercapai ? 'bg-pos' : 'bg-warn'
                   }`}
                   style={{ width: `${Math.min(100, capaianPct ?? 92)}%` }}
                 />

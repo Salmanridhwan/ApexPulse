@@ -11,7 +11,7 @@ export function monogram(name: string): string {
   return (kata[0][0] + kata[1][0]).toUpperCase();
 }
 
-const WARNA_TILE = ['#38c6e2', '#8f90e4', '#2bb8a8', '#f2503a', '#e0a020', '#5b9bd5', '#b06be0'];
+const WARNA_TILE = ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#5b9bd5', '#9a6fe0'];
 
 /** Warna tile stabil per id — instansi yang sama selalu dapat warna sama. */
 export function warnaTile(id: string): string {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useThemeMode } from '../../theme';
 
-// Palet dot selaras palet chart (Soft 3D) — disesuaikan per mode agar kontras.
-const DOT_COLORS_LIGHT = ['#1fa6cc', '#7f80d8', '#0f9d6b', '#d98a12', '#9a6fe0', '#ee4b32', '#5b9bd5'];
-const DOT_COLORS_DARK = ['#38c6e2', '#8f90e4', '#3fd29a', '#ffb547', '#b58cf0', '#f2503a', '#5b9bd5'];
+// Palet dot selaras palet chart (Clean Grid) — disesuaikan per mode agar kontras.
+const DOT_COLORS_LIGHT = ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85', '#5b9bd5'];
+const DOT_COLORS_DARK = ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0', '#5b9bd5'];
 
 interface Column {
   key: string;

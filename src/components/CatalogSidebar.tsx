@@ -69,10 +69,10 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
       <div className="bg-shell text-shell-ink rounded-control p-2 flex items-center justify-between gap-2 border border-shell-line my-2">
         <div className="w-14 h-14 shrink-0 relative flex items-center justify-center">
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#4d5667" strokeWidth="4.5" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#8f90e4" strokeWidth="4.5" strokeDasharray="45 100" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#38c6e2" strokeWidth="4.5" strokeDasharray="25 100" strokeDashoffset="-45" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#f2503a" strokeWidth="4.5" strokeDasharray="18 100" strokeDashoffset="-70" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="var(--color-line-strong)" strokeWidth="4.5" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="var(--color-violet)" strokeWidth="4.5" strokeDasharray="45 100" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="var(--color-brand)" strokeWidth="4.5" strokeDasharray="25 100" strokeDashoffset="-45" />
+            <circle cx="18" cy="18" r="14" fill="none" stroke="var(--color-coral)" strokeWidth="4.5" strokeDasharray="18 100" strokeDashoffset="-70" />
           </svg>
           <span className="absolute text-[8px] font-bold text-shell-ink-2">100%</span>
         </div>
@@ -96,13 +96,13 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
           <svg viewBox="0 0 120 40" className="w-full h-full">
             <defs>
               <linearGradient id={`grad-${preset.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#38c6e2" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#38c6e2" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0.0" />
               </linearGradient>
             </defs>
             <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5 L 120 40 L 0 40 Z" fill={`url(#grad-${preset.id})`} />
-            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5" fill="none" stroke="#38c6e2" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="120" cy="5" r="3" fill="#38c6e2" stroke="#ffffff" strokeWidth="1.5" />
+            <path d="M0 35 Q 20 10, 40 25 T 80 15 T 120 5" fill="none" stroke="var(--color-brand)" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="120" cy="5" r="3" fill="var(--color-brand)" stroke="var(--color-surface)" strokeWidth="1.5" />
           </svg>
         </div>
       </div>
@@ -114,8 +114,8 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
       <div className="bg-shell text-shell-ink rounded-control p-2 flex items-center justify-between border border-shell-line my-2">
         <div className="w-16 h-11 relative flex items-center justify-center">
           <svg viewBox="0 0 40 25" className="w-full h-full">
-            <path d="M 5 22 A 15 15 0 0 1 35 22" fill="none" stroke="#4d5667" strokeWidth="4" strokeLinecap="round" />
-            <path d="M 5 22 A 15 15 0 0 1 28 9" fill="none" stroke="#38c6e2" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 5 22 A 15 15 0 0 1 35 22" fill="none" stroke="var(--color-line-strong)" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 5 22 A 15 15 0 0 1 28 9" fill="none" stroke="var(--color-brand)" strokeWidth="4" strokeLinecap="round" />
           </svg>
           <span className="absolute text-[10px] font-extrabold text-pos top-4">84%</span>
         </div>

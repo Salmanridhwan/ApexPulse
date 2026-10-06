@@ -81,21 +81,21 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
                         Tipe Grafik
                       </div>
-                      <div className="px-3 pb-1.5 flex gap-1">
-                        {(['line', 'bar', 'area'] as const).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => onEdit({ ...widget, type: t })}
-                            className={`flex-1 px-1.5 py-1 rounded-chip text-[11px] font-semibold transition-colors ${
-                              widget.type === t
-                                ? 'bg-brand text-white'
-                                : 'bg-surface-2 text-brand-ink hover:bg-line'
-                            }`}
-                          >
-                            {t === 'line' ? 'Garis' : t === 'bar' ? 'Batang' : 'Area'}
-                          </button>
-                        ))}
+                      <div className="px-3 pb-1.5">
+                        <div className="segmented w-full">
+                          {(['line', 'bar', 'area'] as const).map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => onEdit({ ...widget, type: t })}
+                              className={`segmented-item flex-1 ${
+                                widget.type === t ? 'segmented-item-active' : ''
+                              }`}
+                            >
+                              {t === 'line' ? 'Garis' : t === 'bar' ? 'Batang' : 'Area'}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div className="border-t border-line my-1" />
                     </>

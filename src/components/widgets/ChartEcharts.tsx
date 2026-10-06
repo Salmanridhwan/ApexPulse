@@ -8,20 +8,20 @@ import { useThemeMode } from '../../theme';
 /** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
 function chartTheme(mode: 'light' | 'dark') {
   return mode === 'dark'
-    ? { series: ['#8f90e4', '#38c6e2', '#f2503a', '#ffb547', '#3fd29a', '#b58cf0'], accent: '#8f90e4', accentSoft: '#38c6e2', track: '#4d5667', tick: '#5f6a7e', muted: '#9aa4b8', strong: '#f1f4f9', text2: '#cbd2df', grid: '#4d5667', tipBg: '#1d2129', tooltipInk: '#f1f4f9', surface: '#3a4150', heatLow: '#444c5d' }
-    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#5a6478', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', tooltipInk: '#f1f4f9', surface: '#f6f8fb', heatLow: '#d6eff7' };
+    ? { series: ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0'], accent: '#38c6e2', accentSoft: '#7fdcf0', track: '#2a2f37', tick: '#6b7280', muted: '#8b93a1', strong: '#f2f4f7', text2: '#b6bdc8', grid: '#2a2f37', tipBg: '#1f2329', tooltipInk: '#f2f4f7', surface: '#171a1f', heatLow: '#1f2329' }
+    : { series: ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85'], accent: '#1fa6cc', accentSoft: '#0f6b85', track: '#e8ecf1', tick: '#6b7280', muted: '#6b7280', strong: '#1a1d1f', text2: '#4b5563', grid: '#e8ecf1', tipBg: '#1a1d1f', tooltipInk: '#f2f4f7', surface: '#ffffff', heatLow: '#e6f6fb' };
 }
 
 /**
- * Peta warna seri lama (biru/sky/emerald default) -> palet Soft 3D.
+ * Peta warna seri lama (biru/sky/emerald default) -> palet Clean Grid.
  * Diterapkan saat render agar data tersimpan (MySQL/db.json) maupun respons
  * RAG lama otomatis konsisten, tanpa perlu migrasi data manual.
  */
 const WARNA_LEGACY: Record<string, string> = {
-  '#0284c7': '#38c6e2', '#0ea5e9': '#38c6e2', '#3b82f6': '#5b9bd5',
-  '#1d4ed8': '#8f90e4', '#10b981': '#2bb8a8', '#059669': '#2bb8a8',
-  '#f59e0b': '#e0a020', '#ea580c': '#e0a020', '#8b5cf6': '#8f90e4',
-  '#7c3aed': '#8f90e4', '#e11d48': '#f2503a', '#94a3b8': '#8f90e4',
+  '#0284c7': '#1fa6cc', '#0ea5e9': '#1fa6cc', '#3b82f6': '#1fa6cc',
+  '#1d4ed8': '#7f80d8', '#10b981': '#0f7a53', '#059669': '#0f7a53',
+  '#f59e0b': '#8f5e08', '#ea580c': '#8f5e08', '#8b5cf6': '#7f80d8',
+  '#7c3aed': '#7f80d8', '#e11d48': '#c62f22', '#94a3b8': '#7f80d8',
 };
 const keWarnaTema = (c?: string): string | undefined =>
   c ? (WARNA_LEGACY[c.toLowerCase()] ?? c) : c;

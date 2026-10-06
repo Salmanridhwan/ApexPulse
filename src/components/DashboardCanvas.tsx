@@ -120,7 +120,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-5 auto-rows-min pb-12">
+    <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-12">
       {widgets.map((widget) => {
         // Map grid.w to responsive Tailwind column span
         // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
