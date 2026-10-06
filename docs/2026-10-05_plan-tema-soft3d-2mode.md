@@ -50,6 +50,25 @@ Permintaan: "implementasikan juga ke widget widget chartnya".
 
 **Verifikasi DOM:** token berubah antar mode (`canvas #dfe4ec→#2d333f`, `ink #232a38→#f1f4f9`, `brand #1fa6cc→#38c6e2`); kartu widget ikut (`rgb(251,252,254)→rgb(58,65,80)`). QA 12/12. Commit `cc9fec0`.
 
+### Fase 8 — Primitif ItemCard (pola item/kartu seragam)
+
+Permintaan user (dengan screenshot item sidebar): jadikan pola item sidebar (bar aksen kiri + ikon dalam tile + judul tebal + baris meta) sebagai **standar semua item daftar & kartu**.
+
+**Solusi:** satu primitif reusable `src/components/ui/ItemCard.tsx` + utility CSS `.item-card` / `.item-bar` / `.item-tile` (warna via `--item-accent`).
+
+| Diterapkan ke | Aksen |
+|---|---|
+| AlertsPage (notifikasi) | severity: neg/warn/brand |
+| AlertsModal (notifikasi + aturan) | severity |
+| Admin (tenant ×2, log audit, 6 kartu stat) | brand/violet/pos/warn |
+| CatalogSidebar (25 preset) | brand + ikon tipe chart |
+| ChatPanel (rekomendasi) | brand |
+| DashboardList (4 metrik + kartu dashboard) | brand/violet/pos |
+| WidgetCard (**semua widget**) | brand |
+| ShareView (ShareWidgetCard) | brand |
+
+**Verifikasi DOM:** Katalog 25/25 kartu punya `.item-bar` 4px (left=0); Alerts 2/2 bar ikut mode (`rgb(31,166,204)`↔`rgb(56,198,226)`); Admin 6 ItemCard. Vision 3× false positive "tanpa bar" → dibuktikan DOM bar ADA. QA 12/12. Commit `69108dd`.
+
 ## Ringkasan hasil eksekusi
 
 | Fase | Hasil | Commit |
