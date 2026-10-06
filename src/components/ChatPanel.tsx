@@ -41,9 +41,9 @@ const ChartIcon: React.FC<{ type: string; className?: string }> = ({ type, class
 // Category color map
 const categoryColor: Record<string, string> = {
   Keuangan: 'bg-pos/15 text-pos border-pos/30',
-  Operasional: 'bg-surface-2 text-brand-ink border-line',
+  Operasional: 'bg-brand/15 text-brand-ink border-brand/30',
   'Kepatuhan & Risiko': 'bg-warn/15 text-warn border-warn/30',
-  SDM: 'bg-violet-50 text-violet-700 border-violet-200',
+  SDM: 'bg-violet/15 text-violet border-violet/30',
   Pelanggan: 'bg-neg/15 text-neg border-neg/30',
 };
 const getCategoryClass = (cat: string) =>

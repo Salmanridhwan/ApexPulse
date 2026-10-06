@@ -97,7 +97,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('notifications')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'notifications'
-                ? 'border-neg text-neg'
+                ? 'border-brand text-brand-ink font-bold'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
@@ -107,7 +107,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('rules')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'rules'
-                ? 'border-brand text-brand-ink'
+                ? 'border-brand text-brand-ink font-bold'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
@@ -117,7 +117,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           <button
             onClick={() => setActiveTab('create')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'create'
-                ? 'border-pos text-pos'
+                ? 'border-brand text-brand-ink font-bold'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >

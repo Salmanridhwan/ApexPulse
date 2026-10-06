@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Lock, Printer, Shield, ShieldCheck } from 'lucide-react';
 import { LogoTile } from '../components/BrandMark';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { GlobalFiltersBar } from '../components/GlobalFiltersBar';
 import { ActiveChartFilterChip, ChartSelectionProvider } from '../components/widgets/ChartSelection';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
@@ -184,6 +185,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             <span className="hidden sm:inline text-shell-ink-2 text-[11px]">Mode Publik Read-Only</span>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={handlePrint}
               className="px-3 py-1 rounded-control bg-shell-hover hover:bg-shell-active text-shell-ink border border-shell-line transition-colors flex items-center gap-1.5 text-[11px]"

@@ -153,7 +153,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           <button
             onClick={() => setActiveTab('config')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'config'
-                ? 'border-brand text-brand-ink'
+                ? 'border-brand text-brand-ink font-bold'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >
@@ -163,7 +163,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           <button
             onClick={() => setActiveTab('correction')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'correction'
-                ? 'border-warn text-warn'
+                ? 'border-brand text-brand-ink font-bold'
                 : 'border-transparent text-ink-2 hover:text-ink'
               }`}
           >

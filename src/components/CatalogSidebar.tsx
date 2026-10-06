@@ -32,7 +32,7 @@ const PresetChartPreview: React.FC<{ preset: CatalogPreset }> = ({ preset }) => 
           <span className="text-[10px] text-shell-ink-2 font-medium block">Estimasi Nilai ({preset.satuan})</span>
           <div className="text-sm font-extrabold text-shell-ink tracking-tight flex items-baseline gap-1.5 mt-0.5">
             <span>128.4</span>
-            <span className="text-[10px] font-semibold text-pos bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">+8.5% YoY</span>
+            <span className="text-[10px] font-semibold text-pos bg-pos/15 px-1.5 py-0.2 rounded border border-pos/30">+8.5% YoY</span>
           </div>
         </div>
         <div className="w-16 h-7 opacity-90">
@@ -268,7 +268,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('current')}
             className={`flex-1 py-1 px-2 rounded-chip font-medium text-center transition-all ${sectorTab === 'current'
-                ? 'bg-surface text-brand-ink shadow-xs'
+                ? 'bg-brand text-white shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >
@@ -277,7 +277,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('universal')}
             className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'universal'
-                ? 'bg-surface text-brand-ink shadow-xs'
+                ? 'bg-brand text-white shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >
@@ -286,7 +286,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('all')}
             className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'all'
-                ? 'bg-surface text-brand-ink shadow-xs'
+                ? 'bg-brand text-white shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >

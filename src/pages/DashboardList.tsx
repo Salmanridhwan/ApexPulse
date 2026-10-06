@@ -132,7 +132,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               placeholder="Cari dashboard berdasarkan judul atau deskripsi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card text-xs font-medium text-ink placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card text-xs font-medium text-ink placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
           </div>
 
