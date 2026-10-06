@@ -191,18 +191,18 @@ export const KpiCard: React.FC<KpiCardProps> = ({
       <div className={`relative z-10 flex flex-col justify-between h-full ${hero ? 'gap-2' : 'gap-1.5'}`}>
         <div className="flex items-baseline gap-2 flex-wrap">
           {awalanRp && (
-            <span className={`${hero ? 'text-xl' : 'text-base'} font-bold text-ink-3`}>{awalanRp}</span>
+            <span className={`${hero ? 'text-xl' : 'text-base'} font-normal text-ink-3`}>{awalanRp}</span>
           )}
           <span
             data-testid="kpi-value"
-            className={`kpi-enter ${angkaKelas} leading-none font-extrabold tracking-tight tabular-nums ${
+            className={`kpi-enter ${angkaKelas} leading-none font-normal tracking-tight tabular-nums ${
               isCorrected ? 'text-warn' : 'text-ink'
             }`}
           >
             {value}
           </span>
           {satuanAkhir && (
-            <span className={`${hero ? 'text-sm' : 'text-xs'} font-semibold text-ink-3`}>{satuanAkhir}</span>
+            <span className={`${hero ? 'text-sm' : 'text-xs'} font-normal text-ink-3`}>{satuanAkhir}</span>
           )}
         </div>
 

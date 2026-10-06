@@ -60,7 +60,7 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
                 style={{ width: `${Math.round(((it.n ?? 0) / max) * 100)}%`, backgroundColor: it.color }}
               />
             </span>
-            <span className="text-sm font-bold text-ink tabular-nums w-16 text-right shrink-0">
+            <span className="text-sm font-normal text-ink tabular-nums w-16 text-right shrink-0">
               {String(it.value)}
             </span>
           </div>
@@ -96,7 +96,7 @@ export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
                   <td
                     key={col.key}
                     className={`px-3 py-2 whitespace-nowrap ${
-                      col !== labelCol ? 'font-semibold text-ink tabular-nums' : 'font-medium'
+                      col !== labelCol ? 'font-normal text-ink tabular-nums' : 'font-medium'
                     }`}
                   >
                     {row[col.key] !== undefined && row[col.key] !== null ? String(row[col.key]) : '-'}
