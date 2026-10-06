@@ -20,6 +20,22 @@ Keluhan user: *"thema uinya masih belom seragam semua"*. Audit menemukan & mempe
 
 **Verifikasi:** DOM membuktikan toggle ada & strip tab aktif = 1 di Admin/Audit/Ambang/Workspace (vision "tanpa strip" = false positive, strip 4px tak terlihat di skala screenshot). Scrim terverifikasi `rgb(16,20,28)` gelap di kedua mode. 0 sisa `slate-*`. QA 12/12. Commit `0cb0515`.
 
+### Fase 7b — Sapu seluruh komponen
+
+Audit lanjutan atas permintaan "implementasikan ke SEMUA komponen":
+
+| Komponen | Temuan | Perbaikan |
+|---|---|---|
+| `AlertsModal` | 3 tab aktif pakai 3 warna (neg/brand/pos) | → `border-brand text-brand-ink font-bold` |
+| `WidgetEditorModal` | tab config brand vs correction warn | → seragam brand |
+| `CatalogSidebar` | **2 gaya berbeda dalam 1 komponen** (`sectorTab` = `bg-surface`, `selectedCategory` = `bg-brand`) | → keduanya `bg-brand text-white` |
+| `ChatPanel` | kategori SDM pakai `violet-50/700/200` mentah; Operasional netral | → token `violet/15`, `brand/15` |
+| `CatalogSidebar` | badge `emerald-950/80` mentah | → `bg-pos/15` |
+| `DashboardList` | `placeholder-slate-400` | → `placeholder:text-ink-3` |
+| `ShareView` | **satu-satunya halaman tanpa toggle** | `ThemeToggle` ditambahkan di banner |
+
+**Verifikasi DOM:** toggle=1 di Login/Workspace/Admin/ShareView; strip aktif=1 di Workspace & Admin; Katalog `sectorTab` & kategori sama-sama `rgb(56,198,226)`. 0 sisa warna mentah. QA 12/12. Commit `e9993d9`.
+
 ## Ringkasan hasil eksekusi
 
 | Fase | Hasil | Commit |
