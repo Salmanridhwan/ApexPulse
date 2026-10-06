@@ -181,12 +181,12 @@ export class MockRagClient implements RagClient {
                   {
                     name: 'Produksi IPA',
                     data: [5.8, 5.9, 6.1, 6.0, 6.2, 6.1, 6.3, 6.2, 6.4, 6.1, 6.1, 6.25],
-                    color: '#0284c7',
+                    color: '#38c6e2',
                   },
                   {
                     name: 'Air Terdistribusi & Terjual',
                     data: [4.2, 4.3, 4.5, 4.4, 4.6, 4.6, 4.8, 4.7, 4.9, 4.7, 4.8, 4.85],
-                    color: '#10b981',
+                    color: '#2bb8a8',
                   },
                 ],
                 unit: 'Juta m³',
@@ -211,7 +211,7 @@ export class MockRagClient implements RagClient {
                   {
                     name: 'Pelanggan',
                     data: [118500, 19200, 4150, 6800],
-                    color: '#0ea5e9',
+                    color: '#38c6e2',
                   },
                 ],
                 unit: 'SL',
@@ -327,12 +327,12 @@ export class MockRagClient implements RagClient {
                   {
                     name: 'Realisasi TW1 2026',
                     data: [7.2, 5.8, 2.9, 1.85, 1.0],
-                    color: '#3b82f6',
+                    color: '#5b9bd5',
                   },
                   {
                     name: 'Target RKAP',
                     data: [7.0, 5.5, 3.1, 1.7, 0.9],
-                    color: '#94a3b8',
+                    color: '#8f90e4',
                   },
                 ],
                 unit: 'Triliun Rp',
@@ -413,7 +413,7 @@ export class MockRagClient implements RagClient {
                   {
                     name: 'Realisasi Bulanan',
                     data: [42, 45, 48, 47, 50, 52, 53, 51, 55, 54, 56, 58],
-                    color: '#0284c7',
+                    color: '#38c6e2',
                   },
                 ],
               },

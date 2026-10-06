@@ -237,7 +237,7 @@ export function satuanSeragam(teks: unknown): string | undefined {
   return s;
 }
 
-const WARNA_SERI = ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6'];
+const WARNA_SERI = ['#38c6e2', '#2bb8a8', '#e0a020', '#8f90e4'];
 
 /**
  * Ubah hasil /extract (satu dashboard berupa data: kpi[], grafik, tabel, narasi)

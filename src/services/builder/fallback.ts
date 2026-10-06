@@ -100,12 +100,12 @@ export function getFallbackDemoDashboard(sector: BumdSector, tenantId: string): 
                 {
                   name: 'Produksi IPA',
                   data: [5.8, 5.9, 6.0, 6.1, 6.2, 6.1, 6.3, 6.2, 6.4, 6.1, 6.1, 6.25],
-                  color: '#0284c7',
+                  color: '#38c6e2',
                 },
                 {
                   name: 'Air Terjual',
                   data: [4.2, 4.3, 4.5, 4.4, 4.6, 4.6, 4.8, 4.7, 4.9, 4.7, 4.8, 4.85],
-                  color: '#10b981',
+                  color: '#2bb8a8',
                 },
               ],
               unit: 'Juta m³',
@@ -221,12 +221,12 @@ export function getFallbackDemoDashboard(sector: BumdSector, tenantId: string): 
                 {
                   name: 'Realisasi TW1 2026',
                   data: [7.2, 5.8, 2.9, 1.85, 1.0],
-                  color: '#3b82f6',
+                  color: '#5b9bd5',
                 },
                 {
                   name: 'Target RKAP',
                   data: [7.0, 5.5, 3.1, 1.7, 0.9],
-                  color: '#94a3b8',
+                  color: '#8f90e4',
                 },
               ],
               showLegend: true,
@@ -306,7 +306,7 @@ export function getFallbackDemoDashboard(sector: BumdSector, tenantId: string): 
                 {
                   name: 'Realisasi Bulanan',
                   data: [1.1, 1.15, 1.2, 1.18, 1.25, 1.3, 1.28, 1.35, 1.4, 1.42, 1.45, 1.5],
-                  color: '#0284c7',
+                  color: '#38c6e2',
                 },
               ],
             },

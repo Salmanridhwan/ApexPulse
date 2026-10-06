@@ -110,7 +110,7 @@ export class InMemoryDb {
       code: 'PAM-TK',
       city: 'Kota Mandiri',
       logo: '💧',
-      primaryColor: '#0284c7',
+      primaryColor: '#38c6e2',
       documentCount: 48,
     },
     {
@@ -121,7 +121,7 @@ export class InMemoryDb {
       code: 'BPD-AD',
       city: 'Provinsi Nusantara',
       logo: '🏦',
-      primaryColor: '#1d4ed8',
+      primaryColor: '#8f90e4',
       documentCount: 76,
     },
     {
@@ -132,7 +132,7 @@ export class InMemoryDb {
       code: 'PRS-01',
       city: 'Kota Mandiri',
       logo: '🏪',
-      primaryColor: '#059669',
+      primaryColor: '#2bb8a8',
       documentCount: 34,
     },
     {
@@ -143,7 +143,7 @@ export class InMemoryDb {
       code: 'RSUD-SM',
       city: 'Kabupaten Madani',
       logo: '🏥',
-      primaryColor: '#e11d48',
+      primaryColor: '#f2503a',
       documentCount: 62,
     },
     {
@@ -154,7 +154,7 @@ export class InMemoryDb {
       code: 'TMD-09',
       city: 'Kota Metropolitan',
       logo: '🚌',
-      primaryColor: '#ea580c',
+      primaryColor: '#e0a020',
       documentCount: 29,
     },
     {
@@ -165,7 +165,7 @@ export class InMemoryDb {
       code: 'AUKM-03',
       city: 'Kota Mandiri',
       logo: '🏢',
-      primaryColor: '#7c3aed',
+      primaryColor: '#8f90e4',
       documentCount: 22,
     },
   ];

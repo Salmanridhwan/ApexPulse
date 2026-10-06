@@ -105,7 +105,7 @@ export function buildWidgetsFromMetadata(
         {
           name: primaryMetric,
           data: [20.2, 21.0, 21.8, 22.4, 22.9, 23.5, 23.2, 24.1, 24.5, 24.8, 25.1, 25.6],
-          color: '#0284c7',
+          color: '#38c6e2',
         },
       ],
       unit: primaryUnit,

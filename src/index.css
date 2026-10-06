@@ -18,10 +18,10 @@
 
   --color-ink: #232a38;
   --color-ink-2: #4a5468;
-  --color-ink-3: #667187;
+  --color-ink-3: #5a6478;   /* digelapkan: lulus WCAG AA di kanvas (4.66:1) */
 
   --color-brand: #1fa6cc;       /* cyan */
-  --color-brand-ink: #167f9e;
+  --color-brand-ink: #157b99;   /* digelapkan: lulus WCAG AA (4.73:1) */
   --color-brand-soft: #d6eff7;
   --color-violet: #7f80d8;      /* periwinkle */
   --color-coral: #ee4b32;       /* merah-oranye */
@@ -59,7 +59,7 @@
 
   --color-ink: #f1f4f9;
   --color-ink-2: #cbd2df;
-  --color-ink-3: #9aa4b8;
+  --color-ink-3: #a8b1c2;   /* diterangkan: lulus WCAG AA di permukaan (4.74:1) */
 
   --color-brand: #38c6e2;
   --color-brand-ink: #7fdcf0;

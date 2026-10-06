@@ -9,8 +9,22 @@ import { useThemeMode } from '../../theme';
 function chartTheme(mode: 'light' | 'dark') {
   return mode === 'dark'
     ? { series: ['#8f90e4', '#38c6e2', '#f2503a', '#ffb547', '#3fd29a', '#b58cf0'], accent: '#8f90e4', accentSoft: '#38c6e2', track: '#4d5667', tick: '#5f6a7e', muted: '#9aa4b8', strong: '#f1f4f9', text2: '#cbd2df', grid: '#4d5667', tipBg: '#1d2129', surface: '#3a4150', heatLow: '#444c5d' }
-    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#667187', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', surface: '#f6f8fb', heatLow: '#d6eff7' };
+    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#5a6478', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', surface: '#f6f8fb', heatLow: '#d6eff7' };
 }
+
+/**
+ * Peta warna seri lama (biru/sky/emerald default) -> palet Soft 3D.
+ * Diterapkan saat render agar data tersimpan (MySQL/db.json) maupun respons
+ * RAG lama otomatis konsisten, tanpa perlu migrasi data manual.
+ */
+const WARNA_LEGACY: Record<string, string> = {
+  '#0284c7': '#38c6e2', '#0ea5e9': '#38c6e2', '#3b82f6': '#5b9bd5',
+  '#1d4ed8': '#8f90e4', '#10b981': '#2bb8a8', '#059669': '#2bb8a8',
+  '#f59e0b': '#e0a020', '#ea580c': '#e0a020', '#8b5cf6': '#8f90e4',
+  '#7c3aed': '#8f90e4', '#e11d48': '#f2503a', '#94a3b8': '#8f90e4',
+};
+const keWarnaTema = (c?: string): string | undefined =>
+  c ? (WARNA_LEGACY[c.toLowerCase()] ?? c) : c;
 
 // echarts (~1 MB) hanya dimuat saat widget chart pertama dirender —
 // tidak ikut bundle awal. Promise di-cache supaya import sekali saja.
@@ -307,7 +321,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         const paletSoft = T.series;
         const echartsSeries = seriesView.map((s, sIdx) => {
           // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
-          const baseColor = s.color || paletSoft[sIdx % paletSoft.length];
+          const baseColor = keWarnaTema(s.color) || paletSoft[sIdx % paletSoft.length];
           return {
             name: s.name,
             type: (isArea ? 'line' : type) as any,
