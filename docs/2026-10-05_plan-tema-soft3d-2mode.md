@@ -36,6 +36,20 @@ Audit lanjutan atas permintaan "implementasikan ke SEMUA komponen":
 
 **Verifikasi DOM:** toggle=1 di Login/Workspace/Admin/ShareView; strip aktif=1 di Workspace & Admin; Katalog `sectorTab` & kategori sama-sama `rgb(56,198,226)`. 0 sisa warna mentah. QA 12/12. Commit `e9993d9`.
 
+### Fase 7c — Widget chart
+
+Permintaan: "implementasikan juga ke widget widget chartnya".
+
+| Widget | Temuan | Perbaikan |
+|---|---|---|
+| `ChartEcharts` | 2 tooltip pakai `#f8fafc` hardcoded (donut & cartesian) | token `tooltipInk` di `chartTheme` (ikut mode) |
+| `DataTable` | `DOT_COLORS` satu palet untuk kedua mode | dipisah LIGHT/DARK via `useThemeMode` |
+| `WidgetCard` | pemilih tipe grafik (Garis/Batang/Area) aktif pakai gradient brand→violet | → `bg-brand text-white` |
+
+**Sudah konsisten (diverifikasi, tidak diubah):** `ChartEcharts` pakai `useThemeMode` + `themeMode` di dependensi `useEffect` → re-render saat mode berubah; semua tipe chart (line/area/bar/donut/heatmap/gauge) pakai token tema; `RingGauge3D` white/black = efek bevel 3D (sah); KpiCard progress gradient = dekoratif.
+
+**Verifikasi DOM:** token berubah antar mode (`canvas #dfe4ec→#2d333f`, `ink #232a38→#f1f4f9`, `brand #1fa6cc→#38c6e2`); kartu widget ikut (`rgb(251,252,254)→rgb(58,65,80)`). QA 12/12. Commit `cc9fec0`.
+
 ## Ringkasan hasil eksekusi
 
 | Fase | Hasil | Commit |
