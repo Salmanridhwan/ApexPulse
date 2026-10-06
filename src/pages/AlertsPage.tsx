@@ -51,7 +51,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
         {/* Page Header Header & Description */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-control bg-neg flex items-center justify-center text-white shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-control bg-neg flex items-center justify-center text-on-neg shrink-0 shadow-sm">
               <Bell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
@@ -85,7 +85,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('notifications')}
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'notifications'
-                    ? 'bg-brand text-white shadow-sm'
+                    ? 'bg-brand text-on-brand shadow-sm'
                     : 'bg-surface-2 text-ink-2 hover:bg-brand/10 hover:text-brand-ink'
                 }`}
               >
@@ -95,7 +95,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 onClick={() => setActiveTab('rules')}
                 className={`px-4 py-2 rounded-control text-xs font-bold transition-colors ${
                   activeTab === 'rules'
-                    ? 'bg-brand text-white shadow-sm'
+                    ? 'bg-brand text-on-brand shadow-sm'
                     : 'bg-surface-2 text-ink-2 hover:bg-brand/10 hover:text-brand-ink'
                 }`}
               >

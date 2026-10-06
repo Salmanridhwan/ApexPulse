@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={`h-14 border-b border-shell-line flex items-center shrink-0 ${isCollapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
         {!isCollapsed ? (
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-control bg-brand text-white flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center shrink-0">
               <Activity className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-control bg-brand text-white flex items-center justify-center" title="ApexPulse Studio">
+          <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center" title="ApexPulse Studio">
             <Activity className="w-4 h-4" />
           </div>
         )}
@@ -216,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {currentView === 'alerts' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
               <Bell className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'alerts' ? 'text-brand' : unreadAlertsCount > 0 ? 'text-neg' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
               {!isCollapsed && <span className="flex-1 truncate">Ambang Batas & Alert</span>}
-              {unreadAlertsCount > 0 && <span className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-auto'} px-1.5 py-0.2 rounded-full ${currentView === 'alerts' ? 'bg-surface text-brand' : 'bg-neg text-white'} text-[10px] font-bold`}>{unreadAlertsCount}</span>}
+              {unreadAlertsCount > 0 && <span className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-auto'} px-1.5 py-0.2 rounded-full ${currentView === 'alerts' ? 'bg-surface text-brand' : 'bg-neg text-on-neg'} text-[10px] font-bold`}>{unreadAlertsCount}</span>}
             </button>
             {currentUser?.role === 'admin' && (
               <button onClick={onOpenAdmin} className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'admin' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title="Panel Admin & Pengaturan Studio">

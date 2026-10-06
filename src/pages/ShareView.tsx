@@ -269,7 +269,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
               ) : (
                 <button
                   onClick={() => { setShowPinDialog(true); setPinError(null); }}
-                  className="px-3 py-1 rounded-control bg-brand text-white hover:opacity-90 transition-opacity flex items-center gap-1.5 text-[11px] font-semibold"
+                  className="px-3 py-1 rounded-control bg-brand text-on-brand hover:opacity-90 transition-opacity flex items-center gap-1.5 text-[11px] font-semibold"
                   title="Masukkan PIN untuk mengedit"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -367,14 +367,14 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         {/* Dialog PIN mode edit */}
         {showPinDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/50 p-4">
-            <div className="w-full max-w-sm bg-surface rounded-card border border-line shadow-pop p-6 space-y-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="pin-dialog-title" className="w-full max-w-sm bg-surface rounded-card border border-line shadow-pop p-6 space-y-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-card bg-brand/15 text-brand-ink flex items-center justify-center">
                     <Lock className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-ink">Mode Edit Tautan Publik</h3>
+                    <h3 id="pin-dialog-title" className="text-sm font-bold text-ink">Mode Edit Tautan Publik</h3>
                     <p className="text-[11px] text-ink-3">Masukkan PIN untuk mengedit widget.</p>
                   </div>
                 </div>
@@ -399,7 +399,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
                   className="w-full px-3 py-2 rounded-control border border-line bg-surface text-ink text-center text-base tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
-              {pinError && <p className="text-[11px] text-neg font-medium">{pinError}</p>}
+              {pinError && <p role="alert" className="text-[11px] text-neg font-medium">{pinError}</p>}
               <button
                 onClick={handleVerifyPin}
                 disabled={pinInput.length < 4}

@@ -102,7 +102,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenChat}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             <span>Buat via Chat</span>

@@ -91,15 +91,15 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col">
+      <div role="dialog" aria-modal="true" aria-labelledby="share-modal-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-on-brand">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 id="share-modal-title" className="text-sm font-semibold text-ink">
                 Bagikan Dashboard (Read-Only)
               </h2>
               <p className="text-xs text-ink-2 truncate max-w-xs">{dashboard.title}</p>
@@ -130,7 +130,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-card font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-on-brand rounded-card font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
                 <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi Baru'}</span>
@@ -148,7 +148,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 />
                 <button
                   onClick={copyToClipboard}
-                  className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
+                  className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
                 >
                   {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
@@ -188,7 +188,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   />
                   <button
                     onClick={copyEmbedSnippet}
-                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 flex items-center gap-1"
+                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
                     {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
@@ -223,13 +223,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     inputMode="numeric"
                     value={pinDraft}
                     onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder={hasEditPin ? 'PIN aktif — isi untuk ganti' : '4-8 angka'}
+                    placeholder={hasEditPin ? 'PIN aktif, isi untuk ganti' : '4-8 angka'}
                     className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                   <button
                     onClick={() => handleSavePin(pinDraft)}
                     disabled={pinSaving || (pinDraft.length > 0 && pinDraft.length < 4)}
-                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-white rounded-control transition-colors shrink-0 disabled:opacity-40"
+                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 disabled:opacity-40"
                   >
                     {pinSaving ? '...' : hasEditPin ? 'Perbarui' : 'Aktifkan'}
                   </button>
@@ -253,7 +253,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <div className="p-4 border-t border-line bg-surface-2 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-ink hover:bg-ink/90 text-white text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-ink hover:bg-ink/90 text-surface text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

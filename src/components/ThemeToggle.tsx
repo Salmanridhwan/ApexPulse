@@ -25,7 +25,7 @@ export const ThemeToggle: React.FC = () => {
       <Sun className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-500" />
       <Moon className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-brand-ink" />
       <span
-        className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-ink flex items-center justify-center text-surface transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+        className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-ink flex items-center justify-center text-surface transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           gelap ? 'translate-x-[26px]' : 'translate-x-0'
         }`}
       >

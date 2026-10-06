@@ -51,15 +51,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
+      <div role="dialog" aria-modal="true" aria-labelledby="export-modal-title" className="relative w-full max-w-2xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-ink flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-ink flex items-center justify-center text-surface">
               <Printer className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 id="export-modal-title" className="text-sm font-semibold text-ink">
                 Laporan Eksekutif Resmi BUMD (Cetak & Ekspor)
               </h2>
               <p className="text-xs text-ink-2">Standar Dokumen Pertanggungjawaban Daerah</p>
@@ -84,7 +84,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div className="flex items-center gap-3">                  <span className="text-3xl" aria-hidden="true">{tenant?.logo || '🏛️'}</span>
                 <div>
                   <h1 className="text-sm font-extrabold tracking-tight uppercase text-ink">
-                    {tenant?.name || 'PEMERINTAH DAERAH — BADAN USAHA MILIK DAERAH'}
+                    {tenant?.name || 'PEMERINTAH DAERAH, BADAN USAHA MILIK DAERAH'}
                   </h1>
                   <p className="text-[11px] text-ink-2 font-medium">
                     Sistem Pemantauan Kinerja & Data Terintegrasi ApexPulse • {tenant?.city || 'Indonesia'}
@@ -144,7 +144,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                             Dokumen Resmi
                           </span>
                         ) : (
-                          <span className="text-ink-3">—</span>
+                          <span className="text-ink-3">-</span>
                         )}
                       </td>
                     </tr>
@@ -206,7 +206,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </button>
             <button
               onClick={handlePrint}
-              className="px-5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Cetak / Simpan PDF</span>

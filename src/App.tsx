@@ -712,7 +712,7 @@ export default function App() {
                 onClick={() => setIsChatOpen(!isChatOpen)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-control transition-colors border ${
                   isChatOpen
-                    ? 'bg-brand text-white border-brand'
+                    ? 'bg-brand text-on-brand border-brand'
                     : 'bg-surface hover:bg-surface-2 text-ink-2 border-line'
                 }`}
                 title="Buka / Tutup Chat RAG Copilot"
@@ -802,7 +802,7 @@ export default function App() {
                                 <div className="flex gap-1.5">
                                   <button
                                     onClick={() => { setHapusKonfirmasi(false); setIsMoreMenuOpen(false); handleDeleteDashboard(activeDashboard.id); }}
-                                    className="flex-1 px-2 py-1.5 bg-neg hover:bg-neg text-white rounded-control text-[11px] font-bold transition-colors"
+                                    className="flex-1 px-2 py-1.5 bg-neg hover:bg-neg text-on-neg rounded-control text-[11px] font-bold transition-colors"
                                   >
                                     Ya, Hapus
                                   </button>
@@ -948,7 +948,7 @@ export default function App() {
                           {/* Deskripsi / sub judul */}
                           <h2 className="text-sm sm:text-[15px] font-bold text-ink leading-snug truncate max-w-2xl">
                             {activeDashboard.description ||
-                              `${currentTenant?.name || ''} — Dashboard Kinerja`}
+                              `${currentTenant?.name ? currentTenant.name + ' | ' : ''}Dashboard Kinerja`}
                           </h2>
                           {/* Metadata baris bawah */}
                           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1011,7 +1011,7 @@ export default function App() {
                           </button>
                           <button
                             onClick={() => setIsShareOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-brand hover:bg-brand-ink rounded-control transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors"
                           >
                             <Share2 className="w-3 h-3" />
                             Bagikan

@@ -67,7 +67,7 @@ const RecommendationCards: React.FC<{
         <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
         <div className="flex items-start gap-2.5">
           {/* index badge */}
-          <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5 group-hover:bg-brand group-hover:text-white transition-colors">
+          <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5 group-hover:bg-brand group-hover:text-on-brand transition-colors">
             {i + 1}
           </span>
           <div className="flex-1 min-w-0">
@@ -300,7 +300,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2/70">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white shadow-xs">
+          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-on-brand shadow-xs">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -354,7 +354,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <div
               className={`max-w-[92%] rounded-card p-3.5 text-xs leading-relaxed shadow-xs ${
                 msg.sender === 'user'
-                  ? 'bg-brand text-white rounded-tr-none'
+                  ? 'bg-brand text-on-brand rounded-tr-none'
                   : 'bg-surface-2 border border-line/80 text-ink rounded-tl-none'
               }`}
             >
@@ -482,24 +482,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="relative flex items-center justify-center">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
-                    <div className="w-6 h-6 rounded-control bg-brand text-white flex items-center justify-center relative z-10 shadow-xs">
+                    <div className="w-6 h-6 rounded-control bg-brand text-on-brand flex items-center justify-center relative z-10 shadow-xs">
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
                   </div>
                   <div>
                     <span className="font-bold text-ink text-[11px] block">ApexPulse Orchestrator</span>
-                    <span className="text-[10px] text-brand font-medium flex items-center gap-1">
+                    <span role="status" aria-live="polite" className="text-[10px] text-brand font-medium flex items-center gap-1">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                       Sedang memproses & menganalisis...
                     </span>
                   </div>
                 </div>
 
-                {/* Animated Bouncing Dots */}
+                {/* Animated Typing Dots — exponential ease-out, bukan bounce */}
                 <div className="flex items-center gap-1 bg-surface-2 px-2 py-1 rounded-full border border-line">
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand dot-typing" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand dot-typing" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand dot-typing" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
 
@@ -528,7 +528,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       )}
                       <span className="flex-1 truncate">{step.title}</span>
                       {isCurrent && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand text-white font-mono uppercase tracking-wider animate-pulse">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand text-on-brand font-mono uppercase tracking-wider animate-pulse">
                           Aktif
                         </span>
                       )}
@@ -602,7 +602,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <button
             type="submit"
             disabled={!inputPrompt.trim() || isStreaming}
-            className="absolute right-1.5 p-1.5 rounded-control bg-brand hover:bg-brand-ink text-white disabled:opacity-40 disabled:hover:bg-brand transition-colors"
+            className="absolute right-1.5 p-1.5 rounded-control bg-brand hover:bg-brand-ink text-on-brand disabled:opacity-40 disabled:hover:bg-brand transition-colors"
           >
             {isStreaming ? (
               <Loader2 className="w-4 h-4 animate-spin" />

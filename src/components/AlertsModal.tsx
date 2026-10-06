@@ -71,15 +71,15 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
-      <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[85vh]">
+      <div role="dialog" aria-modal="true" aria-labelledby="alerts-modal-title" className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-neg flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-neg flex items-center justify-center text-on-neg">
               <Bell className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 id="alerts-modal-title" className="text-sm font-semibold text-ink">
                 Pusat Peringatan & Ambang Batas (Alert System)
               </h2>
               <p className="text-xs text-ink-2">Notifikasi In-App & Email SMTP</p>
@@ -295,7 +295,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-2 bg-pos hover:bg-pos text-white rounded-control font-medium transition-colors"
+                  className="w-full py-2 bg-pos hover:bg-pos text-on-pos rounded-control font-medium transition-colors"
                 >
                   Simpan Aturan Ambang Batas
                 </button>
@@ -311,7 +311,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-ink hover:bg-ink/90 text-white text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-ink hover:bg-ink/90 text-surface text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

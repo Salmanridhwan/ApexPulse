@@ -68,7 +68,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       <header className="bg-surface/80 backdrop-blur-md border-b border-line px-6 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-control bg-brand text-white flex items-center justify-center font-bold text-sm tracking-wider">
+            <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center font-bold text-sm tracking-wider">
               AP
             </div>
             <span className="font-bold text-ink text-sm tracking-tight flex items-center gap-2">
@@ -87,7 +87,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-4xl card overflow-hidden grid grid-cols-1 md:grid-cols-12">
           {/* Left: konteks singkat — panel gelap senada sidebar */}
-          <div className="md:col-span-5 relative bg-shell p-6 sm:p-8 border-b md:border-b-0 md:border-r border-shell-line flex flex-col justify-center space-y-5">`r`n            <div className="hidden sm:block h-40 -mt-2 -mb-1">`r`n              <React.Suspense fallback={null}>`r`n                <Hero3D className="w-full h-full" />`r`n              </React.Suspense>`r`n            </div>
+          <div className="md:col-span-5 relative bg-shell p-6 sm:p-8 border-b md:border-b-0 md:border-r border-shell-line flex flex-col justify-center space-y-5">
+            <div className="hidden sm:block h-40 -mt-2 -mb-1">
+              <React.Suspense fallback={null}>
+                <Hero3D className="w-full h-full" />
+              </React.Suspense>
+            </div>
             <div>
               <h1 className="text-lg font-bold text-shell-ink tracking-tight leading-snug">
                 Masuk ke Portal ApexPulse
@@ -121,7 +126,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
             </div>
 
             {errorMessage && (
-              <div className="p-3 bg-neg/15 border border-neg/30 rounded-control text-neg text-xs flex items-start gap-2.5">
+              <div role="alert" aria-live="assertive" className="p-3 bg-neg/15 border border-neg/30 rounded-control text-neg text-xs flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{errorMessage}</span>
               </div>
@@ -165,7 +170,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-2 text-ink-3 hover:text-ink-2"
+                    aria-label={showPassword ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-control text-ink-3 hover:text-ink-2 hover:bg-surface-2 cursor-pointer flex items-center justify-center"
                     title={showPassword ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -209,7 +215,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       {/* Footer */}
       <footer className="bg-surface border-t border-line px-6 py-4 text-xs text-ink-3">
         <div className="max-w-6xl mx-auto">
-          © 2026 ApexPulse — Portal Dashboard BUMD
+          © 2026 ApexPulse. Portal Dashboard BUMD
         </div>
       </footer>
     </div>

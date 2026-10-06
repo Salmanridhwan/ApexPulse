@@ -351,7 +351,7 @@ export class InMemoryDb {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
         this.ensureSeedUsers();
-        console.log('[AionesBoard DB] State dimuat dari MySQL — persistence aktif');
+        console.log('[AionesBoard DB] State dimuat dari MySQL (persistence aktif)');
       } else {
         await this.mysql.saveAll(this.snapshot());
         console.log('[AionesBoard DB] MySQL siap — seed awal disimpan ke database');

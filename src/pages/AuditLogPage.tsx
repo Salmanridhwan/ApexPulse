@@ -27,7 +27,7 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-white shrink-0">
+          <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-surface shrink-0">
             <History className="w-5 h-5" />
           </div>
           <div className="min-w-0">

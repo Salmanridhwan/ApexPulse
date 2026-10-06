@@ -18,10 +18,11 @@
 
   --color-ink: #1a1d1f;
   --color-ink-2: #4b5563;
-  --color-ink-3: #6b7280;   /* lulus WCAG AA di permukaan (4.83:1) */
+  --color-ink-3: #646b78;   /* lulus WCAG AA di kanvas (4.95:1) & permukaan (5.36:1) */
 
   --color-brand: #1fa6cc;       /* cyan — aksen/isi */
   --color-brand-ink: #0f6b85;   /* digelapkan: teks & chip lulus WCAG AA (6.07:1) */
+  --color-on-brand: #10141d;    /* teks/ikon di ATAS latar brand solid — lulus AA (6.48:1); tetap gelap di kedua mode agar brand terang (mode gelap) juga terbaca */
   --color-brand-soft: #e6f6fb;
   --color-violet: #7f80d8;      /* periwinkle */
   --color-coral: #ee4b32;       /* merah-oranye */
@@ -29,6 +30,12 @@
   --color-pos: #0f7a53;
   --color-neg: #c62f22;
   --color-warn: #8f5e08;
+
+  /* Teks/ikon di atas latar warna semantik SOLID. Mode terang: warna semantik
+     gelap -> teks putih. Mode gelap: warna semantik terang -> teks gelap. */
+  --color-on-pos: #ffffff;
+  --color-on-neg: #ffffff;
+  --color-on-warn: #ffffff;
 
   /* Shell (sidebar) */
   --color-shell: #ffffff;
@@ -73,6 +80,11 @@
   --color-pos: #3fd29a;
   --color-neg: #ff6b5b;
   --color-warn: #ffb547;
+
+  /* Mode gelap: warna semantik terang -> teks gelap agar lolos AA. */
+  --color-on-pos: #10141d;
+  --color-on-neg: #10141d;
+  --color-on-warn: #10141d;
 
   --color-shell: #14171c;
   --color-shell-2: #1c2026;
@@ -287,12 +299,6 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
-  .bg-grid-subtle {
-    background-size: 24px 24px;
-    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  }
 }
 
 @media print {
@@ -332,9 +338,29 @@
   }
 }
 
+/* Indikator "sedang mengetik": titik naik-turun halus (exponential ease-out,
+   bukan bounce). Dua keyframe -> mengembang lalu mengendap, tanpa pegas. */
+@keyframes dot-typing {
+  0% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+}
+
 @layer utilities {
   .kpi-enter {
     animation: kpi-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .dot-typing {
+    animation: dot-typing 1.05s cubic-bezier(0.16, 1, 0.3, 1) infinite;
   }
   .kpi-spark-line {
     stroke-dasharray: 1;
@@ -381,5 +407,33 @@
 @keyframes card-rise {
   from { opacity: 0; transform: translateY(14px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Knot dekoratif hero login (pengganti three.js WebGL, hemat ~531 KB).
+   Animasi berputar + mengambang halus; berhenti saat reduced-motion. */
+.hero-knot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.hero-knot-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: visible;
+}
+@keyframes knot-spin {
+  0% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(180deg) translateY(-6px); }
+  100% { transform: rotate(360deg) translateY(0); }
+}
+.hero-knot-spin {
+  transform-origin: 100px 100px;
+  animation: knot-spin 18s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-knot-spin { animation: none; }
 }
 .card-rise { animation: card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }

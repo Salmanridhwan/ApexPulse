@@ -342,7 +342,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </div>
                   <button
                     onClick={() => setIsAddTenantOpen(true)}
-                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ Tambah Instansi BUMD</span>
@@ -427,7 +427,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddUserOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>+ Tambah Pengguna Baru</span>
@@ -516,7 +516,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 </div>
                 <button
                   onClick={() => setIsAddTenantOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Daftarkan BUMD Baru</span>
@@ -576,7 +576,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
                   <span>
                     Provider masih <strong>Mock</strong>, jadi Base URL &amp; API Key di bawah{' '}
-                    <strong>tidak dipakai</strong> — dashboard tetap disusun dari data contoh. Ubah
+                    <strong>tidak dipakai</strong>. Dashboard tetap disusun dari data contoh. Ubah
                     Provider ke <strong>HTTP</strong> lalu simpan, baru klik “Uji Koneksi Sekarang”.
                   </span>
                 </div>
@@ -595,8 +595,8 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       }
                       className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                     >
-                      <option value="mock">Mock — data demo lokal</option>
-                      <option value="http">HTTP — API RAG eksternal</option>
+                      <option value="mock">Mock: data demo lokal</option>
+                      <option value="http">HTTP: API RAG eksternal</option>
                     </select>
                   </div>
 
@@ -623,7 +623,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
                 <div>
                   <label className="block text-ink-2 font-semibold mb-1">
-                    Knowledge Base ID <span className="font-normal text-ink-3">(opsional — jika layanan RAG menskopkan retrieval per KB)</span>
+                    Knowledge Base ID <span className="font-normal text-ink-3">(opsional, jika layanan RAG menskopkan retrieval per KB)</span>
                   </label>
                   <input
                     type="text"
@@ -710,7 +710,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   />
                   <label htmlFor="ragUseExtract" className="text-[11px] text-ink-2 leading-relaxed">
                     <span className="font-semibold text-ink">
-                      Jalur A — pakai endpoint /extract
+                      Jalur A: pakai endpoint /extract
                     </span>{' '}
                     (disarankan). Angka dashboard diambil langsung dari dokumen beserta halaman
                     sumbernya, jadi tidak lagi mengandalkan deret contoh. Kalau layanan RAG tidak
@@ -754,7 +754,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                 <div className="pt-3 flex items-center gap-3">
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-white rounded-control font-medium transition-colors shadow-xs"
+                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs"
                   >
                     Simpan Konfigurasi Sistem
                   </button>
@@ -954,9 +954,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {isAddUserOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
-            <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="add-user-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h3 className="font-bold text-sm text-ink">Tambah Pengguna BUMD Baru</h3>
+                <h3 id="add-user-title" className="font-bold text-sm text-ink">Tambah Pengguna BUMD Baru</h3>
                 <button onClick={() => setIsAddUserOpen(false)} className="text-ink-3 hover:text-ink-2">
                   <X className="w-4 h-4" />
                 </button>
@@ -1025,7 +1025,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-control font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium"
                   >
                     Daftarkan Pengguna
                   </button>
@@ -1039,9 +1039,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
         {isAddTenantOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
-            <div className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="add-tenant-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h3 className="font-bold text-sm text-ink">Daftarkan Instansi BUMD Baru</h3>
+                <h3 id="add-tenant-title" className="font-bold text-sm text-ink">Daftarkan Instansi BUMD Baru</h3>
                 <button onClick={() => setIsAddTenantOpen(false)} className="text-ink-3 hover:text-ink-2">
                   <X className="w-4 h-4" />
                 </button>
@@ -1122,7 +1122,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-white rounded-control font-medium"
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium"
                   >
                     Simpan BUMD
                   </button>

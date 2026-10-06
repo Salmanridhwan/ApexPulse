@@ -1,113 +1,80 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
 /**
- * Objek 3D dekoratif (torus knot glossy) untuk panel hero.
- * three.js dimuat dinamis supaya tidak membebani bundle awal; objek bergerak
- * mengikuti kursor dan berhenti berputar bila pengguna memilih "reduce motion".
+ * Objek dekoratif untuk panel hero login.
+ *
+ * Sebelumnya memakai three.js (torus knot WebGL) yang menyeret ~531 KB ke
+ * halaman login hanya untuk dekorasi. Diganti SVG + CSS: bentuk knot glossy
+ * yang setara secara visual, animasi halus, tanpa dependensi runtime.
+ *
+ * Menghormati `prefers-reduced-motion`: animasi berhenti, bentuk tetap tampil.
  */
 export const Hero3D: React.FC<{ className?: string }> = ({ className = '' }) => {
-  const wadah = useRef<HTMLDivElement>(null);
+  return (
+    <div className={`hero-knot ${className}`} aria-hidden="true">
+      <svg viewBox="0 0 200 200" className="hero-knot-svg" role="presentation">
+        <defs>
+          {/* Gradien utama: cyan -> violet -> coral (senada palet ApexPulse). */}
+          <linearGradient id="knot-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--color-brand)" />
+            <stop offset="52%" stopColor="var(--color-violet)" />
+            <stop offset="100%" stopColor="var(--color-coral)" />
+          </linearGradient>
+          {/* Kilau glossy di bagian atas. */}
+          <linearGradient id="knot-gloss" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+            <stop offset="45%" stopColor="#ffffff" stopOpacity="0.06" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+          <filter id="knot-soft" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="5" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
 
-  useEffect(() => {
-    const el = wadah.current;
-    if (!el) return;
-    let batal = false;
-    let bersihkan: (() => void) | null = null;
+        {/* Bayangan lembut di bawah knot. */}
+        <ellipse cx="100" cy="170" rx="50" ry="9" fill="var(--color-ink)" opacity="0.10" />
 
-    import('three').then((THREE) => {
-      if (batal || !el) return;
-      const kurangiGerak = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      let renderer: import('three').WebGLRenderer;
-      try {
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      } catch {
-        return; // WebGL tidak tersedia — panel tetap tampil tanpa objek 3D.
-      }
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      el.appendChild(renderer.domElement);
-      renderer.domElement.style.display = 'block';
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-      camera.position.z = 6;
-
-      const bahan = new THREE.MeshPhysicalMaterial({
-        color: 0x8f90e4,
-        metalness: 0.25,
-        roughness: 0.18,
-        clearcoat: 1,
-        clearcoatRoughness: 0.12,
-        emissive: 0x2a3a5f,
-        emissiveIntensity: 0.35,
-      });
-      const geo = new THREE.TorusKnotGeometry(1.05, 0.36, 180, 24);
-      const knot = new THREE.Mesh(geo, bahan);
-      scene.add(knot);
-
-      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-      const l1 = new THREE.PointLight(0x38c6e2, 70, 20);
-      l1.position.set(3, 3, 4);
-      const l2 = new THREE.PointLight(0xf2503a, 50, 20);
-      l2.position.set(-4, -2, 3);
-      scene.add(l1, l2);
-
-      const ukur = () => {
-        const w = el.clientWidth || 1;
-        const h = el.clientHeight || 1;
-        renderer.setSize(w, h, false);
-        renderer.domElement.style.width = '100%';
-        renderer.domElement.style.height = '100%';
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      };
-      ukur();
-      const ro = new ResizeObserver(ukur);
-      ro.observe(el);
-
-      let tx = 0;
-      let ty = 0;
-      const gerak = (e: PointerEvent) => {
-        const r = el.getBoundingClientRect();
-        tx = ((e.clientX - (r.left + r.width / 2)) / window.innerWidth) * 2;
-        ty = ((e.clientY - (r.top + r.height / 2)) / window.innerHeight) * 2;
-      };
-      window.addEventListener('pointermove', gerak);
-
-      let raf = 0;
-      let t = 0;
-      const gambar = () => {
-        t += 0.008;
-        if (!kurangiGerak) {
-          knot.rotation.y += 0.006;
-          knot.rotation.x += 0.003;
-          knot.position.y = Math.sin(t * 2) * 0.12;
-        }
-        // Parallax halus mengikuti kursor.
-        camera.position.x += (tx * 0.9 - camera.position.x) * 0.05;
-        camera.position.y += (-ty * 0.9 - camera.position.y) * 0.05;
-        camera.lookAt(0, 0, 0);
-        renderer.render(scene, camera);
-        raf = requestAnimationFrame(gambar);
-      };
-      gambar();
-
-      bersihkan = () => {
-        cancelAnimationFrame(raf);
-        window.removeEventListener('pointermove', gerak);
-        ro.disconnect();
-        geo.dispose();
-        bahan.dispose();
-        renderer.dispose();
-        renderer.domElement.remove();
-      };
-    });
-
-    return () => {
-      batal = true;
-      bersihkan?.();
-    };
-  }, []);
-
-  return <div ref={wadah} className={className} aria-hidden="true" />;
+        <g filter="url(#knot-soft)">
+          <g className="hero-knot-spin">
+            {/* Trefoil knot: tiga lengkung saling silang. */}
+            <path
+              d="M100 34 C150 34 168 74 142 104 C120 130 80 130 58 104 C32 74 50 34 100 34 Z"
+              fill="none"
+              stroke="url(#knot-grad)"
+              strokeWidth="17"
+              strokeLinecap="round"
+            />
+            <path
+              d="M142 104 C168 134 140 170 100 170 C60 170 32 134 58 104 C80 130 120 130 142 104 Z"
+              fill="none"
+              stroke="url(#knot-grad)"
+              strokeWidth="17"
+              strokeLinecap="round"
+              opacity="0.92"
+            />
+            <path
+              d="M100 34 C70 60 70 100 100 124 C130 100 130 60 100 34 Z"
+              fill="none"
+              stroke="url(#knot-grad)"
+              strokeWidth="15"
+              strokeLinecap="round"
+              opacity="0.85"
+            />
+            {/* Kilau di atas untuk kesan bahan glossy. */}
+            <path
+              d="M100 34 C150 34 168 74 142 104"
+              fill="none"
+              stroke="url(#knot-gloss)"
+              strokeWidth="6"
+              strokeLinecap="round"
+            />
+          </g>
+        </g>
+      </svg>
+    </div>
+  );
 };

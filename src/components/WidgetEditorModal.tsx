@@ -126,15 +126,15 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
       <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
+      <div role="dialog" aria-modal="true" aria-labelledby="widget-editor-title" className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-on-brand">
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 id="widget-editor-title" className="text-sm font-semibold text-ink">
                 Pengaturan & Kustomisasi Widget
               </h2>
               <p className="text-xs text-ink-2 truncate max-w-xs">{widget.title}</p>
@@ -355,7 +355,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2 bg-brand hover:bg-brand-ink text-white rounded-control text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" />
             <span>Simpan Perubahan</span>

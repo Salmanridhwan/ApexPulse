@@ -26,14 +26,15 @@ const WARNA_LEGACY: Record<string, string> = {
 const keWarnaTema = (c?: string): string | undefined =>
   c ? (WARNA_LEGACY[c.toLowerCase()] ?? c) : c;
 
-// echarts (~1 MB) hanya dimuat saat widget chart pertama dirender —
-// tidak ikut bundle awal. Promise di-cache supaya import sekali saja.
-let echartsPromise: Promise<typeof import('echarts')> | null = null;
-const loadEcharts = () => (echartsPromise ??= import('echarts'));
+// echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
+// awal. Modul tree-shaken (lihat echartsSetup.ts) supaya bundel tidak 1 MB.
+// Dynamic import -> Vite memecahnya jadi chunk terpisah.
+let echartsPromise: Promise<typeof import('./echartsSetup')> | null = null;
+const loadEcharts = () => (echartsPromise ??= import('./echartsSetup'));
 
 /** Mulai unduh chunk echarts lebih awal (saat dashboard dibuka),
  *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
-export const preloadEcharts = (): Promise<typeof import('echarts')> => loadEcharts();
+export const preloadEcharts = (): Promise<unknown> => loadEcharts();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIT NORMALIZATION
@@ -184,7 +185,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     let container: HTMLElement | null = null;
     let handleDomClick: ((ev: MouseEvent) => void) | null = null;
 
-    loadEcharts().then((echarts) => {
+    loadEcharts().then(({ echarts }) => {
       if (disposed || !chartRef.current) return;
 
       if (!chartInstanceRef.current) {

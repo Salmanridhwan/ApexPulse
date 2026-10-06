@@ -248,7 +248,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-white shadow-xs">
+          <div className="w-8 h-8 rounded-control bg-brand flex items-center justify-center text-on-brand shadow-xs">
             <Layers className="w-4 h-4" />
           </div>
           <div>
@@ -288,7 +288,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('current')}
             className={`flex-1 py-1 px-2 rounded-chip font-medium text-center transition-all ${sectorTab === 'current'
-                ? 'bg-brand text-white shadow-xs'
+                ? 'bg-brand text-on-brand shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >
@@ -297,7 +297,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('universal')}
             className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'universal'
-                ? 'bg-brand text-white shadow-xs'
+                ? 'bg-brand text-on-brand shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >
@@ -306,7 +306,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
           <button
             onClick={() => setSectorTab('all')}
             className={`py-1 px-2.5 rounded-chip font-medium text-center transition-all ${sectorTab === 'all'
-                ? 'bg-brand text-white shadow-xs'
+                ? 'bg-brand text-on-brand shadow-xs'
                 : 'text-ink-2 hover:text-ink'
               }`}
           >
@@ -321,7 +321,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`text-[11px] whitespace-nowrap px-2.5 py-0.5 rounded-full transition-colors ${selectedCategory === cat
-                  ? 'bg-brand text-white font-medium'
+                  ? 'bg-brand text-on-brand font-medium'
                   : 'bg-surface-2 text-ink-2 hover:bg-line'
                 }`}
             >
@@ -372,8 +372,8 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                     onClick={() => handleAdd(preset)}
                     disabled={isMemuat}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-control text-xs font-medium transition-all disabled:opacity-60 ${isAdded
-                        ? 'bg-pos text-white'
-                        : 'bg-surface-2 text-brand-ink hover:bg-brand hover:text-white'
+                        ? 'bg-pos text-on-pos'
+                        : 'bg-surface-2 text-brand-ink hover:bg-brand hover:text-on-brand'
                       }`}
                   >
                     {isMemuat ? (

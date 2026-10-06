@@ -150,7 +150,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2 text-xs font-bold text-white bg-ink hover:bg-ink rounded-card transition-all shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-surface bg-ink hover:bg-ink rounded-card transition-all shadow-xs"
               >
                 + Dashboard Baru
               </button>
@@ -286,7 +286,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                               onDeleteDashboard(dash.id);
                               setDeleteConfirmId(null);
                             }}
-                            className="px-2 py-1 bg-neg text-white rounded-chip text-[10px] font-bold hover:bg-neg"
+                            className="px-2 py-1 bg-neg text-on-neg rounded-chip text-[10px] font-bold hover:bg-neg"
                           >
                             Hapus
                           </button>
