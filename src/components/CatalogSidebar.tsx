@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import {
   BarChart3,
+  Activity,
+  PieChart,
+  Table2,
   Bookmark,
   Check,
   Filter,
@@ -14,6 +17,23 @@ import {
 import { WIDGET_CATALOG } from '../services/builder/catalog';
 import { MONTHS_12 } from '../services/rag/mockData';
 import { BumdSector, CatalogPreset, WidgetSpec } from '../types';
+import { ItemCard } from './ui/ItemCard';
+
+/** Ikon kecil sesuai tipe chart preset (untuk tile ItemCard). */
+const ChartPreviewIcon: React.FC<{ tipe?: string }> = ({ tipe }) => {
+  const cls = 'w-4 h-4';
+  switch (tipe) {
+    case 'line':
+    case 'area':
+      return <Activity className={cls} />;
+    case 'donut':
+      return <PieChart className={cls} />;
+    case 'table':
+      return <Table2 className={cls} />;
+    default:
+      return <BarChart3 className={cls} />;
+  }
+};
 
 interface CatalogSidebarProps {
   isOpen: boolean;
@@ -322,37 +342,31 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
             const isAdded = addedIds[preset.id];
             const isMemuat = memuatIds[preset.id];
             return (
-              <div
+              <ItemCard
                 key={preset.id}
-                className="bg-surface border border-line rounded-card p-3.5 hover:border-line-strong hover:shadow-xs transition-all space-y-2 group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-surface-2 text-brand-ink border border-line">
-                      {preset.id}
-                    </span>
-                    <span className="text-xs font-semibold text-ink">
-                      {preset.nama}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-2 text-ink-2 shrink-0">
+                icon={<ChartPreviewIcon tipe={preset.tipeChart[0]} />}
+                title={preset.nama}
+                meta={
+                  <>
+                    <span className="font-mono font-bold text-brand-ink">{preset.id}</span>
+                    <span className="mx-1.5">•</span>
                     {preset.kategori}
-                  </span>
-                </div>
-
-                <p className="text-xs text-ink-2 leading-relaxed">
+                  </>
+                }
+              >
+                <span className="block text-xs text-ink-2 leading-relaxed mt-2">
                   {preset.deskripsi}
-                </p>
+                </span>
 
                 {/* Live Visual Chart Preview */}
-                <PresetChartPreview preset={preset} />
+                <span className="block mt-2"><PresetChartPreview preset={preset} /></span>
 
-                <div className="flex items-center justify-between pt-2 border-t border-line text-[11px] text-ink-3">
-                  <div className="flex items-center gap-2">
+                <span className="flex items-center justify-between pt-2 mt-2 border-t border-line text-[11px] text-ink-3">
+                  <span className="flex items-center gap-2">
                     <span>Satuan: <strong className="text-ink-2">{preset.satuan}</strong></span>
                     <span>•</span>
                     <span className="capitalize">{preset.tipeChart.join(', ')}</span>
-                  </div>
+                  </span>
 
                   <button
                     onClick={() => handleAdd(preset)}
@@ -379,14 +393,14 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                       </>
                     )}
                   </button>
-                </div>
+                </span>
 
                 {galat[preset.id] && (
-                  <p className="text-[11px] text-neg bg-neg/15 border border-neg/30 rounded-control px-2 py-1.5 leading-relaxed">
+                  <span className="block text-[11px] text-neg bg-neg/15 border border-neg/30 rounded-control px-2 py-1.5 leading-relaxed mt-2">
                     {galat[preset.id]}
-                  </p>
+                  </span>
                 )}
-              </div>
+              </ItemCard>
             );
           })
         )}

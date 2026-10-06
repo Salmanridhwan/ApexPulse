@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { ItemCard } from '../components/ui/ItemCard';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 interface AdminProps {
@@ -308,38 +309,24 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
             <div className="space-y-6">
               {/* Top Stat Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Total BUMD</span>
-                  <p className="text-2xl font-bold text-ink mt-1">{stats?.tenantsCount ?? 6}</p>
-                  <span className="text-[10px] text-pos font-medium">6 Sektor Aktif</span>
-                </div>
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Pengguna Aktif</span>
-                  <p className="text-2xl font-bold text-ink mt-1">{users.length}</p>
-                  <span className="text-[10px] text-brand font-medium">RBAC Terproteksi</span>
-                </div>
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Total Dashboard</span>
-                  <p className="text-2xl font-bold text-ink mt-1">{stats?.dashboardsCount ?? 6}</p>
-                  <span className="text-[10px] text-ink-2 font-medium">{stats?.totalWidgets ?? 34} Widget</span>
-                </div>
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Sitasi Resmi</span>
-                  <p className="text-2xl font-bold text-pos mt-1">{stats?.totalCitations ?? 42}</p>
-                  <span className="text-[10px] text-pos font-medium">100% Tervalidasi</span>
-                </div>
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Aturan Ambang</span>
-                  <p className="text-2xl font-bold text-warn mt-1">{alertRules.length}</p>
-                  <span className="text-[10px] text-warn font-medium">Evaluasi Otomatis</span>
-                </div>
-                <div className="bg-surface p-4 rounded-card border border-line shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-ink-3">Provider RAG</span>
-                  <p className="text-base font-bold text-brand-ink mt-2 truncate">
-                    {stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal'}
-                  </p>
-                  <span className="text-[10px] text-pos font-medium">Sehat (Online)</span>
-                </div>
+                {[
+                  { label: 'Total BUMD', nilai: String(stats?.tenantsCount ?? 6), sub: '6 Sektor Aktif', accent: 'var(--color-brand)' },
+                  { label: 'Pengguna Aktif', nilai: String(users.length), sub: 'RBAC Terproteksi', accent: 'var(--color-violet)' },
+                  { label: 'Total Dashboard', nilai: String(stats?.dashboardsCount ?? 6), sub: `${stats?.totalWidgets ?? 34} Widget`, accent: 'var(--color-brand)' },
+                  { label: 'Sitasi Resmi', nilai: String(stats?.totalCitations ?? 42), sub: '100% Tervalidasi', accent: 'var(--color-pos)' },
+                  { label: 'Aturan Ambang', nilai: String(alertRules.length), sub: 'Evaluasi Otomatis', accent: 'var(--color-warn)' },
+                  { label: 'Provider RAG', nilai: stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal', sub: 'Sehat (Online)', accent: 'var(--color-brand)' },
+                ].map((m, i) => (
+                  <div
+                    key={i}
+                    className="relative overflow-hidden bg-surface p-4 pl-5 rounded-card border border-line shadow-2xs"
+                  >
+                    <span className="absolute left-0 top-0 bottom-0 w-[4px]" style={{ background: m.accent }} aria-hidden="true" />
+                    <span className="text-[10px] uppercase font-bold text-ink-3">{m.label}</span>
+                    <p className="text-2xl font-bold text-ink mt-1 truncate">{m.nilai}</p>
+                    <span className="text-[10px] text-ink-2 font-medium">{m.sub}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Quick Sektor BUMD Grid */}
@@ -364,26 +351,21 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {tenants.map((t) => (
-                    <div
+                    <ItemCard
                       key={t.id}
-                      className="p-3.5 border border-line rounded-card hover:border-line-strong transition-all bg-surface-2/50 flex items-start gap-3"
+                      icon={<span className="text-base leading-none">{t.logo}</span>}
+                      title={t.name}
+                      meta={
+                        <>
+                          {t.city} • Kode: <strong className="font-mono">{t.code}</strong>
+                        </>
+                      }
                     >
-                      <span className="text-2xl p-2 bg-surface rounded-control border border-line shrink-0">
-                        {t.logo}
+                      <span className="flex items-center justify-between mt-2 pt-2 border-t border-line text-[10px] text-ink-3">
+                        <span className="uppercase font-semibold text-ink-2">{t.sector}</span>
+                        <span>{t.documentCount} Berkas Terindeks</span>
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-bold text-ink truncate">{t.name}</h4>
-                        </div>
-                        <p className="text-[11px] text-ink-2 mt-0.5">
-                          {t.city} • Kode: <strong className="font-mono text-ink-2">{t.code}</strong>
-                        </p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-line text-[10px] text-ink-3">
-                          <span className="uppercase font-semibold text-ink-2">{t.sector}</span>
-                          <span>{t.documentCount} Berkas Terindeks</span>
-                        </div>
-                      </div>
-                    </div>
+                    </ItemCard>
                   ))}
                 </div>
               </div>
@@ -403,24 +385,28 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                 </div>
 
-                <div className="divide-y divide-line text-xs">
+                <div className="space-y-2 text-xs">
                   {auditLogs.slice(0, 5).map((log) => (
-                    <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
-                        <div>
-                          <span className="font-semibold text-ink">{log.action}: </span>
-                          <span className="text-ink-2">{log.target}</span>
-                          <span className="text-ink-3 block text-[11px] mt-0.5">{log.details}</span>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 text-[11px] text-ink-3">
-                        <span>{log.userName}</span>
-                        <span className="block text-[10px]">
-                          {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
+                    <ItemCard
+                      key={log.id}
+                      accent="var(--color-brand)"
+                      icon={<span className="w-1.5 h-1.5 rounded-full bg-brand block" />}
+                      title={
+                        <>
+                          <span className="font-semibold">{log.action}</span>
+                          <span className="font-normal text-ink-2"> · {log.target}</span>
+                        </>
+                      }
+                      meta={log.details}
+                      trailing={
+                        <>
+                          <span className="text-[11px] text-ink-3">{log.userName}</span>
+                          <span className="block text-[10px] text-ink-3">
+                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </>
+                      }
+                    />
                   ))}
                 </div>
               </div>
@@ -539,34 +525,26 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {tenants.map((t) => (
-                  <div
+                  <ItemCard
                     key={t.id}
-                    className="p-4 bg-surface-2 border border-line rounded-card space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-3xl p-1.5 bg-surface rounded-control border border-line">
-                          {t.logo}
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold text-ink">{t.name}</h4>
-                          <p className="text-xs text-ink-2">{t.city}</p>
-                        </div>
-                      </div>
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-surface-2 text-ink">
+                    icon={<span className="text-lg leading-none">{t.logo}</span>}
+                    title={t.name}
+                    meta={t.city}
+                    trailing={
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-surface-2 text-ink border border-line">
                         {t.code}
                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-line/70">
-                      <div className="text-ink-2">
+                    }
+                  >
+                    <span className="grid grid-cols-2 gap-2 text-xs pt-2 mt-2 border-t border-line/70">
+                      <span className="text-ink-2">
                         Sektor: <strong className="text-ink-2 capitalize">{t.sector}</strong>
-                      </div>
-                      <div className="text-ink-2">
-                        Berkas RAG: <strong className="text-pos">{t.documentCount} LRA & RKAP</strong>
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                      <span className="text-ink-2">
+                        Berkas RAG: <strong className="text-pos">{t.documentCount} LRA &amp; RKAP</strong>
+                      </span>
+                    </span>
+                  </ItemCard>
                 ))}
               </div>
             </div>

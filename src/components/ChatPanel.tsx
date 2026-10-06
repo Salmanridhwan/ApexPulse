@@ -61,12 +61,13 @@ const RecommendationCards: React.FC<{
         key={rec.id}
         disabled={isStreaming}
         onClick={() => onSelect(rec.prompt)}
-        className="group text-left w-full bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="group text-left w-full relative bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 pl-4 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
         style={{ animationDelay: `${i * 60}ms` }}
       >
+        <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
         <div className="flex items-start gap-2.5">
           {/* index badge */}
-          <span className="shrink-0 w-5 h-5 rounded-full bg-surface-2 text-brand-ink text-[10px] font-bold flex items-center justify-center mt-0.5 group-hover:bg-brand group-hover:text-white transition-colors">
+          <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5 group-hover:bg-brand group-hover:text-white transition-colors">
             {i + 1}
           </span>
           <div className="flex-1 min-w-0">

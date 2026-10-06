@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   Bell,
   CheckCircle,
-  Mail,
   Plus,
   Radio,
   Send,
@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { AlertRule, NotificationItem } from '../types';
+import { ItemCard } from './ui/ItemCard';
 
 interface AlertsModalProps {
   isOpen: boolean;
@@ -146,57 +147,49 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   Semua indikator berada dalam batas aman. Belum ada peringatan aktif.
                 </div>
               ) : (
-                notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className={`p-3.5 rounded-card border transition-all ${notif.severity === 'critical'
-                        ? 'bg-neg/15/60 border-neg/30 text-neg'
-                        : notif.severity === 'warning'
-                          ? 'bg-warn/15/60 border-warn/30 text-warn'
-                          : 'bg-surface-2 border-line text-ink'
-                      }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <ShieldAlert
-                          className={`w-4 h-4 ${notif.severity === 'critical'
-                              ? 'text-neg'
-                              : 'text-warn'
-                            }`}
-                        />
-                        <h4 className="font-semibold">{notif.title}</h4>
-                      </div>
-                      <span className="text-[10px] opacity-60">
-                        {new Date(notif.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-
-                    <p className="mt-1 text-xs opacity-90 leading-relaxed">
-                      {notif.message}
-                    </p>
-
-                    {notif.sentEmail && (
-                      <div className="mt-2 pt-2 border-t border-neg/30/50 flex items-center gap-1.5 text-[10px] text-neg">
-                        <Mail className="w-3 h-3" />
-                        <span>Email notifikasi terkirim ke penerima terdaftar (SMTP)</span>
-                      </div>
-                    )}
-                  </div>
-                ))
+                notifications.map((notif) => {
+                  const warna =
+                    notif.severity === 'critical'
+                      ? 'var(--color-neg)'
+                      : notif.severity === 'warning'
+                      ? 'var(--color-warn)'
+                      : 'var(--color-brand)';
+                  return (
+                    <ItemCard
+                      key={notif.id}
+                      accent={warna}
+                      icon={
+                        notif.severity === 'critical' ? (
+                          <ShieldAlert className="w-4 h-4" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4" />
+                        )
+                      }
+                      title={notif.title}
+                      trailing={
+                        <span className="text-[10px] font-mono text-ink-3">
+                          {new Date(notif.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      }
+                    >
+                      <span className="block mt-1.5 text-xs text-ink-2 leading-relaxed">{notif.message}</span>
+                    </ItemCard>
+                  );
+                })
               )}
             </>
           ) : activeTab === 'rules' ? (
             <>
               {alertRules.map((rule) => (
-                <div
+                <ItemCard
                   key={rule.id}
-                  className="p-3 bg-surface border border-line rounded-card space-y-1.5 hover:border-line-strong"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-ink">{rule.title}</span>
+                  accent={rule.severity === 'critical' ? 'var(--color-neg)' : 'var(--color-warn)'}
+                  icon={<Sliders className="w-4 h-4" />}
+                  title={rule.title}
+                  trailing={
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${rule.severity === 'critical'
                           ? 'bg-neg/15 text-neg'
@@ -205,19 +198,18 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                     >
                       {rule.severity.toUpperCase()}
                     </span>
-                  </div>
-
-                  <p className="text-ink-2">
+                  }
+                >
+                  <span className="block text-ink-2 mt-1.5">
                     Kondisi: <strong>{rule.metricName}</strong> {rule.operator} {rule.threshold}{' '}
                     {rule.unit}
-                  </p>
-
-                  <div className="flex items-center gap-3 pt-1 text-[11px] text-ink-3">
+                  </span>
+                  <span className="flex items-center gap-3 pt-1 text-[11px] text-ink-3">
                     <span>Kanal: {rule.channels.join(', ')}</span>
                     <span>•</span>
                     <span className="text-pos font-medium">Status: Aktif</span>
-                  </div>
-                </div>
+                  </span>
+                </ItemCard>
               ))}
             </>
           ) : (

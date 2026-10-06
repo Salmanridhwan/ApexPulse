@@ -13,7 +13,6 @@ import {
   Search,
   Share2,
   Sparkles,
-  Tag,
   Trash2,
 } from 'lucide-react';
 import { BumdSector, Dashboard, Tenant } from '../types';
@@ -80,47 +79,26 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
         {/* Ringkasan Angka Metrik (Cards Grid) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
-          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
-              <LayoutGrid className="w-5 h-5" />
+          {[
+            { icon: <LayoutGrid className="w-5 h-5" />, label: 'Total Dashboard', nilai: String(dashboards.length), accent: 'var(--color-brand)' },
+            { icon: <Layers className="w-5 h-5" />, label: 'Total Widget Aktif', nilai: String(totalWidgets), accent: 'var(--color-brand)' },
+            { icon: <Activity className="w-5 h-5" />, label: 'Kartu KPI / Metrik', nilai: String(totalKpis), accent: 'var(--color-violet)' },
+            { icon: <Building2 className="w-5 h-5" />, label: 'Sektor BUMD', nilai: currentTenant?.sector || 'Multi', accent: 'var(--color-pos)' },
+          ].map((m, i) => (
+            <div
+              key={i}
+              className="relative overflow-hidden bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 pl-5 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5"
+            >
+              <span className="absolute left-0 top-0 bottom-0 w-[4px]" style={{ background: m.accent }} aria-hidden="true" />
+              <div className="item-tile shrink-0" style={{ ['--item-accent' as any]: m.accent }}>
+                {m.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-ink-2 font-semibold">{m.label}</p>
+                <p className="text-xl font-extrabold text-ink mt-0.5 capitalize truncate">{m.nilai}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] text-ink-2 font-semibold">Total Dashboard</p>
-              <p className="text-xl font-extrabold text-ink mt-0.5">{dashboards.length}</p>
-            </div>
-          </div>
-
-          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-ink-2 font-semibold">Total Widget Aktif</p>
-              <p className="text-xl font-extrabold text-ink mt-0.5">{totalWidgets}</p>
-            </div>
-          </div>
-
-          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-brand/10 text-brand-ink shrink-0">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-ink-2 font-semibold">Kartu KPI / Metrik</p>
-              <p className="text-xl font-extrabold text-ink mt-0.5">{totalKpis}</p>
-            </div>
-          </div>
-
-          <div className="bg-surface/95 backdrop-blur-md border border-line/80 rounded-card p-4 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3.5">
-            <div className="p-2.5 rounded-card bg-pos/10 text-pos shrink-0">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-ink-2 font-semibold">Sektor BUMD</p>
-              <p className="text-base font-bold text-ink capitalize truncate max-w-[120px] mt-0.5">
-                {currentTenant?.sector || 'Multi'}
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Search & Filter Toolbar */}
@@ -196,13 +174,16 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               return (
                 <Tilt key={dash.id} className="h-full">
                 <div
-                  className="card flex flex-col justify-between overflow-hidden group h-full"
+                  className="card relative flex flex-col justify-between overflow-hidden group h-full pl-1.5"
                 >
+                  <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />
                   <div className="p-5 space-y-3.5">
                     {/* Top Tag & Sector */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-2 text-brand-ink capitalize border border-line/60">
-                        <Tag className="w-3 h-3 text-brand" />
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-brand-ink capitalize">
+                        <span className="item-tile !w-7 !h-7">
+                          <LayoutGrid className="w-3.5 h-3.5" />
+                        </span>
                         {dash.sector || currentTenant?.sector || 'BUMD'}
                       </span>
                       <span className="text-[11px] font-medium text-ink-3 flex items-center gap-1">

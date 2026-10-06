@@ -168,6 +168,47 @@
   .accent-cyan { --accent-a: #38c6e2; --accent-b: #1e96b4; }
   .accent-teal { --accent-a: #2bb8a8; --accent-b: #1a8f84; }
   .accent-amber { --accent-a: #e0a020; --accent-b: #b87d10; }
+
+  /* ItemCard — pola item/kartu daftar seragam: bar aksen kiri + tile ikon.
+     Dipakai di seluruh app agar konsisten dengan item sidebar. */
+  .item-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px 10px 16px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-line);
+    background-color: var(--color-surface);
+    overflow: hidden;
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .item-card-interactive { cursor: pointer; }
+  .item-card-interactive:hover {
+    background-color: var(--color-surface-2);
+    box-shadow: var(--shadow-pop-sm);
+  }
+  .item-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--item-accent, var(--color-brand));
+    border-radius: 0 4px 4px 0;
+  }
+  .item-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: var(--radius-control);
+    color: var(--item-accent, var(--color-brand));
+    background-color: color-mix(in srgb, var(--item-accent, var(--color-brand)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--item-accent, var(--color-brand)) 28%, transparent);
+  }
 }
 @utility shadow-soft {
   box-shadow: var(--elev-card);

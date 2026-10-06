@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, AlertTriangle, CheckCircle2, ShieldAlert, Plus, RefreshCw, Search, Mail } from 'lucide-react';
 import { AlertRule, NotificationItem } from '../types';
+import { ItemCard } from '../components/ui/ItemCard';
 
 interface AlertsPageProps {
   tenantId: string;
@@ -124,65 +125,58 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId, onBackToWorksp
                 <div className="text-center py-12 text-xs text-ink-3">Tidak ada notifikasi ditemukan.</div>
               ) : (
                 <div className="space-y-3">
-                  {filteredNotifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`p-4 rounded-card border transition-colors flex items-start gap-3.5 ${
-                        item.severity === 'critical'
-                          ? 'bg-neg/15/50 border-neg/30'
-                          : item.severity === 'warning'
-                          ? 'bg-warn/15/50 border-warn/30'
-                          : 'bg-surface-2/50 border-line'
-                      }`}
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-control flex items-center justify-center shrink-0 text-white mt-0.5 ${
-                          item.severity === 'critical'
-                            ? 'bg-neg'
-                            : item.severity === 'warning'
-                            ? 'bg-warn'
-                            : 'bg-brand'
-                        }`}
-                      >
-                        {item.severity === 'critical' ? (
-                          <ShieldAlert className="w-4 h-4" />
-                        ) : item.severity === 'warning' ? (
-                          <AlertTriangle className="w-4 h-4" />
-                        ) : (
-                          <Bell className="w-4 h-4" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <h3 className="text-xs font-bold text-ink truncate">{item.title}</h3>
-                          <span className="text-[10px] font-mono text-ink-3 shrink-0">
-                            {new Date(item.timestamp).toLocaleString('id-ID', {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            })}
-                          </span>
-                        </div>
-                        <p className="text-xs text-ink-2 leading-relaxed mb-2">{item.message}</p>
-                        <div className="flex items-center gap-2 text-[10px]">
-                          <span className="px-2 py-0.5 rounded bg-surface-2 text-ink-2 font-semibold uppercase">
-                            {item.severity}
-                          </span>
-                          <span className="text-ink-3">
+                  {filteredNotifications.map((item) => {
+                    const warna =
+                      item.severity === 'critical'
+                        ? 'var(--color-neg)'
+                        : item.severity === 'warning'
+                        ? 'var(--color-warn)'
+                        : 'var(--color-brand)';
+                    return (
+                      <ItemCard
+                        key={item.id}
+                        accent={warna}
+                        icon={
+                          item.severity === 'critical' ? (
+                            <ShieldAlert className="w-4 h-4" />
+                          ) : item.severity === 'warning' ? (
+                            <AlertTriangle className="w-4 h-4" />
+                          ) : (
+                            <Bell className="w-4 h-4" />
+                          )
+                        }
+                        title={item.title}
+                        meta={
+                          <>
+                            <span className="px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 font-semibold uppercase mr-1.5">
+                              {item.severity}
+                            </span>
                             {item.metricValue !== undefined && item.threshold !== undefined
                               ? `Nilai ${item.metricValue} vs ambang ${item.threshold}`
                               : 'Sistem'}
-                          </span>
-                          {item.sentEmail && (
-                            <span className="inline-flex items-center gap-1 text-pos font-semibold">
-                              <Mail className="w-3 h-3" />
-                              Email terkirim
+                          </>
+                        }
+                        trailing={
+                          <>
+                            {item.sentEmail && (
+                              <span className="inline-flex items-center gap-1 text-pos text-[10px] font-semibold">
+                                <Mail className="w-3 h-3" />
+                                Terkirim
+                              </span>
+                            )}
+                            <span className="text-[10px] font-mono text-ink-3">
+                              {new Date(item.timestamp).toLocaleString('id-ID', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                          </>
+                        }
+                      >
+                        <span className="block text-xs text-ink-2 leading-relaxed mt-1.5">{item.message}</span>
+                      </ItemCard>
+                    );
+                  })}
                 </div>
               )
             ) : (
