@@ -1,7 +1,9 @@
 import React from 'react';
+import { useThemeMode } from '../../theme';
 
-// Palet dot ala referensi — biru dominan sesuai tone aplikasi.
-const DOT_COLORS = ['#38c6e2', '#8f90e4', '#2bb8a8', '#e0a020', '#b06be0', '#f2503a', '#5b9bd5'];
+// Palet dot selaras palet chart (Soft 3D) — disesuaikan per mode agar kontras.
+const DOT_COLORS_LIGHT = ['#1fa6cc', '#7f80d8', '#0f9d6b', '#d98a12', '#9a6fe0', '#ee4b32', '#5b9bd5'];
+const DOT_COLORS_DARK = ['#38c6e2', '#8f90e4', '#3fd29a', '#ffb547', '#b58cf0', '#f2503a', '#5b9bd5'];
 
 interface Column {
   key: string;
@@ -15,6 +17,8 @@ interface DataTableProps {
 }
 
 export const DataTable: React.FC<DataTableProps> = ({ columns, rows }) => {
+  const mode = useThemeMode();
+  const DOT_COLORS = mode === 'dark' ? DOT_COLORS_DARK : DOT_COLORS_LIGHT;
   // Tanpa sort/search toolbar — daftar sederhana ala referensi.
   const labelCol = columns[0];
   const valueCols = columns.slice(1);

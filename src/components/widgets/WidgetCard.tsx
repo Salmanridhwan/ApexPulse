@@ -87,8 +87,8 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                             onClick={() => onEdit({ ...widget, type: t })}
                             className={`flex-1 px-1.5 py-1 rounded-chip text-[11px] font-semibold transition-colors ${
                               widget.type === t
-                                ? 'bg-gradient-to-r from-brand to-violet text-white'
-                                : 'bg-surface-2 text-brand-ink hover:bg-surface-2'
+                                ? 'bg-brand text-white'
+                                : 'bg-surface-2 text-brand-ink hover:bg-line'
                             }`}
                           >
                             {t === 'line' ? 'Garis' : t === 'bar' ? 'Batang' : 'Area'}

@@ -8,8 +8,8 @@ import { useThemeMode } from '../../theme';
 /** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
 function chartTheme(mode: 'light' | 'dark') {
   return mode === 'dark'
-    ? { series: ['#8f90e4', '#38c6e2', '#f2503a', '#ffb547', '#3fd29a', '#b58cf0'], accent: '#8f90e4', accentSoft: '#38c6e2', track: '#4d5667', tick: '#5f6a7e', muted: '#9aa4b8', strong: '#f1f4f9', text2: '#cbd2df', grid: '#4d5667', tipBg: '#1d2129', surface: '#3a4150', heatLow: '#444c5d' }
-    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#5a6478', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', surface: '#f6f8fb', heatLow: '#d6eff7' };
+    ? { series: ['#8f90e4', '#38c6e2', '#f2503a', '#ffb547', '#3fd29a', '#b58cf0'], accent: '#8f90e4', accentSoft: '#38c6e2', track: '#4d5667', tick: '#5f6a7e', muted: '#9aa4b8', strong: '#f1f4f9', text2: '#cbd2df', grid: '#4d5667', tipBg: '#1d2129', tooltipInk: '#f1f4f9', surface: '#3a4150', heatLow: '#444c5d' }
+    : { series: ['#7f80d8', '#1fa6cc', '#ee4b32', '#d98a12', '#0f9d6b', '#9a6fe0'], accent: '#7f80d8', accentSoft: '#1fa6cc', track: '#d3d9e3', tick: '#bcc5d3', muted: '#5a6478', strong: '#232a38', text2: '#4a5468', grid: '#d3d9e3', tipBg: '#232a38', tooltipInk: '#f1f4f9', surface: '#f6f8fb', heatLow: '#d6eff7' };
 }
 
 /**
@@ -278,7 +278,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             backgroundColor: T.tipBg,
             borderColor: T.tipBg,
             borderRadius: 8,
-            textStyle: { color: '#f8fafc', fontSize: 11 },
+            textStyle: { color: T.tooltipInk, fontSize: 11 },
             formatter: (p: any) =>
               `${p.name}: <b>${p.value}${displayUnit ? ' ' + displayUnit : ''}</b> (${p.percent}%)`,
           },
@@ -359,7 +359,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             backgroundColor: T.tipBg,
             borderColor: T.tipBg,
             borderRadius: 8,
-            textStyle: { color: '#f8fafc', fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
+            textStyle: { color: T.tooltipInk, fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
             valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
           },
           legend: showLegend && seriesView.length > 1
