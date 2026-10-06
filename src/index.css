@@ -9,97 +9,97 @@
    Mode gelap menimpa variabel yang sama di [data-theme='dark'].
    ============================================================ */
 @theme {
-  --color-canvas: #dfe4ec;
-  --color-surface: #fbfcfe;
-  --color-surface-2: #eaeef5;
+  --color-canvas: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f3f6;
 
-  --color-line: #cbd3e0;
-  --color-line-strong: #aab5c7;
+  --color-line: #e8ecf1;
+  --color-line-strong: #d1d7e0;
 
-  --color-ink: #232a38;
-  --color-ink-2: #4a5468;
-  --color-ink-3: #5a6478;   /* digelapkan: lulus WCAG AA di kanvas (4.66:1) */
+  --color-ink: #1a1d1f;
+  --color-ink-2: #4b5563;
+  --color-ink-3: #6b7280;   /* lulus WCAG AA di permukaan (4.83:1) */
 
-  --color-brand: #1fa6cc;       /* cyan */
-  --color-brand-ink: #157b99;   /* digelapkan: lulus WCAG AA (4.73:1) */
-  --color-brand-soft: #d6eff7;
+  --color-brand: #1fa6cc;       /* cyan — aksen/isi */
+  --color-brand-ink: #0f6b85;   /* digelapkan: teks & chip lulus WCAG AA (6.07:1) */
+  --color-brand-soft: #e6f6fb;
   --color-violet: #7f80d8;      /* periwinkle */
   --color-coral: #ee4b32;       /* merah-oranye */
 
-  --color-pos: #0f9d6b;
-  --color-neg: #e0392b;
-  --color-warn: #d98a12;
+  --color-pos: #0f7a53;
+  --color-neg: #c62f22;
+  --color-warn: #8f5e08;
 
   /* Shell (sidebar) */
-  --color-shell: #dfe4ec;
-  --color-shell-2: #d3d9e3;
-  --color-shell-line: #c4ccd9;
-  --color-shell-ink: #232a38;
-  --color-shell-ink-2: #566074;
-  --color-shell-hover: rgb(31 166 204 / 0.12);
-  --color-shell-active: #c9d1de;
+  --color-shell: #ffffff;
+  --color-shell-2: #f1f3f6;
+  --color-shell-line: #e8ecf1;
+  --color-shell-ink: #1a1d1f;
+  --color-shell-ink-2: #4b5563;
+  --color-shell-hover: rgb(31 166 204 / 0.08);
+  --color-shell-active: #e6f6fb;
 
-  --radius-card: 14px;
+  --radius-card: 12px;
   --radius-control: 10px;
   --radius-chip: 999px;
 
-  --shadow-pop: 0 20px 44px rgb(35 42 56 / 0.22);
-  --shadow-pop-sm: 0 6px 16px rgb(35 42 56 / 0.12);
+  --shadow-pop: 0 12px 32px rgb(16 24 40 / 0.14);
+  --shadow-pop-sm: 0 2px 8px rgb(16 24 40 / 0.06);
 
   /* Scrim (latar gelap di belakang modal/drawer) — gelap di KEDUA mode. */
   --color-scrim: #10141d;
 }
 
-/* Mode gelap — slate kebiruan seperti referensi */
+/* Mode gelap — "Clean Grid" gelap (near-black netral, bukan navy). */
 [data-theme='dark'] {
   color-scheme: dark;
-  --color-canvas: #2d333f;
-  --color-surface: #3a4150;
-  --color-surface-2: #444c5d;
+  --color-canvas: #0f1115;
+  --color-surface: #171a1f;
+  --color-surface-2: #1f2329;
 
-  --color-line: #4d5667;
-  --color-line-strong: #5f6a7e;
+  --color-line: #2a2f37;
+  --color-line-strong: #3a4149;
 
-  --color-ink: #f1f4f9;
-  --color-ink-2: #cbd2df;
-  --color-ink-3: #a8b1c2;   /* diterangkan: lulus WCAG AA di permukaan (4.74:1) */
+  --color-ink: #f2f4f7;
+  --color-ink-2: #b6bdc8;
+  --color-ink-3: #8b93a1;   /* lulus WCAG AA (5.64:1) */
 
   --color-brand: #38c6e2;
   --color-brand-ink: #7fdcf0;
-  --color-brand-soft: #2c4f5f;
-  --color-violet: #8f90e4;
+  --color-brand-soft: #1a3a44;
+  --color-violet: #9a9be8;
   --color-coral: #f2503a;
 
   --color-pos: #3fd29a;
   --color-neg: #ff6b5b;
   --color-warn: #ffb547;
 
-  --color-shell: #2a2f3a;
-  --color-shell-2: #323845;
-  --color-shell-line: #3d4452;
-  --color-shell-ink: #eef1f7;
-  --color-shell-ink-2: #98a2b6;
+  --color-shell: #14171c;
+  --color-shell-2: #1c2026;
+  --color-shell-line: #262b33;
+  --color-shell-ink: #f2f4f7;
+  --color-shell-ink-2: #8b93a1;
   --color-shell-hover: rgb(255 255 255 / 0.05);
-  --color-shell-active: #1d2129;
+  --color-shell-active: #1f2329;
 
-  --shadow-pop: 0 22px 46px rgb(8 10 16 / 0.6);
-  --shadow-pop-sm: 0 4px 14px rgb(8 10 16 / 0.45);
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
+  --shadow-pop-sm: 0 2px 8px rgb(0 0 0 / 0.4);
 }
 
-/* Elevasi: bayangan jatuh lembut, warna biru-gelap (bukan hitam murni). */
+/* Elevasi: bayangan sangat lembut (Clean Grid). Warna biru-gelap, bukan hitam murni. */
 :root {
-  --elev-card: 0 10px 24px rgb(35 42 56 / 0.10), 0 2px 6px rgb(35 42 56 / 0.06);
-  --elev-card-hover: 0 18px 34px rgb(35 42 56 / 0.16), 0 4px 10px rgb(35 42 56 / 0.10);
-  --elev-inset: inset 0 2px 6px rgb(35 42 56 / 0.18);
-  --glow-brand: 0 8px 20px rgb(31 166 204 / 0.35);
-  --bg-app: linear-gradient(135deg, #eef1f6 0%, #dfe4ec 55%, #d5dbe6 100%);
+  --elev-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
+  --elev-card-hover: 0 4px 12px rgb(16 24 40 / 0.08), 0 1px 3px rgb(16 24 40 / 0.05);
+  --elev-inset: inset 0 2px 4px rgb(16 24 40 / 0.08);
+  --glow-brand: 0 1px 3px rgb(31 166 204 / 0.2);
+  --bg-app: #f4f6f8;
 }
 [data-theme='dark'] {
-  --elev-card: 0 12px 28px rgb(4 6 12 / 0.45), 0 2px 6px rgb(4 6 12 / 0.30);
-  --elev-card-hover: 0 20px 40px rgb(4 6 12 / 0.55), 0 4px 10px rgb(4 6 12 / 0.38);
-  --elev-inset: inset 0 2px 7px rgb(4 6 12 / 0.55);
-  --glow-brand: 0 8px 22px rgb(56 198 226 / 0.4);
-  --bg-app: linear-gradient(135deg, #4a5263 0%, #353b48 45%, #2a2f3a 100%);
+  --elev-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --elev-card-hover: 0 4px 14px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
+  --elev-inset: inset 0 2px 5px rgb(0 0 0 / 0.5);
+  --glow-brand: 0 1px 4px rgb(56 198 226 / 0.25);
+  --bg-app: #0f1115;
 }
 /* Kelas komponen siap pakai. */
 @utility card {
@@ -117,18 +117,15 @@
 }
 @utility btn-primary {
   border-radius: var(--radius-control);
-  background-image: linear-gradient(135deg, var(--color-brand), var(--color-violet));
-  color: #fff;
+  background-color: var(--color-ink);
+  color: var(--color-surface);
   font-weight: 600;
-  box-shadow: var(--glow-brand);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   &:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.08);
+    opacity: 0.88;
   }
   &:active {
     transform: translateY(1px);
-    box-shadow: var(--elev-inset);
   }
 }
 @utility btn-ghost {
