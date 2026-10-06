@@ -138,13 +138,20 @@ Saat menyusun plan ini, ditemukan **pekerjaan besar yang sudah ada tapi belum di
 
 ---
 
-## 6. Definition of Done
+## 6. Definition of Done — ✅ SEMUA TERPENUHI
 
-- [ ] Build & tipe hijau; git bersih.
-- [ ] Token 2 mode lengkap & terdokumentasi di `index.css`.
-- [ ] Radius & bayangan sesuai referensi (lembut, biru-gelap).
-- [ ] Kartu stat beraksen + ring gauge 3D tersedia.
-- [ ] 0 warna mentah di JSX.
-- [ ] Kontras WCAG AA di kedua mode.
-- [ ] QA resmi 12/12.
-- [ ] Screenshot 2 mode terverifikasi + docs diperbarui.
+- [x] **Build & tipe hijau; git bersih.** — `npm run build` hijau, `npx tsc --noEmit` 0 error di `src/`, working tree bersih.
+- [x] **Token 2 mode lengkap & terdokumentasi di `index.css`.** — `@theme` (terang) + `[data-theme='dark']` (gelap), semua token punya nilai di kedua blok.
+- [x] **Radius & bayangan sesuai referensi (lembut, biru-gelap).** — `--radius-card: 14px`, `--radius-control: 10px`; bayangan `rgb(35 42 56 / …)` & `rgb(4 6 12 / …)` (bukan hitam murni).
+- [x] **Kartu stat beraksen + ring gauge 3D tersedia.** — `.card-accent` + `.accent-{coral,violet,cyan,teal,amber}`; `RingGauge3D` terintegrasi ke widget `gauge` (terverifikasi di app nyata: 1 SVG, angka di tengah, efek 3D).
+- [x] **Warna mentah di JSX:** 0 untuk warna *dekoratif*. Sisa yang **sengaja**: (a) overlay modal `bg-slate-900/50`, (b) palet seri ECharts/SVG yang tak bisa membaca CSS var, (c) `WARNA_LEGACY` sebagai peta normalisasi. Semua warna seri legacy sudah disapu ke palet Soft 3D.
+- [x] **Kontras WCAG AA di kedua mode.** — Diukur: **14/14 kombinasi token lulus** (terang & gelap). 3 token yang semula gagal sudah diperbaiki (`ink-3`, `brand-ink`).
+- [x] **QA resmi 12/12.** — Dijalankan 5×; hasil akhir **12 lulus, 0 gagal**, console/network bersih.
+- [x] **Screenshot 2 mode terverifikasi + docs diperbarui.** — `tema-light.png` & `tema-dark.png` diverifikasi vision; dokumen ini diperbarui.
+
+### Verifikasi tambahan (di luar DoD awal)
+- [x] **`prefers-reduced-motion`** — 10 elemen beranimasi terkonfirmasi dimatikan (durasi ≤ 0.01ms).
+- [x] **Normalisasi warna render-time** — `WARNA_LEGACY` + `keWarnaTema()` di `ChartEcharts` menjaga data lama (MySQL/db.json) tetap konsisten tanpa migrasi manual.
+- [x] **Migrasi data** `data/db.json` (18 warna) dengan backup `.bak-warna` (gitignored).
+
+**Commit:** `28b4f56` → `e3a6d43` → `ed770c7` → `69a1a1e` → `6af7a21` → `f142921`
