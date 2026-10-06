@@ -32,9 +32,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const isSource = widget.confidence === 'sumber' && !isManual;
 
   return (
-    <div className="relative card card-lift flex flex-col h-full overflow-hidden group pl-1">
-      {/* Bar aksen kiri — motif seragam (konsisten dengan item sidebar & ItemCard). */}
-      <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
+    <div className="relative card card-lift flex flex-col h-full overflow-hidden group">
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">

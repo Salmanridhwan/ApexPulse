@@ -288,11 +288,10 @@ const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget }) => {
   return (
     <div
       data-widget-id={widget.id}
-      className={`relative bg-surface rounded-card border border-line/90 shadow-2xs overflow-hidden flex flex-col justify-between pl-1 ${
+      className={`relative bg-surface rounded-card border border-line/90 shadow-2xs overflow-hidden flex flex-col justify-between ${
         isWide ? 'md:col-span-2' : ''
       }`}
     >
-      <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
       <div className="p-4 sm:p-5 flex-1 flex flex-col">
         <div className="flex items-start justify-between gap-3 mb-3 border-b border-line pb-3">
           <div>
