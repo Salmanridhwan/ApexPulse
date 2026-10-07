@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { WidgetSpec, WidgetType } from '../types';
-import { tipeKompatibel } from '../services/spec/widgetTypes';
+import { tipeKompatibel, GRUP_VISUALISASI } from '../services/spec/widgetTypes';
 
 interface WidgetEditorModalProps {
   isOpen: boolean;
@@ -205,7 +205,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                 </div>
               </div>
 
-              {/* Tipe Visualisasi Grid */}
+              {/* Tipe Visualisasi Grid — dikelompokkan agar mudah dipindai */}
               <div>
                 <label className="block text-ink-2 font-medium mb-2">
                   Pilih Tipe Visualisasi Chart
@@ -215,21 +215,34 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                     Widget ini hanya punya data untuk tipe ini.
                   </p>
                 )}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {chartTypes.map((ct) => (
-                    <button
-                      key={ct.type}
-                      type="button"
-                      onClick={() => setType(ct.type)}
-                      className={`p-2.5 rounded-card border text-left transition-all ${type === ct.type
-                          ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
-                          : 'border-line bg-surface hover:bg-surface-2'
-                        }`}
-                    >
-                      <p className="font-semibold text-ink">{ct.label}</p>
-                      <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{ct.desc}</p>
-                    </button>
-                  ))}
+                <div className="space-y-3">
+                  {GRUP_VISUALISASI.map((grup) => {
+                    const tipeGrup = chartTypes.filter((ct) => ct.grup === grup);
+                    if (!tipeGrup.length) return null;
+                    return (
+                      <div key={grup}>
+                        <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3 mb-1.5">
+                          {grup}
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {tipeGrup.map((ct) => (
+                            <button
+                              key={ct.type}
+                              type="button"
+                              onClick={() => setType(ct.type)}
+                              className={`p-2.5 rounded-card border text-left transition-all ${type === ct.type
+                                  ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
+                                  : 'border-line bg-surface hover:bg-surface-2'
+                                }`}
+                            >
+                              <p className="font-semibold text-ink">{ct.label}</p>
+                              <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{ct.desc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

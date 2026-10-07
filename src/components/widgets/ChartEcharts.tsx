@@ -4,31 +4,11 @@ import { Table2, BarChart3 } from 'lucide-react';
 import { useChartSelection } from './ChartSelection';
 import { RingGauge3D } from './RingGauge3D';
 import { useThemeMode } from '../../theme';
-
-/** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
-function chartTheme(mode: 'light' | 'dark') {
-  return mode === 'dark'
-    ? { series: ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0'], accent: '#38c6e2', accentSoft: '#7fdcf0', track: '#2a2f37', tick: '#6b7280', muted: '#8b93a1', strong: '#f2f4f7', text2: '#b6bdc8', grid: '#2a2f37', tipBg: '#1f2329', tooltipInk: '#f2f4f7', surface: '#171a1f', heatLow: '#1f2329' }
-    : { series: ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85'], accent: '#1fa6cc', accentSoft: '#0f6b85', track: '#e8ecf1', tick: '#6b7280', muted: '#6b7280', strong: '#1a1d1f', text2: '#4b5563', grid: '#e8ecf1', tipBg: '#1a1d1f', tooltipInk: '#f2f4f7', surface: '#ffffff', heatLow: '#e6f6fb' };
-}
-
-/**
- * Peta warna seri lama (biru/sky/emerald default) -> palet Clean Grid.
- * Diterapkan saat render agar data tersimpan (MySQL/db.json) maupun respons
- * RAG lama otomatis konsisten, tanpa perlu migrasi data manual.
- */
-const WARNA_LEGACY: Record<string, string> = {
-  '#0284c7': '#1fa6cc', '#0ea5e9': '#1fa6cc', '#3b82f6': '#1fa6cc',
-  '#1d4ed8': '#7f80d8', '#10b981': '#0f7a53', '#059669': '#0f7a53',
-  '#f59e0b': '#8f5e08', '#ea580c': '#8f5e08', '#8b5cf6': '#7f80d8',
-  '#7c3aed': '#7f80d8', '#e11d48': '#c62f22', '#94a3b8': '#7f80d8',
-};
-const keWarnaTema = (c?: string): string | undefined =>
-  c ? (WARNA_LEGACY[c.toLowerCase()] ?? c) : c;
+import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
+import { WidgetType } from '../../types';
 
 // echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
 // awal. Modul tree-shaken (lihat echartsSetup.ts) supaya bundel tidak 1 MB.
-// Dynamic import -> Vite memecahnya jadi chunk terpisah.
 let echartsPromise: Promise<typeof import('./echartsSetup')> | null = null;
 const loadEcharts = () => (echartsPromise ??= import('./echartsSetup'));
 
@@ -36,86 +16,97 @@ const loadEcharts = () => (echartsPromise ??= import('./echartsSetup'));
  *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
 export const preloadEcharts = (): Promise<unknown> => loadEcharts();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UNIT NORMALIZATION
-// Problem: RAG sometimes returns series data where some items are in "triliun"
-// and others in "miliar". ECharts has no concept of units, so it compares raw
-// numbers directly — causing 1.0 (triliun) to look smaller than 985.4 (miliar).
-//
-// Fix: detect the dominant unit from the `unit` prop, and apply a multiplier so
-// ALL values are expressed in the SAME base unit (miliar) before charting.
-// ─────────────────────────────────────────────────────────────────────────────
+/** Cache peta Indonesia: diunduh & didaftarkan sekali untuk semua widget peta. */
+let petaIndonesiaPromise: Promise<void> | null = null;
+const NAMA_MAP = 'indonesia';
 
-/** Parse a unit string and return its multiplier relative to "miliar" base. */
-function unitMultiplier(unit: string): number {
-  const u = unit.toLowerCase();
-  if (/triliun/.test(u)) return 1_000;    // 1 triliun = 1000 miliar
-  if (/juta/.test(u)) return 0.001;       // 1 juta = 0.001 miliar
-  if (/ribu/.test(u)) return 0.000_001;   // 1 ribu = 0.000001 miliar
-  return 1; // miliar or unknown → no conversion
+function pastikanPetaTerdaftar(echarts: any): Promise<void> {
+  return (petaIndonesiaPromise ??= (async () => {
+    if (echarts.getMap?.(NAMA_MAP)) return;
+    const res = await fetch('/geo/indonesia.geojson');
+    if (!res.ok) throw new Error('GeoJSON peta gagal dimuat');
+    const geo = await res.json();
+    echarts.registerMap(NAMA_MAP, geo);
+  })().catch((err) => {
+    // Reset agar percobaan berikutnya bisa mengulang (mis. jaringan pulih).
+    petaIndonesiaPromise = null;
+    throw err;
+  }));
 }
 
-/**
- * Normalize series data so all values are expressed in miliar.
- * Reads `unit` from each series entry (falls back to the widget-level unit).
- * Returns the normalized series plus the resolved display unit label.
- */
-function normalizeSeriesData(
-  series: Array<{ name: string; data: number[]; color?: string; unit?: string }>,
-  widgetUnit?: string
-): {
-  normalizedSeries: Array<{ name: string; data: number[]; color?: string }>;
-  displayUnit: string;
-} {
-  // Determine per-series multipliers; use widget-level unit as fallback.
-  const multipliers = series.map((s) => unitMultiplier(s.unit || widgetUnit || ''));
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIT NORMALIZATION
+// RAG kadang mengembalikan data satu seri dalam "triliun" dan seri lain dalam
+// "miliar". ECharts membandingkan angka mentah, jadi 1.0 (triliun) terlihat
+// lebih kecil dari 985.4 (miliar). Normalisasi ke basis "miliar" sebelum render.
+// ─────────────────────────────────────────────────────────────────────────────
+function unitMultiplier(unit: string): number {
+  const u = unit.toLowerCase();
+  if (/triliun/.test(u)) return 1_000;
+  if (/juta/.test(u)) return 0.001;
+  if (/ribu/.test(u)) return 0.000_001;
+  return 1;
+}
 
-  // If all multipliers are the same (or 1), skip normalization.
+function normalizeSeriesData(
+  series: Array<{ name: string; data: number[]; color?: string; unit?: string; kind?: 'bar' | 'line'; yAxisIndex?: 0 | 1 }>,
+  widgetUnit?: string
+) {
+  const multipliers = series.map((s) => unitMultiplier(s.unit || widgetUnit || ''));
   const allSame = multipliers.every((m) => m === multipliers[0]);
   if (allSame && multipliers[0] === 1) {
-    return {
-      normalizedSeries: series,
-      displayUnit: widgetUnit || '',
-    };
+    return { normalizedSeries: series, displayUnit: widgetUnit || '' };
   }
-
-  // Normalize everything to miliar base.
-  const normalizedSeries = series.map((s, i) => ({
-    ...s,
-    data: s.data.map((v) => v * multipliers[i]),
-  }));
-
-  // Pick a sensible display unit:
-  // If original widget unit is triliun and we normalized to miliar, say "miliar".
+  const normalizedSeries = series.map((s, i) => ({ ...s, data: s.data.map((v) => v * multipliers[i]) }));
   const maxMultiplier = Math.max(...multipliers);
   let displayUnit = widgetUnit || '';
   if (maxMultiplier >= 1_000) {
-    // Originally mixed triliun/miliar → display in miliar (already converted)
     displayUnit = displayUnit.replace(/triliun/i, 'miliar');
     if (!displayUnit) displayUnit = 'Rp miliar';
   }
-
   return { normalizedSeries, displayUnit };
 }
 
-interface ChartEchartsProps {
-  type: 'line' | 'area' | 'bar' | 'donut' | 'gauge' | 'heatmap';
+/** Semua tipe yang dirender ECharts (bukan kpi/table/narasi/gauge/bullet-target). */
+const TIPE_ECHARTS: WidgetType[] = [
+  'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+  'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+  'radar', 'map', 'gantt',
+];
+
+/** Tipe yang mendukung cross-filter klik kategori. */
+const TIPE_SELEKSI: WidgetType[] = [
+  'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+  'waterfall', 'heatmap',
+];
+
+export interface ChartEchartsProps {
+  type: WidgetType;
   xAxis: string[];
   series: Array<{
     name: string;
     data: number[];
     color?: string;
-    /** Satuan per-seri (opsional). Bila diisi, normalisasi antar satuan dilakukan
-     *  sebelum rendering sehingga bar triliun tidak terlihat lebih kecil dari miliar. */
     unit?: string;
+    kind?: 'bar' | 'line';
+    yAxisIndex?: 0 | 1;
   }>;
   unit?: string;
   stacked?: boolean;
   showLegend?: boolean;
   min?: number;
   max?: number;
-  /** Khusus heatmap: matriks nilai [baris][kolom]. */
   heatmapData?: number[][];
+  heatmapRows?: string[];
+  heatmapCols?: string[];
+  points?: Array<{ x: number; y: number; size?: number; label?: string; color?: string }>;
+  links?: Array<{ source: string; target: string; value: number }>;
+  waterfall?: Array<{ name: string; value: number }>;
+  radarData?: { indicators: Array<{ name: string; max: number }>; series: Array<{ name: string; values: number[]; color?: string }> };
+  boxRaw?: number[][];
+  treemapData?: { name: string; value?: number; children?: Array<{ name: string; value: number }> };
+  geoData?: { mapName?: string; regions: Array<{ name: string; value: number }>; unit?: string };
+  ganttData?: { tasks: Array<{ name: string; start: string; end: string; progress?: number; color?: string }> };
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -128,6 +119,16 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   min,
   max,
   heatmapData,
+  heatmapRows,
+  heatmapCols,
+  points,
+  links,
+  waterfall,
+  radarData,
+  boxRaw,
+  treemapData,
+  geoData,
+  ganttData,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -135,319 +136,148 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   const themeMode = useThemeMode();
   const [showData, setShowData] = useState(false);
 
-  // ── Normalisasi satuan SEBELUM render ─────────────────────────────────────
   const { normalizedSeries, displayUnit } = useMemo(
     () => normalizeSeriesData(series, unit),
     [series, unit]
   );
 
-  const isCartesian = type === 'line' || type === 'area' || type === 'bar';
+  const isSeleksi = TIPE_SELEKSI.includes(type);
 
   // ── Turunkan data tampilan berdasarkan seleksi (cross-filter ala Tableau) ──
   const view = useMemo(() => {
     let xView = xAxis;
-    let seriesView: Array<{ name: string; data: number[]; color?: string }> = normalizedSeries;
-    if (isCartesian && selected && xAxis.includes(selected)) {
-      const i = xAxis.indexOf(selected);
-      xView = [selected];
-      seriesView = normalizedSeries.map((s) => ({ ...s, data: [s.data[i] ?? 0] }));
+    let seriesView = normalizedSeries;
+    let heatCols = heatmapCols ?? xAxis;
+    let heatRows = heatmapRows ?? normalizedSeries.map((s) => s.name);
+    let heatMatriks = heatmapData ?? normalizedSeries.map((s) => heatCols.map((_, c) => s.data[c] ?? 0));
+    let treemapView = treemapData;
+    let radarView = radarData;
+    let funnelView = xView.map((label, idx) => ({ name: label, value: normalizedSeries[0]?.data[idx] || 0 }));
+    let pieView = xView.map((label, idx) => ({ name: label, value: normalizedSeries[0]?.data[idx] || 0 }));
+
+    if (selected && isSeleksi) {
+      if (['line', 'area', 'bar', 'hbar', 'combo'].includes(type) && xAxis.includes(selected)) {
+        const i = xAxis.indexOf(selected);
+        xView = [selected];
+        seriesView = normalizedSeries.map((s) => ({ ...s, data: [s.data[i] ?? 0] }));
+      } else if ((type === 'pie' || type === 'donut') && pieView.some((d) => d.name === selected)) {
+        pieView = pieView.filter((d) => d.name === selected);
+      } else if (type === 'funnel' && funnelView.some((d) => d.name === selected)) {
+        funnelView = funnelView.filter((d) => d.name === selected);
+      } else if (type === 'heatmap' && heatCols.includes(selected)) {
+        const ci = heatCols.indexOf(selected);
+        heatCols = [selected];
+        heatMatriks = heatMatriks.map((r) => [r[ci] ?? 0]);
+      } else if (type === 'treemap' && treemapView?.children?.some((c) => c.name === selected)) {
+        treemapView = { ...treemapView, children: treemapView.children.filter((c) => c.name === selected) };
+      }
     }
 
-    let donutView = xAxis.map((label, idx) => ({
-      name: label,
-      value: normalizedSeries[0]?.data[idx] || 0,
-    }));
-    if (type === 'donut' && selected) {
-      const cocok = donutView.filter((d) => d.name === selected);
-      if (cocok.length) donutView = cocok;
-    }
-
-    let heatCols = xAxis;
-    let heatRows = normalizedSeries.map((s) => s.name);
-    let heatMatriks =
-      heatmapData ?? normalizedSeries.map((s) => heatCols.map((_, c) => s.data[c] ?? 0));
-    if (type === 'heatmap' && selected && heatCols.includes(selected)) {
-      const ci = heatCols.indexOf(selected);
-      heatCols = [selected];
-      heatMatriks = heatMatriks.map((r) => [r[ci] ?? 0]);
-    }
-
-    return { xView, seriesView, donutView, heatCols, heatRows, heatMatriks };
-  }, [type, xAxis, normalizedSeries, heatmapData, selected, isCartesian]);
+    return { xView, seriesView, heatCols, heatRows, heatMatriks, treemapView, radarView, funnelView, pieView };
+  }, [type, xAxis, normalizedSeries, heatmapData, heatmapRows, heatmapCols, selected, isSeleksi, treemapData, radarData]);
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartRef.current || !TIPE_ECHARTS.includes(type)) return;
 
     let disposed = false;
     let resizeObserver: ResizeObserver | null = null;
     const handleResize = () => chartInstanceRef.current?.resize();
-    // Elemen & handler klik dipakai lintas callback (didaftarkan di then, dibuang di cleanup).
     let container: HTMLElement | null = null;
     let handleDomClick: ((ev: MouseEvent) => void) | null = null;
 
-    loadEcharts().then(({ echarts }) => {
+    loadEcharts().then(async ({ echarts }) => {
       if (disposed || !chartRef.current) return;
+
+      // Peta: GeoJSON harus terdaftar dulu sebelum opsi dirender.
+      if (type === 'map') {
+        try {
+          await pastikanPetaTerdaftar(echarts);
+        } catch {
+          // Gagal muat peta -> tetap render (peta kosong) daripada crash.
+        }
+        if (disposed || !chartRef.current) return;
+      }
 
       if (!chartInstanceRef.current) {
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
       const T = chartTheme(themeMode);
-      const { xView, seriesView, donutView, heatCols, heatRows, heatMatriks } = view;
+      const { xView, seriesView, heatCols, heatRows, heatMatriks, treemapView, radarView, funnelView, pieView } = view;
 
-      let option: EChartsOption = {};
+      const chartData: ChartData = {
+        xAxis: xView,
+        series: seriesView,
+        unit: displayUnit,
+        stacked,
+        showLegend,
+        min,
+        max,
+        points,
+        links,
+        waterfall,
+        radar: radarView,
+        boxRaw,
+        treemap: treemapView,
+        geo: geoData,
+        gantt: ganttData,
+        heatmap: { rows: heatRows, columns: heatCols, data: heatMatriks, unit: displayUnit },
+      };
 
-      if (type === 'gauge') {
-        const nilai = seriesView[0]?.data?.[0] ?? 0;
-        const gMin = min ?? 0;
-        const gMax = max ?? 100;
-        option = {
-          series: [
-            {
-              type: 'gauge',
-              startAngle: 210,
-              endAngle: -30,
-              min: gMin,
-              max: gMax,
-              radius: '92%',
-              progress: {
-                show: true,
-                width: 14,
-                itemStyle: { color: T.accent },
-              },
-              axisLine: { lineStyle: { width: 14, color: [[1, T.track]] } },
-              axisTick: { show: false },
-              splitLine: { length: 6, distance: 4, lineStyle: { color: T.tick, width: 1 } },
-              axisLabel: { color: T.muted, fontSize: 10, distance: 18 },
-              pointer: { show: false },
-              anchor: { show: false },
-              title: { show: false },
-              detail: {
-                valueAnimation: true,
-                fontSize: 30,
-                fontWeight: 'bold' as any,
-                color: T.strong,
-                offsetCenter: [0, '10%'],
-                formatter: (v: number) => `${v}${displayUnit ? ' ' + displayUnit : ''}`,
-              },
-              data: [{ value: nilai, name: seriesView[0]?.name || '' }],
-            },
-          ],
-        };
-      } else if (type === 'heatmap') {
-        const cols = heatCols;
-        const rows = heatRows;
-        const matriks = heatMatriks;
-        const semuaNilai = matriks.flat();
-        const vMin = semuaNilai.length ? Math.min(...semuaNilai) : 0;
-        const vMax = semuaNilai.length ? Math.max(...semuaNilai) : 100;
-        option = {
-          tooltip: {
-            position: 'top',
-            formatter: (p: any) =>
-              `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${displayUnit ? ' ' + displayUnit : ''}`,
-          },
-          grid: { left: 10, right: 10, top: 24, bottom: 30, containLabel: true },
-          xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
-          yAxis: { type: 'category', data: rows, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
-          visualMap: {
-            min: vMin,
-            max: vMax,
-            calculable: false,
-            orient: 'horizontal',
-            left: 'center',
-            bottom: -6,
-            itemHeight: 60,
-            itemWidth: 10,
-            textStyle: { fontSize: 9, color: T.muted },
-            inRange: { color: [T.heatLow, T.accent] },
-          },
-          series: [
-            {
-              type: 'heatmap',
-              data: matriks.flatMap((baris, rIdx) => baris.map((v, cIdx) => [cIdx, rIdx, v])),
-              label: { show: true, fontSize: 10, color: T.strong, formatter: (p: any) => `${p.value[2]}` },
-              itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 },
-              emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(29,78,216,0.35)' } },
-            },
-          ],
-        };
-      } else if (type === 'donut') {
-        option = {
-          tooltip: {
-            trigger: 'item',
-            backgroundColor: T.tipBg,
-            borderColor: T.tipBg,
-            borderRadius: 8,
-            textStyle: { color: T.tooltipInk, fontSize: 11 },
-            formatter: (p: any) =>
-              `${p.name}: <b>${p.value}${displayUnit ? ' ' + displayUnit : ''}</b> (${p.percent}%)`,
-          },
-          legend: showLegend
-            ? {
-              bottom: 0,
-              icon: 'circle',
-              textStyle: { fontSize: 11, color: T.muted },
-            }
-            : undefined,
-          series: [
-            {
-              name: displayUnit || 'Nilai',
-              type: 'pie',
-              radius: ['45%', '72%'],
-              avoidLabelOverlap: false,
-              itemStyle: {
-                borderRadius: 6,
-                borderColor: T.surface,
-                borderWidth: 2,
-              },
-              label: {
-                show: false,
-                position: 'center',
-              },
-              emphasis: {
-                label: {
-                  show: true,
-                  fontSize: 14,
-                  fontWeight: 'bold',
-                },
-              },
-              data: donutView,
-            },
-          ],
-          color: T.series,
-        };
+      let option: EChartsOption;
+      if (type === 'pie' || type === 'donut') {
+        option = buildChartOption(type, {
+          ...chartData,
+          xAxis: pieView.map((d) => d.name),
+          series: [{ name: seriesView[0]?.name || 'Nilai', data: pieView.map((d) => d.value) }],
+        }, T);
+      } else if (type === 'funnel') {
+        option = buildChartOption(type, {
+          ...chartData,
+          xAxis: funnelView.map((d) => d.name),
+          series: [{ name: seriesView[0]?.name || 'Nilai', data: funnelView.map((d) => d.value) }],
+        }, T);
       } else {
-        const isArea = type === 'area';
-        const paletSoft = T.series;
-        const echartsSeries = seriesView.map((s, sIdx) => {
-          // Seri pertama biru muda soft (ala referensi bar chart), seri lanjutan biru tua sebagai kontras.
-          const baseColor = keWarnaTema(s.color) || paletSoft[sIdx % paletSoft.length];
-          return {
-            name: s.name,
-            type: (isArea ? 'line' : type) as any,
-            stack: stacked ? 'total' : undefined,
-            smooth: 0.35,
-            showSymbol: false,
-            symbolSize: 6,
-            data: s.data,
-            barMaxWidth: 18,
-            itemStyle: {
-              color: baseColor,
-              borderRadius: type === 'bar' ? [4, 4, 0, 0] : 0,
-            },
-            lineStyle: {
-              width: 2.5,
-              color: baseColor,
-            },
-            areaStyle: isArea
-              ? {
-                opacity: 0.85,
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: `${baseColor}66` },
-                  { offset: 0.6, color: `${baseColor}1a` },
-                  { offset: 1, color: `${baseColor}00` },
-                ]),
-              }
-              : undefined,
-          };
-        });
-
-        option = {
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'line', lineStyle: { color: T.tick, type: 'dashed' } },
-            backgroundColor: T.tipBg,
-            borderColor: T.tipBg,
-            borderRadius: 8,
-            textStyle: { color: T.tooltipInk, fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
-            valueFormatter: (val: any) => `${val} ${displayUnit || ''}`.trim(),
-          },
-          legend: showLegend && seriesView.length > 1
-            ? {
-              top: 0,
-              left: 0,
-              icon: 'circle',
-              itemWidth: 8,
-              itemHeight: 8,
-              textStyle: { fontSize: 11, color: T.text2, fontFamily: 'Plus Jakarta Sans' },
-            }
-            : undefined,
-          grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '3%',
-            top: seriesView.length > 1 && showLegend ? '15%' : '10%',
-            containLabel: true,
-          },
-          xAxis: {
-            type: 'category',
-            data: xView,
-            axisLine: { lineStyle: { color: T.track } },
-            axisTick: { show: false },
-            axisLabel: { color: T.muted, fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
-          },
-          yAxis: {
-            type: 'value',
-            splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
-            axisLabel: {
-              color: T.muted,
-              fontSize: 11,
-              fontFamily: 'JetBrains Mono',
-              formatter: (v: number) => {
-                // Unit-aware axis label: show T suffix for triliun-scale values
-                if (/triliun/i.test(displayUnit) || v >= 1_000_000) {
-                  return v >= 1_000 ? `${(v / 1_000).toFixed(1)}T` : `${v}M`;
-                }
-                return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
-              },
-            },
-          },
-          series: echartsSeries,
-        };
+        option = buildChartOption(type, chartData, T);
       }
 
       chart.setOption(option, true);
 
       // Klik area grafik → seleksi kategori lintas-chart (klik lagi = batal).
-      // Catatan: event 'click' level-ECharts tidak terpetakan di lingkungan ini
-      // (target zrender selalu null), jadi dipakai listener DOM + convertFromPixel.
-      container = chartRef.current;
-      handleDomClick = (ev: MouseEvent) => {
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        const x = ev.clientX - rect.left;
-        const y = ev.clientY - rect.top;
-        let nilai: string | null = null;
+      if (isSeleksi) {
+        container = chartRef.current;
+        handleDomClick = (ev: MouseEvent) => {
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const x = ev.clientX - rect.left;
+          const y = ev.clientY - rect.top;
+          let nilai: string | null = null;
 
-        if (type === 'donut') {
-          const hover: any = (chart as any).getZr()?.handler?.findHover?.(x, y);
-          const el = hover?.topTarget || hover?.target;
-          const di = el?.__ecData?.dataIndex;
-          nilai = typeof di === 'number' ? xAxis[di] ?? null : null;
-        } else if (type === 'gauge') {
-          return;
-        } else {
-          let idx = -1;
-          try {
-            const px: any = (chart as any).convertFromPixel({ seriesIndex: 0 }, [x, y]);
-            idx = Math.round(Array.isArray(px) ? px[0] : px);
-          } catch {
-            idx = -1;
+          if (['pie', 'donut', 'treemap', 'funnel'].includes(type)) {
+            const hover: any = (chart as any).getZr()?.handler?.findHover?.(x, y);
+            const el = hover?.topTarget || hover?.target;
+            const di = el?.__ecData?.dataIndex;
+            nilai = typeof di === 'number' ? xAxis[di] ?? null : null;
+          } else {
+            let idx = -1;
+            try {
+              const px: any = (chart as any).convertFromPixel({ seriesIndex: 0 }, [x, y]);
+              idx = Math.round(Array.isArray(px) ? px[0] : px);
+            } catch {
+              idx = -1;
+            }
+            const kolom = type === 'heatmap' ? heatCols : type === 'hbar' ? seriesView.map((s) => s.name) : xView;
+            if (idx >= 0 && idx < kolom.length) nilai = kolom[idx];
           }
-          const kolom = type === 'heatmap' ? heatCols : xView;
-          if (idx >= 0 && idx < kolom.length) nilai = kolom[idx];
-        }
 
-        if (!nilai) return;
-        setSelected(selected === nilai ? null : nilai);
-      };
-      container.addEventListener('click', handleDomClick);
+          if (!nilai) return;
+          setSelected(selected === nilai ? null : nilai);
+        };
+        container.addEventListener('click', handleDomClick);
+      }
 
       window.addEventListener('resize', handleResize);
-      resizeObserver = new ResizeObserver(() => {
-        chartInstanceRef.current?.resize();
-      });
+      resizeObserver = new ResizeObserver(() => chartInstanceRef.current?.resize());
       resizeObserver.observe(chartRef.current);
     });
 
@@ -457,7 +287,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {
@@ -469,84 +299,114 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 
   // ── Tabel "lihat data" dari data yang sedang tampil ───────────────────────
   const tabel = useMemo(() => {
-    const { xView, seriesView, donutView, heatCols, heatRows, heatMatriks } = view;
-    if (type === 'donut') {
-      return {
-        kolom: ['Kategori', `Nilai${displayUnit ? ` (${displayUnit})` : ''}`],
-        baris: donutView.map((d) => [d.name, d.value] as (string | number)[]),
-      };
+    const { xView, seriesView, heatCols, heatRows, heatMatriks } = view;
+    const u = displayUnit ? ` (${displayUnit})` : '';
+
+    if (type === 'pie' || type === 'donut' || type === 'funnel') {
+      return { kolom: ['Kategori', `Nilai${u}`], baris: xView.map((label, i) => [label, seriesView[0]?.data[i] ?? 0] as (string | number)[]) };
+    }
+    if (type === 'treemap') {
+      const anak = treemapData?.children ?? xView.map((label, idx) => ({ name: label, value: seriesView[0]?.data[idx] ?? 0 }));
+      return { kolom: ['Kategori', `Nilai${u}`], baris: anak.map((c) => [c.name, c.value] as (string | number)[]) };
+    }
+    if (type === 'sankey') {
+      return { kolom: ['Sumber', 'Tujuan', `Nilai${u}`], baris: (links ?? []).map((l) => [l.source, l.target, l.value] as (string | number)[]) };
+    }
+    if (type === 'scatter' || type === 'bubble') {
+      const pts = points ?? seriesView.flatMap((s) => s.data.map((y, i) => ({ x: i + 1, y, label: `${s.name} · ${xView[i] ?? i + 1}`, size: undefined as number | undefined })));
+      return { kolom: ['Label', 'X', `Y${u}`, 'Ukuran'], baris: pts.map((p) => [p.label ?? '', p.x, p.y, p.size ?? ''] as (string | number)[]) };
+    }
+    if (type === 'boxplot') {
+      const kelompok = boxRaw ?? seriesView.map((s) => s.data);
+      const nama = boxRaw ? xView.slice(0, kelompok.length) : seriesView.map((s) => s.name);
+      return { kolom: ['Kelompok', 'Nilai'], baris: kelompok.flatMap((g, gi) => g.map((v) => [nama[gi] ?? `Kelompok ${gi + 1}`, v] as (string | number)[])) };
+    }
+    if (type === 'histogram') {
+      const mentah = boxRaw ? boxRaw.flat() : seriesView.flatMap((s) => s.data);
+      return { kolom: ['Nilai'], baris: mentah.map((v) => [v] as (string | number)[]) };
+    }
+    if (type === 'waterfall') {
+      const items = waterfall ?? xView.map((label, idx) => ({ name: label, value: seriesView[0]?.data[idx] ?? 0 }));
+      return { kolom: ['Tahap', `Nilai${u}`], baris: items.map((i) => [i.name, i.value] as (string | number)[]) };
+    }
+    if (type === 'radar') {
+      const ind = radarData?.indicators ?? xView.map((n) => ({ name: n, max: 100 }));
+      const seri = radarData?.series ?? seriesView.map((s) => ({ name: s.name, values: s.data }));
+      return { kolom: ['Indikator', ...seri.map((s) => s.name)], baris: ind.map((indikator, i) => [indikator.name, ...seri.map((s) => s.values[i] ?? '')] as (string | number)[]) };
+    }
+    if (type === 'map') {
+      const regions = geoData?.regions ?? xView.map((label, idx) => ({ name: label, value: seriesView[0]?.data[idx] ?? 0 }));
+      return { kolom: ['Wilayah', `Nilai${u}`], baris: regions.map((r) => [r.name, r.value] as (string | number)[]) };
+    }
+    if (type === 'gantt') {
+      const tasks = ganttData?.tasks ?? [];
+      return { kolom: ['Tugas', 'Mulai', 'Selesai', 'Progres'], baris: tasks.map((t) => [t.name, t.start, t.end, t.progress != null ? `${t.progress}%` : ''] as (string | number)[]) };
     }
     if (type === 'heatmap') {
-      return {
-        kolom: ['Baris', ...heatCols],
-        baris: heatRows.map((r, ri) => [r, ...heatCols.map((_, ci) => heatMatriks[ri]?.[ci] ?? 0)] as (string | number)[]),
-      };
+      return { kolom: ['Baris', ...heatCols], baris: heatRows.map((r, ri) => [r, ...heatCols.map((_, ci) => heatMatriks[ri]?.[ci] ?? 0)] as (string | number)[]) };
     }
     if (type === 'gauge') {
-      return {
-        kolom: ['Metrik', 'Nilai'],
-        baris: [[seriesView[0]?.name || 'Nilai', seriesView[0]?.data?.[0] ?? 0] as (string | number)[]],
-      };
+      return { kolom: ['Metrik', 'Nilai'], baris: [[seriesView[0]?.name || 'Nilai', seriesView[0]?.data?.[0] ?? 0] as (string | number)[]] };
     }
     return {
       kolom: ['Kategori', ...seriesView.map((s) => s.name)],
       baris: xView.map((x, i) => [x, ...seriesView.map((s) => s.data[i] ?? '')] as (string | number)[]),
     };
-  }, [view, type, displayUnit]);
+  }, [view, type, displayUnit, treemapData, links, points, boxRaw, waterfall, radarData, geoData, ganttData]);
 
-  // Widget gauge: pakai RingGauge3D (soft-3D) alih-alih gauge ECharts,
-  // agar sesuai referensi. Toggle "Lihat data" tetap didukung.
+  const toggleDataButton = (
+    <button
+      type="button"
+      onClick={() => setShowData((v) => !v)}
+      data-testid="chart-toggle-data"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-medium text-ink-3 hover:text-brand-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
+      title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
+    >
+      {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
+      <span>{showData ? 'Grafik' : 'Lihat data'}</span>
+    </button>
+  );
+
+  const tabelView = (
+    <div className="absolute inset-0 overflow-auto" data-testid="chart-data-table">
+      <table className="w-full text-[11px] border-collapse">
+        <thead>
+          <tr>
+            {tabel.kolom.map((k) => (
+              <th key={k} className="text-left font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-1 sticky top-0">
+                {k}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tabel.baris.map((row, ri) => (
+            <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
+                  {typeof cell === 'number'
+                    ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
+                    : cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // Widget gauge: pakai RingGauge3D (soft-3D) alih-alih gauge ECharts.
   if (type === 'gauge') {
     const nilai = view.seriesView[0]?.data?.[0] ?? 0;
     return (
       <div className="w-full h-full flex flex-col">
-        <div className="flex justify-end mb-1">
-          <button
-            type="button"
-            onClick={() => setShowData((v) => !v)}
-            data-testid="chart-toggle-data"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-medium text-ink-3 hover:text-brand-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
-            title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
-          >
-            {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
-            <span>{showData ? 'Grafik' : 'Lihat data'}</span>
-          </button>
-        </div>
+        <div className="flex justify-end mb-1">{toggleDataButton}</div>
         <div className="relative flex-1 min-h-[190px] flex items-center justify-center">
           {showData ? (
-            <div className="absolute inset-0 overflow-auto" data-testid="chart-data-table">
-              <table className="w-full text-[11px] border-collapse">
-                <thead>
-                  <tr>
-                    {tabel.kolom.map((k) => (
-                      <th key={k} className="text-left font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-1 sticky top-0">
-                        {k}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tabel.baris.map((row, ri) => (
-                    <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
-                      {row.map((cell, ci) => (
-                        <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
-                          {typeof cell === 'number'
-                            ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
-                            : cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            tabelView
           ) : (
-            <RingGauge3D
-              value={nilai}
-              max={max ?? 100}
-              unit={displayUnit}
-              label={view.seriesView[0]?.name}
-            />
+            <RingGauge3D value={nilai} max={max ?? 100} unit={displayUnit} label={view.seriesView[0]?.name} />
           )}
         </div>
       </div>
@@ -555,55 +415,10 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex justify-end mb-1">
-        <button
-          type="button"
-          onClick={() => setShowData((v) => !v)}
-          data-testid="chart-toggle-data"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-medium text-ink-3 hover:text-brand-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
-          title={showData ? 'Kembali ke grafik' : 'Lihat angka sebagai tabel'}
-        >
-          {showData ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
-          <span>{showData ? 'Grafik' : 'Lihat data'}</span>
-        </button>
-      </div>
-
+      <div className="flex justify-end mb-1">{toggleDataButton}</div>
       <div className="relative flex-1 min-h-[190px]">
-        <div
-          ref={chartRef}
-          className={`absolute inset-0 ${showData ? 'invisible' : ''}`}
-        />
-        {showData && (
-          <div className="absolute inset-0 overflow-auto" data-testid="chart-data-table">
-            <table className="w-full text-[11px] border-collapse">
-              <thead>
-                <tr>
-                  {tabel.kolom.map((k) => (
-                    <th
-                      key={k}
-                      className="text-left font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-1 sticky top-0"
-                    >
-                      {k}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tabel.baris.map((row, ri) => (
-                  <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
-                    {row.map((cell, ci) => (
-                      <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
-                        {typeof cell === 'number'
-                          ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
-                          : cell}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div ref={chartRef} className={`absolute inset-0 ${showData ? 'invisible' : ''}`} />
+        {showData && tabelView}
       </div>
     </div>
   );

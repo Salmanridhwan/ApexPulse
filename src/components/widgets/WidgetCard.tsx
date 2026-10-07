@@ -11,6 +11,15 @@ import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
 
+/** Label pendek untuk tombol ganti tipe cepat di menu widget. */
+const LABEL_TIPE: Record<string, string> = {
+  line: 'Garis', bar: 'Batang', area: 'Area', pie: 'Pai', donut: 'Donat',
+  hbar: 'Horiz.', scatter: 'Sebar', bubble: 'Gelembung', funnel: 'Funnel',
+  treemap: 'Treemap', waterfall: 'Waterfall', sankey: 'Sankey', radar: 'Radar',
+  histogram: 'Histogram', boxplot: 'Box', combo: 'Combo', map: 'Peta',
+  gantt: 'Gantt', heatmap: 'Heatmap', gauge: 'Gauge', kpi: 'KPI',
+};
+
 interface WidgetCardProps {
   widget: WidgetSpec;
   onEdit: (widget: WidgetSpec) => void;
@@ -81,7 +90,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       </div>
                       <div className="px-3 pb-1.5">
                         <div className="segmented w-full">
-                          {(['line', 'bar', 'area'] as const).map((t) => (
+                          {(['line', 'bar', 'area', 'pie', 'hbar', 'scatter', 'funnel'] as const).map((t) => (
                             <button
                               key={t}
                               type="button"
@@ -89,8 +98,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                               className={`segmented-item flex-1 ${
                                 widget.type === t ? 'segmented-item-active' : ''
                               }`}
+                              title={LABEL_TIPE[t]}
                             >
-                              {t === 'line' ? 'Garis' : t === 'bar' ? 'Batang' : 'Area'}
+                              {LABEL_TIPE[t]}
                             </button>
                           ))}
                         </div>
@@ -149,7 +159,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
         className={`px-5 pb-4 pt-1 flex-1 flex flex-col ${
-          ['line', 'bar', 'area', 'donut', 'table', 'heatmap'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
+          ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+            'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+            'radar', 'map', 'gantt', 'table'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
         }`}
       >
         <WidgetRenderer widget={widget} />

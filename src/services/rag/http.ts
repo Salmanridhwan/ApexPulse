@@ -591,7 +591,9 @@ export class ConfigurableRagClient implements RagClient {
     const fokus =
       ['kpi', 'bullet-target', 'gauge'].includes(tipeTarget)
         ? 'kpi'
-        : ['line', 'area', 'bar', 'donut', 'heatmap'].includes(tipeTarget)
+        : ['line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+           'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+           'radar', 'map', 'gantt'].includes(tipeTarget)
           ? 'grafik'
           : tipeTarget === 'table'
             ? 'tabel'

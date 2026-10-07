@@ -32,13 +32,34 @@ export const WidgetTypeEnum = z.enum([
   'line',
   'area',
   'bar',
+  'hbar',
+  'combo',
+  'pie',
   'donut',
+  'treemap',
+  'funnel',
+  'waterfall',
+  'sankey',
+  'scatter',
+  'bubble',
+  'histogram',
+  'boxplot',
+  'heatmap',
+  'radar',
+  'map',
+  'gantt',
   'table',
   'narasi',
   'bullet-target',
   'gauge',
-  'heatmap',
 ]);
+
+/** Tipe yang WAJIB punya sitasi dokumen sumber (berbasis angka). */
+export const TIPE_BERBASIS_DATA: string[] = [
+  'kpi', 'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap',
+  'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
+  'heatmap', 'radar', 'map', 'gantt', 'bullet-target', 'gauge',
+];
 
 export const ConfidenceLevelEnum = z.enum(['sumber', 'inferensi AI', 'manual']);
 
@@ -59,6 +80,9 @@ export const ChartDataSchema = z.object({
       name: z.string(),
       data: z.array(z.number()),
       color: z.string().optional(),
+      unit: z.string().optional(),
+      kind: z.enum(['bar', 'line']).optional(),
+      yAxisIndex: z.union([z.literal(0), z.literal(1)]).optional(),
     })
   ),
   unit: z.string().optional(),
@@ -66,6 +90,54 @@ export const ChartDataSchema = z.object({
   showLegend: z.boolean().optional(),
   min: z.number().optional(),
   max: z.number().optional(),
+  points: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number().optional(),
+        label: z.string().optional(),
+        color: z.string().optional(),
+      })
+    )
+    .optional(),
+  links: z
+    .array(z.object({ source: z.string(), target: z.string(), value: z.number() }))
+    .optional(),
+  waterfall: z.array(z.object({ name: z.string(), value: z.number() })).optional(),
+  radar: z
+    .object({
+      indicators: z.array(z.object({ name: z.string(), max: z.number() })),
+      series: z.array(
+        z.object({ name: z.string(), values: z.array(z.number()), color: z.string().optional() })
+      ),
+    })
+    .optional(),
+  boxRaw: z.array(z.array(z.number())).optional(),
+});
+
+export const TreemapDataSchema = z.object({
+  name: z.string(),
+  value: z.number().optional(),
+  children: z.array(z.object({ name: z.string(), value: z.number() })).optional(),
+});
+
+export const GeoDataSchema = z.object({
+  mapName: z.string().optional(),
+  regions: z.array(z.object({ name: z.string(), value: z.number() })),
+  unit: z.string().optional(),
+});
+
+export const GanttDataSchema = z.object({
+  tasks: z.array(
+    z.object({
+      name: z.string(),
+      start: z.string(),
+      end: z.string(),
+      progress: z.number().optional(),
+      color: z.string().optional(),
+    })
+  ),
 });
 
 export const HeatmapDataSchema = z.object({
@@ -112,6 +184,9 @@ export const WidgetSpecSchema = z.object({
   kpi: KpiDataSchema.optional(),
   chart: ChartDataSchema.optional(),
   heatmap: HeatmapDataSchema.optional(),
+  treemap: TreemapDataSchema.optional(),
+  geo: GeoDataSchema.optional(),
+  gantt: GanttDataSchema.optional(),
   table: TableDataSchema.optional(),
   narasi: NarasiDataSchema.optional(),
   citations: z.array(CitationSchema).default([]),
@@ -122,7 +197,7 @@ export const WidgetSpecSchema = z.object({
 }).refine(
   (widget) => {
     // If it's a KPI or chart widget, it MUST have citations or be manual correction
-    if (['kpi', 'line', 'area', 'bar', 'donut', 'bullet-target', 'gauge', 'heatmap'].includes(widget.type)) {
+    if (TIPE_BERBASIS_DATA.includes(widget.type)) {
       if (widget.confidence === 'manual') return true;
       return widget.citations && widget.citations.length > 0;
     }

@@ -11,13 +11,34 @@
  *   const chart = init(el);
  */
 import * as echarts from 'echarts/core';
-import { LineChart, BarChart, PieChart, GaugeChart, HeatmapChart } from 'echarts/charts';
+import {
+  LineChart,
+  BarChart,
+  PieChart,
+  GaugeChart,
+  HeatmapChart,
+  ScatterChart,
+  EffectScatterChart,
+  RadarChart,
+  BoxplotChart,
+  FunnelChart,
+  TreemapChart,
+  SankeyChart,
+  MapChart,
+  CustomChart,
+} from 'echarts/charts';
 import {
   GridComponent,
   TooltipComponent,
   LegendComponent,
   VisualMapComponent,
   TitleComponent,
+  GeoComponent,
+  MarkLineComponent,
+  MarkPointComponent,
+  MarkAreaComponent,
+  DataZoomComponent,
+  TransformComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsOption } from 'echarts';
@@ -28,11 +49,26 @@ echarts.use([
   PieChart,
   GaugeChart,
   HeatmapChart,
+  ScatterChart,
+  EffectScatterChart,
+  RadarChart,
+  BoxplotChart,
+  FunnelChart,
+  TreemapChart,
+  SankeyChart,
+  MapChart,
+  CustomChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   VisualMapComponent,
   TitleComponent,
+  GeoComponent,
+  MarkLineComponent,
+  MarkPointComponent,
+  MarkAreaComponent,
+  DataZoomComponent,
+  TransformComponent,
   CanvasRenderer,
 ]);
 

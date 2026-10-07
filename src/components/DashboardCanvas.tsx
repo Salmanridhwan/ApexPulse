@@ -139,7 +139,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         }
         
         // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
-        const tinggiMin = ['line', 'bar', 'area', 'donut', 'table', 'heatmap'].includes(widget.type)
+        const tinggiMin = ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
+          'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
+          'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
           ? 'min-h-[248px]'
           : 'min-h-[110px]';
 

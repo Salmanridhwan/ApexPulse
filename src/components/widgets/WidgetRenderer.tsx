@@ -9,7 +9,40 @@ interface WidgetRendererProps {
   widget: WidgetSpec;
 }
 
+/** Tipe yang dirender lewat ChartEcharts. */
+const TIPE_CHART = [
+  'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+  'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+  'radar', 'map', 'gantt', 'gauge',
+];
+
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
+  if (TIPE_CHART.includes(widget.type)) {
+    return (
+      <ChartEcharts
+        type={widget.type}
+        xAxis={widget.chart?.xAxis || []}
+        series={widget.chart?.series || []}
+        unit={widget.chart?.unit}
+        stacked={widget.chart?.stacked}
+        showLegend={widget.chart?.showLegend}
+        min={widget.chart?.min}
+        max={widget.chart?.max}
+        heatmapData={widget.heatmap?.data}
+        heatmapRows={widget.heatmap?.rows}
+        heatmapCols={widget.heatmap?.columns}
+        points={widget.chart?.points}
+        links={widget.chart?.links}
+        waterfall={widget.chart?.waterfall}
+        radarData={widget.chart?.radar}
+        boxRaw={widget.chart?.boxRaw}
+        treemapData={widget.treemap}
+        geoData={widget.geo}
+        ganttData={widget.gantt}
+      />
+    );
+  }
+
   switch (widget.type) {
     case 'kpi':
       return (
@@ -23,26 +56,6 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
           sparkline={widget.kpi?.sparkline}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
-        />
-      );
-
-    case 'line':
-    case 'area':
-    case 'bar':
-    case 'donut':
-    case 'gauge':
-    case 'heatmap':
-      return (
-        <ChartEcharts
-          type={widget.type}
-          xAxis={widget.chart?.xAxis || []}
-          series={widget.chart?.series || []}
-          unit={widget.chart?.unit}
-          stacked={widget.chart?.stacked}
-          showLegend={widget.chart?.showLegend}
-          min={widget.chart?.min}
-          max={widget.chart?.max}
-          heatmapData={widget.heatmap?.data}
         />
       );
 

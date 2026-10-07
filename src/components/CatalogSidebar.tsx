@@ -7,9 +7,14 @@ import {
   Bookmark,
   Check,
   Filter,
+  Gauge,
+  Grid3x3,
   Layers,
+  LayoutGrid,
   Loader2,
+  Map,
   Plus,
+  ScatterChart,
   Search,
   Sparkles,
   X,
@@ -26,10 +31,26 @@ const ChartPreviewIcon: React.FC<{ tipe?: string }> = ({ tipe }) => {
     case 'line':
     case 'area':
       return <Activity className={cls} />;
+    case 'pie':
     case 'donut':
       return <PieChart className={cls} />;
     case 'table':
       return <Table2 className={cls} />;
+    case 'gauge':
+    case 'bullet-target':
+    case 'kpi':
+      return <Gauge className={cls} />;
+    case 'map':
+      return <Map className={cls} />;
+    case 'scatter':
+    case 'bubble':
+      return <ScatterChart className={cls} />;
+    case 'heatmap':
+      return <Grid3x3 className={cls} />;
+    case 'funnel':
+      return <Filter className={cls} />;
+    case 'treemap':
+      return <LayoutGrid className={cls} />;
     default:
       return <BarChart3 className={cls} />;
   }

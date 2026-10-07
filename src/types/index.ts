@@ -25,7 +25,50 @@ export interface User {
   passwordHash?: string;
 }
 
-export type WidgetType = 'kpi' | 'line' | 'area' | 'bar' | 'donut' | 'table' | 'narasi' | 'bullet-target' | 'gauge' | 'heatmap';
+/**
+ * Semua tipe visualisasi yang didukung. Dikelompokkan agar mudah dibaca:
+ * - Kartu/teks  : kpi, bullet-target, table, narasi
+ * - Kartu ukur  : gauge
+ * - Kartesius   : line, area, bar (kolom), hbar (batang horizontal), combo (dual-axis)
+ * - Komposisi   : pie, donut, treemap, funnel, waterfall, sankey
+ * - Sebaran     : scatter, bubble, histogram, boxplot
+ * - Matriks     : heatmap
+ * - Geometri    : radar
+ * - Peta        : map (choropleth / filled map)
+ * - Jadwal      : gantt
+ */
+export type WidgetType =
+  | 'kpi'
+  | 'line'
+  | 'area'
+  | 'bar'
+  | 'hbar'
+  | 'combo'
+  | 'pie'
+  | 'donut'
+  | 'treemap'
+  | 'funnel'
+  | 'waterfall'
+  | 'sankey'
+  | 'scatter'
+  | 'bubble'
+  | 'histogram'
+  | 'boxplot'
+  | 'heatmap'
+  | 'radar'
+  | 'map'
+  | 'gantt'
+  | 'gauge'
+  | 'bullet-target'
+  | 'table'
+  | 'narasi';
+
+/** Tipe yang butuh data seri (xAxis + minimal satu seri) untuk dirender. */
+export const TIPE_SERI: WidgetType[] = [
+  'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+  'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+  'radar', 'map', 'gantt',
+];
 
 export type ConfidenceLevel = 'sumber' | 'inferensi AI' | 'manual';
 
@@ -80,6 +123,12 @@ export interface WidgetSpec {
       name: string;
       data: number[];
       color?: string;
+      /** Satuan per-seri (opsional) untuk normalisasi antar satuan. */
+      unit?: string;
+      /** Tipe seri pada combo/dual-axis: 'bar' | 'line'. */
+      kind?: 'bar' | 'line';
+      /** Sumbu mana yang dipakai pada combo/dual-axis: 0 = kiri, 1 = kanan. */
+      yAxisIndex?: 0 | 1;
     }>;
     unit?: string;
     stacked?: boolean;
@@ -87,6 +136,41 @@ export interface WidgetSpec {
     /** Khusus gauge: nilai minimal & maksimal skala (default 0-100). */
     min?: number;
     max?: number;
+    /** Khusus scatter/bubble: titik (x, y) dengan ukuran opsional. */
+    points?: Array<{ x: number; y: number; size?: number; label?: string; color?: string }>;
+    /** Khusus sankey: aliran antar node. */
+    links?: Array<{ source: string; target: string; value: number }>;
+    /** Khusus waterfall: nilai bertahap (positif/negatif). */
+    waterfall?: Array<{ name: string; value: number }>;
+    /** Khusus radar: indikator + nilai per seri. */
+    radar?: {
+      indicators: Array<{ name: string; max: number }>;
+      series: Array<{ name: string; values: number[]; color?: string }>;
+    };
+    /** Khusus boxplot: nilai mentah per kategori. */
+    boxRaw?: number[][];
+  };
+  /** Khusus treemap: hierarki nilai (nama + nilai, boleh punya anak). */
+  treemap?: {
+    name: string;
+    value?: number;
+    children?: Array<{ name: string; value: number }>;
+  };
+  /** Khusus peta (choropleth/filled map): nilai per wilayah. */
+  geo?: {
+    mapName?: string;
+    regions: Array<{ name: string; value: number }>;
+    unit?: string;
+  };
+  /** Khusus Gantt: daftar tugas dengan rentang waktu. */
+  gantt?: {
+    tasks: Array<{
+      name: string;
+      start: string;
+      end: string;
+      progress?: number;
+      color?: string;
+    }>;
   };
   /** Khusus heatmap: matriks nilai [baris][kolom] + label sumbunya. */
   heatmap?: {
