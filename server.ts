@@ -742,9 +742,34 @@ async function startServer() {
         tenantId,
         instansi: tenantAktif?.name,
         kbId: kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId),
+        // Snapshot dashboard contoh hanya untuk mode demo tanpa RAG nyata.
+        izinkanSnapshotDemo: db.systemConfig.ragProvider !== 'http',
         onProgress,
         ragClient,
       });
+
+      // Tidak ada angka sah dari dokumen instansi ini: JANGAN simpan/tampilkan
+      // dashboard. Menampilkan template contoh di sini membuat kanvas terlihat
+      // resmi padahal angkanya karangan.
+      if (!genResult.ok) {
+        const pesanGagal =
+          `Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}". ` +
+          (genResult.alasanGagal || 'Dokumen instansi ini tidak memadai.') +
+          ` Yang bisa dilakukan: tambahkan atau rapikan dokumen instansi ini di knowledge base ` +
+          `(${kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || 'KB belum ditautkan'}), lalu coba lagi.`;
+        catatAsisten({ sender: 'system', text: pesanGagal, actionTaken: 'none', modeUsed: genResult.modeUsed } as any);
+        db.addAuditLog({
+          tenantId,
+          userId: session.userId,
+          userName: session.name,
+          action: 'Generate Dashboard Gagal',
+          target: prompt.slice(0, 60),
+          details: genResult.alasanGagal || 'Dokumen tidak memadai',
+        });
+        sendEvent('result', { actionTaken: 'none', message: pesanGagal, modeUsed: genResult.modeUsed });
+        sendEvent('done', { ok: false });
+        return res.end();
+      }
 
       let dashboardTersimpan: Dashboard;
       if (activeDash) {
@@ -787,7 +812,11 @@ async function startServer() {
       const kpiItems = kpis.slice(0, 3).map((k) => `• **${k.title}**: ${k.kpi?.value} ${k.kpi?.unit || ''}`).join('\n');
       const chartNames = charts.map((c) => `• ${c.title} (${c.type.toUpperCase()})`).join('\n');
 
-      let replyText = `Tentu! Dashboard **"${dashboardTersimpan.title}"** berhasil ${activeDash ? 'diperbarui' : 'disintesis'} menggunakan dokumen resmi ${sector.toUpperCase()}.\n\n`;
+      let replyText = `Tentu! Dashboard **"${dashboardTersimpan.title}"** berhasil ${activeDash ? 'diperbarui' : 'disintesis'} ${
+        genResult.modeUsed === 'Fallback (Template Snapshot)'
+          ? 'dari TEMPLATE CONTOH (bukan dokumen instansi)'
+          : `menggunakan dokumen resmi ${sector.toUpperCase()}`
+      }.\n\n`;
 
       if (narasiWidget?.narasi?.text) {
         replyText += `📋 **Ringkasan Temuan Dokumen:**\n${narasiWidget.narasi.text}\n\n`;
@@ -801,7 +830,12 @@ async function startServer() {
         replyText += `🎯 **Indikator Kunci Utama:**\n${kpiItems}\n\n`;
       }
 
-      replyText += `Seluruh data diverifikasi langsung via **${genResult.modeUsed}** dengan **${genResult.citationsCount} sitasi resmi**.\n`;
+      replyText +=
+        genResult.modeUsed === 'Jalur A (LLM JSON)'
+          ? `Seluruh angka bersitasi dokumen resmi instansi ini (**${genResult.citationsCount} sitasi**).\n`
+          : genResult.modeUsed === 'Jalur B (Agregasi Metadata)'
+            ? `Angka disusun dari ringkasan metadata dokumen instansi ini (**${genResult.citationsCount} sitasi**), jadi bisa lebih sedikit daripada dashboard penuh.\n`
+            : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
       replyText += `Anda bisa meminta penyesuaian lebih lanjut (misalnya: *"rekomendasi chart"*, *"ubah grafik ke diagram garis"*, atau *"hapus widget [nama]"*).`;
 
       catatAsisten({

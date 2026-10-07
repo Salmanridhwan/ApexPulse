@@ -297,7 +297,7 @@ export interface ChatMessage {
   timestamp: string;
   actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'recommend';
   affectedWidgetId?: string;
-  modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)';
+  modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;
   progressSteps?: ProgressStep[];
   recommendations?: ChatRecommendation[];

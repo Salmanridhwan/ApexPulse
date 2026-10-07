@@ -1,6 +1,7 @@
 import { BumdSector, WidgetSpec } from '../../types';
 import { WidgetSpecSchema } from '../spec/widgetSpec';
 import { WIDGET_CATALOG } from './catalog';
+import { bersihkanLabel, bersihkanPayload } from './teks';
 
 export interface FromJsonResult {
   success: boolean;
@@ -26,9 +27,17 @@ export function buildWidgetsFromJson(rawJson: any, sector: BumdSector): FromJson
     };
   }
 
+  // Buang aksara non-Latin/karakter kontrol yang kadang diselipkan model ke
+  // label (mis. "Rasio air hilang网络 (NRW)") sebelum widget dirender.
+  rawJson = bersihkanPayload(rawJson);
+
   const rawWidgets = Array.isArray(rawJson.widgets) ? rawJson.widgets : [];
-  const dashboardTitle = rawJson.dashboardTitle || `Dashboard Otomatis Sektor ${sector.toUpperCase()}`;
-  const description = rawJson.description || 'Dashboard disintesis otomatis dari pangkalan dokumen RAG BUMD.';
+  const dashboardTitle = bersihkanLabel(
+    rawJson.dashboardTitle || `Dashboard Otomatis Sektor ${sector.toUpperCase()}`
+  );
+  const description = bersihkanLabel(
+    rawJson.description || 'Dashboard disintesis otomatis dari pangkalan dokumen RAG BUMD.'
+  );
 
   let currentX = 0;
   let currentY = 0;

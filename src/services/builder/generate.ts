@@ -14,21 +14,41 @@ export interface GenerateOptions {
   instansi?: string;
   /** Knowledge base milik instansi aktif (satu KB per instansi di layanan RAG). */
   kbId?: string;
+  /**
+   * Boleh memakai snapshot dashboard contoh (angka + sitasi karangan) saat RAG
+   * tidak menghasilkan widget?
+   *
+   * HANYA untuk mode demo tanpa RAG nyata (provider `mock`). Saat RAG nyata
+   * aktif, snapshot itu membuat dashboard tampak resmi padahal angkanya contoh
+   * — jadi dilarang dan permintaan digagalkan dengan pesan jelas.
+   */
+  izinkanSnapshotDemo?: boolean;
   onProgress?: (step: ProgressStep) => void;
   /** Klien RAG aktif (mock atau HTTP sesuai konfigurasi admin). */
   ragClient?: RagClient;
 }
 
+/** Cara sebuah dashboard diperoleh — dipakai untuk pesan jujur ke pengguna. */
+export type GenerateMode =
+  | 'Jalur A (LLM JSON)'
+  | 'Jalur B (Agregasi Metadata)'
+  | 'Fallback (Template Snapshot)'
+  | 'Gagal (Dokumen Tidak Memadai)';
+
 export interface GenerateResult {
   dashboard: Dashboard;
-  modeUsed: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)';
+  modeUsed: GenerateMode;
+  /** false = dashboard TIDAK boleh disimpan/ditampilkan (tidak ada data sah). */
+  ok: boolean;
+  /** Alasan kegagalan — diisi hanya saat ok=false. */
+  alasanGagal?: string;
   latencyMs: number;
   citationsCount: number;
   logSummary: string[];
 }
 
 export async function generateDashboard(options: GenerateOptions): Promise<GenerateResult> {
-  const { userPrompt, sector, tenantId, instansi, kbId, onProgress } = options;
+  const { userPrompt, sector, tenantId, instansi, kbId, izinkanSnapshotDemo, onProgress } = options;
   const start = Date.now();
   const logSummary: string[] = [];
 
@@ -83,7 +103,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   let synthesizedWidgets: WidgetSpec[] = [];
   let dashboardTitle = `Dashboard Kinerja ${sector.toUpperCase()} 2026`;
   let dashboardDesc = `Dashboard terintegrasi otomatis dari data resmi BUMD.`;
-  let modeUsed: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)' = 'Jalur A (LLM JSON)';
+  let modeUsed: GenerateMode = 'Jalur A (LLM JSON)';
 
   // JALUR A ATTEMPT: If structured JSON exists
   if (ragRes.structuredJson) {
@@ -113,28 +133,44 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     }
   }
 
-  // FALLBACK 3: If both failed, use saved demo dashboard
+  // FALLBACK 3: tidak ada data sah sama sekali.
+  // Snapshot contoh hanya boleh dipakai di mode demo tanpa RAG nyata. Dengan RAG
+  // nyata (provider `http`) snapshot itu menampilkan angka + sitasi karangan yang
+  // tampak resmi, jadi permintaan digagalkan dan dashboard TIDAK disimpan.
+  let ok = true;
+  let alasanGagal: string | undefined;
   if (synthesizedWidgets.length === 0) {
-    logSummary.push('[Fallback 3] Menggunakan template dashboard tersimpan (Jaring Pengaman Demo).');
-    const fb = getFallbackDemoDashboard(sector, tenantId);
-    synthesizedWidgets = fb.widgets;
-    dashboardTitle = fb.title;
-    dashboardDesc = fb.description;
-    modeUsed = 'Fallback (Template Snapshot)';
+    if (izinkanSnapshotDemo) {
+      logSummary.push('[Fallback 3] Menggunakan template dashboard tersimpan (mode demo).');
+      const fb = getFallbackDemoDashboard(sector, tenantId);
+      synthesizedWidgets = fb.widgets;
+      dashboardTitle = fb.title;
+      dashboardDesc = fb.description;
+      modeUsed = 'Fallback (Template Snapshot)';
+    } else {
+      modeUsed = 'Gagal (Dokumen Tidak Memadai)';
+      ok = false;
+      alasanGagal =
+        'RAG tidak mengembalikan angka yang bisa divalidasi dari dokumen instansi ini, ' +
+        'jadi dashboard tidak dibuat supaya kanvas tidak menampilkan angka contoh.';
+      logSummary.push(`[Gagal] ${alasanGagal}`);
+    }
   }
 
   onProgress?.({
     id: 'step-3',
-    title: `Sintesis selesai via ${modeUsed}`,
-    status: 'completed',
+    title: ok ? `Sintesis selesai via ${modeUsed}` : 'Dokumen instansi tidak memadai — dashboard tidak dibuat',
+    status: ok ? 'completed' : 'failed',
   });
 
-  // Step 4: Finalisasi
-  onProgress?.({
-    id: 'step-4',
-    title: 'Merender kanvas dashboard kustomisasi penuh',
-    status: 'completed',
-  });
+  // Step 4: Finalisasi (hanya kalau ada dashboard yang benar-benar dibuat)
+  if (ok) {
+    onProgress?.({
+      id: 'step-4',
+      title: 'Merender kanvas dashboard kustomisasi penuh',
+      status: 'completed',
+    });
+  }
 
   const latencyMs = Date.now() - start;
 
@@ -162,6 +198,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   return {
     dashboard,
     modeUsed,
+    ok,
+    alasanGagal,
     latencyMs,
     citationsCount: totalCitations,
     logSummary,
