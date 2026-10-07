@@ -71,6 +71,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   const [tenantSector, setTenantSector] = useState<BumdSector>('pdam');
   const [tenantCity, setTenantCity] = useState('');
   const [tenantCode, setTenantCode] = useState('');
+  const [tenantKbId, setTenantKbId] = useState('');
 
   // Search Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,6 +164,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
           code: tenantCode || `BUMD-${Date.now().toString().slice(-3)}`,
           logo: '🏛️',
           documentCount: 16,
+          knowledgeBaseId: tenantKbId.trim() || undefined,
         }),
       });
       const newT = await res.json();
@@ -170,6 +172,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
       setIsAddTenantOpen(false);
       setTenantName('');
       setTenantCity('');
+      setTenantKbId('');
       loadData();
     } catch (err) {
       console.error('Create tenant failed:', err);
@@ -1110,6 +1113,23 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-ink-2 font-medium mb-1">
+                    Knowledge Base ID <span className="font-normal text-ink-3">(KB milik instansi ini di layanan RAG)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: kb_pam_jaya"
+                    value={tenantKbId}
+                    onChange={(e) => setTenantKbId(e.target.value)}
+                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                  />
+                  <p className="text-[10px] text-ink-3 mt-1">
+                    Kosongkan hanya kalau instansi belum punya KB. Tanpa KB, chat instansi ini
+                    menolak menjawab daripada menampilkan dokumen instansi lain.
+                  </p>
                 </div>
 
                 <div className="pt-2 flex justify-end gap-2">

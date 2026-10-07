@@ -3,6 +3,23 @@ import { mockRag } from './mock';
 import { RAG_PROMPTS } from './prompts';
 import { RagClient, RagQueryOptions, RagResult } from './types';
 import { SectorDocumentChunk } from './mockData';
+import { KB_CAMPUR } from './kbDefaults';
+
+/**
+ * Pilih KB pertama yang layak dari daftar kandidat (KB instansi → KB global),
+ * dengan MELEWATI KB campur. KB campur (mis. `kb_chat`) berisi dokumen banyak
+ * instansi sehingga retrieval-nya tidak bisa dijamin terisolasi; memakainya
+ * sebagai cadangan mengembalikan bug lama "dashboard PDAM berisi laporan Bank
+ * BJB". Kalau semua kandidat campur/tidak ada, hasilnya `undefined` — pemanggil
+ * harus menolak permintaan, bukan memakai KB campur diam-diam.
+ */
+function kbAman(...kandidat: Array<string | undefined>): string | undefined {
+  for (const k of kandidat) {
+    const v = k?.trim();
+    if (v && !KB_CAMPUR.has(v)) return v;
+  }
+  return undefined;
+}
 
 /** Sumber konfigurasi RAG (disimpan di systemConfig, diatur admin). */
 export type RagConfigFetcher = () => {
@@ -472,10 +489,14 @@ export class ConfigurableRagClient implements RagClient {
     base: string,
     cfg: { apiKey: string; kbId?: string; timeoutMs: number },
     instruksi: string,
-    skema: any = SKEMA_EKSTRAKSI
+    skema: any = SKEMA_EKSTRAKSI,
+    kbId?: string
   ): Promise<any | null> {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), Math.max(5, cfg.timeoutMs || 60) * 1000);
+    // KB per-instansi (kalau ada) menimpa KB global. KB campur dilewati supaya
+    // tidak pernah jadi sumber (lihat kbAman).
+    const kbEfektif = kbAman(kbId, cfg.kbId);
     try {
       const res = await fetch(`${base}/extract`, {
         method: 'POST',
@@ -485,7 +506,7 @@ export class ConfigurableRagClient implements RagClient {
         },
         body: JSON.stringify({
           query: instruksi,
-          ...(cfg.kbId ? { knowledge_base_id: cfg.kbId } : {}),
+          ...(kbEfektif ? { knowledge_base_id: kbEfektif } : {}),
           top_k: 8,
           output_schema: skema,
         }),
@@ -510,8 +531,25 @@ export class ConfigurableRagClient implements RagClient {
 
   /** Instruksi Jalur A: satu dashboard KPI utuh dari dokumen resmi. */
   private instruksiDashboard(options: RagQueryOptions): string {
+    // Isolasi utama ada di sisi knowledge base: kalau `kbId` menunjuk KB milik
+    // satu instansi, dokumen instansi lain memang tidak ikut terambil. Dalam
+    // kondisi itu JANGAN memaksa nama instansi tampilan ke prompt — nama demo
+    // sering tidak sama dengan nama di dokumen, dan paksaan itu membuat model
+    // menolak semua dokumen lalu turun ke Jalur B (dashboard jadi miskin).
+    // Klausa "abaikan instansi lain" hanya dipakai saat KB tidak di-scope.
+    const instansi = (options.instansi || '').trim();
+    const kbTerskop = !!options.kbId?.trim();
+    const sebutanInstansi = kbTerskop
+      ? `Semua dokumen di knowledge base ini milik SATU instansi. Gunakan dokumen yang ada apa adanya, ` +
+        `dan sebut nama instansi sesuai isi dokumen. `
+      : instansi
+        ? `Instansi yang diminta: "${instansi}" (sektor ${options.sector.toUpperCase()}). ` +
+          `Ambil angka HANYA dari dokumen milik instansi tersebut. Kalau dokumen instansi ini tidak ` +
+          `tersedia, kembalikan hasil kosong, jangan pakai instansi lain. `
+        : `Konteks instansi pengguna: sektor ${options.sector.toUpperCase()}. `;
     return `Susun satu dashboard KPI dari dokumen resmi di knowledge base ini. ` +
-      `Konteks instansi pengguna: ${options.sector.toUpperCase()}. Permintaan pengguna: "${options.prompt}". ` +
+      sebutanInstansi +
+      `Permintaan pengguna: "${options.prompt}". ` +
       `Aturan keluaran: ` +
       `(1) dashboardTitle maksimal 6 kata, tanpa kata "Dashboard", sebut instansi dan tahun. ` +
       `(2) description maksimal 18 kata, tanpa catatan meta. ` +
@@ -525,8 +563,7 @@ export class ConfigurableRagClient implements RagClient {
       `(5) grafik: isi hanya kalau dokumen memuat angka beberapa periode atau kategori sekaligus. kategori 3 sampai 6 label, setiap seri panjangnya sama dengan kategori, semua angka dari dokumen. ` +
       `(6) tabel: maksimal 4 kolom, maksimal 5 baris, isinya angka atau nama entitas pendek. ` +
       `(7) narasi: maksimal 45 kata berisi ringkasan kinerja dari dokumen. Jangan menyalin visi misi, syarat sandi, atau kebijakan internal. ` +
-      `Angka wajib berasal dari dokumen yang benar-benar ada. Untuk setiap angka sertakan docName, page, dan chunkSnippet aslinya. ` +
-      `Kalau dokumen berasal dari sektor lain, tetap pakai angkanya dan sebut instansi aslinya di judul.`;
+      `Angka wajib berasal dari dokumen yang benar-benar ada. Untuk setiap angka sertakan docName, page, dan chunkSnippet aslinya.`;
   }
 
   /**
@@ -540,7 +577,13 @@ export class ConfigurableRagClient implements RagClient {
     cfg: { apiKey: string; kbId?: string; timeoutMs: number },
     options: RagQueryOptions
   ): Promise<{ structuredJson: any; citations: Citation[]; chunks: SectorDocumentChunk[] } | null> {
-    const item = await this.ambilPayloadExtract(base, cfg, this.instruksiDashboard(options));
+    const item = await this.ambilPayloadExtract(
+      base,
+      cfg,
+      this.instruksiDashboard(options),
+      SKEMA_EKSTRAKSI,
+      options.kbId
+    );
     if (!item) return null;
 
     const widgets = payloadKeWidgetSpec(item, options.sector);
@@ -583,7 +626,9 @@ export class ConfigurableRagClient implements RagClient {
   async ambilDataWidget(
     query: string,
     sector: BumdSector,
-    tipeTarget: string
+    tipeTarget: string,
+    instansi?: string,
+    kbId?: string
   ): Promise<{ data: any; judul?: string; deskripsi?: string } | null> {
     const cfg = this.getRagConfig();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
@@ -606,9 +651,15 @@ export class ConfigurableRagClient implements RagClient {
           : fokus === 'tabel'
             ? 'Isi maksimal 4 kolom dan 5 baris dengan angka nyata dari dokumen. '
             : 'Isi maksimal 45 kata ringkasan dari dokumen, bukan visi misi atau kebijakan internal. ';
+    const sebutanInstansi = kbId?.trim()
+      ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
+      : instansi?.trim()
+        ? `Instansi yang diminta: "${instansi.trim()}" (sektor ${sector.toUpperCase()}). Ambil angka HANYA dari dokumen instansi ini; abaikan dokumen instansi lain. `
+        : `Konteks instansi: ${sector.toUpperCase()}. `;
     const instruksi =
       `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
-      `Konteks instansi: ${sector.toUpperCase()}. Indikator yang diminta: "${query}". ` +
+      sebutanInstansi +
+      `Indikator yang diminta: "${query}". ` +
       `Kalau dokumen tidak memuat istilah persisnya (misalnya target atau pagu RKAP, laporan bulanan, ` +
       `atau istilah internal yang tidak ada), pakai angka terdekat yang BENAR-BENAR ADA di dokumen dan ` +
       `sebutkan dasar angkanya secara singkat (maksimal 8 kata). Semua angka wajib dari dokumen. ` +
@@ -628,7 +679,7 @@ export class ConfigurableRagClient implements RagClient {
         sector
       );
 
-    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus]);
+    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId);
     if (!item) return null;
     let widgets = bungkus(item);
 
@@ -646,12 +697,13 @@ export class ConfigurableRagClient implements RagClient {
       console.warn(`[rag] percobaan kedua untuk preset: "${polos}"`);
       const instruksiUmum =
         `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
+        sebutanInstansi +
         `Pertanyaan: "${polos || query}". ` +
         `Pakai angka TERDEKAT yang benar-benar ada di dokumen (misalnya pendapatan, aset, laba, jumlah pelanggan, ` +
         `atau rasio yang tersedia) dan sebutkan dasar angkanya secara singkat pada label atau judul (maksimal 8 kata). ` +
         aturanFokus +
         `Semua angka wajib dari dokumen, tidak boleh dikarang. Wajib mengisi docName, page, dan chunkSnippet asli.`;
-      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus]);
+      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId);
       if (item2) {
         item = item2;
         widgets = bungkus(item2);
@@ -716,7 +768,12 @@ export class ConfigurableRagClient implements RagClient {
         body: JSON.stringify({
           // Kontrak ragjev: field bernama `query`, retrieval selalu scoped KB.
           query: options.prompt,
-          ...(cfg.kbId ? { knowledge_base_id: cfg.kbId } : {}),
+          // KB per-instansi menimpa KB global — inilah yang mencegah dashboard
+          // instansi A dijawab dokumen instansi B. KB campur dilewati (kbAman).
+          ...(() => {
+            const kb = kbAman(options.kbId, cfg.kbId);
+            return kb ? { knowledge_base_id: kb } : {};
+          })(),
           options: { top_k: 8, include_sources: true },
         }),
         signal: ac.signal,

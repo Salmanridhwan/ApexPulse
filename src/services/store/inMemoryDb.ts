@@ -15,6 +15,7 @@ import {
 } from '../../types';
 import { hashPassword, verifyPassword } from '../auth/session';
 import { getFallbackDemoDashboard } from '../builder/fallback';
+import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
 /**
  * AuthPayload — data sesi yang tersimpan dalam cookie httpOnly.
@@ -113,6 +114,7 @@ export class InMemoryDb {
       logo: '💧',
       primaryColor: '#38c6e2',
       documentCount: 48,
+      knowledgeBaseId: 'kb_pam_jaya',
     },
     {
       id: 'tenant-bank',
@@ -124,6 +126,7 @@ export class InMemoryDb {
       logo: '🏦',
       primaryColor: '#8f90e4',
       documentCount: 76,
+      knowledgeBaseId: 'kb_bank_jatim',
     },
     {
       id: 'tenant-pasar',
@@ -135,6 +138,7 @@ export class InMemoryDb {
       logo: '🏪',
       primaryColor: '#2bb8a8',
       documentCount: 34,
+      knowledgeBaseId: 'kb_pasar_surya',
     },
     {
       id: 'tenant-rsud',
@@ -168,6 +172,7 @@ export class InMemoryDb {
       logo: '🏢',
       primaryColor: '#8f90e4',
       documentCount: 22,
+      knowledgeBaseId: 'kb_sarana_jaya',
     },
   ];
 
@@ -351,6 +356,9 @@ export class InMemoryDb {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
         this.ensureSeedUsers();
+        // Tenant dari MySQL bisa belum punya KB — backfill agar tidak jatuh
+        // ke KB campur (lihat ensureTenantKb).
+        this.ensureTenantKb();
         console.log('[AionesBoard DB] State dimuat dari MySQL (persistence aktif)');
       } else {
         await this.mysql.saveAll(this.snapshot());
@@ -414,6 +422,24 @@ export class InMemoryDb {
   }
 
   /**
+   * Pastikan tenant seed punya `knowledgeBaseId` — dipanggil setelah state
+   * dimuat (dari data/db.json maupun MySQL), karena tenant yang tersimpan
+   * sebelum fitur KB ada tidak memuat field ini. Tanpa backfill, permintaan
+   * dashboard tenant tersebut jatuh ke KB campur dan bisa menampilkan dokumen
+   * instansi lain (kasus nyata: dashboard PDAM berisi laporan Bank BJB).
+   */
+  private ensureTenantKb() {
+    let berubah = false;
+    for (const t of this.tenants) {
+      if (!t.knowledgeBaseId && KB_SEED_TENANT[t.id]) {
+        t.knowledgeBaseId = KB_SEED_TENANT[t.id];
+        berubah = true;
+      }
+    }
+    if (berubah) this.persist();
+  }
+
+  /**
    * Muat state yang dipersistenkan ke data/db.json supaya dashboard
    * yang dibuat audiens demo tidak hilang saat server restart/PM2 reload.
    * Tenants, users, dan alertRules bawaan tetap di-seed dari kode.
@@ -440,6 +466,8 @@ export class InMemoryDb {
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Jamin user seed tetap ada walau file fallback sudah usang.
       this.ensureSeedUsers();
+      // Jamin tenant seed punya KB (state lama belum menyimpan field ini).
+      this.ensureTenantKb();
     } catch (err) {
       console.error('[AionesBoard DB] Gagal memuat data/db.json — memakai state seed:', err);
     }

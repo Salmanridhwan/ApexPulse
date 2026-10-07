@@ -11,6 +11,7 @@ import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { ConfigurableRagClient, jelaskanError, maskKey } from './src/services/rag/http';
+import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -343,9 +344,16 @@ async function startServer() {
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const sector = (req.body.sector || tenant?.sector || 'universal') as BumdSector;
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId);
     const mulai = Date.now();
     try {
-      const hasil = await ragClient.ambilDataWidget(String(query).trim(), sector, String(tipe || 'kpi'));
+      const hasil = await ragClient.ambilDataWidget(
+        String(query).trim(),
+        sector,
+        String(tipe || 'kpi'),
+        tenant?.name,
+        kbId
+      );
       if (!hasil) {
         return res.status(502).json({
           error:
@@ -371,8 +379,13 @@ async function startServer() {
     const { prompt, activeDashboardId } = req.body;
     // Dashboard milik chat ini. `activeDashboardId` lama tetap didukung sebagai alias.
     const dashboardId: string | undefined = req.body.dashboardId || activeDashboardId;
-    const sector = (req.body.sector || 'pdam') as BumdSector;
     const tenantId = effectiveTenantId(req, session);
+    const tenantChat = db.tenants.find((t) => t.id === tenantId);
+    // Sektor ikut instansi aktif; 'pdam' hanya jaring terakhir kalau tenant tak dikenal.
+    const sector = (req.body.sector || tenantChat?.sector || 'pdam') as BumdSector;
+    // KB milik instansi aktif — dipakai SEMUA jalur (QA bebas maupun generate),
+    // supaya jawaban tidak pernah diambil dari dokumen instansi lain.
+    const kbChat = kbUntukInstansi(tenantChat, db.systemConfig.ragKnowledgeBaseId);
 
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Prompt wajib disertakan.' });
@@ -598,6 +611,22 @@ async function startServer() {
         }
       }
 
+      // Instansi tanpa KB sendiri (mis. RSUD, Transportasi) TIDAK boleh diam-diam
+      // memakai KB campur atau data contoh — itu sumber kebocoran antar-instansi.
+      // Beri pesan jelas supaya admin menautkan KB untuk instansi tersebut.
+      // (Ditaruh setelah kasus edit widget/rekomendasi yang tidak butuh RAG.)
+      if (db.systemConfig.ragProvider === 'http' && !kbChat) {
+        const pesan =
+          `Instansi "${tenantChat?.name || tenantId}" belum punya Knowledge Base RAG sendiri, ` +
+          `jadi saya tidak bisa mengambil data resminya. Hubungi admin untuk menautkan KB ` +
+          `instansi ini (Admin → Instansi → Knowledge Base ID), lalu coba lagi.`;
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'no_kb' } as any);
+        sendEvent('step', { id: 'kb0', title: 'Knowledge Base instansi belum ditautkan', status: 'completed' });
+        sendEvent('result', { actionTaken: 'no_kb', message: pesan });
+        sendEvent('done', { ok: false });
+        return res.end();
+      }
+
       // Case 2.5: Pertanyaan bebas (chatbot) — jawab via /query RAG tanpa generate dashboard
       // Deteksi: pertanyaan informatif, bukan perintah membuat/mengubah dashboard
       const isGenerateDash =
@@ -657,6 +686,8 @@ async function startServer() {
             prompt,
             sector,
             mode: 'prose',
+            instansi: tenantChat?.name,
+            kbId: kbChat,
           });
 
           sendEvent('step', { id: 'sc0', title: 'Dokumen ditemukan, menyusun jawaban...', status: 'completed' });
@@ -702,10 +733,15 @@ async function startServer() {
         sendEvent('step', step);
       };
 
+      // Nama instansi + KB-nya diteruskan ke RAG supaya dokumen instansi lain yang
+      // kebetulan ada di layanan RAG yang sama tidak dipakai menyusun dashboard.
+      const tenantAktif = db.tenants.find((t) => t.id === tenantId);
       const genResult = await generateDashboard({
         userPrompt: prompt,
         sector,
         tenantId,
+        instansi: tenantAktif?.name,
+        kbId: kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId),
         onProgress,
         ragClient,
       });
@@ -1247,6 +1283,9 @@ async function startServer() {
       logo: req.body.logo || '🏢',
       primaryColor: req.body.primaryColor || '#0284c7',
       documentCount: Number(req.body.documentCount) || 12,
+      // KB milik instansi di layanan RAG — tanpa ini permintaan instansi jatuh
+      // ke KB campur dan bisa menampilkan dokumen instansi lain.
+      knowledgeBaseId: typeof req.body.knowledgeBaseId === 'string' ? req.body.knowledgeBaseId.trim() : undefined,
     };
     db.createTenant(newTenant);
     res.status(201).json(newTenant);

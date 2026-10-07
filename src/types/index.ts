@@ -12,6 +12,15 @@ export interface Tenant {
   logo: string;
   primaryColor: string;
   documentCount: number;
+  /**
+   * Knowledge base milik instansi ini di layanan RAG.
+   *
+   * WAJIB diisi: satu layanan RAG memuat banyak knowledge base (satu per
+   * instansi). Kalau dibiarkan kosong, permintaan jatuh ke knowledge base
+   * global yang isinya dokumen lintas instansi — pernah terjadi dashboard
+   * PDAM Tirta Kencana justru berisi laporan Bank BJB.
+   */
+  knowledgeBaseId?: string;
 }
 
 export interface User {

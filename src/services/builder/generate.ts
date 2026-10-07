@@ -10,6 +10,10 @@ export interface GenerateOptions {
   userPrompt: string;
   sector: BumdSector;
   tenantId: string;
+  /** Nama instansi aktif — diteruskan ke RAG agar dokumen instansi lain diabaikan. */
+  instansi?: string;
+  /** Knowledge base milik instansi aktif (satu KB per instansi di layanan RAG). */
+  kbId?: string;
   onProgress?: (step: ProgressStep) => void;
   /** Klien RAG aktif (mock atau HTTP sesuai konfigurasi admin). */
   ragClient?: RagClient;
@@ -24,7 +28,7 @@ export interface GenerateResult {
 }
 
 export async function generateDashboard(options: GenerateOptions): Promise<GenerateResult> {
-  const { userPrompt, sector, tenantId, onProgress } = options;
+  const { userPrompt, sector, tenantId, instansi, kbId, onProgress } = options;
   const start = Date.now();
   const logSummary: string[] = [];
 
@@ -58,6 +62,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   const ragRes = await (options.ragClient || mockRag).query({
     prompt: userPrompt,
     sector,
+    instansi,
+    kbId,
   });
 
   logSummary.push(`[RAG Client] Respons diterima dalam ${ragRes.latencyMs}ms. Mode: ${ragRes.mode}`);
