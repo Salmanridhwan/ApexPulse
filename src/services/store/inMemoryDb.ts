@@ -382,12 +382,45 @@ export class InMemoryDb {
         await this.mysql.saveAll(this.snapshot());
         console.log('[AionesBoard DB] MySQL siap — seed awal disimpan ke database');
       }
+      // Sinkronkan user/kredensial lewat tabel auth khusus (tahan multi-instance).
+      await this.sinkronAuthDariMysql();
     } catch (err: any) {
       console.error(
         '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
         err?.message || err
       );
       this.mysql = null;
+    }
+  }
+
+  /**
+   * Selaraskan user & kredensial dari tabel `auth_users` (khusus auth).
+   *
+   * WAJIB: produksi berjalan di beberapa instance backend yang berbagi MySQL,
+   * sedangkan `persist()` menulis SNAPSHOT PENUH. Tanpa tabel terpisah, user
+   * yang didaftarkan di satu instance terhapus oleh snapshot instance lain.
+   * Di sini auth_users dibaca, DIGABUNG dengan user yang sudah ada (auth_users
+   * menang), lalu SEMUA user ditulis ulang per-baris (upsert) agar tidak saling
+   * menimpa antar instance.
+   */
+  private async sinkronAuthDariMysql(): Promise<void> {
+    if (!this.mysql) return;
+    try {
+      const baris = await this.mysql.loadAuthUsers();
+      if (baris.length > 0) {
+        const peta = new Map(this.users.map((u) => [u.id, u]));
+        for (const r of baris) peta.set(r.id, r.data);
+        this.users = Array.from(peta.values());
+        for (const r of baris) if (r.passHash) this.credentials[r.id] = r.passHash;
+        // User seed dari kode tetap dijamin ada (mis. admin@gmail.com).
+        this.ensureSeedUsers();
+      }
+      // Pastikan SEMUA user (seed + hasil gabung) ada di auth_users.
+      for (const u of this.users) {
+        await this.mysql.upsertAuthUser(u.id, u, this.credentials[u.id] || null);
+      }
+    } catch (err: any) {
+      console.error('[AionesBoard DB] Sinkron auth_users gagal:', err?.message || err);
     }
   }
 
@@ -743,6 +776,12 @@ export class InMemoryDb {
   createUser(user: SafeUser, passwordHash?: string): SafeUser {
     this.users.push(user);
     if (passwordHash) this.credentials[user.id] = passwordHash;
+    // Tulis ke tabel auth khusus (upsert per-baris) supaya instance backend lain
+    // yang berbagi MySQL langsung melihat user ini — snapshot `persist()` bisa
+    // menimpanya. Fire-and-forget; kegagalan cukup dicatat.
+    this.mysql
+      ?.upsertAuthUser(user.id, user, passwordHash || this.credentials[user.id] || null)
+      .catch((err) => console.error('[AionesBoard DB] upsertAuthUser gagal:', err?.message || err));
     this.persist();
     return user;
   }
@@ -752,6 +791,9 @@ export class InMemoryDb {
     if (idx === -1) return undefined;
     const { passwordHash: _ignored, ...rest } = partial as Partial<User> & { passwordHash?: string };
     this.users[idx] = { ...this.users[idx], ...rest };
+    this.mysql
+      ?.upsertAuthUser(id, this.users[idx], this.credentials[id] || null)
+      .catch((err) => console.error('[AionesBoard DB] upsertAuthUser gagal:', err?.message || err));
     this.persist();
     return this.users[idx];
   }
@@ -761,8 +803,42 @@ export class InMemoryDb {
     this.users = this.users.filter((u) => u.id !== id);
     delete this.credentials[id];
     const deleted = this.users.length < len;
-    if (deleted) this.persist();
+    if (deleted) {
+      this.mysql
+        ?.deleteAuthUser(id)
+        .catch((err) => console.error('[AionesBoard DB] deleteAuthUser gagal:', err?.message || err));
+      this.persist();
+    }
     return deleted;
+  }
+
+  /**
+   * Cari user untuk LOGIN dengan menyegarkan dulu dari tabel auth khusus.
+   *
+   * Di produksi, permintaan login bisa mendarat di instance backend mana pun.
+   * Kalau instance ini belum pernah melihat user yang baru didaftarkan instance
+   * lain, pencarian lokal akan gagal. Karena itu tabel `auth_users` dibaca ulang
+   * (sumber kebenaran bersama) sebelum mencocokkan email.
+   */
+  async findUserForLogin(email: string): Promise<SafeUser | undefined> {
+    const cari = (e: string) => this.users.find((u) => u.email.toLowerCase() === e);
+    let user = cari(email);
+    if (!user && this.mysql) {
+      try {
+        const baris = await this.mysql.loadAuthUsers();
+        if (baris.length > 0) {
+          const peta = new Map(this.users.map((u) => [u.id, u]));
+          for (const r of baris) peta.set(r.id, r.data);
+          this.users = Array.from(peta.values());
+          for (const r of baris) if (r.passHash) this.credentials[r.id] = r.passHash;
+          this.ensureSeedUsers();
+          user = cari(email);
+        }
+      } catch (err: any) {
+        console.error('[AionesBoard DB] findUserForLogin gagal menyegarkan:', err?.message || err);
+      }
+    }
+    return user;
   }
 
   // Tenant Management

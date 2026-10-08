@@ -156,7 +156,7 @@ async function startServer() {
     res.json(db.tenants);
   });
 
-  app.post('/api/auth/login', (req: Request, res: Response) => {
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -164,7 +164,9 @@ async function startServer() {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    // findUserForLogin menyegarkan dari tabel auth khusus dulu, supaya user yang
+    // didaftarkan di instance backend lain tetap bisa login di instance ini.
+    const user = await db.findUserForLogin(cleanEmail);
 
     // Verifikasi scrypt terhadap kredensial terpisah; pesan error identik
     // untuk email tak dikenal & password salah (anti user-enumeration).
@@ -236,7 +238,7 @@ async function startServer() {
    * Akun baru dibuat dengan peran 'analis' dan instansi default. Untuk mencegah
    * penyalahgunaan, pendaftaran bisa ditutup lewat env `ALLOW_REGISTRATION=false`.
    */
-  app.post('/api/auth/register', (req: Request, res: Response) => {
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
     if (process.env.ALLOW_REGISTRATION === 'false') {
       return res.status(403).json({ error: 'Pendaftaran akun sedang ditutup. Hubungi admin instansi.' });
     }
@@ -255,7 +257,10 @@ async function startServer() {
     if (password.length < 8) {
       return res.status(400).json({ error: 'Kata sandi minimal 8 karakter.' });
     }
-    if (db.users.some((u) => u.email.toLowerCase() === email)) {
+    // Segarkan dari tabel auth khusus dulu agar email yang sudah didaftarkan di
+    // instance backend lain tidak dibuat dobel (multi-instance).
+    const sudahAda = await db.findUserForLogin(email);
+    if (sudahAda) {
       return res.status(409).json({
         error: 'Email sudah terdaftar. Silakan masuk, atau gunakan tombol "Masuk dengan Google".',
       });
@@ -301,9 +306,11 @@ async function startServer() {
       return res.status(401).json({ error: pesan });
     }
 
-    let user = db.users.find(
-      (u) => u.googleSub === profil.sub || u.email.toLowerCase() === profil.email
-    );
+    // Segarkan dari tabel auth khusus dulu (multi-instance), lalu cocokkan.
+    let user = await db.findUserForLogin(profil.email);
+    if (!user) {
+      user = db.users.find((u) => u.googleSub === profil.sub);
+    }
 
     if (!user) {
       // Pendaftaran otomatis via Google (bisa ditutup dengan ALLOW_REGISTRATION=false).

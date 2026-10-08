@@ -110,6 +110,56 @@ export class MysqlStore {
         data JSON NOT NULL
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel auth KHUSUS, terpisah dari `collections`.
+     *
+     * Latar masalah: produksi berjalan di BEBERAPA instance backend yang berbagi
+     * satu MySQL, dan `saveAll` menulis SNAPSHOT PENUH (DELETE semua lalu insert
+     * state instance itu). Akibatnya user yang didaftarkan di satu instance
+     * terhapus oleh snapshot instance lain — login/registrasi jadi tidak konsisten
+     * (berhasil/gagal bergantian).
+     *
+     * Karena itu user & kredensial disimpan di tabel ini dengan UPSERT per-baris
+     * (tanpa DELETE), sehingga tidak pernah saling menimpa antar instance.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS auth_users (
+        id VARCHAR(128) PRIMARY KEY,
+        data JSON NOT NULL,
+        pass_hash TEXT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB
+    `);
+  }
+
+  /** Tambah/perbarui SATU user + kredensialnya (upsert per-baris, aman multi-instance). */
+  async upsertAuthUser(id: string, data: unknown, passHash?: string | null): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO auth_users (id, data, pass_hash) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         data = VALUES(data),
+         pass_hash = COALESCE(VALUES(pass_hash), pass_hash)`,
+      [id, JSON.stringify(data), passHash ?? null]
+    );
+  }
+
+  /** Muat SEMUA user & kredensial dari tabel auth khusus. */
+  async loadAuthUsers(): Promise<Array<{ id: string; data: SafeUser; passHash: string | null }>> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT id, data, pass_hash FROM auth_users');
+    return (rows as Array<{ id: string; data: any; pass_hash: string | null }>).map((r) => ({
+      id: r.id,
+      data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data,
+      passHash: r.pass_hash ?? null,
+    }));
+  }
+
+  /** Hapus satu user dari tabel auth khusus. */
+  async deleteAuthUser(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM auth_users WHERE id = ?', [id]);
   }
 
   /** Muat seluruh state dari MySQL (null kalau masih kosong). */
