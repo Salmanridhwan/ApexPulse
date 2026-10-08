@@ -37,6 +37,45 @@ export interface RagResult {
 
 export interface RagClient {
   query(options: RagQueryOptions): Promise<RagResult>;
+  /**
+   * Daftar dokumen di sebuah knowledge base (untuk panel admin).
+   * Dipakai supaya saat KB ID dimasukkan, admin langsung tahu ADA BERAPA dokumen
+   * dan dokumen APA SAJA di dalamnya — bukan menebak dari hasil retrieval.
+   */
+  daftarDokumen(kbId: string): Promise<{
+    kbId: string;
+    jumlah: number;
+    dokumen: Array<{
+      id: string;
+      nama: string;
+      status?: string;
+      halaman?: number;
+      potongan?: number;
+      token?: number;
+      dibuat?: string;
+      ringkasan?: string;
+    }>;
+    catatan?: string;
+  }>;
+  /**
+   * Uji API Key RAG: benar-benar memanggil layanan dan melaporkan apakah key-nya
+   * diterima. Dipakai tombol "Simpan & Uji API Key" di panel admin.
+   *
+   * Hasilnya dibedakan jujur: key SALAH (401/AUTH_INVALID), layanan tidak bisa
+   * dihubungi (jaringan/URL salah), endpoint tidak ada (404/405), dan key BENAR.
+   */
+  ujiApiKey(): Promise<{
+    ok: boolean;
+    /** 'valid' | 'invalid' | 'tidak-terhubung' | 'endpoint-tidak-ada' | 'galat-layanan' */
+    status: 'valid' | 'invalid' | 'tidak-terhubung' | 'endpoint-tidak-ada' | 'galat-layanan';
+    httpStatus?: number;
+    latencyMs: number;
+    baseDipakai?: string;
+    pesan: string;
+    /** Kode galat dari layanan RAG (mis. AUTH_INVALID), bila ada. */
+    kodeGalat?: string;
+  }>;
+
   probe(): Promise<{
     latencyMs: number;
     canOutputJson: boolean;
@@ -49,5 +88,22 @@ export interface RagClient {
     baseDisesuaikan?: boolean;
     /** Catatan tambahan untuk panel admin (mis. health 404, KB kosong). */
     catatan?: string[];
+  }>;
+  /**
+   * Tebak profil instansi dari dokumen di sebuah KB: nama, kota, sektor, dan
+   * ringkasan isi. Dipakai supaya admin cukup menempelkan KB ID dan field lain
+   * (nama instansi, kota, sektor) terisi sendiri.
+   *
+   * Nilainya DIAMBIL DARI DOKUMEN (bukan dikarang): kalau dokumen tidak memuat,
+   * field itu dibiarkan kosong supaya admin mengisinya manual.
+   */
+  profilInstansi(kbId: string): Promise<{
+    kbId: string;
+    nama?: string;
+    kota?: string;
+    sektor?: BumdSector;
+    jumlahDokumen: number;
+    ringkasan?: string;
+    catatan?: string;
   }>;
 }

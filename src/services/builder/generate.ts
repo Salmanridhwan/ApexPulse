@@ -5,6 +5,7 @@ import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { buildWidgetsFromMetadata } from './fromMetadata';
+import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 
 export interface GenerateOptions {
   userPrompt: string;
@@ -154,6 +155,22 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
         'RAG tidak mengembalikan angka yang bisa divalidasi dari dokumen instansi ini, ' +
         'jadi dashboard tidak dibuat supaya kanvas tidak menampilkan angka contoh.';
       logSummary.push(`[Gagal] ${alasanGagal}`);
+    }
+  }
+
+  // Selaraskan tipe SEMUA widget dengan gerbang yang sama seperti katalog ("Tambah Widget").
+  // Copilot Jalur A menerima `type` apa adanya dari model dan hanya memvalidasi bentuk
+  // (Zod); tanpa langkah ini tipe seperti heatmap satu seri atau peta tanpa rincian wilayah
+  // lolos ke kanvas dan digambar berbeda dari pratinjau tipe itu di Template Chart.
+  if (synthesizedWidgets.length > 0) {
+    const selaras = selaraskanDaftarWidget(synthesizedWidgets);
+    synthesizedWidgets = selaras.widgets;
+    for (const c of selaras.catatan) {
+      logSummary.push(
+        c.ke
+          ? `[Selaras Tipe] "${c.judul}" ditampilkan sebagai ${c.ke} (diminta ${c.dari}): ${c.alasan}`
+          : `[Selaras Tipe] "${c.judul}" (${c.dari}) tidak ditampilkan: ${c.alasan}`
+      );
     }
   }
 

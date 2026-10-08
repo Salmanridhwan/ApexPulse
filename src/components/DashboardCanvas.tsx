@@ -11,10 +11,16 @@ interface DashboardCanvasProps {
   onDuplicateWidget: (widget: WidgetSpec) => void;
   onReorderWidgets: (orderedIds: string[]) => void;
   onResizeWidget: (widgetId: string, w: number) => void;
-  onOpenCatalog: () => void;
-  onOpenChat: () => void;
+  /** Opsional: di halaman tautan publik tidak ada sesi instansi, jadi tidak ditampilkan. */
+  onOpenCatalog?: () => void;
+  onOpenChat?: () => void;
   /** Mode lihat-saja (mis. saat filter dashboard aktif): matikan drag & resize. */
   readOnly?: boolean;
+  /**
+   * Mode pratinjau (galeri template): render kartu persis seperti kanvas, tetapi
+   * widget belum nyata — sembunyikan menu ⋯ dan matikan drag/resize.
+   */
+  preview?: boolean;
 }
 
 export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
@@ -28,6 +34,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onOpenCatalog,
   onOpenChat,
   readOnly = false,
+  preview = false,
 }) => {
   // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -97,23 +104,29 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           Bangun dashboard pertama Anda
         </h3>
         <p className="text-sm text-ink-2 max-w-md mt-1 mb-6">
-          Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.
+          {onOpenChat || onOpenCatalog
+            ? 'Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.'
+            : 'Dashboard ini belum memiliki widget. Tambahkan widget dari workspace Aiones Boards — halaman ini hanya mengubah widget yang sudah ada.'}
         </p>
         <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenChat}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Buat via Chat</span>
-          </button>
-          <button
-            onClick={onOpenCatalog}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control shadow-xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Pilih dari Katalog</span>
-          </button>
+          {onOpenChat && (
+            <button
+              onClick={onOpenChat}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Buat via Chat</span>
+            </button>
+          )}
+          {onOpenCatalog && (
+            <button
+              onClick={onOpenCatalog}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control shadow-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Pilih dari Katalog</span>
+            </button>
+          )}
         </div>
       </div>
     );
@@ -149,7 +162,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           <div
             key={widget.id}
             data-widget-id={widget.id}
-            draggable={!readOnly}
+            draggable={!readOnly && !preview}
             onDragStart={(e) => {
               setDragId(widget.id);
               e.dataTransfer.effectAllowed = 'move';
@@ -175,13 +188,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           >
             <WidgetCard
               widget={widget}
+              preview={preview}
               onEdit={onEditWidget}
               onManualCorrection={onManualCorrection}
               onDelete={onDeleteWidget}
               onDuplicate={onDuplicateWidget}
             />
             {/* Resize handle: strip tipis di tepi kiri & kanan — tarik untuk ubah lebar. */}
-            {!readOnly && ([-1, 1] as const).map((arah) => (
+            {!readOnly && !preview && ([-1, 1] as const).map((arah) => (
               <span
                 key={arah}
                 data-resize={arah === -1 ? 'kiri' : 'kanan'}

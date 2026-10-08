@@ -1,5 +1,5 @@
 /**
- * Builder opsi ECharts untuk SEMUA tipe visualisasi ApexPulse.
+ * Builder opsi ECharts untuk SEMUA tipe visualisasi Aiones Boards.
  *
  * Dipisah dari ChartEcharts.tsx supaya komponen hanya mengurus shell (toggle
  * "lihat data", cross-filter, resize) sementara bentuk tiap chart hidup di sini.
@@ -9,12 +9,59 @@
  * Semua fungsi murni: menerima data + tema, mengembalikan EChartsOption.
  */
 import type { EChartsOption } from 'echarts';
+import {
+  regresiLinier,
+  proyeksi,
+  deteksiAnomali,
+  klaster1D,
+  dekomposisi,
+  skenario,
+  sensitivitas,
+  teksPersamaan,
+  angka,
+} from '../../services/spec/analitik';
+import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 
 /** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
-export function chartTheme(mode: 'light' | 'dark') {
-  return mode === 'dark'
+export function chartTheme(mode: 'light' | 'dark', latarKartu?: string) {
+  const dasar = mode === 'dark'
     ? { series: ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0'], accent: '#38c6e2', accentSoft: '#7fdcf0', track: '#2a2f37', tick: '#6b7280', muted: '#8b93a1', strong: '#f2f4f7', text2: '#b6bdc8', grid: '#2a2f37', tipBg: '#1f2329', tooltipInk: '#f2f4f7', surface: '#171a1f', heatLow: '#1f2329' }
     : { series: ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85'], accent: '#1fa6cc', accentSoft: '#0f6b85', track: '#e8ecf1', tick: '#6b7280', muted: '#6b7280', strong: '#1a1d1f', text2: '#4b5563', grid: '#e8ecf1', tipBg: '#1a1d1f', tooltipInk: '#f2f4f7', surface: '#ffffff', heatLow: '#e6f6fb' };
+
+  // Kartu berlatar pilihan pengguna: warna teks & garis chart diturunkan dari
+  // latar itu, kalau tidak label sumbu/legenda jadi tak terbaca (mis. teks abu
+  // tema terang di atas kartu gelap). Warna SERI sengaja tidak disentuh di sini
+  // — itu urusan palet di `widgetStyle.ts`.
+  if (!warnaKartuValid(latarKartu)) return dasar;
+  const latar = (latarKartu as string).trim();
+  const t = temaKartu(latar, mode);
+  return {
+    ...dasar,
+    muted: t.vars['--chart-muted'],
+    tick: t.vars['--chart-muted'],
+    text2: t.vars['--color-ink-2'],
+    strong: t.vars['--chart-ink'],
+    grid: t.vars['--chart-grid'],
+    track: t.vars['--chart-grid'],
+    // Dipakai sebagai warna tepi potongan (mis. border putih antar irisan pai):
+    // harus menyatu dengan latar kartu, bukan selalu putih.
+    surface: latar,
+    heatLow: t.gelap ? campurKeLatar(latar, dasar.accent, 0.12) : campurKeLatar(latar, '#ffffff', 0.55),
+  };
+}
+
+/** Campur `dasar` ke arah `target` sebesar `t` (0..1) — dipakai untuk warna heatmap. */
+function campurKeLatar(dasar: string, target: string, t: number): string {
+  const rgb = (hex: string) => {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [r1, g1, b1] = rgb(dasar);
+  const [r2, g2, b2] = rgb(target);
+  const campur = (a: number, b: number) => Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+  return `#${campur(r1, r2)}${campur(g1, g2)}${campur(b1, b2)}`;
 }
 
 export type ChartTheme = ReturnType<typeof chartTheme>;
@@ -192,6 +239,385 @@ export function buildChartOption(
     textStyle: { color: T.tooltipInk, fontSize: 11, fontFamily: 'Plus Jakarta Sans' },
   };
 
+  /** Subjudul metode: setiap grafik analitik menyebut cara angkanya dihitung. */
+  const judulMetode = (sub: string): Partial<EChartsOption> => ({
+    title: {
+      text: '',
+      subtext: sub,
+      left: 6,
+      top: 0,
+      itemGap: 2,
+      textStyle: { fontSize: 9 },
+      subtextStyle: { color: T.muted, fontSize: 9 },
+    },
+  });
+
+  /** Kartu yang jujur menampilkan alasan saat datanya tidak cukup. */
+  const pesanKosong = (teks: string): EChartsOption => ({
+    title: {
+      text: teks,
+      left: 'center',
+      top: 'middle',
+      textStyle: { color: T.muted, fontSize: 11, fontWeight: 'normal' },
+    },
+  });
+
+  // ── Analitik prediktif: garis tren + regresi ───────────────────────────────
+  if (type === 'trend-line') {
+    const deret = seriesView[0]?.data ?? [];
+    const reg = regresiLinier(deret);
+    if (!reg) return pesanKosong('Butuh minimal 3 titik data untuk menghitung garis tren.');
+    const garis = xView.map((_, i) => Number(reg.nilai(i).toFixed(4)));
+    return {
+      ...judulMetode(`${teksPersamaan(reg)} · R² ${angka(reg.r2, 3)} (1 = cocok sempurna). ${reg.metode}`),
+      tooltip: { trigger: 'axis', ...tooltipDasar },
+      grid: { left: '3%', right: '4%', bottom: 30, top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: xView,
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 10 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: seriesView[0]?.name || 'Nilai dokumen',
+          type: 'line', data: deret, symbol: 'circle', symbolSize: 5,
+          lineStyle: { width: 1.5, color: T.series[0], opacity: 0.75 },
+          itemStyle: { color: T.series[0], opacity: 0.75 },
+          z: 2,
+        },
+        {
+          // Digambar paling atas & lebih tebal: kalau R² mendekati 1, garis regresi
+          // hampir berimpit dengan data, jadi tanpa urutan ini ia tak terlihat.
+          name: 'Garis tren (regresi)',
+          type: 'line', data: garis, symbol: 'none',
+          lineStyle: { width: 2.5, type: 'dashed', color: T.accent },
+          itemStyle: { color: T.accent },
+          z: 5,
+        },
+      ],
+      legend: { bottom: 0, icon: 'circle', textStyle: { fontSize: 11, color: T.muted } },
+    };
+  }
+
+  // ── Forecast + pita prediksi ───────────────────────────────────────────────
+  if (type === 'forecast') {
+    const deret = seriesView[0]?.data ?? [];
+    if (deret.length < 4) return pesanKosong('Butuh minimal 4 titik data untuk membuat proyeksi.');
+    const proy = proyeksi(deret, 3);
+    if (!proy) return pesanKosong('Data dokumen belum cukup untuk proyeksi.');
+    const n = deret.length;
+    const labelProy = Array.from({ length: 3 }, (_, i) => `P+${i + 1}`);
+    const xAll = [...xView, ...labelProy];
+    // Pita digambar TANPA nilai kosong: sebelum titik proyeksi, batas bawah = nilai
+    // terakhir dan lebarnya 0. Nilai kosong (null) membuat penumpukan pita gagal
+    // dirender di ECharts, jadi bagian aktual diisi angka, bukan null.
+    const isiPita = (isi: number[]) => [...Array(n - 1).fill(deret[n - 1]), deret[n - 1], ...isi.slice(n)];
+    const aktual = [...deret, ...Array(3).fill(null)];
+    const garisProy = [...Array(n - 1).fill(null), deret[n - 1], ...proy.nilai.slice(n)];
+    const batasBawah = isiPita(proy.bawah);
+    const batasAtas = isiPita(proy.atas);
+    const selisih = batasAtas.map((a, i) => Number((a - batasBawah[i]).toFixed(4)));
+    return {
+      ...judulMetode(`${proy.metode}. Titik putus-putus = proyeksi, bukan angka dokumen.`),
+      tooltip: { trigger: 'axis', ...tooltipDasar },
+      grid: { left: '3%', right: '4%', bottom: 30, top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: xAll,
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 10 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: seriesView[0]?.name || 'Nilai dokumen',
+          type: 'line', data: aktual, symbol: 'circle', symbolSize: 5,
+          lineStyle: { width: 2, color: T.series[0] }, itemStyle: { color: T.series[0] },
+          z: 3,
+        },
+        // Pita prediksi = dua seri bertumpuk: batas bawah + selisihnya. Batas bawah
+        // digambar sebagai garis tepi putus-putus supaya pitanya terbaca jelas
+        // walau kartunya pendek (temuan pemeriksaan visual).
+        {
+          name: 'Batas bawah pita', type: 'line', stack: 'pita', data: batasBawah, symbol: 'none',
+          lineStyle: { width: 1, type: 'dashed', color: T.accent, opacity: 0.8 },
+          areaStyle: { opacity: 0 }, silent: true, tooltip: { show: false }, z: 2,
+        },
+        {
+          name: 'Pita prediksi 95%', type: 'line', stack: 'pita', data: selisih, symbol: 'none',
+          lineStyle: { width: 1, type: 'dashed', color: T.accent, opacity: 0.8 },
+          areaStyle: { color: T.accentSoft, opacity: 0.5 },
+          tooltip: { show: false }, z: 1,
+        },
+        {
+          name: 'Proyeksi', type: 'line', data: garisProy, symbol: 'circle', symbolSize: 6,
+          lineStyle: { width: 2.5, type: 'dashed', color: T.accent }, itemStyle: { color: T.accent },
+          z: 5,
+        },
+      ],
+      // "Batas bawah pita" hanya alat bantu gambar, tidak perlu masuk legenda.
+      legend: {
+        bottom: 0, icon: 'circle', textStyle: { fontSize: 10, color: T.muted },
+        data: [seriesView[0]?.name || 'Nilai dokumen', 'Pita prediksi 95%', 'Proyeksi'],
+      },
+    };
+  }
+
+  // ── Deteksi anomali (z-score) ──────────────────────────────────────────────
+  if (type === 'anomaly') {
+    const deret = seriesView[0]?.data ?? [];
+    const an = deteksiAnomali(deret);
+    if (!an) return pesanKosong('Butuh minimal 5 titik data untuk menilai simpangan.');
+    return {
+      ...judulMetode(an.metode),
+      tooltip: { trigger: 'axis', ...tooltipDasar },
+      grid: { left: '3%', right: '6%', bottom: 22, top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: xView,
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 10 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: seriesView[0]?.name || 'Nilai dokumen',
+          type: 'line', data: deret, symbol: 'circle', symbolSize: 6,
+          lineStyle: { width: 2, color: T.series[0] }, itemStyle: { color: T.series[0] },
+          markLine: {
+            silent: true, symbol: 'none',
+            data: [{ yAxis: Number(an.rata.toFixed(4)) }],
+            lineStyle: { type: 'dashed', color: T.muted },
+            // Label ditaruh di dalam area gambar: kalau di ujung kanan, teksnya
+            // terpotong tepi kanvas (temuan pemeriksaan visual).
+            label: {
+              position: 'insideEndTop', formatter: `rata-rata ${angka(an.rata, 1)}`,
+              color: T.muted, fontSize: 9,
+            },
+          },
+          markPoint: {
+            symbolSize: 46,
+            data: an.indeks.map((i) => ({
+              name: xView[i],
+              coord: [xView[i], deret[i]],
+              value: `z=${angka(an.z[i], 1)}`,
+              itemStyle: { color: T.series[4] || '#e11d48' },
+              label: { fontSize: 9, color: '#fff' },
+            })),
+          },
+        },
+      ],
+    };
+  }
+
+  // ── Clustering k-means ─────────────────────────────────────────────────────
+  if (type === 'cluster') {
+    const deret = seriesView[0]?.data ?? [];
+    const kl = klaster1D(deret, 3);
+    if (!kl) return pesanKosong('Butuh minimal 6 titik data (dengan ≥3 nilai berbeda) untuk mengelompokkan.');
+    const seri = kl.centroid.map((c, ci) => ({
+      name: `Kelompok ${ci + 1} (≈${angka(c, 1)})`,
+      type: 'scatter' as const,
+      symbolSize: 15,
+      // Cincin putih supaya titik tidak menyatu dengan garis centroid yang berwarna sama.
+      itemStyle: {
+        color: T.series[ci % T.series.length],
+        borderColor: '#fff',
+        borderWidth: 2,
+      },
+      // Nilai ditaruh apa adanya dan diisi null di luar kelompoknya. Bentuk
+      // pasangan [indeks, nilai] tidak tergambar di sumbu kategori ECharts.
+      data: deret.map((v, i) => (kl.label[i] === ci ? v : null)),
+      tooltip: { formatter: (p: any) => `${xView[p.dataIndex]}: ${angka(p.value ?? 0, 1)}` },
+    }));
+    return {
+      ...judulMetode(kl.metode),
+      tooltip: { trigger: 'axis', ...tooltipDasar },
+      grid: { left: '3%', right: '4%', bottom: 30, top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: xView, boundaryGap: true,
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 9, interval: Math.ceil(xView.length / 8) },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          ...seri[0],
+          markLine: {
+            silent: true, symbol: 'none',
+            data: kl.centroid.map((c, i) => ({
+              yAxis: Number(c.toFixed(4)),
+              lineStyle: { type: 'dashed', color: T.series[i % T.series.length], width: 1, opacity: 0.6 },
+              label: { formatter: `K${i + 1}`, color: T.muted, fontSize: 9 },
+            })),
+          },
+        },
+        ...seri.slice(1),
+      ],
+      legend: { bottom: 0, icon: 'circle', textStyle: { fontSize: 10, color: T.muted } },
+    };
+  }
+
+  // ── Dekomposisi kontribusi (preskriptif) ───────────────────────────────────
+  if (type === 'dekomposisi') {
+    const deret = seriesView[0]?.data ?? [];
+    const dk = dekomposisi(deret);
+    if (!dk) return pesanKosong('Butuh minimal 3 titik data untuk mengurai kontribusi.');
+    const label = xView.slice(1);
+    const nilai = dk.kontribusi.slice(1).map((v) => Number(v.toFixed(1)));
+    const terbesar = dk.bagian.reduce((a, b) => (b.porsi > a.porsi ? b : a), dk.bagian[0]);
+    return {
+      ...judulMetode(dk.metode),
+      tooltip: {
+        trigger: 'axis', ...tooltipDasar, axisPointer: { type: 'shadow' },
+        formatter: (ps: any) => {
+          const p = Array.isArray(ps) ? ps[0] : ps;
+          const i = (p?.dataIndex ?? 0) + 1;
+          const dari = deret[i - 1];
+          const ke = deret[i];
+          const arah = ke >= dari ? 'naik' : 'turun';
+          return `${label[p?.dataIndex ?? 0]}<br/>${angka(dari, 1)} → ${angka(ke, 1)} (${arah})<br/>Andil: <b>${nilai[p?.dataIndex ?? 0]}%</b> dari total gerakan`;
+        },
+      },
+      grid: { left: '3%', right: '4%', bottom: 26, top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: label,
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 9, interval: Math.ceil(label.length / 7) },
+      },
+      yAxis: {
+        type: 'value', name: 'andil (%)', nameTextStyle: { color: T.muted, fontSize: 9 },
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: 'Andil perubahan', type: 'bar', barMaxWidth: 26,
+          data: nilai.map((v, i) => ({
+            value: v,
+            itemStyle: { color: deret[i + 1] >= deret[i] ? T.series[2] : (T.series[4] || '#e11d48') },
+          })),
+          label: { show: true, position: 'top', fontSize: 9, color: T.muted, formatter: '{c}%' },
+        },
+      ],
+      // Ditulis apa adanya supaya pembaca tahu kategori penyumbang terbesar.
+      graphic: [
+        {
+          type: 'text', left: 6, bottom: 0,
+          style: {
+            text: `Total ${angka(dk.total, 1)} · penyumbang terbesar: ${xView[terbesar.indeks]} (${angka(terbesar.porsi, 1)}% dari total)`,
+            fill: T.muted, fontSize: 9, fontFamily: 'Plus Jakarta Sans',
+          },
+        },
+      ],
+    };
+  }
+
+  // ── Analisis skenario (preskriptif, SIMULASI) ──────────────────────────────
+  if (type === 'skenario') {
+    const deret = seriesView[0]?.data ?? [];
+    const sk = skenario(deret);
+    if (!sk) return pesanKosong('Butuh minimal 2 titik data (dan nilai ≠ 0) untuk menyusun skenario.');
+    return {
+      ...judulMetode(sk.metode),
+      tooltip: {
+        trigger: 'axis', ...tooltipDasar, axisPointer: { type: 'shadow' },
+        formatter: (ps: any) => {
+          const p = Array.isArray(ps) ? ps[0] : ps;
+          const item = sk.daftar[p?.dataIndex ?? 0];
+          return `${item?.nama}<br/>Nilai: <b>${angka(item?.nilai ?? 0, 1)}${satuan(displayUnit)}</b><br/>faktor ${angka((item?.faktor ?? 1) * 100, 1)}% dari nilai terakhir dokumen`;
+        },
+      },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: sk.daftar.map((s) => s.nama),
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 10 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: 'Simulasi', type: 'bar', barMaxWidth: 54,
+          data: sk.daftar.map((s, i) => ({
+            value: Number(s.nilai.toFixed(2)),
+            itemStyle: { color: i === 0 ? (T.series[4] || '#e11d48') : i === 1 ? T.series[0] : T.series[2] },
+          })),
+          label: {
+            show: true, position: 'top', fontSize: 9, color: T.muted,
+            formatter: (p: any) => `${angka(p.value, 1)}`,
+          },
+          markLine: {
+            silent: true, symbol: 'none',
+            data: [{ yAxis: Number(sk.dasar.toFixed(2)) }],
+            lineStyle: { type: 'dashed', color: T.muted },
+            label: { formatter: `posisi terakhir: ${angka(sk.dasar, 1)}`, color: T.muted, fontSize: 9 },
+          },
+        },
+      ],
+    };
+  }
+
+  // ── Sensitivitas / what-if statis (preskriptif) ────────────────────────────
+  if (type === 'sensitivitas') {
+    const deret = seriesView[0]?.data ?? [];
+    const dasar = deret[deret.length - 1];
+    const sn = sensitivitas(dasar, 10);
+    if (!sn) return pesanKosong('Nilai dokumen nol/kosong, sensitivitas tidak bisa dihitung.');
+    return {
+      ...judulMetode(sn.metode),
+      tooltip: {
+        trigger: 'axis', ...tooltipDasar,
+        formatter: (ps: any) => {
+          const p = Array.isArray(ps) ? ps[0] : ps;
+          return `Perubahan ${sn.persen[p?.dataIndex ?? 0]}%<br/>Nilai: <b>${angka(p?.value ?? 0, 1)}${satuan(displayUnit)}</b>`;
+        },
+      },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: 34, containLabel: true },
+      xAxis: {
+        type: 'category', data: sn.persen.map((p) => `${p > 0 ? '+' : ''}${p}%`),
+        axisLine: { lineStyle: { color: T.track } }, axisTick: { show: false },
+        axisLabel: { color: T.muted, fontSize: 9 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: T.grid, type: 'dashed' } },
+        axisLabel: { color: T.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+      },
+      series: [
+        {
+          name: 'Hasil simulasi', type: 'line', data: sn.nilai.map((v) => Number(v.toFixed(2))),
+          symbol: 'circle', symbolSize: 5, smooth: false,
+          lineStyle: { width: 2, color: T.accent }, itemStyle: { color: T.accent },
+          markLine: {
+            silent: true, symbol: 'none',
+            data: [{ yAxis: Number(dasar.toFixed(2)) }],
+            lineStyle: { type: 'dashed', color: T.muted },
+            label: { formatter: `nilai dokumen: ${angka(dasar, 1)}`, color: T.muted, fontSize: 9 },
+          },
+        },
+      ],
+    };
+  }
+
   // ── Gauge ──────────────────────────────────────────────────────────────────
   if (type === 'gauge') {
     const nilai = seriesView[0]?.data?.[0] ?? 0;
@@ -234,22 +660,59 @@ export function buildChartOption(
     const semua = matriks.flat();
     const vMin = semua.length ? Math.min(...semua) : 0;
     const vMax = semua.length ? Math.max(...semua) : 100;
+
+    /**
+     * Intensitas warna dihitung PER SEL untuk menentukan warna angkanya; warna latar sel
+     * sendiri tetap dari `visualMap` yang disembunyikan (aturan ECharts).
+     */
+    const keRgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const warnaSel = (v: number): [number, number, number] => {
+      const t = vMax === vMin ? 0.5 : (v - vMin) / (vMax - vMin);
+      const [r1, g1, b1] = keRgb(T.heatLow);
+      const [r2, g2, b2] = keRgb(T.accent);
+      const f = (x: number, y: number) => Math.round(x + (y - x) * t);
+      return [f(r1, r2), f(g1, g2), f(b1, b2)];
+    };
+    /**
+     * Warna angka ditentukan warna SEL-nya, bukan tema halaman: sel terang → angka gelap,
+     * sel gelap → angka terang. Dihitung dengan luminansi relatif WCAG (bukan rata-rata
+     * kanal) supaya cyna pekat tetap dapat angka gelap dan kontrasnya tetap tinggi.
+     */
+    const INK_GELAP = '#1a1d1f'; // = ink-1 tema terang
+    const INK_TERANG = '#f2f4f7'; // = token tooltip (berlaku di kedua tema)
+    const linear = (n: number) => {
+      const s = n / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const luminansi = (c: [number, number, number]) => 0.2126 * linear(c[0]) + 0.7152 * linear(c[1]) + 0.0722 * linear(c[2]);
+    const warnaLabel = (c: [number, number, number]) => (luminansi(c) > 0.18 ? INK_GELAP : INK_TERANG);
+
     return {
       tooltip: { ...tooltipDasar, position: 'top', formatter: (p: any) => `${rows[p.value[1]]} · ${cols[p.value[0]]}: <b>${p.value[2]}</b>${satuan(displayUnit)}` },
-      grid: { left: 10, right: 10, top: 24, bottom: 30, containLabel: true },
+      grid: { left: 10, right: 12, top: 14, bottom: 26, containLabel: true },
       xAxis: { type: 'category', data: cols, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
       yAxis: { type: 'category', data: rows, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 10 } },
       visualMap: {
-        min: vMin, max: vMax, calculable: false, orient: 'horizontal', left: 'center', bottom: -6,
-        itemHeight: 60, itemWidth: 10, textStyle: { fontSize: 9, color: T.muted },
+        // ECharts MENOLAK heatmap tanpa visualMap ("Heatmap must use with visualMap"),
+        // jadi skala warnanya tetap ada tetapi widgetnya TIDAK DIGAMBAR: `show: false`
+        // menghapus bar skalanya yang dulu melintang menutupi grafik. Angka tiap sel
+        // tetap tercetak, jadi intensitas warna + nilai tetap terbaca.
+        show: false,
+        min: vMin,
+        max: vMax,
         inRange: { color: [T.heatLow, T.accent] },
       },
       series: [
         {
           type: 'heatmap',
-          data: matriks.flatMap((baris, rIdx) => baris.map((v, cIdx) => [cIdx, rIdx, v])),
-          label: { show: true, fontSize: 10, color: T.strong, formatter: (p: any) => `${p.value[2]}` },
-          itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 },
+          data: matriks.flatMap((baris, rIdx) =>
+            baris.map((v, cIdx) => ({
+              value: [cIdx, rIdx, v],
+              label: { color: warnaLabel(warnaSel(v)) },
+            }))
+          ),
+          label: { show: true, fontSize: 10 },
+          itemStyle: { borderColor: T.surface, borderWidth: 2 },
           emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(29,78,216,0.35)' } },
         },
       ],
@@ -269,11 +732,24 @@ export function buildChartOption(
         {
           name: displayUnit || 'Nilai',
           type: 'pie',
-          radius: type === 'donut' ? ['45%', '72%'] : ['0%', '72%'],
-          avoidLabelOverlap: false,
+          // Kalau ada legenda, diagramnya digeser ke atas + dikecilkan supaya label
+          // legenda (bisa dua baris) tidak tertimpa cincin di kartu pendek.
+          center: showLegend ? ['50%', '35%'] : ['50%', '50%'],
+          radius: type === 'donut'
+            ? (showLegend ? ['42%', '56%'] : ['45%', '72%'])
+            : (showLegend ? ['0%', '56%'] : ['0%', '72%']),
+          // Semua label TETAP ditampilkan — hanya digeser/diaturnya supaya tidak
+          // bertumpuk. `avoidLabelOverlap` menggeser potongan kecil menjauh dan
+          // memanjangkan garis penunjuknya, jadi keterangan tetap utuh dan terbaca.
+          avoidLabelOverlap: true,
           itemStyle: { borderRadius: 6, borderColor: T.surface, borderWidth: 2 },
+          labelLine: type === 'pie'
+            ? { show: true, length: 14, length2: 14 }
+            : { show: false },
           label: type === 'pie'
-            ? { show: true, fontSize: 10, color: T.text2, formatter: '{b}\n{d}%' }
+            // `distance` kecil menjaga label tetap rapat ke cincin sehingga baris
+            // bawahnya tidak masuk ke baris legenda di kartu yang pendek.
+            ? { show: true, fontSize: 10, color: T.text2, distance: 8, formatter: '{b}\n{d}%' }
             : { show: false, position: 'center' },
           emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
           data: donutView,

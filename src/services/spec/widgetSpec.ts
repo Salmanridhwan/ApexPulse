@@ -48,6 +48,13 @@ export const WidgetTypeEnum = z.enum([
   'radar',
   'map',
   'gantt',
+  'trend-line',
+  'forecast',
+  'anomaly',
+  'cluster',
+  'dekomposisi',
+  'skenario',
+  'sensitivitas',
   'table',
   'narasi',
   'bullet-target',
@@ -71,6 +78,8 @@ export const KpiDataSchema = z.object({
   target: z.number().optional(),
   targetLabel: z.string().optional(),
   sparkline: z.array(z.number()).optional(),
+  /** Asal grafik tren (jejak audit: seri dokumen / turunan delta / turunan nilai). */
+  sparklineAsal: z.enum(['dokumen-seri', 'turunan-delta', 'turunan-nilai']).optional(),
 });
 
 export const ChartDataSchema = z.object({
@@ -172,6 +181,16 @@ export const NarasiDataSchema = z.object({
     .optional(),
 });
 
+export const WidgetStyleSchema = z.object({
+  palette: z.enum(['default', 'brand', 'hijau', 'ungu', 'oranye', 'monokrom', 'hangat', 'sejuk']).optional(),
+  warnaSeri: z.array(z.string()).optional(),
+  font: z.enum(['Inter', 'JetBrains Mono']).optional(),
+  fontUkuran: z.number().min(8).max(24).optional(),
+  garisTebal: z.number().min(0.5).max(8).optional(),
+  batangRadius: z.number().min(0).max(20).optional(),
+  kartu: z.string().optional(),
+});
+
 export const WidgetSpecSchema = z.object({
   id: z.string(),
   presetId: z.string().optional(),
@@ -194,6 +213,7 @@ export const WidgetSpecSchema = z.object({
   unitKerja: z.string().optional(),
   periode: z.string().optional(),
   lastUpdated: z.string().optional(),
+  style: WidgetStyleSchema.optional(),
 }).refine(
   (widget) => {
     // If it's a KPI or chart widget, it MUST have citations or be manual correction

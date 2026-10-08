@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Check, Minus, Target } from 'lucide-react';
+import type { WidgetStyle } from '../../types';
 
 interface KpiCardProps {
   value: string | number;
@@ -8,12 +9,20 @@ interface KpiCardProps {
   deltaLabel?: string;
   target?: number;
   targetLabel?: string;
+  /**
+   * Tampilkan baris Target + bar progres? Untuk tipe `kpi` DIMATIKAN (permintaan user:
+   * kartu KPI cukup angka, delta, dan grafik tren). Tipe `bullet-target` tetap
+   * menampilkannya karena justru itu inti tipe tersebut (aktual vs target).
+   */
+  tampilkanTarget?: boolean;
   sparkline?: number[];
   isCorrected?: boolean;
   /** Judul widget — dipakai mendeteksi metrik "semakin kecil semakin baik" (NRW dkk). */
   title?: string;
   /** `compact` (default) = angka lebih kecil & sparkline tipis; `hero` = angka besar. */
   variant?: 'hero' | 'compact';
+  /** Gaya tampilan pilihan pengguna (font/ukuran/warna). */
+  style?: WidgetStyle;
 }
 
 /** Jalur SVG sparkline di ruang viewBox 0..100 × 0..100 (sumbu Y dibalik). */
@@ -77,10 +86,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   deltaLabel,
   target,
   targetLabel,
+  tampilkanTarget = true,
   sparkline,
   isCorrected,
   title,
   variant = 'compact',
+  style,
 }) => {
   const gradId = useId().replace(/:/g, '');
   const hero = variant === 'hero';
@@ -94,7 +105,18 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   // Ukuran mengikuti varian: compact lebih rapat, hero menonjol.
   const angkaKelas = hero ? 'text-[2.75rem]' : 'text-[2rem]';
   const chipKelas = hero ? 'text-[11px]' : 'text-[10px]';
-  const sparkTinggi = hero ? 'h-[68%]' : 'h-[52%]';
+  // Gaya pilihan pengguna: kartu KPI bukan ECharts, jadi font/ukuran/warna
+  // diterapkan langsung di sini (chart lain lewat terapkanGaya).
+  const rasioFont = style?.fontUkuran ? style.fontUkuran / 10 : 1;
+  const gayaFont = style?.font ? { fontFamily: `'${style.font}', sans-serif` } : undefined;
+  const gayaAngka = {
+    ...gayaFont,
+    ...(rasioFont !== 1 ? { fontSize: `${(hero ? 2.75 : 2) * rasioFont}rem` } : {}),
+    ...(style?.warnaSeri?.[0] ? { color: style.warnaSeri[0] } : {}),
+  };
+  // Grafik tren: tingginya TETAP (bukan % dari kartu) karena ia sekarang menempati barisnya
+  // sendiri di bawah teks, bukan lapisan latar yang ditimpa teks.
+  const sparkTinggi = hero ? 'h-[52px]' : 'h-[36px]';
   const sparkTebal = hero ? 2 : 1.5;
   const sparkOpasitas = hero ? 0.2 : 0.14;
 
@@ -149,46 +171,26 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   const awalanRp = unitTampil && /^rp\b/i.test(unitTampil) ? 'Rp' : undefined;
   const satuanAkhir = awalanRp ? unitTampil!.replace(/^rp\.?\s*/i, '') || undefined : unitTampil;
 
-  // Warna garis sparkline mengikuti makna tren: baik (hijau), buruk (merah), netral (biru).
-  const warnaTren = deltaBad ? 'var(--color-neg)' : deltaGood ? 'var(--color-pos)' : 'var(--color-brand)';
+  // Warna garis sparkline mengikuti ARAH tren, sama seperti Template Chart:
+  // naik = hijau, turun = merah, datar/tak cukup data = netral (brand).
+  const arahTren = (() => {
+    if (!sparkline || sparkline.length < 2) return 0;
+    const awal = Number(sparkline[0]);
+    const akhir = Number(sparkline[sparkline.length - 1]);
+    if (!Number.isFinite(awal) || !Number.isFinite(akhir) || awal === akhir) return 0;
+    return akhir > awal ? 1 : -1;
+  })();
+  const warnaTren =
+    arahTren > 0 ? 'var(--color-pos)' : arahTren < 0 ? 'var(--color-neg)' : 'var(--color-brand)';
   const jalur =
     sparkline && sparkline.length > 1 ? sparkPaths(sparkline) : null;
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
-      {/* Sparkline sebagai LATAR — halus, tidak mengganggu keterbacaan angka. */}
-      {jalur && (
-        <svg
-          data-testid="kpi-sparkline"
-          className={`absolute inset-x-0 bottom-0 w-full pointer-events-none ${sparkTinggi}`}
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id={`spk-${gradId}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" style={{ stopColor: warnaTren }} stopOpacity={sparkOpasitas * 1.6} />
-              <stop offset="100%" style={{ stopColor: warnaTren }} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d={jalur.area} fill={`url(#spk-${gradId})`} className="kpi-spark-area" />
-          <path
-            d={jalur.line}
-            fill="none"
-            style={{ stroke: warnaTren, filter: `drop-shadow(0 3px 4px ${warnaTren})` }}
-            strokeWidth={sparkTebal}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            opacity="0.85"
-            pathLength={1}
-            className="kpi-spark-line"
-          />
-        </svg>
-      )}
-
-      {/* Konten di atas latar */}
-      <div className={`relative z-10 flex flex-col justify-between h-full ${hero ? 'gap-2' : 'gap-1.5'}`}>
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden">
+      {/* Teks memakai bagian atas kartu. Grafik tren TIDAK lagi jadi lapisan latar:
+          pada versi lama grafik setinggi 52% ditimpa baris delta/target sehingga garisnya
+          menembus label. Sekarang grafik menempati barisnya sendiri di dasar kartu. */}
+      <div className={`relative z-10 flex flex-1 min-h-0 flex-col justify-between ${hero ? 'gap-2' : 'gap-1.5'}`}>
         <div className="flex items-baseline gap-2 flex-wrap">
           {awalanRp && (
             <span className={`${hero ? 'text-xl' : 'text-base'} font-normal text-ink-3`}>{awalanRp}</span>
@@ -198,6 +200,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
             className={`kpi-enter ${angkaKelas} leading-none font-normal tracking-tight tabular-nums ${
               isCorrected ? 'text-warn' : 'text-ink'
             }`}
+            style={isCorrected ? undefined : gayaAngka}
           >
             {value}
           </span>
@@ -238,7 +241,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
             </div>
           )}
 
-          {target !== undefined && (
+          {tampilkanTarget && target !== undefined && (
             <div className="space-y-1">
               <div className={`flex items-center justify-between gap-2 ${chipKelas} text-ink-2`}>
                 <span className="flex items-center gap-1 min-w-0">
@@ -272,6 +275,36 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           )}
         </div>
       </div>
+
+      {jalur && (
+        <svg
+          data-testid="kpi-sparkline"
+          className={`mt-1 w-full shrink-0 pointer-events-none ${sparkTinggi}`}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id={`spk-${gradId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: warnaTren }} stopOpacity={sparkOpasitas * 1.6} />
+              <stop offset="100%" style={{ stopColor: warnaTren }} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={jalur.area} fill={`url(#spk-${gradId})`} className="kpi-spark-area" />
+          <path
+            d={jalur.line}
+            fill="none"
+            style={{ stroke: warnaTren, filter: `drop-shadow(0 3px 4px ${warnaTren})` }}
+            strokeWidth={sparkTebal}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            opacity="0.85"
+            pathLength={1}
+            className="kpi-spark-line"
+          />
+        </svg>
+      )}
     </div>
   );
 };

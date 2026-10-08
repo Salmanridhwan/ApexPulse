@@ -13,16 +13,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onClose,
   dashboard,
 }) => {
+  const [accessMode, setAccessMode] = useState<'readonly' | 'editable'>('readonly');
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedEmbed, setIsCopiedEmbed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mode edit ber-PIN.
-  const [hasEditPin, setHasEditPin] = useState(false);
-  const [pinDraft, setPinDraft] = useState('');
-  const [pinMsg, setPinMsg] = useState<string | null>(null);
-  const [pinSaving, setPinSaving] = useState(false);
 
   if (!isOpen || !dashboard) return null;
 
@@ -31,6 +26,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     try {
       const res = await fetch(`/api/dashboards/${dashboard.id}/share`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: accessMode }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -40,29 +37,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       console.error('Failed to create share link:', err);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  /** Aktifkan / matikan mode edit ber-PIN untuk token ini. */
-  const handleSavePin = async (pin: string) => {
-    if (!shareToken) return;
-    setPinSaving(true);
-    setPinMsg(null);
-    try {
-      const res = await fetch(`/api/share/${shareToken}/pin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan PIN.');
-      setHasEditPin(!!data.hasEditPin);
-      setPinDraft('');
-      setPinMsg(data.hasEditPin ? 'Mode edit aktif dengan PIN.' : 'Mode edit dimatikan.');
-    } catch (err: any) {
-      setPinMsg(err.message || 'Gagal menyimpan PIN.');
-    } finally {
-      setPinSaving(false);
     }
   };
 
@@ -100,7 +74,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             </div>
             <div>
               <h2 id="share-modal-title" className="text-sm font-semibold text-ink">
-                Bagikan Dashboard (Read-Only)
+                Bagikan Dashboard ({accessMode === 'editable' ? 'Bisa Edit' : 'Read-Only'})
               </h2>
               <p className="text-xs text-ink-2 truncate max-w-xs">{dashboard.title}</p>
             </div>
@@ -118,44 +92,98 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <div className="p-3.5 bg-surface-2 border border-line rounded-card text-ink space-y-1">
             <div className="flex items-center gap-1.5 font-semibold">
               <Globe className="w-4 h-4 text-brand" />
-              <span>Akses Tampilan Publik Aman</span>
+              <span>{accessMode === 'editable' ? 'Akses Edit Tanpa PIN' : 'Akses Tampilan Publik Aman'}</span>
             </div>
             <p className="text-[11px] text-ink leading-relaxed">
-              Tautan ini memungkinkan Dewan Pengawas, Kepala Daerah, atau auditor eksternal melihat dashboard tanpa perlu kredensial login atau hak akses edit.
+              {accessMode === 'editable'
+                ? 'Penerima tautan dapat mengedit widget langsung dari halaman publik tanpa kredensial login. Setiap perubahan tersimpan permanen pada dashboard asli dan tercatat di jejak audit instansi.'
+                : 'Tautan ini memungkinkan Dewan Pengawas, Kepala Daerah, atau auditor eksternal melihat dashboard tanpa perlu kredensial login atau hak akses edit.'}
             </p>
           </div>
 
+          {/* Opsi Mode Akses */}
+          <div className="space-y-2">
+            <label className="block text-ink font-semibold">Tipe Akses Tautan:</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setAccessMode('readonly')}
+                className={`p-3 rounded-card border text-left flex flex-col justify-between transition-all ${
+                  accessMode === 'readonly'
+                    ? 'border-brand bg-brand/10 text-brand-ink ring-1 ring-brand'
+                    : 'border-line bg-surface-2 text-ink-2 hover:bg-line/50'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Read-Only</span>
+                </div>
+                <span className="text-[10px] text-ink-3">Hanya untuk melihat dashboard</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccessMode('editable')}
+                className={`p-3 rounded-card border text-left flex flex-col justify-between transition-all ${
+                  accessMode === 'editable'
+                    ? 'border-brand bg-brand/10 text-brand-ink ring-1 ring-brand'
+                    : 'border-line bg-surface-2 text-ink-2 hover:bg-line/50'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Bisa Edit</span>
+                </div>
+                <span className="text-[10px] text-ink-3">Penerima tautan dapat mengedit widget</span>
+              </button>
+            </div>
+
+          {/* Mode terkunci pada saat tautan dibuat — supaya tidak ada harapan
+              bahwa tautan lama bisa dinaikkan jadi bisa-edit. */}
+          <div className="flex items-start gap-1.5 text-[10px] text-ink-3 leading-relaxed">
+            <Lock className="w-3 h-3 mt-0.5 shrink-0" />
+            <span>
+              Mode akses terkunci saat tautan dibuat. Tautan yang sudah beredar tidak berubah mode
+              {' '}— untuk mengubahnya, buat tautan baru.
+            </span>
+          </div>
+          </div>
+
           {!shareToken ? (
-            <div className="text-center py-4">
+            <div className="text-center py-3">
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-on-brand rounded-card font-medium shadow-xs transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+                className="w-full py-2.5 bg-brand hover:bg-brand-ink text-white rounded-card font-medium shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
-                <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi Baru'}</span>
+                <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi'}</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              <label className="block text-ink-2 font-medium">Tautan Publik Read-Only:</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  readOnly
-                  value={fullShareUrl}
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono select-all focus:outline-none"
-                />
-                <button
-                  onClick={copyToClipboard}
-                  className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
-                >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
-                </button>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-ink-2 font-medium">
+                  Tautan Publik ({accessMode === 'editable' ? 'Bisa Edit' : 'Read-Only'}):
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={fullShareUrl}
+                    className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono select-all focus:outline-none"
+                  />
+                  <button
+                    onClick={copyToClipboard}
+                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between text-[11px] text-ink-3">
+              <div className="flex items-center justify-between text-[11px] text-ink-3">
                 <span className="flex items-center gap-1">
                   <Lock className="w-3 h-3" /> Dilindungi Token Enkripsi
                 </span>
@@ -171,20 +199,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               </div>
 
               {/* Embed untuk website instansi klien */}
-              <div className="pt-3 mt-1 border-t border-line space-y-2">
+              <div className="pt-3 border-t border-line space-y-2">
                 <div className="flex items-center gap-1.5 text-ink-2 font-medium">
                   <Code2 className="w-3.5 h-3.5 text-ink-2" />
                   <span>Embed di website instansi</span>
                 </div>
-                <p className="text-[11px] text-ink-2 leading-relaxed">
-                  Tempel kode berikut untuk menampilkan dashboard langsung di halaman web instansi.
-                </p>
                 <div className="flex items-start gap-1.5">
                   <textarea
                     readOnly
                     value={embedSnippet}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-[11px] font-mono resize-none focus:outline-none"
+                    rows={2}
+                    className="w-full px-3 py-1.5 border border-line rounded-control bg-surface-2 text-[11px] font-mono resize-none focus:outline-none"
                   />
                   <button
                     onClick={copyEmbedSnippet}
@@ -194,56 +219,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-ink-3">
-                  <span>Mode kanvas telanjang, tanpa menu internal</span>
-                  <a
-                    href={`/embed/${shareToken}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-brand hover:underline flex items-center gap-1"
-                  >
-                    <span>Pratinjau Embed</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-
-              {/* Mode Edit ber-PIN (opsional) */}
-              <div className="pt-3 mt-1 border-t border-line space-y-2">
-                <div className="flex items-center gap-1.5 text-ink-2 font-medium">
-                  <Pencil className="w-3.5 h-3.5 text-ink-2" />
-                  <span>Mode Edit lewat Tautan (opsional)</span>
-                </div>
-                <p className="text-[11px] text-ink-2 leading-relaxed">
-                  Atur PIN agar penerima tautan bisa mengedit widget langsung. Kosongkan PIN untuk menonaktifkan.
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={pinDraft}
-                    onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder={hasEditPin ? 'PIN aktif, isi untuk ganti' : '4-8 angka'}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface-2 text-xs font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand"
-                  />
-                  <button
-                    onClick={() => handleSavePin(pinDraft)}
-                    disabled={pinSaving || (pinDraft.length > 0 && pinDraft.length < 4)}
-                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 disabled:opacity-40"
-                  >
-                    {pinSaving ? '...' : hasEditPin ? 'Perbarui' : 'Aktifkan'}
-                  </button>
-                </div>
-                {hasEditPin && (
-                  <button
-                    onClick={() => handleSavePin('')}
-                    disabled={pinSaving}
-                    className="text-[11px] text-neg hover:underline disabled:opacity-40"
-                  >
-                    Matikan mode edit
-                  </button>
-                )}
-                {pinMsg && <p className="text-[11px] text-ink-2">{pinMsg}</p>}
               </div>
             </div>
           )}

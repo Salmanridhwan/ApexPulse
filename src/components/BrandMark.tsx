@@ -6,7 +6,7 @@ export function monogram(name: string): string {
     .replace(/[^\p{L}\s]/gu, '')
     .split(/\s+/)
     .filter(Boolean);
-  if (kata.length === 0) return 'AP';
+  if (kata.length === 0) return 'AB';
   if (kata.length === 1) return kata[0].slice(0, 2).toUpperCase();
   return (kata[0][0] + kata[1][0]).toUpperCase();
 }
@@ -63,7 +63,7 @@ export const LogoTile: React.FC<LogoTileProps> = ({ name, id, size = 'md', class
       style={{ backgroundColor: bg, color: warnaTeksTile(bg) }}
       title={name}
     >
-      {monogram(name || 'ApexPulse')}
+      {monogram(name || 'Aiones Boards')}
     </span>
   );
 };

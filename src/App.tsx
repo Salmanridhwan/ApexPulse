@@ -6,7 +6,6 @@ import {
   Building2,
   CheckCircle,
   Clock,
-  Download,
   EllipsisVertical,
   FileCheck,
   FileText,
@@ -18,9 +17,9 @@ import {
   Maximize2,
   Menu,
   Minimize2,
+  Palette,
   Plus,
   Printer,
-  Radio,
   Search,
   Share2,
   Shield,
@@ -29,17 +28,20 @@ import {
   Users,
 } from 'lucide-react';
 import { AlertsModal } from './components/AlertsModal';
-import { CatalogSidebar } from './components/CatalogSidebar';
+import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
 import { DashboardCanvas } from './components/DashboardCanvas';
 import { ExportModal } from './components/ExportModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
+import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
 import { GlobalFiltersBar } from './components/GlobalFiltersBar';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
 
 import { WidgetEditorModal } from './components/WidgetEditorModal';
+import { GlobalStyleModal } from './components/GlobalStyleModal';
+import { tipePunyaGaya } from './components/widgets/widgetStyle';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Login } from './pages/Login';
 
@@ -56,6 +58,12 @@ const AuditLogPage = React.lazy(() =>
 const AlertsPage = React.lazy(() =>
   import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage }))
 );
+const ChartGalleryPage = React.lazy(() =>
+  import('./pages/ChartGalleryPage').then((m) => ({ default: m.ChartGalleryPage }))
+);
+const DashboardTemplatesPage = React.lazy(() =>
+  import('./pages/DashboardTemplatesPage').then((m) => ({ default: m.DashboardTemplatesPage }))
+);
 const ShareView = React.lazy(() =>
   import('./pages/ShareView').then((m) => ({ default: m.ShareView }))
 );
@@ -67,7 +75,12 @@ import {
   Tenant,
   User,
   WidgetSpec,
+  WidgetStyle,
 } from './types';
+import {
+  DashboardTemplate,
+  widgetDariTemplate,
+} from './services/templates/dashboardTemplates';
 
 export default function App() {
   // Public Share / Embed Route Handling (No Login Required)
@@ -104,9 +117,13 @@ export default function App() {
     return null;
   });
 
+  // Tab Panel Admin yang sedang aktif. Menu-nya kini berada di sidebar utama,
+  // jadi tab aktif harus hidup di App (bukan di dalam halaman Admin).
+  const [adminTab, setAdminTab] = useState<AdminTabId>('overview');
+
   // App Core State
   // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'admin'>(() => {
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'admin'>(() => {
     const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
     if (saved) {
       try {
@@ -140,6 +157,7 @@ export default function App() {
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isGlobalStyleOpen, setIsGlobalStyleOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -330,6 +348,34 @@ export default function App() {
     setActiveDashboard(newDash);
   };
 
+  /**
+   * Buat dashboard baru dari TEMPLATE (angka contoh), lalu buka kanvasnya.
+   *
+   * Widget template disalin dengan id baru (lihat `widgetDariTemplate`) supaya
+   * tidak bertabrakan dengan dashboard lain. Setelah dibuat, dashboard ini
+   * berperilaku seperti dashboard biasa: widget bisa diubah/dihapus/ditambah.
+   */
+  const handleUseTemplate = async (template: DashboardTemplate) => {
+    if (!currentTenant) return;
+    const seed = Date.now();
+    const res = await fetch('/api/dashboards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId: currentTenant.id,
+        title: template.judulDashboard,
+        description: template.deskripsiDashboard,
+        sector: template.sektor,
+        widgets: widgetDariTemplate(template, seed),
+      }),
+    });
+    if (!res.ok) return;
+    const newDash: Dashboard = await res.json();
+    setDashboards((prev) => [newDash, ...prev]);
+    setActiveDashboard(newDash);
+    setViewMode('workspace');
+  };
+
   const handleDeleteDashboard = async (dashboardId: string) => {
     if (!currentTenant) return;
     try {
@@ -397,6 +443,38 @@ export default function App() {
         widgets: updatedWidgets,
         tenantId: currentTenant.id,
       }),
+    });
+  };
+
+  /**
+   * Terapkan gaya satu widget ke SELURUH widget di dashboard aktif.
+   *
+   * Dipakai tombol "Terapkan ke Semua Widget" di editor: supaya pengguna tidak
+   * perlu mengatur warna/font satu per satu. Disimpan sekali lewat PATCH yang
+   * sama dengan penyimpanan widget biasa.
+   */
+  const handleApplyStyleToAll = async (style: WidgetStyle | undefined) => {
+    if (!activeDashboard || !currentTenant) return;
+    // Warna KARTU berlaku untuk semua kartu (termasuk tabel & narasi, karena
+    // warna latar dipasang di pembungkus kartunya). Field khusus CHART
+    // (palet/font/ketebalan) hanya bermakna untuk tipe yang menggambar chart —
+    // jangan disimpan di tabel/narasi supaya tidak jadi data mati.
+    const updatedWidgets = activeDashboard.widgets.map((w) => {
+      if (tipePunyaGaya(w.type)) return { ...w, style };
+      // Tabel/narasi: simpan HANYA warna kartunya.
+      return { ...w, style: style?.kartu ? { kartu: style.kartu } : undefined };
+    });
+    const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
+
+    setActiveDashboard(updatedDashboard);
+    setDashboards((prev) =>
+      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
+    );
+
+    await fetch(`/api/dashboards/${activeDashboard.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgets: updatedWidgets, tenantId: currentTenant.id }),
     });
   };
 
@@ -586,7 +664,9 @@ export default function App() {
   return (
     <div className="fixed inset-0 text-ink flex flex-row font-sans antialiased overflow-hidden">
       {/* ================= LEFT SIDEBAR ================= */}
-      {!isPresentationMode && viewMode !== 'admin' && (
+      {/* Sidebar utama juga tampil di mode admin: menu Panel Admin kini ada di sini,
+          bukan lagi sebagai sidebar kedua di dalam halaman Admin. */}
+      {!isPresentationMode && (
         <>
           {isMobileNavOpen && (
             <div
@@ -626,12 +706,26 @@ export default function App() {
                 setViewMode('audit');
                 setIsMobileNavOpen(false);
               }}
+              onOpenChartGallery={() => {
+                setViewMode('charts');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenDashboardTemplates={() => {
+                setViewMode('templates');
+                setIsMobileNavOpen(false);
+              }}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
               }}
               unreadAlertsCount={unreadCount}
               currentView={viewMode}
+              adminTab={adminTab}
+              onSelectAdminTab={(tab) => {
+                setAdminTab(tab);
+                setViewMode('admin');
+                setIsMobileNavOpen(false);
+              }}
               onOpenAdmin={() => {
                 setViewMode('admin');
                 setIsMobileNavOpen(false);
@@ -681,45 +775,32 @@ export default function App() {
                     {viewMode === 'dashboards' ? 'Galeri'
                       : viewMode === 'audit' ? 'Audit'
                       : viewMode === 'alerts' ? 'Alert'
+                      : viewMode === 'charts' ? 'Chart'
+                      : viewMode === 'templates' ? 'Template Dashboard'
                       : 'Workspace'}
                   </span>
                 </div>
-                <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-ink leading-tight mt-0.5">
-                  {viewMode === 'dashboards'
-                    ? 'Galeri Dashboard'
-                    : viewMode === 'audit'
-                      ? 'Jejak Audit & Kepatuhan'
-                      : viewMode === 'alerts'
-                        ? 'Ambang Batas & Alert'
-                        : activeDashboard?.title || 'Belum ada dashboard'}
-                </h1>
+                {/* Judul halaman (baris bawah navbar). Di mode workspace baris ini TIDAK
+                    ditampilkan karena hanya mengulang kata "Workspace" padahal judul
+                    dashboard sudah ada di kartu header di bawahnya (permintaan user). */}
+                {viewMode !== 'workspace' && (
+                  <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-ink leading-tight mt-0.5">
+                    {viewMode === 'dashboards'
+                      ? 'Galeri Dashboard'
+                      : viewMode === 'audit'
+                        ? 'Jejak Audit & Kepatuhan'
+                        : viewMode === 'alerts'
+                          ? 'Ambang Batas & Alert'
+                          : viewMode === 'templates'
+                            ? 'Template Dashboard'
+                            : 'Template Chart'}
+                  </h1>
+                )}
               </div>
-
-              {/* Widget count badge — hanya di workspace */}
-              {viewMode === 'workspace' && activeDashboard && (
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-chip bg-surface-2 border border-line text-[10px] font-mono text-ink-3 shrink-0">
-                  <LayoutGrid className="w-2.5 h-2.5" />
-                  {activeDashboard.widgets?.length || 0} widget
-                </span>
-              )}
             </div>
 
             {/* ── Kanan: aksi utama ── */}
             <div className="flex items-center gap-1.5 shrink-0">
-
-              {/* Tombol Chat RAG */}
-              <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-control transition-colors border ${
-                  isChatOpen
-                    ? 'bg-brand text-on-brand border-brand'
-                    : 'bg-surface hover:bg-surface-2 text-ink-2 border-line'
-                }`}
-                title="Buka / Tutup Chat RAG Copilot"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">RAG Copilot</span>
-              </button>
 
               <ThemeToggle />
 
@@ -737,17 +818,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* Katalog preset (hanya di workspace) */}
-              {viewMode === 'workspace' && activeDashboard && (
-                <button
-                  onClick={() => setIsCatalogOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                  title="Tambah widget dari katalog preset"
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Katalog</span>
-                </button>
-              )}
+
 
               {/* More menu (hanya di workspace) */}
               {viewMode === 'workspace' && (
@@ -766,17 +837,6 @@ export default function App() {
                       <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface border border-line rounded-card shadow-pop z-50 p-1 text-xs overflow-hidden">
 
                         <div className="px-2.5 py-1.5 text-[10px] font-semibold text-ink-3 uppercase tracking-wider">
-                          Tampilan
-                        </div>
-                        <button
-                          onClick={() => { setIsMoreMenuOpen(false); setIsPresentationMode(true); }}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5 shrink-0 text-ink-3" />
-                          <span>Mode Presentasi</span>
-                        </button>
-
-                        <div className="px-2.5 py-1.5 text-[10px] font-semibold text-ink-3 uppercase tracking-wider mt-0.5">
                           Ekspor & Bagikan
                         </div>
                         <button
@@ -844,6 +904,15 @@ export default function App() {
               <Admin
                 currentUser={currentUser}
                 onLogout={handleLogout}
+                activeTab={adminTab}
+                onSelectTab={setAdminTab}
+                onToggleSidebar={() => {
+                  if (window.matchMedia('(max-width: 767px)').matches) {
+                    setIsMobileNavOpen(true);
+                  } else {
+                    setIsSidebarCollapsed(!isSidebarCollapsed);
+                  }
+                }}
               />
             </React.Suspense>
           ) : (
@@ -894,6 +963,19 @@ export default function App() {
                     onBackToWorkspace={() => setViewMode('workspace')}
                   />
                 </React.Suspense>
+              ) : viewMode === 'charts' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <ChartGalleryPage
+                    onBukaKatalog={() => setIsCatalogOpen(true)}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'templates' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <DashboardTemplatesPage
+                    currentTenant={currentTenant}
+                    onUseTemplate={handleUseTemplate}
+                  />
+                </React.Suspense>
               ) : (
                 <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
                   {/* Executive Presentation Top Header with Title when Active */}
@@ -937,6 +1019,15 @@ export default function App() {
                       {/* Baris atas: info dashboard */}
                       <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="min-w-0">
+                          {/* Judul dashboard — dipindah dari navbar; navbar cukup "Workspace" */}
+                          {activeDashboard.title && (
+                            <h1
+                              className="text-lg sm:text-xl font-extrabold text-ink tracking-tight truncate mb-1"
+                              title={activeDashboard.title}
+                            >
+                              {activeDashboard.title}
+                            </h1>
+                          )}
                           {/* Label sektor */}
                           {currentTenant?.sector && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3 mb-1.5">
@@ -945,11 +1036,6 @@ export default function App() {
                               {currentTenant.city && <> · {currentTenant.city}</>}
                             </span>
                           )}
-                          {/* Deskripsi / sub judul */}
-                          <h2 className="text-sm sm:text-[15px] font-bold text-ink leading-snug truncate max-w-2xl">
-                            {activeDashboard.description ||
-                              `${currentTenant?.name ? currentTenant.name + ' | ' : ''}Dashboard Kinerja`}
-                          </h2>
                           {/* Metadata baris bawah */}
                           <div className="flex flex-wrap items-center gap-2 mt-2">
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
@@ -965,32 +1051,30 @@ export default function App() {
                                 year: 'numeric',
                               })}
                             </span>
-                            <span className="text-line-strong text-xs">·</span>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-pos bg-pos/15 border border-pos/30/70 px-2 py-0.5 rounded-chip">
-                              <Radio className="w-2.5 h-2.5" />
-                              RAG Aktif
-                            </span>
+
                           </div>
                         </div>
-
-                        {/* Tombol Mode Presentasi */}
-                        <button
-                          onClick={() => setIsPresentationMode(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors shrink-0 self-start sm:self-center"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5 text-ink-3" />
-                          <span>Presentasi</span>
-                        </button>
                       </div>
 
                       {/* Divider + Toolbar bawah */}
                       <div className="border-t border-line px-4 sm:px-5 py-2.5 flex items-center justify-between gap-2 bg-surface-2 rounded-b-card">
-                        {/* Kiri: status filter aktif (placeholder) */}
-                        <div className="flex items-center gap-1.5">
-                          <FileCheck className="w-3.5 h-3.5 text-ink-3" />
-                          <span className="text-[11px] text-ink-3 font-medium">
+                        {/* Kiri: instansi + judul dashboard aktif */}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <FileCheck className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                          <span className="text-[11px] text-ink-3 font-medium truncate">
                             {currentTenant?.name || 'Dashboard aktif'}
                           </span>
+                          {activeDashboard.title && (
+                            <>
+                              <span className="text-line-strong text-xs shrink-0">·</span>
+                              <span
+                                className="text-[11px] text-ink-2 font-semibold truncate"
+                                title={activeDashboard.title}
+                              >
+                                {activeDashboard.title}
+                              </span>
+                            </>
+                          )}
                         </div>
 
                         {/* Kanan: tombol aksi */}
@@ -1003,15 +1087,21 @@ export default function App() {
                             Tambah Widget
                           </button>
                           <button
-                            onClick={() => setIsExportOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                            onClick={() => setIsGlobalStyleOpen(true)}
+                            disabled={!activeDashboard?.widgets?.length}
+                            title={
+                              activeDashboard?.widgets?.length
+                                ? 'Atur warna & font untuk seluruh widget dashboard'
+                                : 'Belum ada widget di dashboard ini'
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                            <Download className="w-3 h-3 text-ink-3" />
-                            Ekspor
+                            <Palette className="w-3 h-3 text-ink-3" />
+                            Gaya Semua
                           </button>
                           <button
                             onClick={() => setIsShareOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-brand hover:bg-brand-ink rounded-control transition-colors"
                           >
                             <Share2 className="w-3 h-3" />
                             Bagikan
@@ -1070,6 +1160,7 @@ export default function App() {
         sector={currentTenant?.sector || 'pdam'}
         tenantId={currentTenant?.id || 'tenant-pdam'}
         dashboardId={activeDashboard?.id}
+        onAddWidget={handleAddWidgetFromCatalog}
         onDashboardUpdated={(newDash) => {
           setActiveDashboard(newDash);
           setDashboards((prev) => [
@@ -1079,11 +1170,24 @@ export default function App() {
         }}
       />
 
-      {/* 2. 40 Widget Catalog Preset Sidebar */}
-      <CatalogSidebar
+      {/* Floating Action Button RAG Copilot di Ujung Kanan Bawah (hanya tampil saat panel chat tertutup) */}
+      {!isPresentationMode && !isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-white bg-brand hover:bg-brand-ink shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
+          title="Buka RAG Copilot"
+        >
+          <Sparkles className="w-4 h-4 animate-pulse" />
+          <span>RAG Copilot</span>
+        </button>
+      )}
+
+      {/* 2. Katalog Preset Widget (modal layar penuh) */}
+      <CatalogModal
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
         sector={currentTenant?.sector || 'pdam'}
+        tenantId={currentTenant?.id}
         onAddWidget={handleAddWidgetFromCatalog}
       />
 
@@ -1094,6 +1198,15 @@ export default function App() {
         widget={editingWidget}
         onSave={handleSaveWidget}
         initialTab={editorTab}
+      />
+
+      {/* 4. Gaya Semua Widget — tombolnya ada di toolbar kanvas, sebelah "Tambah Widget" */}
+      <GlobalStyleModal
+        isOpen={isGlobalStyleOpen}
+        onClose={() => setIsGlobalStyleOpen(false)}
+        jumlahWidget={activeDashboard?.widgets?.length || 0}
+        styleAwal={activeDashboard?.widgets?.find((w) => w.style)?.style}
+        onApply={handleApplyStyleToAll}
       />
 
       {/* 5. Alerts & Notification Center Modal */}

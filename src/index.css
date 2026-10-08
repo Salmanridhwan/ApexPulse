@@ -355,12 +355,61 @@
   }
 }
 
+/* Panel orchestrator yang sedang berjalan: kilau menyapu baris langkah aktif dan alur
+   bergerak di bar progres. Tanpa ini panel tampak "diam" saat satu langkah memakan waktu
+   lama (mis. menunggu jawaban RAG) karena judul langkahnya tidak berubah. */
+@keyframes step-sheen {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes bar-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 24px 0;
+  }
+}
+
 @layer utilities {
   .kpi-enter {
     animation: kpi-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   .dot-typing {
     animation: dot-typing 1.05s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  /* Kilau pada baris langkah yang sedang berjalan. */
+  .step-live {
+    position: relative;
+    overflow: hidden;
+  }
+  .step-live::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-brand) 22%, transparent),
+      transparent
+    );
+    transform: translateX(-120%);
+    animation: step-sheen 1.7s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+  }
+  /* Bar progres bergaris yang alurnya bergerak terus. */
+  .bar-live {
+    background-image: repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-on-brand) 38%, transparent) 0 8px,
+      transparent 8px 16px
+    );
+    animation: bar-flow 0.9s linear infinite;
   }
   .kpi-spark-line {
     stroke-dasharray: 1;
@@ -437,3 +486,243 @@
   .hero-knot-spin { animation: none; }
 }
 .card-rise { animation: card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ============================================================
+   Latar & animasi halaman login (Aiones Boards)
+   Tema: dokumen RAG yang mengalir menjadi dashboard.
+   Semua CSS murni (tanpa dependensi, tanpa JS berjalan terus).
+   Tunduk pada prefers-reduced-motion lewat aturan global di atas.
+   ============================================================ */
+
+/* ---- Kanvas latar ---- */
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Cahaya aurora: bidang warna brand yang bergerak sangat perlahan. */
+.auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform;
+}
+.auth-blob-a {
+  width: 52vmax; height: 52vmax;
+  top: -22vmax; left: -14vmax;
+  background: var(--color-brand);
+  opacity: 0.40;
+  animation: auth-drift-a 30s ease-in-out infinite;
+}
+.auth-blob-b {
+  width: 44vmax; height: 44vmax;
+  bottom: -20vmax; right: -12vmax;
+  background: var(--color-violet);
+  opacity: 0.30;
+  animation: auth-drift-b 36s ease-in-out infinite;
+}
+.auth-blob-c {
+  width: 34vmax; height: 34vmax;
+  top: 34%; left: 46%;
+  background: var(--color-coral);
+  opacity: 0.16;
+  animation: auth-drift-c 42s ease-in-out infinite;
+}
+@keyframes auth-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); }
+}
+@keyframes auth-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(-5vmax, -5vmax, 0) scale(0.92); }
+}
+@keyframes auth-drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.95); }
+  50%      { transform: translate3d(-7vmax, 3vmax, 0) scale(1.15); }
+}
+
+/* Kisi halus: memberi kesan kanvas dashboard, menggeser sangat pelan. */
+.auth-grid {
+  position: absolute;
+  inset: -44px;
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 42%, #000 18%, transparent 76%);
+  mask-image: radial-gradient(ellipse 82% 72% at 50% 42%, #000 18%, transparent 76%);
+  animation: auth-grid-pan 60s linear infinite;
+}
+@keyframes auth-grid-pan {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 44px 44px, 44px 44px; }
+}
+
+/* ---- Kartu widget kecil yang mengapung ---- */
+.auth-float {
+  position: absolute;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--elev-card);
+  padding: 8px 10px;
+  animation: auth-float-y var(--dur, 14s) ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes auth-float-y {
+  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+  50%      { transform: translateY(-16px) rotate(var(--rot, 0deg)); }
+}
+
+/* Batang chart tumbuh-mengempis bergantian. */
+.auth-bar {
+  transform-origin: bottom;
+  animation: auth-bar-grow var(--bdur, 3.6s) ease-in-out infinite;
+}
+@keyframes auth-bar-grow {
+  0%, 100% { transform: scaleY(0.55); }
+  50%      { transform: scaleY(1); }
+}
+
+/* Garis tren menggambar dirinya lalu pudar, berulang. */
+.auth-line-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: auth-draw 4.6s ease-in-out infinite;
+}
+@keyframes auth-draw {
+  0%   { stroke-dashoffset: 100; opacity: 0; }
+  12%  { opacity: 1; }
+  68%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+/* Cincin donut berputar. */
+.auth-donut { animation: auth-donut 5.5s ease-in-out infinite; }
+@keyframes auth-donut {
+  0%, 100% { stroke-dasharray: 66 94; }
+  50%      { stroke-dasharray: 96 64; }
+}
+
+/* Garis pindai pada ikon dokumen. */
+.auth-scanline { animation: auth-scan 3.2s ease-in-out infinite; }
+@keyframes auth-scan {
+  0%        { transform: translateY(0); opacity: 0; }
+  10%, 80%  { opacity: 0.9; }
+  50%       { transform: translateY(30px); opacity: 0.9; }
+  100%      { transform: translateY(30px); opacity: 0; }
+}
+
+/* ---- Animasi masuk (entrance) ---- */
+.auth-rise { animation: auth-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.auth-rise-l { animation: auth-rise-l 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes auth-rise-l {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.auth-rise-r { animation: auth-rise-r 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes auth-rise-r {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---- Kilau pada tombol utama ---- */
+.auth-btn-shine { position: relative; overflow: hidden; }
+.auth-btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.30), transparent);
+  animation: auth-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes auth-shine {
+  0%, 58% { left: -60%; }
+  100%    { left: 135%; }
+}
+
+/* ---- Denyut cincin pada logo ---- */
+.auth-logo-pulse { position: relative; }
+.auth-logo-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1.5px solid var(--color-brand);
+  animation: auth-ring 2.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes auth-ring {
+  0%   { transform: scale(0.92); opacity: 0.75; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ---- Knot hero: lingkaran orbit + denyut cahaya ---- */
+.hero-orbit { animation: hero-orbit 9s linear infinite; transform-origin: 100px 100px; }
+@keyframes hero-orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.hero-glow { animation: hero-glow 5.5s ease-in-out infinite; transform-origin: 100px 100px; }
+@keyframes hero-glow {
+  0%, 100% { opacity: 0.30; transform: scale(0.94); }
+  50%      { opacity: 0.55; transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-orbit, .hero-glow { animation: none; }
+}
+
+/* ------------------------------------------------------------
+   PENGECUALIAN SADAR: halaman login TETAP beranimasi walau
+   pengaturan OS "reduce motion" aktif.
+
+   Alasan: halaman login adalah etalase pertama produk, dan versi
+   statis dinilai tidak menggambarkan produk (permintaan pemilik
+   produk). Aturan global di atas mematikan semua animasi; blok ini
+   mengembalikannya HANYA untuk dekorasi halaman login.
+
+   Kalau ingin halaman login ikut menghormati pengaturan OS lagi,
+   cukup hapus seluruh blok @media ini — tidak ada perubahan lain
+   yang diperlukan.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .auth-blob-a { animation: auth-drift-a 30s ease-in-out infinite !important; }
+  .auth-blob-b { animation: auth-drift-b 36s ease-in-out infinite !important; }
+  .auth-blob-c { animation: auth-drift-c 42s ease-in-out infinite !important; }
+  .auth-grid   { animation: auth-grid-pan 60s linear infinite !important; }
+
+  .auth-float  { animation: auth-float-y var(--dur, 14s) ease-in-out infinite !important; }
+  .auth-bar    { animation: auth-bar-grow var(--bdur, 3.6s) ease-in-out infinite !important; }
+  .auth-line-draw { animation: auth-draw 4.6s ease-in-out infinite !important; }
+  .auth-donut  { animation: auth-donut 5.5s ease-in-out infinite !important; }
+  .auth-scanline { animation: auth-scan 3.2s ease-in-out infinite !important; }
+
+  .auth-btn-shine::after { animation: auth-shine 3.6s ease-in-out infinite !important; }
+  .auth-logo-pulse::before { animation: auth-ring 2.8s ease-out infinite !important; }
+
+  .hero-knot-spin { animation: knot-spin 18s linear infinite !important; }
+  .hero-orbit { animation: hero-orbit 9s linear infinite !important; }
+  .hero-glow  { animation: hero-glow 5.5s ease-in-out infinite !important; }
+
+  /* Animasi masuk: tetap tampil sekali agar halaman tidak "melompat". */
+  .auth-rise   { animation: auth-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both !important; }
+  .auth-rise-l { animation: auth-rise-l 0.8s cubic-bezier(0.22, 1, 0.36, 1) both !important; }
+  .auth-rise-r { animation: auth-rise-r 0.8s cubic-bezier(0.22, 1, 0.36, 1) both !important; }
+
+  /* Transisi halus pada kontrol form login. */
+  .auth-transisi {
+    transition-duration: 0.2s !important;
+  }
+}

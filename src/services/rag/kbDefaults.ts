@@ -11,15 +11,14 @@ import { BumdSector } from '../../types';
  * laporan Bank BJB" — permintaan PDAM dijawab dokumen Bank BJB dari KB campur.
  */
 export const KB_DEFAULT_PER_SEKTOR: Partial<Record<BumdSector, string>> = {
-  // CATATAN PENTING (per 2026-10-07): `kb_pam_jaya` isinya BARU sebatas stub
-  // (5 dokumen @13-129 token, teksnya "isi dokumen tidak tersedia") sehingga
-  // /extract selalu kosong. Isi nyata PAM JAYA (angka RKAP: pendapatan, NRW,
-  // rehabilitasi jaringan) ada di `kb_prj_pamjaya_demo`. Kalau PDF asli sudah
-  // diunggah ulang ke `kb_pam_jaya` lewat UI RAG, kembalikan ke KB itu.
-  pdam: 'kb_prj_pamjaya_demo',
-  bank: 'kb_bank_jatim',
-  pasar: 'kb_pasar_surya',
-  aneka_usaha: 'kb_sarana_jaya',
+  // CATATAN (per 2026-10-08): layanan RAG sudah diisi ULANG dengan dokumen asli.
+  // `kb_pam_jaya`, `kb_tirta_moedal`, dan `kb_tirta_pakuan` masing-masing memuat
+  // 3 PDF nyata (profil, RKAP 2026, SOP; ±24 ribu token). `kb_prj_pamjaya_demo`
+  // yang lama hanya 899 token dan WAJIB dianggap data dummy — jangan dipakai lagi.
+  // Satu instansi = satu KB; instansi air yang belum punya KB sendiri tidak boleh
+  // diam-diam memakai dokumen instansi air lain, jadi hanya PAM JAYA yang jadi
+  // default sektor (instansi lain selalu diatur lewat `knowledgeBaseId` sendiri).
+  pdam: 'kb_pam_jaya',
 };
 
 /**
@@ -32,10 +31,11 @@ export const KB_DEFAULT_PER_SEKTOR: Partial<Record<BumdSector, string>> = {
  * pesan jelas daripada menyajikan dokumen instansi lain.
  */
 export const KB_SEED_TENANT: Record<string, string> = {
-  'tenant-pdam': 'kb_prj_pamjaya_demo',
-  'tenant-bank': 'kb_bank_jatim',
-  'tenant-pasar': 'kb_pasar_surya',
-  'tenant-aneka': 'kb_sarana_jaya',
+  'tenant-pdam': 'kb_pam_jaya',
+  // Dua instansi air tambahan (dibuat 2026-10-08) supaya tiga BUMD air nyata
+  // punya KB sendiri-sendiri: satu instansi = satu dokumen instansi.
+  'tenant-1791429954407': 'kb_tirta_moedal',
+  'tenant-1791429954419': 'kb_tirta_pakuan',
 };
 
 /**

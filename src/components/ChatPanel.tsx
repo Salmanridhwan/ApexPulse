@@ -19,7 +19,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { BumdSector, ChatMessage, ChatRecommendation, Dashboard, ProgressStep } from '../types';
+import { BumdSector, ChatMessage, ChatRecommendation, Dashboard, ProgressStep, WidgetSpec, WidgetType } from '../types';
+import { WIDGET_CATALOG } from '../services/builder/catalog';
+import { ambilWidgetPreset } from '../services/builder/dariPreset';
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -29,6 +31,8 @@ interface ChatPanelProps {
   /** Dashboard pemilik percakapan ini — sumber riwayatnya. */
   dashboardId?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
+  /** Sematkan widget hasil pilihan pengguna LANGSUNG ke kanvas (tanpa memanggil LLM lagi). */
+  onAddWidget?: (widget: WidgetSpec) => void | Promise<void>;
 }
 
 // Chart type icon helper
@@ -50,55 +54,97 @@ const categoryColor: Record<string, string> = {
 const getCategoryClass = (cat: string) =>
   categoryColor[cat] || 'bg-surface-2 text-ink-2 border-line';
 
-// Recommendation cards component
+/** Status penyematan per kartu rekomendasi. */
+interface StatusSemat {
+  memuat?: boolean;
+  pesan?: string;
+  galat?: boolean;
+}
+
+// Recommendation cards component — KLIK = SEMATKAN LANGSUNG ke kanvas (tanpa memanggil LLM lagi).
 const RecommendationCards: React.FC<{
   items: ChatRecommendation[];
-  onSelect: (prompt: string) => void;
+  onPick: (rec: ChatRecommendation, tipe: string) => void;
+  status: Record<string, StatusSemat>;
   isStreaming: boolean;
-}> = ({ items, onSelect, isStreaming }) => (
+  bolehSemat: boolean;
+}> = ({ items, onPick, status, isStreaming, bolehSemat }) => (
   <div className="mt-3 grid gap-2">
-    {items.map((rec, i) => (
-      <button
-        key={rec.id}
-        disabled={isStreaming}
-        onClick={() => onSelect(rec.prompt)}
-        className="group text-left w-full relative bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 pl-4 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-        style={{ animationDelay: `${i * 60}ms` }}
-      >
-        <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
-        <div className="flex items-start gap-2.5">
-          {/* index badge */}
-          <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5 group-hover:bg-brand group-hover:text-on-brand transition-colors">
-            {i + 1}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span className="text-xs font-semibold text-ink leading-tight">{rec.name}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getCategoryClass(rec.category)}`}>
-                {rec.category}
-              </span>
-            </div>
-            <p className="text-[11px] text-ink-2 leading-snug line-clamp-2 mb-2">{rec.description}</p>
-            {/* chart type pills */}
-            <div className="flex items-center gap-1 flex-wrap">
-              {rec.chartTypes.slice(0, 3).map((ct) => (
-                <span
-                  key={ct}
-                  className="inline-flex items-center gap-0.5 text-[10px] bg-surface-2 text-ink-2 px-1.5 py-0.5 rounded font-mono"
-                >
-                  <ChartIcon type={ct} className="w-2.5 h-2.5" />
-                  {ct}
+    {items.map((rec, i) => {
+      const st = status[rec.id] || {};
+      const sibuk = !!st.memuat;
+      const tipeUtama = rec.chartTypes[0] || 'kpi';
+      const nonaktif = !bolehSemat || sibuk || isStreaming;
+      return (
+        <div
+          key={rec.id}
+          className="group relative bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 pl-4 transition-all duration-200 overflow-hidden"
+          style={{ animationDelay: `${i * 60}ms` }}
+          data-testid={`kartu-saran-${rec.id}`}
+        >
+          <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
+          <div className="flex items-start gap-2.5">
+            {/* index badge */}
+            <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5">
+              {i + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                <span className="text-xs font-semibold text-ink leading-tight">{rec.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getCategoryClass(rec.category)}`}>
+                  {rec.category}
                 </span>
-              ))}
+              </div>
+              <p className="text-[11px] text-ink-2 leading-snug line-clamp-2 mb-2">{rec.description}</p>
+              {/* chip tipe = tombol; klik = sematkan dengan tipe itu */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {rec.chartTypes.slice(0, 3).map((ct) => (
+                  <button
+                    key={ct}
+                    type="button"
+                    disabled={nonaktif}
+                    onClick={() => onPick(rec, ct)}
+                    title={`Sematkan sebagai ${ct}`}
+                    data-testid={`semat-${rec.id}-${ct}`}
+                    className="inline-flex items-center gap-0.5 text-[10px] bg-surface-2 text-ink-2 hover:bg-brand/15 hover:text-brand-ink px-1.5 py-0.5 rounded font-mono border border-transparent hover:border-brand/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChartIcon type={ct} className="w-2.5 h-2.5" />
+                    {ct}
+                  </button>
+                ))}
+              </div>
             </div>
+            {/* tombol sematkan: tipe pertama */}
+            <button
+              type="button"
+              disabled={nonaktif}
+              onClick={() => onPick(rec, tipeUtama)}
+              title={bolehSemat ? `Sematkan sebagai ${tipeUtama}` : 'Buka dashboard dulu untuk menyematkan'}
+              data-testid={`semat-${rec.id}`}
+              className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-control border border-brand/40 text-brand-ink bg-brand/10 hover:bg-brand hover:text-on-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sibuk ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : st.pesan && !st.galat ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              {sibuk ? 'Menyematkan' : st.pesan && !st.galat ? 'Tersemat' : 'Sematkan'}
+            </button>
           </div>
-          {/* CTA arrow */}
-          <div className="shrink-0 mt-1 text-ink-3 group-hover:text-brand transition-colors">
-            <Plus className="w-4 h-4" />
-          </div>
+          {st.pesan && (
+            <p
+              className={`mt-2 text-[10.5px] leading-snug flex items-start gap-1 ${st.galat ? 'text-neg' : 'text-pos'}`}
+              data-testid={`status-${rec.id}`}
+            >
+              {st.galat ? <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />}
+              <span>{st.pesan}</span>
+            </p>
+          )}
         </div>
-      </button>
-    ))}
+      );
+    })}
   </div>
 );
 
@@ -109,13 +155,76 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   tenantId,
   dashboardId,
   onDashboardUpdated,
+  onAddWidget,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [inputPrompt, setInputPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<ProgressStep[]>([]);
+  /**
+   * Detak waktu berjalan + urutan langkah. Langkah hanya berubah saat backend mengirim
+   * progres baru, jadi tanpa penanda yang bergerak tiap detik panel terlihat "diam"
+   * meski sedang menunggu RAG puluhan detik.
+   */
+  const [detik, setDetik] = useState(0);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setDetik(0);
+      return;
+    }
+    const id = setInterval(() => setDetik((d) => d + 1), 1000);
+    return () => clearInterval(id);
+  }, [isStreaming]);
+
+  /**
+   * Hanya langkah TERAKHIR yang berstatus `in_progress` yang dianggap sedang berjalan.
+   * Backend mengirim langkah baru tanpa menutup langkah sebelumnya, jadi tanpa penanda
+   * ini dua baris (atau lebih) tampil "AKTIF" sekaligus.
+   */
+  const idxLangkahAktif = currentSteps.reduce((acc, s, i) => (s.status === 'in_progress' ? i : acc), -1);
+  const [sematkan, setSematkan] = useState<Record<string, StatusSemat>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Sematkan rekomendasi ke kanvas LANGSUNG — tanpa memanggil LLM lagi.
+   * Angka tetap dari dokumen resmi lewat jalur yang sama dengan katalog
+   * (`ambilWidgetPreset`); kalau dokumen tidak memuat indikatornya, muncul
+   * alasan jujur dan kanvas tidak ditambah apa pun.
+   */
+  const handleSematkan = async (rec: ChatRecommendation, tipe: string) => {
+    if (!onAddWidget) return;
+    const preset = WIDGET_CATALOG.find((p) => p.id === rec.id);
+    if (!preset) {
+      setSematkan((prev) => ({
+        ...prev,
+        [rec.id]: { galat: true, pesan: `Preset ${rec.id} tidak ditemukan di katalog.` },
+      }));
+      return;
+    }
+    setSematkan((prev) => ({ ...prev, [rec.id]: { memuat: true } }));
+    const { widget, error } = await ambilWidgetPreset(preset, tipe as WidgetType, sector, tenantId);
+    if (!widget) {
+      setSematkan((prev) => ({
+        ...prev,
+        [rec.id]: { galat: true, pesan: error || 'Gagal mengambil data dari dokumen.' },
+      }));
+      return;
+    }
+    try {
+      await onAddWidget(widget);
+      setSematkan((prev) => ({
+        ...prev,
+        [rec.id]: { pesan: `Tersemat ke kanvas (${widget.type}) — ${widget.title}` },
+      }));
+    } catch {
+      setSematkan((prev) => ({
+        ...prev,
+        [rec.id]: { galat: true, pesan: 'Gagal menyimpan ke dashboard.' },
+      }));
+    }
+  };
 
   /** Timestamp pesan dari server berbentuk ISO; tampilkan sebagai jam lokal. */
   const jam = (ts: string) => {
@@ -183,7 +292,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setCurrentSteps([
-      { id: 'step-0', title: 'Menghubungkan ke ApexPulse Orchestrator...', status: 'in_progress' },
+      { id: 'step-0', title: 'Menghubungkan ke Aiones Boards Orchestrator...', status: 'in_progress' },
     ]);
 
     const streamStart = Date.now();
@@ -366,7 +475,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                   <>
                     <Bot className="w-3 h-3 text-brand" />
-                    <span>ApexPulse Orchestrator</span>
+                    <span>Aiones Boards Orchestrator</span>
                   </>
                 )}
                 <span>•</span>
@@ -447,8 +556,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               {msg.recommendations && msg.recommendations.length > 0 && (
                 <RecommendationCards
                   items={msg.recommendations}
-                  onSelect={handleSendMessage}
+                  onPick={handleSematkan}
+                  status={sematkan}
                   isStreaming={isStreaming}
+                  bolehSemat={!!onAddWidget && !!dashboardId}
                 />
               )}
 
@@ -500,10 +611,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
                   </div>
                   <div>
-                    <span className="font-bold text-ink text-[11px] block">ApexPulse Orchestrator</span>
+                    <span className="font-bold text-ink text-[11px] block">Aiones Boards Orchestrator</span>
                     <span role="status" aria-live="polite" className="text-[10px] text-brand font-medium flex items-center gap-1">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                       Sedang memproses & menganalisis...
+                      <span className="tabular-nums text-ink-3">· {detik} dtk</span>
                     </span>
                   </div>
                 </div>
@@ -518,15 +630,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
               {/* Realtime Stepper Progress List */}
               <div className="space-y-2 pt-0.5">
-                {currentSteps.map((step) => {
-                  const isDone = step.status === 'completed';
-                  const isCurrent = step.status === 'in_progress';
+                {currentSteps.map((step, i) => {
+                  const isCurrent = i === idxLangkahAktif;
+                  const isDone = step.status === 'completed' || i < idxLangkahAktif;
                   return (
                     <div
                       key={step.id}
                       className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-control text-xs transition-all duration-300 ${
                         isCurrent
-                          ? 'bg-surface-2 border border-line/80 text-ink font-semibold shadow-2xs'
+                          ? 'step-live bg-surface-2 border border-line/80 text-ink font-semibold shadow-2xs'
                           : isDone
                             ? 'text-ink-2 bg-surface-2/70 border border-transparent'
                             : 'text-ink-3 opacity-60'
@@ -541,8 +653,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       )}
                       <span className="flex-1 truncate">{step.title}</span>
                       {isCurrent && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand text-on-brand font-mono uppercase tracking-wider animate-pulse">
-                          Aktif
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand text-on-brand font-mono uppercase tracking-wider animate-pulse tabular-nums">
+                          Aktif · {detik} dtk
                         </span>
                       )}
                     </div>
@@ -550,10 +662,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 })}
               </div>
 
-              {/* Progress Line Bar */}
+              {/* Progress Line Bar — bergaris & alurnya bergerak supaya tetap terlihat hidup
+                  walau persentasenya belum berubah (menunggu RAG bisa puluhan detik). */}
               <div className="w-full bg-surface-2 h-1.5 rounded-full overflow-hidden mt-1">
                 <div
-                  className="bg-gradient-to-r from-brand to-brand h-full transition-all duration-500 rounded-full animate-pulse"
+                  className="bg-brand bar-live h-full transition-all duration-500 rounded-full"
                   style={{
                     width: `${
                       currentSteps.length > 0

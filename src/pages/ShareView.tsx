@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Lock, Pencil, Printer, Shield, ShieldCheck, X } from 'lucide-react';
+import { Activity, Lock, Pencil, Shield, ShieldCheck, X } from 'lucide-react';
 import { LogoTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GlobalFiltersBar } from '../components/GlobalFiltersBar';
 import { ActiveChartFilterChip, ChartSelectionProvider } from '../components/widgets/ChartSelection';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
+import { DashboardCanvas } from '../components/DashboardCanvas';
 import { WidgetEditorModal } from '../components/WidgetEditorModal';
 import { Dashboard, GlobalFilters, Tenant, WidgetSpec } from '../types';
 
@@ -22,20 +23,41 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State untuk mengontrol visibilitas judul di top navbar
+  const [showNavTitle, setShowNavTitle] = useState(false);
+  const headerTitleRef = React.useRef<HTMLHeadingElement | null>(null);
+
   // Filter interaktif sisi klien (K4). Menyaring widget yang tampil — tidak mengarang angka baru.
   const [filters, setFilters] = useState<GlobalFilters>(FILTER_DEFAULT);
 
-  // Mode edit ber-PIN pada tautan publik.
-  const [hasEditPin, setHasEditPin] = useState(false);
-  const [isEditUnlocked, setIsEditUnlocked] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [showPinDialog, setShowPinDialog] = useState(false);
+  // Mode akses tautan publik.
+  const [accessMode, setAccessMode] = useState<'readonly' | 'editable'>('readonly');
   const [editingWidget, setEditingWidget] = useState<WidgetSpec | null>(null);
+  const [editorTab, setEditorTab] = useState<'config' | 'correction'>('config');
   const [savingEdit, setSavingEdit] = useState(false);
 
-  /** PIN yang sudah diverifikasi disimpan di memori (tidak ke localStorage) untuk autentikasi PATCH. */
-  const [unlockedPin, setUnlockedPin] = useState('');
+  useEffect(() => {
+    // Judul di navbar atas muncul begitu judul besar (headerTitleRef) tergeser
+    // keluar layar bagian atas. Dipakai pendeteksi posisi langsung (bukan
+    // IntersectionObserver) supaya perilakunya pasti & mudah diperiksa: bandingkan
+    // dasar judul besar dengan tinggi bilah atas.
+    const perbarui = () => {
+      const el = headerTitleRef.current;
+      if (!el) {
+        setShowNavTitle(false);
+        return;
+      }
+      const AMBANG = 60; // tinggi bilah sticky atas (px) — sedikit lebih longgar dari 56
+      setShowNavTitle(el.getBoundingClientRect().bottom <= AMBANG);
+    };
+    perbarui();
+    window.addEventListener('scroll', perbarui, { passive: true });
+    window.addEventListener('resize', perbarui);
+    return () => {
+      window.removeEventListener('scroll', perbarui);
+      window.removeEventListener('resize', perbarui);
+    };
+  }, [dashboard]);
 
   useEffect(() => {
     async function loadSharedDashboard() {
@@ -49,9 +71,9 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           }
           throw new Error(`Gagal memuat dashboard (Status: ${res.status})`);
         }
-        const dashData: Dashboard & { hasEditPin?: boolean } = await res.json();
+        const dashData: Dashboard & { accessMode?: 'readonly' | 'editable' } = await res.json();
         setDashboard(dashData);
-        setHasEditPin(!!dashData.hasEditPin);
+        setAccessMode(dashData.accessMode === 'editable' ? 'editable' : 'readonly');
 
         if (dashData.tenantId) {
           const tenantRes = await fetch('/api/tenants');
@@ -95,59 +117,79 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
     window.print();
   };
 
-  /** Verifikasi PIN → buka mode edit. */
-  const handleVerifyPin = async () => {
-    setPinError(null);
-    try {
-      const res = await fetch(`/api/share/${token}/verify-pin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pinInput }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'PIN salah.');
-      }
-      setUnlockedPin(pinInput);
-      setIsEditUnlocked(true);
-      setShowPinDialog(false);
-      setPinInput('');
-    } catch (err: any) {
-      setPinError(err.message || 'PIN salah.');
-    }
-  };
-
-  const handleLockEdit = () => {
-    setIsEditUnlocked(false);
-    setUnlockedPin('');
-    setEditingWidget(null);
-  };
-
-  /** Simpan perubahan satu widget → PATCH ke dashboard asli (permanen). */
-  const handleSaveWidget = async (updatedWidget: WidgetSpec) => {
+  /**
+   * Simpan SELURUH daftar widget lewat tautan → PATCH ke dashboard asli (permanen).
+   * Dipakai semua aksi kanvas supaya paritas dengan workspace pembuat.
+   */
+  const simpanWidgets = async (widgetsBaru: WidgetSpec[], pesanGagal: string) => {
     if (!dashboard) return;
-    const updatedWidgets = dashboard.widgets.map((w) =>
-      w.id === updatedWidget.id ? updatedWidget : w
-    );
     setSavingEdit(true);
     try {
       const res = await fetch(`/api/share/${token}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: unlockedPin, widgets: updatedWidgets }),
+        body: JSON.stringify({ widgets: widgetsBaru }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Gagal menyimpan perubahan.');
+        throw new Error(data.error || pesanGagal);
       }
       const saved: Dashboard = await res.json();
       setDashboard(saved);
       setEditingWidget(null);
     } catch (err: any) {
-      alert(err.message || 'Gagal menyimpan perubahan.');
+      alert(err.message || pesanGagal);
     } finally {
       setSavingEdit(false);
     }
+  };
+
+  /** Simpan perubahan satu widget dari editor. */
+  const handleSaveWidget = (updatedWidget: WidgetSpec) => {
+    if (!dashboard) return;
+    const updatedWidgets = dashboard.widgets.map((w) =>
+      w.id === updatedWidget.id ? updatedWidget : w
+    );
+    return simpanWidgets(updatedWidgets, 'Gagal menyimpan perubahan.');
+  };
+
+  /** Pindahkan urutan widget (drag) — sama seperti kanvas pembuat. */
+  const handleReorderWidgets = (orderedIds: string[]) => {
+    if (!dashboard) return;
+    const peta = new Map(dashboard.widgets.map((w) => [w.id, w]));
+    const ordered = orderedIds.map((id) => peta.get(id)).filter((w): w is WidgetSpec => !!w);
+    if (ordered.length !== dashboard.widgets.length) return; // ada id tak dikenal — abaikan
+    return simpanWidgets(ordered, 'Gagal menyimpan urutan widget.');
+  };
+
+  /** Ubah lebar widget (bucket 4/6/8/12) — sama seperti kanvas pembuat. */
+  const handleResizeWidget = (widgetId: string, w: number) => {
+    if (!dashboard) return;
+    const updated = dashboard.widgets.map((wg) =>
+      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w } } : wg
+    );
+    return simpanWidgets(updated, 'Gagal menyimpan ukuran widget.');
+  };
+
+  /** Hapus widget — sama seperti kanvas pembuat (lewat menu kartu). */
+  const handleDeleteWidget = (widgetId: string) => {
+    if (!dashboard) return;
+    return simpanWidgets(
+      dashboard.widgets.filter((w) => w.id !== widgetId),
+      'Gagal menghapus widget.'
+    );
+  };
+
+  /** Gandakan widget — sama seperti kanvas pembuat. */
+  const handleDuplicateWidget = (widget: WidgetSpec) => {
+    if (!dashboard) return;
+    const salinan: WidgetSpec = {
+      ...widget,
+      id: `w-dup-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      title: `${widget.title} (Salinan)`,
+      grid: { ...widget.grid, x: 0, y: 0 },
+    };
+    return simpanWidgets([salinan, ...dashboard.widgets], 'Gagal menggandakan widget.');
   };
 
   const namaInstansi = tenant?.name || 'Instansi';
@@ -201,7 +243,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
               <span>Protokol Keamanan Data</span>
             </div>
             <p className="text-ink-2 leading-normal">
-              Setiap instansi diisolasi. Tautan read-only dapat dibatasi durasi berlakunya atau dicabut sewaktu-waktu.
+              Setiap instansi diisolasi. Tautan publik dapat dibuat dalam mode Read-Only (hanya melihat) atau Bisa Edit, dan dapat dicabut sewaktu-waktu.
             </p>
           </div>
         </div>
@@ -234,7 +276,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             )}
           </main>
           <div className="px-4 pb-4 text-center">
-            <span className="text-[10px] text-ink-3">Dibuat dengan ApexPulse</span>
+            <span className="text-[10px] text-ink-3">Dibuat dengan Aiones Boards</span>
           </div>
         </div>
       </ChartSelectionProvider>
@@ -247,70 +289,38 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
       <div className="min-h-screen bg-surface-2 flex flex-col">
         {/* Top Read-Only Banner */}
         <div className="bg-shell border-b border-shell-line text-shell-ink px-4 sm:px-6 py-2 flex items-center justify-between text-xs sticky top-0 z-30 shadow-md">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-pos animate-pulse" />
-            <span className="font-semibold text-shell-ink">Portal Tinjauan Eksekutif</span>
-            <span className="hidden sm:inline text-shell-ink-2">•</span>
-            <span className="hidden sm:inline text-shell-ink-2 text-[11px]">
-              {isEditUnlocked ? 'Mode Edit Aktif' : 'Mode Publik Read-Only'}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 rounded-full bg-pos animate-pulse shrink-0" />
+            <span className={`font-semibold text-sm sm:text-[15px] text-shell-ink truncate transition-opacity duration-200 ${showNavTitle ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              {dashboard.title}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {hasEditPin && (
-              isEditUnlocked ? (
-                <button
-                  onClick={handleLockEdit}
-                  className="px-3 py-1 rounded-control bg-warn/20 hover:bg-warn/30 text-shell-ink border border-shell-line transition-colors flex items-center gap-1.5 text-[11px]"
-                  title="Kunci kembali mode edit"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Kunci Edit</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => { setShowPinDialog(true); setPinError(null); }}
-                  className="px-3 py-1 rounded-control bg-brand text-on-brand hover:opacity-90 transition-opacity flex items-center gap-1.5 text-[11px] font-semibold"
-                  title="Masukkan PIN untuk mengedit"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Mode Edit</span>
-                </button>
-              )
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1 rounded-control bg-shell-hover hover:bg-shell-active text-shell-ink border border-shell-line transition-colors flex items-center gap-1.5 text-[11px]"
-              title="Cetak / Simpan PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Cetak / PDF</span>
-            </button>
           </div>
         </div>
+
+        {/* Penjelasan mode Read-Only saja. Untuk tautan mode edit, panduan tindakannya
+            TIDAK ditampilkan (permintaan user: bagian itu dihapus dari halaman tautan). */}
+        {accessMode !== 'editable' && (
+          <div className="px-4 sm:px-6 py-2 text-[11px] border-b flex items-center gap-2 bg-warn/10 border-warn/30 text-warn">
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              Tautan ini Read-Only, jadi widget tidak bisa diedit dari halaman ini. Mode akses ditentukan saat
+              tautan dibuat — untuk bisa mengedit, minta pembuat dashboard membuat tautan baru dengan mode
+              &ldquo;Bisa Edit&rdquo;.
+            </span>
+          </div>
+        )}
 
         {/* Official Header — white-label instansi klien (K3) */}
         <header className="bg-surface border-b border-line/90 shadow-2xs px-6 py-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-start gap-4">
-              <LogoTile name={tenant?.name} id={tenant?.id} size="lg" />
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[11px] text-ink-2 font-semibold uppercase tracking-wider">
-                  <span>{namaInstansi}</span>
-                  {tenant?.city && (
-                    <>
-                      <span>•</span>
-                      <span>{tenant.city}</span>
-                    </>
-                  )}
-                </div>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">
+              <div>
+                <h1 ref={headerTitleRef} className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">
                   {dashboard.title}
                 </h1>
-                <p className="text-xs text-ink-2 max-w-3xl leading-relaxed">
-                  {dashboard.description ||
-                    'Dashboard intelijensi dan monitoring kinerja berbasis dokumen resmi instansi.'}
-                </p>
               </div>
             </div>
 
@@ -341,15 +351,28 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
                 ? 'Dashboard ini belum memiliki widget yang dikonfigurasi.'
                 : 'Tidak ada widget yang cocok dengan filter ini.'}
             </div>
+          ) : accessMode === 'editable' ? (
+            /* Mode edit: kanvas yang SAMA dengan workspace pembuat — bisa dipindah,
+               diubah ukurannya, diedit, digandakan, dan dihapus. */
+            <DashboardCanvas
+              widgets={widgetsTampil}
+              onEditWidget={(w) => {
+                setEditorTab('config');
+                setEditingWidget(w);
+              }}
+              onManualCorrection={(w) => {
+                setEditorTab('correction');
+                setEditingWidget(w);
+              }}
+              onDeleteWidget={handleDeleteWidget}
+              onDuplicateWidget={handleDuplicateWidget}
+              onReorderWidgets={handleReorderWidgets}
+              onResizeWidget={handleResizeWidget}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {widgetsTampil.map((widget) => (
-                <ShareWidgetCard
-                  key={widget.id}
-                  widget={widget}
-                  canEdit={isEditUnlocked}
-                  onEdit={() => setEditingWidget(widget)}
-                />
+                <ShareWidgetCard key={widget.id} widget={widget} canEdit={false} />
               ))}
             </div>
           )}
@@ -360,56 +383,11 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <p className="font-semibold text-ink-2">{namaInstansi}</p>
           <p className="text-[11px] text-ink-3 mt-1">
             Setiap angka terikat sitasi dokumen resmi. Dibuat &amp; dikelola dengan{' '}
-            <span className="text-ink-3 font-medium">ApexPulse</span>.
+            <span className="text-ink-3 font-medium">Aiones Boards</span>.
           </p>
         </footer>
 
-        {/* Dialog PIN mode edit */}
-        {showPinDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/50 p-4">
-            <div role="dialog" aria-modal="true" aria-labelledby="pin-dialog-title" className="w-full max-w-sm bg-surface rounded-card border border-line shadow-pop p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-card bg-brand/15 text-brand-ink flex items-center justify-center">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 id="pin-dialog-title" className="text-sm font-bold text-ink">Mode Edit Tautan Publik</h3>
-                    <p className="text-[11px] text-ink-3">Masukkan PIN untuk mengedit widget.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowPinDialog(false); setPinError(null); setPinInput(''); }}
-                  className="text-ink-3 hover:text-ink p-1"
-                  aria-label="Tutup"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-medium text-ink-2">PIN Mode Edit</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoFocus
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyPin(); }}
-                  placeholder="4-8 angka"
-                  className="w-full px-3 py-2 rounded-control border border-line bg-surface text-ink text-center text-base tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-brand"
-                />
-              </div>
-              {pinError && <p role="alert" className="text-[11px] text-neg font-medium">{pinError}</p>}
-              <button
-                onClick={handleVerifyPin}
-                disabled={pinInput.length < 4}
-                className="w-full py-2.5 rounded-control bg-ink text-surface text-sm font-semibold disabled:opacity-40 transition-opacity"
-              >
-                Buka Mode Edit
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Editor widget (reusable dari workspace) */}
         <WidgetEditorModal
@@ -417,6 +395,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           onClose={() => setEditingWidget(null)}
           widget={editingWidget}
           onSave={handleSaveWidget}
+          initialTab={editorTab}
         />
 
         {savingEdit && (
@@ -436,7 +415,7 @@ interface ShareWidgetCardProps {
   onEdit?: () => void;
 }
 
-/** Kartu widget untuk tampilan publik/embed (opsional dapat diedit bila mode edit ber-PIN aktif). */
+/** Kartu widget untuk tampilan publik/embed (dapat diedit bila mode tautan 'editable'). */
 const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget, canEdit = false, onEdit }) => {
   const isWide =
     widget.grid.w >= 8 ||

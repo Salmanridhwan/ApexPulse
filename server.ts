@@ -24,7 +24,9 @@ import {
   SessionPayload,
 } from './src/services/auth/session';
 import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, WidgetSpec } from './src/types';
+import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
+import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 
 // ============ AUTH HELPERS ============
@@ -84,6 +86,26 @@ async function startServer() {
   if (process.env.RAG_API_KEY) db.systemConfig.ragApiKey = process.env.RAG_API_KEY;
   if (process.env.RAG_KB_ID) (db.systemConfig as any).ragKnowledgeBaseId = process.env.RAG_KB_ID;
 
+  // Pemeriksa ketersediaan preset katalog (lihat services/widgets/ketersediaan.ts).
+  const pemeriksaKetersediaan = buatPemeriksaKetersediaan({
+    ragClient,
+    db,
+    ambilProvider: () => db.systemConfig.ragProvider,
+  });
+
+  // Buang catatan ketersediaan yang tidak sah lagi (KB instansi berganti / kedaluwarsa)
+  // supaya katalog tidak mewarisi hasil pemeriksaan dari KB yang sudah tidak dipakai.
+  {
+    const kbPerTenant: Record<string, string> = {};
+    for (const t of db.tenants) {
+      kbPerTenant[t.id] = kbUntukInstansi(t, db.systemConfig.ragKnowledgeBaseId) || '';
+    }
+    const dibuang = db.bersihkanKetersediaan(kbPerTenant);
+    if (dibuang > 0) {
+      console.log(`[ketersediaan] ${dibuang} catatan lama dibuang (KB berubah / kedaluwarsa)`);
+    }
+  }
+
   app.use(express.json());
 
   // Health Check
@@ -132,7 +154,7 @@ async function startServer() {
       userId: user.id,
       userName: user.name,
       action: 'Login Pengguna',
-      target: 'Portal ApexPulse BUMD',
+      target: 'Portal Aiones Boards BUMD',
       details: `Masuk sebagai ${user.role.toUpperCase()} (${user.email})`,
     });
 
@@ -153,7 +175,7 @@ async function startServer() {
           userId: user.id,
           userName: user.name,
           action: 'Logout Pengguna',
-          target: 'Portal ApexPulse BUMD',
+          target: 'Portal Aiones Boards BUMD',
           details: 'Sesi pengguna berhasil diakhiri dengan aman',
         });
       }
@@ -329,6 +351,40 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // ================= KETERSEDIAAN PRESET KATALOG =================
+  // Menjawab dari cache hasil pemeriksaan NYATA ke dokumen instansi yang sedang
+  // dibuka, sekaligus memulai pemeriksaan latar untuk preset yang belum diperiksa.
+  // Dipakai katalog "Tambah Widget" agar hanya preset yang bisa diisi yang tampil.
+  app.get('/api/widgets/ketersediaan', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+
+    // Pemeriksaan atas permintaan: dipakai saat pengguna berganti tipe chart
+    // pada satu kartu, supaya tipe itu pun dinilai dengan dokumen yang sama.
+    const mintaan = String(req.query.periksa || '').trim();
+    if (mintaan && kbId) {
+      const pasangan = mintaan
+        .split(',')
+        .map((s) => s.split(':'))
+        .filter((p) => p[0])
+        .slice(0, 3);
+      for (const [presetId, tipe] of pasangan) {
+        try {
+          await pemeriksaKetersediaan.periksaPasangan(tenant, kbId, presetId);
+        } catch (err) {
+          console.error('[ketersediaan] periksaPasangan gagal:', err);
+        }
+      }
+    }
+
+    res.json(pemeriksaKetersediaan.ringkas(tenant, kbId));
+  });
+
   // ================= CHAT & SSE STREAMING ROUTE =================
   // Ambil data NYATA satu indikator untuk widget dari katalog preset.
   // Tidak ada angka contoh: kalau dokumen tidak memuat indikatornya, balas 502.
@@ -344,8 +400,27 @@ async function startServer() {
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const sector = (req.body.sector || tenant?.sector || 'universal') as BumdSector;
-    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId);
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
     const mulai = Date.now();
+
+    // Kalau preset ini sudah diverifikasi untuk instansi ini, pakai hasil itu:
+    // angka yang masuk ke dashboard sama persis dengan yang ada di katalog.
+    const presetId = typeof req.body?.presetId === 'string' ? req.body.presetId.trim() : '';
+    const dariCache =
+      presetId && tenant
+        ? pemeriksaKetersediaan.ambilDariCache(tenant.id, kbId, presetId, String(tipe || 'kpi'))
+        : null;
+    if (dariCache) {
+      return res.json({
+        widget: dariCache.data,
+        judul: dariCache.judul,
+        deskripsi: dariCache.deskripsi,
+        sector,
+        dariCache: true,
+        latencyMs: Date.now() - mulai,
+      });
+    }
+
     try {
       const hasil = await ragClient.ambilDataWidget(
         String(query).trim(),
@@ -358,6 +433,13 @@ async function startServer() {
         return res.status(502).json({
           error:
             'Dokumen resmi tidak memuat indikator ini, atau layanan RAG tidak menjawab. Tidak ada angka contoh yang ditambahkan.',
+        });
+      }
+      // Data ADA tetapi tipe yang dipilih tidak bisa dibuat dari bentuk datanya
+      // (mis. peta tanpa rincian wilayah). Katakan apa adanya.
+      if (!hasil.data) {
+        return res.status(409).json({
+          error: hasil.alasan || 'Tipe tampilan ini tidak bisa dibuat dari data dokumen ini.',
         });
       }
       return res.json({
@@ -994,7 +1076,7 @@ async function startServer() {
       if (rule.channels.includes('email')) {
         emailDiantre++;
         antreEmail({
-          subject: `[ApexPulse ${rule.severity.toUpperCase()}] ${notif.title}`,
+          subject: `[Aiones Boards ${rule.severity.toUpperCase()}] ${notif.title}`,
           text: `${notif.message}\n\nInstansi: ${tenant?.name || tenantId}\nWaktu: ${notif.timestamp}`,
           html:
             `<p><strong>${notif.title}</strong></p>` +
@@ -1054,13 +1136,17 @@ async function startServer() {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
     const token = `share_${randomBytes(12).toString('hex')}`;
-    db.shareTokens[token] = req.params.id;
+    const mode = req.body?.mode === 'editable' ? 'editable' : 'readonly';
+    db.shareTokens[token] = { dashboardId: req.params.id, mode } as any;
     db.persist();
-    res.json({ token, shareUrl: `/share/${token}` });
+    res.json({ token, shareUrl: `/share/${token}`, mode });
   });
 
   app.get('/api/share/:token', (req: Request, res: Response) => {
-    const dashId = db.shareTokens[req.params.token];
+    const shareMeta = db.shareTokens[req.params.token] as any;
+    const dashId = typeof shareMeta === 'object' && shareMeta ? shareMeta.dashboardId : shareMeta;
+    const mode = typeof shareMeta === 'object' && shareMeta ? shareMeta.mode : 'readonly';
+
     if (!dashId) {
       return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan atau telah kedaluwarsa.' });
     }
@@ -1068,73 +1154,25 @@ async function startServer() {
     if (!dash) {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
-    // Jangan bocorkan hash PIN ke klien — cukup flag apakah PIN sudah diatur.
-    res.json({ ...dash, hasEditPin: !!db.sharePins[req.params.token] });
+    res.json({ ...dash, accessMode: mode });
   });
 
   /**
-   * Atur / ganti PIN mode edit untuk tautan publik.
-   * Butuh sesi login (hanya pemilik dashboard yang bisa mengaktifkan).
-   * PIN kosong = matikan mode edit (hapus PIN).
-   */
-  app.post('/api/share/:token/pin', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    const dashId = db.shareTokens[req.params.token];
-    if (!dashId) {
-      return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
-    }
-    const dash = db.dashboards.find((d) => d.id === dashId);
-    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
-    // Pastikan sesi berhak atas tenant dashboard ini.
-    if (dash.tenantId && dash.tenantId !== effectiveTenantId(req, session)) {
-      return res.status(403).json({ error: 'Tidak berhak mengubah tautan ini.' });
-    }
-    const pin = String(req.body?.pin ?? '').trim();
-    if (!pin) {
-      delete db.sharePins[req.params.token];
-      db.persist();
-      return res.json({ hasEditPin: false });
-    }
-    if (!/^\d{4,8}$/.test(pin)) {
-      return res.status(400).json({ error: 'PIN harus berupa 4-8 angka.' });
-    }
-    db.sharePins[req.params.token] = hashPassword(pin);
-    db.persist();
-    res.json({ hasEditPin: true });
-  });
-
-  /** Verifikasi PIN mode edit (tanpa mengubah data) — untuk membuka kunci editor. */
-  app.post('/api/share/:token/verify-pin', (req: Request, res: Response) => {
-    const stored = db.sharePins[req.params.token];
-    if (!stored) {
-      return res.status(400).json({ error: 'Tautan ini tidak mengaktifkan mode edit.' });
-    }
-    const pin = String(req.body?.pin ?? '');
-    if (!verifyPassword(pin, stored)) {
-      return res.status(401).json({ error: 'PIN salah.' });
-    }
-    res.json({ ok: true });
-  });
-
-  /**
-   * Edit widget lewat tautan publik (mode edit ber-PIN).
-   * Body: { pin, widgets } — hanya field aman yang diterapkan; dashboard asli diperbarui.
+   * Edit widget lewat tautan publik (apabila mode 'editable').
    */
   app.patch('/api/share/:token', (req: Request, res: Response) => {
     const token = req.params.token;
-    const dashId = db.shareTokens[token];
+    const shareMeta = db.shareTokens[token] as any;
+    const dashId = typeof shareMeta === 'object' && shareMeta ? shareMeta.dashboardId : shareMeta;
+    const mode = typeof shareMeta === 'object' && shareMeta ? shareMeta.mode : 'readonly';
+
     if (!dashId) {
       return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
     }
-    const stored = db.sharePins[token];
-    if (!stored) {
-      return res.status(403).json({ error: 'Mode edit tidak aktif untuk tautan ini.' });
+    if (mode !== 'editable') {
+      return res.status(403).json({ error: 'Tautan ini bersifat Read-Only dan tidak dapat diedit.' });
     }
-    const pin = String(req.body?.pin ?? '');
-    if (!verifyPassword(pin, stored)) {
-      return res.status(401).json({ error: 'PIN salah.' });
-    }
+
     const dash = db.dashboards.find((d) => d.id === dashId);
     if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
 
@@ -1142,28 +1180,42 @@ async function startServer() {
     if (!Array.isArray(widgets)) {
       return res.status(400).json({ error: 'Field "widgets" wajib berupa array.' });
     }
-    // Hanya izinkan memperbarui widget yang memang ada di dashboard ini (cegah injeksi).
-    const idSet = new Set(dash.widgets.map((w) => w.id));
-    const aman = widgets.filter((w) => w && idSet.has(w.id));
-    if (aman.length === 0) {
+    // Paritas penuh dengan kanvas pembuat: urutkan, ubah lebar, edit, gandakan,
+    // tambah, dan hapus. Bentuk tiap widget tetap divalidasi (tidak sekadar
+    // dipercaya) supaya tautan publik tak bisa menyimpan data rusak.
+    const sah = widgets.filter(
+      (w) => w && typeof w.id === 'string' && WidgetSpecSchema.safeParse(w).success
+    );
+    if (sah.length === 0 && widgets.length > 0) {
       return res.status(400).json({ error: 'Tidak ada widget valid untuk diperbarui.' });
     }
-    const updated = db.updateDashboard(dashId, { widgets: aman }, dash.tenantId);
+    const idSebelum = new Set(dash.widgets.map((w) => w.id));
+    const idSesudah = new Set(sah.map((w) => w.id));
+    const ditambah = [...idSesudah].filter((id) => !idSebelum.has(id)).length;
+    const dihapus = [...idSebelum].filter((id) => !idSesudah.has(id)).length;
+
+    const updated = db.updateDashboard(dashId, { widgets: sah }, dash.tenantId);
     if (!updated) return res.status(500).json({ error: 'Gagal menyimpan perubahan.' });
 
-    // Catat jejak audit: perubahan lewat tautan publik.
+    // Catat jejak audit: perubahan lewat tautan publik (termasuk tambah/hapus).
+    const rincian = [
+      ditambah > 0 ? `+${ditambah} ditambah` : null,
+      dihapus > 0 ? `-${dihapus} dihapus` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
     db.auditLogs.unshift({
       id: `audit_${randomBytes(8).toString('hex')}`,
       tenantId: dash.tenantId,
       userId: 'public-link',
       userName: 'Editor Tautan Publik',
       action: 'UPDATE',
-      target: `Dashboard "${dash.title}" via tautan publik (${aman.length} widget)`,
+      target: `Dashboard "${dash.title}" via tautan publik — ${sah.length} widget${rincian ? ` (${rincian})` : ''}`,
       timestamp: new Date().toISOString(),
     } as (typeof db.auditLogs)[number]);
     db.persist();
 
-    res.json({ ...updated, hasEditPin: true });
+    res.json(updated);
   });
 
   // ================= AUDIT LOGS =================
@@ -1338,6 +1390,84 @@ async function startServer() {
     res.json(updated);
   });
 
+  /**
+   * Sinkronkan data RAG satu instansi dengan KB-nya di layanan RAG.
+   *
+   * Dipakai tombol "Perbarui RAG" di tab BUMD & Tenant: setelah admin mengunggah
+   * dokumen baru ke KB, tombol ini membaca ulang isi KB lalu memperbarui jumlah
+   * dokumen instansi. Dokumen BARU disebutkan namanya, jadi admin tahu apa yang
+   * berubah — bukan hanya angkanya bergeser tanpa penjelasan.
+   *
+   * Read-only terhadap layanan RAG: tidak ada dokumen yang diubah/dihapus.
+   */
+  app.post('/api/admin/tenants/:id/sinkron-rag', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh menyinkronkan RAG.' });
+    }
+
+    const tenant = db.tenants.find((t) => t.id === req.params.id);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const kb = String(tenant.knowledgeBaseId || '').trim();
+    if (!kb) {
+      // Jujur: tanpa KB, tidak ada yang bisa disinkronkan. Jangan mengarang angka.
+      return res.status(400).json({
+        error:
+          'Instansi ini belum punya Knowledge Base ID. Isi KB ID-nya lebih dulu (tombol "+ Daftarkan BUMD Baru" atau perbaiki data instansi).',
+      });
+    }
+
+    try {
+      const hasil = await ragClient.daftarDokumen(kb);
+      const namaSekarang = hasil.dokumen.map((d) => d.nama);
+      const namaSebelum = Array.isArray(tenant.dokumenTerakhir) ? tenant.dokumenTerakhir : [];
+      const belumPernahSinkron = namaSebelum.length === 0;
+
+      // Dokumen baru = ada di daftar sekarang, tidak ada di daftar sebelumnya.
+      const dokumenBaru = belumPernahSinkron
+        ? []
+        : namaSekarang.filter((n) => !namaSebelum.includes(n));
+      // Dokumen hilang = ada sebelumnya, kini tidak ada (jangan disembunyikan).
+      const dokumenHilang = belumPernahSinkron
+        ? []
+        : namaSebelum.filter((n) => !namaSekarang.includes(n));
+
+      const diperbarui = db.updateTenant(tenant.id, {
+        documentCount: hasil.jumlah,
+        dokumenTerakhir: namaSekarang,
+        kbTersinkronPada: new Date().toISOString(),
+      });
+
+      db.addAuditLog({
+        tenantId: tenant.id,
+        action: 'SINKRON RAG',
+        target: `Instansi ${tenant.name} → KB ${kb}`,
+        details: `Jumlah dokumen: ${hasil.jumlah}${dokumenBaru.length ? ` · baru: ${dokumenBaru.length}` : ''}${
+          dokumenHilang.length ? ` · hilang: ${dokumenHilang.length}` : ''
+        }`,
+        userId: session.userId,
+        userName: session.name,
+      });
+
+      res.json({
+        ok: true,
+        tenant: diperbarui,
+        kbId: kb,
+        jumlahDokumen: hasil.jumlah,
+        dokumenBaru,
+        dokumenHilang,
+        belumPernahSinkron,
+        catatan: hasil.catatan,
+      });
+    } catch (err: any) {
+      res.status(502).json({
+        error: `Gagal membaca KB "${kb}" dari layanan RAG: ${err?.message || 'kesalahan tidak diketahui'}`,
+      });
+    }
+  });
+
   app.get('/api/admin/config', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1346,6 +1476,126 @@ async function startServer() {
     }
     // API key dikirim ter-mask — nilai asli hanya hidup di server.
     res.json({ ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) });
+  });
+
+  /**
+   * Daftar dokumen sebuah knowledge base (panel admin → Konfigurasi RAG).
+   * Saat admin menempelkan KB ID, endpoint ini memberi tahu ADA BERAPA dokumen
+   * dan dokumen APA SAJA di dalamnya, supaya KB bisa diperiksa sebelum dipakai.
+   * Body/query: `kb` (ID KB yang mau diperiksa; kalau kosong pakai KB dari config).
+   */
+  app.get('/api/admin/knowledge', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
+    }
+    const kb = String((req.query.kb as string) || (db.systemConfig as any).ragKnowledgeBaseId || '').trim();
+    try {
+      const hasil = await ragClient.daftarDokumen(kb);
+      res.json({ ...hasil, provider: db.systemConfig.ragProvider });
+    } catch (err: any) {
+      res.status(502).json({
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: `Gagal membaca daftar dokumen: ${err?.message || 'kesalahan tidak diketahui'}`,
+      });
+    }
+  });
+
+  /**
+   * Profil instansi dari sebuah KB: nama, kota, sektor, jumlah dokumen, ringkasan.
+   * Dipakai form "BUMD & Tenant" supaya admin cukup menempel KB ID dan field lainnya
+   * terisi otomatis dari dokumen.
+   */
+  app.get('/api/admin/kb-profil', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
+    }
+    const kb = String(req.query.kb || '').trim();
+    try {
+      const hasil = await ragClient.profilInstansi(kb);
+      res.json({ ...hasil, provider: db.systemConfig.ragProvider });
+    } catch (err: any) {
+      res.status(502).json({
+        kbId: kb,
+        jumlahDokumen: 0,
+        catatan: `Gagal membaca profil instansi: ${err?.message || 'kesalahan tidak diketahui'}`,
+      });
+    }
+  });
+
+  /**
+   * Simpan konfigurasi SEKALIGUS uji API Key-nya dalam satu panggilan.
+   *
+   * Urutannya penting: simpan dulu, baru uji. Kalau diuji dulu, key yang diuji adalah
+   * key lama yang masih tersimpan — bukan yang baru ditempel admin.
+   */
+  app.post('/api/admin/config-simpan-uji', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh mengubah konfigurasi.' });
+    }
+
+    const sebelum = { ...db.systemConfig };
+    try {
+      // Nilai yang dikirim dari form; field yang tidak dikirim dibiarkan seperti semula.
+      //
+      // PENJAGAAN API KEY (wajib, sama seperti POST /api/admin/config):
+      // GET /api/admin/config mengirim key TER-MASK ke browser, jadi kolom isian
+      // berisi topeng seperti "rag_*********w4c4". Kalau topeng itu ikut tersimpan,
+      // kredensial asli HANCUR dan uji berikutnya selalu gagal. Dua kasus yang
+      // ditangani: (a) nilai sama dengan topeng saat ini -> pertahankan key lama;
+      // (b) nilai SUDAH BERBENTUK TOPENG (topeng basi, mis. panel dibuka sebelum key
+      // diubah pihak lain) -> JANGAN simpan topeng sebagai key.
+      const body = { ...(req.body || {}) };
+      const berbentukMask =
+        typeof body.ragApiKey === 'string' && /[*•·]{4,}/.test(body.ragApiKey);
+      if (
+        berbentukMask ||
+        body.ragApiKey === maskKey(db.systemConfig.ragApiKey) ||
+        body.ragApiKey === '*********'
+      ) {
+        body.ragApiKey = db.systemConfig.ragApiKey;
+      }
+      db.updateSystemConfig(body);
+    } catch (err: any) {
+      return res.status(500).json({
+        tersimpan: false,
+        error: `Gagal menyimpan konfigurasi: ${err?.message || 'kesalahan tidak diketahui'}`,
+      });
+    }
+
+    let hasil: any;
+    try {
+      hasil = await ragClient.ujiApiKey();
+    } catch (err: any) {
+      hasil = {
+        ok: false,
+        status: 'galat-layanan',
+        latencyMs: 0,
+        pesan: `Uji API Key gagal dijalankan: ${err?.message || 'kesalahan tidak diketahui'}`,
+      };
+    }
+
+    res.json({
+      tersimpan: true,
+      // Selalu bertopeng ke browser — nilai asli hanya hidup di server.
+      konfigurasi: { ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) },
+      // Jejak audit: key hanya ditampilkan sebagai sidik jari, bukan nilai penuh.
+      jejak: {
+        baseUrlSebelum: sebelum.ragApiUrl,
+        baseUrlSesudah: db.systemConfig.ragApiUrl,
+        providerSebelum: sebelum.ragProvider,
+        providerSesudah: db.systemConfig.ragProvider,
+        keyBerubah: sebelum.ragApiKey !== db.systemConfig.ragApiKey,
+      },
+      hasil,
+    });
   });
 
   app.post('/api/admin/config', (req: Request, res: Response) => {
@@ -1398,7 +1648,7 @@ async function startServer() {
   await db.initMysql();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[ApexPulse Server] Berjalan pada port ${PORT}`);
+    console.log(`[Aiones Boards Server] Berjalan pada port ${PORT}`);
   });
 
   // Graceful shutdown: tutup server & pool MySQL saat menerima SIGINT/SIGTERM.
@@ -1408,20 +1658,20 @@ async function startServer() {
   const tutup = async (sinyal: string) => {
     if (sedangTutup) return;
     sedangTutup = true;
-    console.log(`[ApexPulse Server] Menerima ${sinyal} — menutup dengan rapi...`);
+    console.log(`[Aiones Boards Server] Menerima ${sinyal} — menutup dengan rapi...`);
     // Berhenti menerima koneksi baru; paksa tutup setelah 5 dtk bila ada yang menggantung.
     server.close(() => {
-      console.log('[ApexPulse Server] Koneksi HTTP ditutup.');
+      console.log('[Aiones Boards Server] Koneksi HTTP ditutup.');
     });
     const paksa = setTimeout(() => {
-      console.warn('[ApexPulse Server] Batas waktu 5 dtk — keluar paksa.');
+      console.warn('[Aiones Boards Server] Batas waktu 5 dtk — keluar paksa.');
       process.exit(0);
     }, 5000);
     paksa.unref();
     try {
       await db.closeMysql();
     } catch (err) {
-      console.error('[ApexPulse Server] Gagal menutup pool MySQL:', err);
+      console.error('[Aiones Boards Server] Gagal menutup pool MySQL:', err);
     }
     process.exit(0);
   };
@@ -1430,6 +1680,6 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-  console.error('[ApexPulse Server] Gagal inisialisasi server:', err);
+  console.error('[Aiones Boards Server] Gagal inisialisasi server:', err);
   process.exit(1);
 });

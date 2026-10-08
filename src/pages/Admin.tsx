@@ -1,47 +1,69 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
-  Bell,
-  Building2,
   Check,
   CheckCircle2,
-  Clock,
   Database,
-  Edit2,
   Key,
-  Layers,
-  Lock,
   LogOut,
   Menu,
   Plus,
   Radio,
   RefreshCw,
   Search,
-  Server,
   Settings,
   Shield,
-  ShieldAlert,
   ShieldCheck,
   Trash2,
-  UserCheck,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
+import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
+
+/** Label sektor untuk ditampilkan (sektor tetap dipetakan dari dokumen KB). */
+const LABEL_SEKTOR: Record<BumdSector, string> = {
+  pdam: 'PDAM (Air Minum)',
+  bank: 'Bank Daerah (BPD/BPR)',
+  pasar: 'Pasar Rakyat',
+  rsud: 'Rumah Sakit (RSUD)',
+  transportasi: 'Transportasi Daerah',
+  aneka_usaha: 'Aneka Usaha / Pariwisata',
+};
+
+/**
+ * Baris hasil yang terisi otomatis dari KB — BUKAN kolom isian.
+ * Dipakai form "BUMD & Tenant" supaya admin hanya perlu mengisi KB ID.
+ */
+const BarisOtomatis: React.FC<{ label: string; nilai?: string }> = ({ label, nilai }) => (
+  <div>
+    <label className="block text-ink-3 mb-0.5">{label}</label>
+    <div className="px-3 py-2 border border-line rounded-control bg-surface-2 text-ink min-h-[34px] break-words">
+      {nilai ? nilai : <span className="text-ink-3">— menunggu KB ID</span>}
+    </div>
+  </div>
+);
 
 interface AdminProps {
   currentUser: User | null;
   onLogout: () => void;
+  /** Tab aktif dikendalikan App supaya menu di sidebar utama dan isi halaman sinkron. */
+  activeTab: AdminTabId;
+  onSelectTab: (tab: AdminTabId) => void;
+  /** Buka/tutup sidebar utama aplikasi dari header halaman admin. */
+  onToggleSidebar: () => void;
 }
 
-export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tenants' | 'rag' | 'alerts' | 'audit'>('overview');
-  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+export const Admin: React.FC<AdminProps> = ({
+  currentUser,
+  onLogout,
+  activeTab,
+  onSelectTab,
+  onToggleSidebar,
+}) => {
 
   // Admin Data State
   const [stats, setStats] = useState<any>(null);
@@ -56,6 +78,38 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   // RAG Probe State (uji koneksi RAG)
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeResult, setProbeResult] = useState<any>(null);
+
+  // Uji API Key: menyimpan konfigurasi lalu benar-benar mengecek key ke layanan RAG.
+  const [keyTestLoading, setKeyTestLoading] = useState(false);
+  const [keyTestHasil, setKeyTestHasil] = useState<{
+    ok: boolean;
+    status: string;
+    pesan: string;
+    latencyMs?: number;
+    httpStatus?: number;
+    baseDipakai?: string;
+    kodeGalat?: string;
+  } | null>(null);
+
+  // Panel Knowledge Base: daftar dokumen sebuah KB (dipisah dari form umum).
+  const [kbInput, setKbInput] = useState('');
+  const [kbLoading, setKbLoading] = useState(false);
+  const [kbHasil, setKbHasil] = useState<{
+    kbId: string;
+    jumlah: number;
+    dokumen: Array<{
+      id: string;
+      nama: string;
+      status?: string;
+      halaman?: number;
+      potongan?: number;
+      token?: number;
+      dibuat?: string;
+      ringkasan?: string;
+    }>;
+    catatan?: string;
+    provider?: string;
+  } | null>(null);
 
   // User Modal State
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -72,6 +126,27 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   const [tenantCity, setTenantCity] = useState('');
   const [tenantCode, setTenantCode] = useState('');
   const [tenantKbId, setTenantKbId] = useState('');
+  /** Hasil pembacaan profil instansi dari KB (nama/kota/sektor/jumlah dokumen). */
+  const [tenantKbInfo, setTenantKbInfo] = useState<{
+    kbId: string;
+    nama?: string;
+    kota?: string;
+    sektor?: BumdSector;
+    jumlahDokumen: number;
+    ringkasan?: string;
+    catatan?: string;
+  } | null>(null);
+  const [tenantKbLoading, setTenantKbLoading] = useState(false);
+
+  // Sinkronisasi RAG (tab BUMD & Tenant): null = tidak sedang jalan.
+  const [sinkronLoading, setSinkronLoading] = useState<string | null>(null);
+  const [sinkronHasil, setSinkronHasil] = useState<{
+    judul: string;
+    dokumenBaru: string[];
+    dokumenHilang: string[];
+    catatan?: string;
+    gagal?: boolean;
+  } | null>(null);
 
   // Search Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,6 +185,12 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Isi kolom Knowledge Base dari konfigurasi tersimpan begitu config dimuat.
+  useEffect(() => {
+    const kb = (systemConfig as any)?.ragKnowledgeBaseId;
+    if (typeof kb === 'string' && kb && !kbInput) setKbInput(kb);
+  }, [systemConfig]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +244,9 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
           city: tenantCity,
           code: tenantCode || `BUMD-${Date.now().toString().slice(-3)}`,
           logo: '🏛️',
-          documentCount: 16,
+          // Jumlah dokumen diambil dari KB nyata (bukan angka tetap); kalau KB belum
+          // diperiksa, biarkan 0 daripada memakai angka karangan.
+          documentCount: tenantKbInfo?.jumlahDokumen ?? 0,
           knowledgeBaseId: tenantKbId.trim() || undefined,
         }),
       });
@@ -173,6 +256,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
       setTenantName('');
       setTenantCity('');
       setTenantKbId('');
+      setTenantKbInfo(null);
       loadData();
     } catch (err) {
       console.error('Create tenant failed:', err);
@@ -197,6 +281,158 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
     }
   };
 
+  /**
+   * Simpan konfigurasi + uji API Key dalam satu klik.
+   * Server menyimpan dulu, baru menguji key yang BARU tersimpan — supaya yang diuji
+   * benar-benar key yang baru ditempel, bukan key lama.
+   */
+  const handleSimpanUjiKey = async () => {
+    setKeyTestLoading(true);
+    setKeyTestHasil(null);
+    try {
+      const res = await fetch('/api/admin/config-simpan-uji', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(systemConfig),
+      });
+      const data = await res.json();
+      if (data?.konfigurasi) setSystemConfig(data.konfigurasi);
+      if (data?.tersimpan) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+      }
+      setKeyTestHasil(
+        data?.hasil || {
+          ok: false,
+          status: 'galat-layanan',
+          pesan: data?.error || 'Server tidak mengembalikan hasil uji.',
+        }
+      );
+      loadData();
+    } catch (err: any) {
+      setKeyTestHasil({
+        ok: false,
+        status: 'tidak-terhubung',
+        pesan: `Gagal menghubungi server: ${err?.message || 'kesalahan jaringan'}`,
+      });
+    } finally {
+      setKeyTestLoading(false);
+    }
+  };
+
+  /**
+   * Perbarui data RAG SATU instansi: baca ulang isi KB-nya dari layanan RAG,
+   * lalu perbarui jumlah dokumen + catat dokumen baru/hilang.
+   */
+  const handleSinkronTenant = async (tenantId: string) => {
+    const tenant = tenants.find((t) => t.id === tenantId);
+    setSinkronLoading(tenantId);
+    setSinkronHasil(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}/sinkron-rag`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSinkronHasil({
+          judul: `Gagal memperbarui ${tenant?.name || 'instansi'}`,
+          dokumenBaru: [],
+          dokumenHilang: [],
+          catatan: data?.error || `Server menjawab HTTP ${res.status}.`,
+          gagal: true,
+        });
+        return;
+      }
+
+      // Perbarui kartu di layar tanpa perlu muat ulang seluruh halaman.
+      if (data?.tenant) {
+        setTenants((prev) => prev.map((t) => (t.id === data.tenant.id ? data.tenant : t)));
+      }
+
+      const baru: string[] = Array.isArray(data?.dokumenBaru) ? data.dokumenBaru : [];
+      const hilang: string[] = Array.isArray(data?.dokumenHilang) ? data.dokumenHilang : [];
+      const judul = data?.belumPernahSinkron
+        ? `${tenant?.name || 'Instansi'}: ${data?.jumlahDokumen ?? 0} dokumen tersinkron (sinkron pertama)`
+        : baru.length > 0
+          ? `${tenant?.name || 'Instansi'}: ${baru.length} dokumen BARU terdeteksi (total ${data?.jumlahDokumen ?? 0})`
+          : `${tenant?.name || 'Instansi'}: tidak ada dokumen baru (total ${data?.jumlahDokumen ?? 0})`;
+
+      setSinkronHasil({ judul, dokumenBaru: baru, dokumenHilang: hilang, catatan: data?.catatan });
+    } catch (err: any) {
+      setSinkronHasil({
+        judul: `Gagal memperbarui ${tenant?.name || 'instansi'}`,
+        dokumenBaru: [],
+        dokumenHilang: [],
+        catatan: `Tidak bisa menghubungi server: ${err?.message || 'kesalahan jaringan'}`,
+        gagal: true,
+      });
+    } finally {
+      setSinkronLoading(null);
+    }
+  };
+
+  /**
+   * Perbarui SEMUA instansi berurutan (sengaja tidak paralel supaya layanan RAG
+   * tidak dihujani permintaan sekaligus), lalu rangkum hasilnya.
+   */
+  const handleSinkronSemua = async () => {
+    const berKb = tenants.filter((t) => t.knowledgeBaseId);
+    if (berKb.length === 0) {
+      setSinkronHasil({
+        judul: 'Tidak ada instansi yang punya Knowledge Base ID',
+        dokumenBaru: [],
+        dokumenHilang: [],
+        catatan: 'Isi KB ID instansi lebih dulu, baru sinkronkan.',
+        gagal: true,
+      });
+      return;
+    }
+    setSinkronLoading('semua');
+    setSinkronHasil(null);
+
+    const semuaBaru: string[] = [];
+    const semuaHilang: string[] = [];
+    let berhasil = 0;
+    const gagal: string[] = [];
+
+    for (const t of tenants) {
+      const kb = (t as any).knowledgeBaseId;
+      if (!kb) continue;
+      try {
+        const res = await fetch(`/api/admin/tenants/${encodeURIComponent(t.id)}/sinkron-rag`, {
+          method: 'POST',
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          gagal.push(`${t.name}: ${data?.error || `HTTP ${res.status}`}`);
+          continue;
+        }
+        if (data?.tenant) {
+          setTenants((prev) => prev.map((x) => (x.id === data.tenant.id ? data.tenant : x)));
+        }
+        for (const n of data?.dokumenBaru || []) semuaBaru.push(`${t.name} → ${n}`);
+        for (const n of data?.dokumenHilang || []) semuaHilang.push(`${t.name} → ${n}`);
+        berhasil++;
+      } catch (err: any) {
+        gagal.push(`${t.name}: ${err?.message || 'kesalahan jaringan'}`);
+      }
+    }
+
+    setSinkronHasil({
+      judul:
+        gagal.length > 0
+          ? `Selesai dengan masalah: ${berhasil} berhasil, ${gagal.length} gagal`
+          : semuaBaru.length > 0
+            ? `Selesai: ${berhasil} instansi diperbarui, ${semuaBaru.length} dokumen BARU terdeteksi`
+            : `Selesai: ${berhasil} instansi diperbarui, tidak ada dokumen baru`,
+      dokumenBaru: semuaBaru,
+      dokumenHilang: semuaHilang,
+      catatan: gagal.length > 0 ? `Gagal: ${gagal.join(' | ')}` : undefined,
+      gagal: gagal.length > 0,
+    });
+    setSinkronLoading(null);
+  };
+
   const handleProbeRag = async () => {
     setProbeLoading(true);
     setProbeResult(null);
@@ -218,48 +454,108 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
     }
   };
 
+  /**
+   * Periksa sebuah Knowledge Base ID: tampilkan ADA BERAPA dokumen dan dokumen APA SAJA.
+   * Tidak menyimpan apa pun — murni pemeriksaan supaya admin tahu isi KB sebelum dipakai.
+   */
+  const handleCekKb = async (kbId?: string) => {
+    const kb = (kbId ?? kbInput ?? '').trim();
+    if (!kb) {
+      setKbHasil(null);
+      return;
+    }
+    setKbLoading(true);
+    setKbHasil(null);
+    try {
+      const res = await fetch(`/api/admin/knowledge?kb=${encodeURIComponent(kb)}`);
+      const data = await res.json();
+      setKbHasil(data);
+    } catch (err: any) {
+      setKbHasil({
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: `Gagal menghubungi server: ${err?.message || 'kesalahan jaringan'}`,
+      });
+    } finally {
+      setKbLoading(false);
+    }
+  };
+
+  // Auto-isi: cukup mengetik/tempel KB ID, daftar dokumen langsung diperiksa sendiri
+  // (tanpa klik tombol). Diberi jeda 700 ms supaya tidak memanggil server tiap ketukan.
+  useEffect(() => {
+    const kb = kbInput.trim();
+    if (!kb) {
+      setKbHasil(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void handleCekKb(kb);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [kbInput]);
+
+  /**
+   * AUTO-ISI dari KB: satu-satunya isian di form ini adalah KB ID. Begitu diisi,
+   * semua field lain (Nama, Kota, Sektor, Nama Singkat, Kode) TERISI dari dokumen KB.
+   * Kalau KB kosong/ID salah, field dikosongkan lagi supaya tidak ada sisa nilai lama
+   * yang tertinggal dan tampak seolah-olah masih berlaku.
+   */
+  useEffect(() => {
+    const kb = tenantKbId.trim();
+    if (!kb) {
+      setTenantKbInfo(null);
+      setTenantName('');
+      setTenantCity('');
+      setTenantShortName('');
+      setTenantCode('');
+      setTenantSector('pdam');
+      return;
+    }
+    let batal = false;
+    setTenantKbLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/kb-profil?kb=${encodeURIComponent(kb)}`);
+        const data = await res.json();
+        if (batal) return;
+        setTenantKbInfo(data);
+        // Field ini bukan isian lagi, jadi diisi apa adanya dari dokumen.
+        setTenantName(data?.nama || '');
+        setTenantCity(data?.kota || '');
+        if (data?.sektor) setTenantSector(data.sektor);
+        // Nama singkat: ambil potongan nama instansi; kalau tidak ada, dari KB ID.
+        setTenantShortName(
+          data?.nama ? String(data.nama).replace(/^Perumda\s+/i, '').slice(0, 24) : ''
+        );
+        // Kode instansi diturunkan dari KB ID (mis. kb_pam_jaya → KB_PAM_JAYA).
+        setTenantCode(kb.toUpperCase());
+      } catch {
+        if (!batal) {
+          setTenantKbInfo({
+            kbId: kb,
+            jumlahDokumen: 0,
+            catatan: 'Tidak bisa menghubungi server untuk membaca KB.',
+          });
+          setTenantName('');
+          setTenantCity('');
+        }
+      } finally {
+        if (!batal) setTenantKbLoading(false);
+      }
+    }, 800);
+    return () => {
+      batal = true;
+      clearTimeout(timer);
+    };
+  }, [tenantKbId]);
+
   return (
     <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-canvas text-ink font-sans">
-      {/* Sidebar Panel Admin — menu navigasi vertikal */}
-      <aside className={`${isNavCollapsed ? 'w-14' : 'w-56'} shrink-0 h-full overflow-hidden bg-shell text-shell-ink-2 border-r border-shell-line flex flex-col transition-all duration-200`}>
-        <div>
-          <div className={`h-14 border-b border-shell-line flex items-center gap-2 ${isNavCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-            <Shield className="w-4 h-4 text-shell-ink-2 shrink-0" />
-            {!isNavCollapsed && (
-              <span className="text-sm font-bold text-shell-ink tracking-tight">Admin Center</span>
-            )}
-          </div>
-          <nav className={`p-3 space-y-1 text-xs font-medium ${isNavCollapsed ? 'px-2' : ''}`}>
-            {[
-              { id: 'overview', label: 'Ringkasan', icon: Activity },
-              { id: 'users', label: 'Pengguna & RBAC', icon: Users },
-              { id: 'tenants', label: 'BUMD & Tenant', icon: Building2 },
-              { id: 'rag', label: 'Konfigurasi RAG', icon: Database },
-              { id: 'alerts', label: 'Ambang Batas', icon: Bell },
-              { id: 'audit', label: 'Jejak Audit', icon: ShieldCheck },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  title={tab.label}
-                  className={`w-full flex items-center gap-2.5 py-2 rounded-control text-left transition-colors relative overflow-hidden ${isNavCollapsed ? 'justify-center px-0' : 'px-2.5'
-                    } ${isActive
-                      ? 'bg-shell-active text-shell-ink font-bold shadow-inset'
-                      : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'
-                    }`}
-                >
-                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-brand' : 'text-shell-ink-2'}`} />
-                  {!isNavCollapsed && <span className="truncate">{tab.label}</span>}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </aside>
+      {/* Menu Panel Admin kini berada di SIDEBAR UTAMA aplikasi (lihat `components/adminTabs.ts`),
+          jadi halaman ini tidak lagi merender sidebar kedua. Tab aktif datang dari App
+          supaya penanda aktif di sidebar utama dan isi halaman selalu sinkron. */}
 
       {/* Kolom kanan: header + konten */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
@@ -267,9 +563,10 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={() => setIsNavCollapsed((v) => !v)}
+                onClick={onToggleSidebar}
                 className="p-1.5 rounded-control text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
-                title={isNavCollapsed ? 'Tampilkan Sidebar Admin' : 'Sembunyikan Sidebar Admin'}
+                title="Buka / Tutup Sidebar"
+                aria-label="Buka atau tutup sidebar"
               >
                 <Menu className="w-4 h-4" />
               </button>
@@ -277,9 +574,13 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               <div className="flex items-center gap-2 truncate">
                 <Shield className="w-4 h-4 text-brand shrink-0" />
                 <h1 className="text-sm font-bold tracking-tight text-ink truncate">
-                  ApexPulse Admin & Governance Center
+                  {ADMIN_TABS.find((t) => t.id === activeTab)?.judul || 'Admin Center'}
                 </h1>
               </div>
+              <div className="h-4 w-px bg-line hidden sm:block" />
+              <span className="hidden md:inline text-[10px] text-ink-3 font-medium uppercase tracking-wider truncate">
+                Aiones Boards Admin &amp; Governance Center
+              </span>
             </div>
 
             <div className="flex items-center gap-3 text-xs shrink-0">
@@ -381,7 +682,7 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     <span>Aktivitas & Log Audit Terakhir</span>
                   </h3>
                   <button
-                    onClick={() => setActiveTab('audit')}
+                    onClick={() => onSelectTab('audit')}
                     className="text-xs text-brand hover:underline font-medium"
                   >
                     Lihat Seluruh Log &rarr;
@@ -517,14 +818,75 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     Kelola identitas resmi, kode BUMD, dan pangkalan dokumen retrieval
                   </p>
                 </div>
-                <button
-                  onClick={() => setIsAddTenantOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Daftarkan BUMD Baru</span>
-                </button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  {/* Sinkronkan semua instansi sekaligus — untuk kasus admin mengunggah
+                      dokumen baru ke beberapa KB lalu ingin semua angka diperbarui. */}
+                  <button
+                    onClick={handleSinkronSemua}
+                    disabled={sinkronLoading !== null}
+                    className="px-3.5 py-2 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Baca ulang jumlah dokumen semua instansi dari layanan RAG"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${sinkronLoading === 'semua' ? 'animate-spin' : ''}`} />
+                    <span>Perbarui Semua</span>
+                  </button>
+                  <button
+                    onClick={() => setIsAddTenantOpen(true)}
+                    className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Daftarkan BUMD Baru</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Hasil sinkronisasi terakhir (dokumen baru disebutkan namanya). */}
+              {sinkronHasil && (
+                <div
+                  className={`p-3 rounded-card border text-xs flex items-start gap-2 ${
+                    sinkronHasil.gagal
+                      ? 'bg-neg/15 border-neg/30 text-neg'
+                      : sinkronHasil.dokumenBaru.length > 0
+                        ? 'bg-pos/15 border-pos/30 text-pos'
+                        : 'bg-surface-2 border-line text-ink-2'
+                  }`}
+                >
+                  {sinkronHasil.gagal ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-1 min-w-0">
+                    <div className="font-semibold">{sinkronHasil.judul}</div>
+                    {!!sinkronHasil.dokumenBaru.length && (
+                      <ul className="list-disc pl-4 space-y-0.5">
+                        {sinkronHasil.dokumenBaru.map((n) => (
+                          <li key={n} className="break-all">
+                            <span className="font-semibold">BARU:</span> {n}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!!sinkronHasil.dokumenHilang?.length && (
+                      <ul className="list-disc pl-4 space-y-0.5 text-warn">
+                        {sinkronHasil.dokumenHilang.map((n) => (
+                          <li key={n} className="break-all">
+                            <span className="font-semibold">HILANG:</span> {n}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!!sinkronHasil.catatan && <div className="text-ink-3">{sinkronHasil.catatan}</div>}
+                  </div>
+                  <button
+                    onClick={() => setSinkronHasil(null)}
+                    className="ml-auto text-ink-3 hover:text-ink-2 shrink-0"
+                    aria-label="Tutup hasil sinkronisasi"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {tenants.map((t) => (
@@ -544,12 +906,41 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         Sektor: <strong className="text-ink-2 capitalize">{t.sector}</strong>
                       </span>
                       <span className="text-ink-2">
-                        Berkas RAG: <strong className="text-pos">{t.documentCount} LRA &amp; RKAP</strong>
+                        Berkas RAG: <strong className="text-pos">{t.documentCount} berkas</strong>
+                      </span>
+                      <span className="text-ink-2 col-span-2">
+                        KB: <strong className="font-mono text-ink-2">{t.knowledgeBaseId || '(belum diisi)'}</strong>
+                      </span>
+                      <span className="text-ink-3 col-span-2">
+                        {t.kbTersinkronPada
+                          ? `Terakhir disinkronkan: ${new Date(t.kbTersinkronPada).toLocaleString('id-ID')}`
+                          : 'Belum pernah disinkronkan dari panel ini'}
                       </span>
                     </span>
+                    <div className="pt-2 mt-2 border-t border-line/70">
+                      <button
+                        onClick={() => handleSinkronTenant(t.id)}
+                        disabled={sinkronLoading !== null || !t.knowledgeBaseId}
+                        className="w-full px-3 py-1.5 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={
+                          t.knowledgeBaseId
+                            ? `Baca ulang isi KB ${t.knowledgeBaseId} dari layanan RAG`
+                            : 'Instansi ini belum punya Knowledge Base ID'
+                        }
+                      >
+                        <RefreshCw className={`w-3 h-3 ${sinkronLoading === t.id ? 'animate-spin' : ''}`} />
+                        <span>{sinkronLoading === t.id ? 'Memperbarui…' : 'Perbarui RAG'}</span>
+                      </button>
+                    </div>
                   </ItemCard>
                 ))}
               </div>
+
+              <p className="text-[11px] text-ink-3 border-t border-line pt-3">
+                Tombol <strong>Perbarui RAG</strong> membaca ulang isi Knowledge Base instansi dari
+                layanan RAG, lalu memperbarui jumlah dokumen. Kalau ada dokumen baru yang kamu unggah,
+                namanya akan disebutkan di atas. Layanan RAG tidak diubah — hanya dibaca.
+              </p>
             </div>
           )}
 
@@ -624,30 +1015,15 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </p>
                 </div>
 
+                {/* API Key + tombol uji. Tombolnya menyimpan konfigurasi dulu, baru
+                    mengecek key-nya ke layanan RAG — jadi yang diuji benar-benar key
+                    yang baru ditempel, bukan key lama yang masih tersimpan. */}
                 <div>
                   <label className="block text-ink-2 font-semibold mb-1">
-                    Knowledge Base ID <span className="font-normal text-ink-3">(opsional, jika layanan RAG menskopkan retrieval per KB)</span>
+                    API Key LLM / RAG
                   </label>
-                  <input
-                    type="text"
-                    placeholder="kb-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    value={systemConfig.ragKnowledgeBaseId || ''}
-                    onChange={(e) =>
-                      setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                  />
-                  <p className="text-[10px] text-ink-3 mt-1">
-                    Daftar KB & dokumen bisa dilihat di layanan RAG teman (endpoint /api/v1/knowledge)
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">
-                      API Key LLM / RAG
-                    </label>
-                    <div className="relative">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
                       <input
                         type="password"
                         placeholder="tempel API key di sini"
@@ -655,49 +1031,62 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         onChange={(e) =>
                           setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                        className="w-full px-3 py-2 pr-9 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                       />
                       <Key className="w-4 h-4 text-ink-3 absolute right-3 top-2.5" />
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleSimpanUjiKey}
+                      disabled={keyTestLoading || !String(systemConfig.ragApiKey || '').trim()}
+                      className="shrink-0 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {keyTestLoading ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menguji…
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5" /> Simpan &amp; Uji API Key
+                        </>
+                      )}
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">
-                      Model LLM <span className="font-normal text-ink-3">(untuk Chat Orchestrator)</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="gpt-4o-mini"
-                      value={(systemConfig as any).ragModel || 'gpt-4o-mini'}
-                      onChange={(e) =>
-                        setSystemConfig({ ...systemConfig, ragModel: e.target.value } as any)
-                      }
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                    />
-                    <p className="text-[10px] text-ink-3 mt-1">
-                      Contoh: <span className="font-mono">gpt-4o-mini</span>, <span className="font-mono">gemini-1.5-flash</span>, <span className="font-mono">llama-3.1-70b</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">
-                      Batas Waktu Respons (Detik)
-                    </label>
-                    <input
-                      type="number"
-                      value={systemConfig.ragTimeoutSeconds}
-                      onChange={(e) =>
-                        setSystemConfig({
-                          ...systemConfig,
-                          ragTimeoutSeconds: Number(e.target.value),
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                    />
-                    <p className="text-[10px] text-ink-3 mt-1">Standar PRD: maksimal 60 detik</p>
-                  </div>
+                  {/* Hasil uji API Key — dibedakan jujur: valid / ditolak / tidak terhubung. */}
+                  {keyTestHasil && (
+                    <div
+                      className={`mt-2 p-3 rounded-card border text-[11px] flex items-start gap-2 ${
+                        keyTestHasil.ok
+                          ? 'bg-pos/15 border-pos/30 text-pos'
+                          : 'bg-neg/15 border-neg/30 text-neg'
+                      }`}
+                    >
+                      {keyTestHasil.ok ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      )}
+                      <div className="space-y-0.5">
+                        <div className="font-semibold">
+                          {keyTestHasil.ok ? 'API Key Berjalan' : 'API Key Bermasalah'}
+                        </div>
+                        <div className="text-ink-2">{keyTestHasil.pesan}</div>
+                        {keyTestHasil.kodeGalat && (
+                          <div className="text-ink-3 font-mono">Kode: {keyTestHasil.kodeGalat}</div>
+                        )}
+                        {keyTestHasil.baseDipakai && (
+                          <div className="text-ink-3 font-mono break-all">
+                            Diuji ke: {keyTestHasil.baseDipakai}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-ink-3 mt-1">
+                    Tombol ini menyimpan konfigurasi lalu benar-benar memanggil layanan RAG untuk
+                    memastikan key-nya diterima (bukan sekadar tersimpan).
+                  </p>
                 </div>
 
 
@@ -719,48 +1108,6 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     sumbernya, jadi tidak lagi mengandalkan deret contoh. Kalau layanan RAG tidak
                     punya /extract, aplikasi otomatis memakai jalur retrieval biasa.
                   </label>
-                </div>
-
-                {/* SMTP Settings */}
-                <div className="pt-4 border-t border-line space-y-3">
-                  <h4 className="font-bold text-ink flex items-center gap-1.5">
-                    <Server className="w-4 h-4 text-brand" />
-                    <span>Konfigurasi SMTP Email Dispatcher (Alert Ambang Batas)</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-ink-2 mb-1">Host SMTP</label>
-                      <input
-                        type="text"
-                        value={systemConfig.smtpHost}
-                        onChange={(e) =>
-                          setSystemConfig({ ...systemConfig, smtpHost: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-line rounded-control font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-ink-2 mb-1">Alamat Pengirim (MAIL_FROM)</label>
-                      <input
-                        type="text"
-                        value={systemConfig.smtpFrom}
-                        onChange={(e) =>
-                          setSystemConfig({ ...systemConfig, smtpFrom: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-line rounded-control"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 flex items-center gap-3">
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs"
-                  >
-                    Simpan Konfigurasi Sistem
-                  </button>
                 </div>
               </form>
 
@@ -844,6 +1191,150 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                         <li key={i}>{d}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== KNOWLEDGE BASE (DIPISAH DARI FORM UMUM) ===== */}
+              <div className="pt-4 border-t border-line space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h4 className="font-bold text-ink flex items-center gap-1.5">
+                      <Database className="w-4 h-4 text-brand" />
+                      <span>Knowledge Base</span>
+                    </h4>
+                    <p className="text-[11px] text-ink-2 mt-0.5">
+                      Tempel Knowledge Base ID lalu periksa isinya: aplikasi akan menampilkan{' '}
+                      <strong>ada berapa dokumen</strong> dan <strong>dokumen apa saja</strong> di KB itu.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-end gap-2 flex-wrap">
+                  <div className="flex-1 min-w-[240px]">
+                    <label className="block text-ink-2 font-semibold mb-1 text-xs">Knowledge Base ID</label>
+                    <input
+                      type="text"
+                      placeholder="kb_pam_jaya"
+                      value={kbInput}
+                      onChange={(e) => setKbInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleCekKb();
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono text-xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCekKb()}
+                    disabled={kbLoading || !kbInput.trim()}
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${kbLoading ? 'animate-spin' : ''}`} />
+                    {kbLoading ? 'Memeriksa...' : 'Periksa Dokumen'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const kb = kbInput.trim();
+                      if (!kb || !systemConfig) return;
+                      const res = await fetch('/api/admin/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ragKnowledgeBaseId: kb }),
+                      });
+                      if (res.ok) {
+                        setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: kb });
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 2500);
+                      }
+                    }}
+                    disabled={!kbInput.trim()}
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Simpan KB ini sebagai Knowledge Base default aplikasi"
+                  >
+                    <Check className="w-4 h-4" />
+                    Jadikan KB Default
+                  </button>
+                </div>
+
+                {kbHasil && (
+                  <div className="space-y-3">
+                    <div
+                      className={`p-3 rounded-card border text-xs ${
+                        kbHasil.jumlah > 0 ? 'bg-pos/15 border-pos/30' : 'bg-warn/15 border-warn/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold">
+                        {kbHasil.jumlah > 0 ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-pos" />
+                            <span className="text-pos">
+                              KB <span className="font-mono">{kbHasil.kbId}</span> memuat{' '}
+                              {kbHasil.jumlah} dokumen
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-warn" />
+                            <span className="text-warn">
+                              KB <span className="font-mono">{kbHasil.kbId || '(kosong)'}</span> tidak memuat dokumen
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {kbHasil.catatan && <p className="text-ink-2 mt-1.5">{kbHasil.catatan}</p>}
+                      {kbHasil.provider && (
+                        <p className="text-ink-3 mt-1">
+                          Provider RAG aktif: <span className="font-mono">{kbHasil.provider}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {kbHasil.jumlah > 0 && (
+                      <div className="overflow-x-auto border border-line rounded-card">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
+                            <tr>
+                              <th className="p-3 w-8">#</th>
+                              <th className="p-3">Nama Dokumen</th>
+                              <th className="p-3">Status</th>
+                              <th className="p-3 text-right">Halaman</th>
+                              <th className="p-3 text-right">Potongan</th>
+                              <th className="p-3 text-right">Token</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-line text-ink-2">
+                            {kbHasil.dokumen.map((d, i) => (
+                              <tr key={d.id || i} className="hover:bg-surface-2/60 transition-colors align-top">
+                                <td className="p-3 font-mono text-ink-3">{i + 1}</td>
+                                <td className="p-3">
+                                  <span className="text-ink font-medium break-all">{d.nama}</span>
+                                  {d.id && <span className="block text-[10px] text-ink-3 font-mono mt-0.5">{d.id}</span>}
+                                </td>
+                                <td className="p-3">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                      !d.status || /complete|done|ready|selesai/i.test(d.status)
+                                        ? 'bg-pos/15 text-pos'
+                                        : 'bg-warn/15 text-warn'
+                                    }`}
+                                  >
+                                    {d.status || 'siap'}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">{d.halaman ?? '—'}</td>
+                                <td className="p-3 text-right font-mono">{d.potongan ?? '—'}</td>
+                                <td className="p-3 text-right font-mono">{d.token ?? '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1051,73 +1542,11 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
               </div>
 
               <form onSubmit={handleCreateTenant} className="space-y-3">
-                <div>
-                  <label className="block text-ink-2 font-medium mb-1">Nama Resmi BUMD</label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: Perumda Pariwisata Tirta Graha"
-                    value={tenantName}
-                    onChange={(e) => setTenantName(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-ink-2 font-medium mb-1">Nama Singkat</label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Perumda Graha"
-                      value={tenantShortName}
-                      onChange={(e) => setTenantShortName(e.target.value)}
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-ink-2 font-medium mb-1">Kode Instansi</label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: PTG-01"
-                      value={tenantCode}
-                      onChange={(e) => setTenantCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand uppercase font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-ink-2 font-medium mb-1">Sektor</label>
-                    <select
-                      value={tenantSector}
-                      onChange={(e) => setTenantSector(e.target.value as BumdSector)}
-                      className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
-                    >
-                      <option value="pdam">PDAM (Air Minum)</option>
-                      <option value="bank">Bank Daerah (BPD/BPR)</option>
-                      <option value="pasar">Pasar Rakyat</option>
-                      <option value="rsud">Rumah Sakit (RSUD)</option>
-                      <option value="transportasi">Transportasi Daerah</option>
-                      <option value="aneka_usaha">Aneka Usaha / Pariwisata</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-ink-2 font-medium mb-1">Kota / Kabupaten</label>
-                    <input
-                      type="text"
-                      placeholder="Kota Mandiri"
-                      value={tenantCity}
-                      onChange={(e) => setTenantCity(e.target.value)}
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
+                {/* KB ID paling atas: begitu ditempel, field di bawah terisi otomatis
+                    dari dokumen KB (nama, kota, sektor, jumlah dokumen). */}
+                <div className="p-3 bg-surface-2 border border-line rounded-card space-y-2">
                   <label className="block text-ink-2 font-medium mb-1">
-                    Knowledge Base ID <span className="font-normal text-ink-3">(KB milik instansi ini di layanan RAG)</span>
+                    Knowledge Base ID <span className="font-normal text-ink-3">(isi ini dulu — sisanya terisi otomatis)</span>
                   </label>
                   <input
                     type="text"
@@ -1126,10 +1555,48 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                     onChange={(e) => setTenantKbId(e.target.value)}
                     className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
-                  <p className="text-[10px] text-ink-3 mt-1">
+                  {tenantKbLoading && (
+                    <p className="text-[11px] text-ink-2 flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Membaca dokumen KB…
+                    </p>
+                  )}
+                  {!tenantKbLoading && tenantKbInfo && (
+                    <div
+                      className={`text-[11px] rounded-control p-2 border ${
+                        tenantKbInfo.jumlahDokumen > 0
+                          ? 'bg-pos/15 border-pos/30 text-pos'
+                          : 'bg-warn/15 border-warn/30 text-warn'
+                      }`}
+                    >
+                      <span className="font-semibold">
+                        {tenantKbInfo.jumlahDokumen > 0
+                          ? `${tenantKbInfo.jumlahDokumen} dokumen ditemukan — field di bawah sudah terisi otomatis.`
+                          : 'KB ini tidak memuat dokumen.'}
+                      </span>
+                      {tenantKbInfo.catatan && <span className="block text-ink-2 mt-0.5">{tenantKbInfo.catatan}</span>}
+                      {!!tenantKbInfo.ringkasan && (
+                        <span className="block text-ink-3 mt-1 break-all">Isi: {tenantKbInfo.ringkasan}</span>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-ink-3">
                     Kosongkan hanya kalau instansi belum punya KB. Tanpa KB, chat instansi ini
                     menolak menjawab daripada menampilkan dokumen instansi lain.
                   </p>
+                </div>
+
+                {/* Field lain BUKAN isian: hanya menampilkan hasil yang dibaca dari
+                    dokumen KB. Admin cukup mengisi KB ID di atas. */}
+                <div className="space-y-2">
+                  <BarisOtomatis label="Nama Resmi BUMD" nilai={tenantName} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <BarisOtomatis label="Nama Singkat" nilai={tenantShortName} />
+                    <BarisOtomatis label="Kode Instansi" nilai={tenantCode} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <BarisOtomatis label="Sektor" nilai={LABEL_SEKTOR[tenantSector]} />
+                    <BarisOtomatis label="Kota / Kabupaten" nilai={tenantCity} />
+                  </div>
                 </div>
 
                 <div className="pt-2 flex justify-end gap-2">
@@ -1142,7 +1609,8 @@ export const Admin: React.FC<AdminProps> = ({ currentUser, onLogout }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium"
+                    disabled={tenantKbLoading || !tenantName || !tenantCity}
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Simpan BUMD
                   </button>

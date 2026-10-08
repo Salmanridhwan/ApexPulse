@@ -5,7 +5,8 @@ import { useChartSelection } from './ChartSelection';
 import { RingGauge3D } from './RingGauge3D';
 import { useThemeMode } from '../../theme';
 import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
-import { WidgetType } from '../../types';
+import { terapkanGaya } from './widgetStyle';
+import { WidgetType, type WidgetStyle } from '../../types';
 
 // echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
 // awal. Modul tree-shaken (lihat echartsSetup.ts) supaya bundel tidak 1 MB.
@@ -72,6 +73,8 @@ const TIPE_ECHARTS: WidgetType[] = [
   'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
   'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
   'radar', 'map', 'gantt',
+  // Analitik prediktif & preskriptif: tetap digambar dari deret dokumen.
+  'trend-line', 'forecast', 'anomaly', 'cluster', 'dekomposisi', 'skenario', 'sensitivitas',
 ];
 
 /** Tipe yang mendukung cross-filter klik kategori. */
@@ -107,6 +110,8 @@ export interface ChartEchartsProps {
   treemapData?: { name: string; value?: number; children?: Array<{ name: string; value: number }> };
   geoData?: { mapName?: string; regions: Array<{ name: string; value: number }>; unit?: string };
   ganttData?: { tasks: Array<{ name: string; start: string; end: string; progress?: number; color?: string }> };
+  /** Gaya tampilan pilihan pengguna (warna/font/ketebalan). */
+  style?: WidgetStyle;
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -129,6 +134,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   treemapData,
   geoData,
   ganttData,
+  style,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -202,7 +208,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
-      const T = chartTheme(themeMode);
+      const T = chartTheme(themeMode, style?.kartu);
       const { xView, seriesView, heatCols, heatRows, heatMatriks, treemapView, radarView, funnelView, pieView } = view;
 
       const chartData: ChartData = {
@@ -240,6 +246,10 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       } else {
         option = buildChartOption(type, chartData, T);
       }
+
+      // Gaya pilihan pengguna (warna/font/ketebalan) diterapkan SETELAH opsi jadi,
+      // supaya semua tipe chart ikut tanpa perlu tahu soal fitur ini.
+      option = terapkanGaya(option, style, T.series);
 
       chart.setOption(option, true);
 
@@ -287,7 +297,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {

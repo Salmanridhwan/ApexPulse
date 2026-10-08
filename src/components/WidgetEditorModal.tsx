@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   BarChart3,
@@ -8,20 +8,24 @@ import {
   FileCheck,
   History,
   Layout,
+  Palette,
   Sliders,
   Type,
   UserCheck,
   X,
 } from 'lucide-react';
-import { WidgetSpec, WidgetType } from '../types';
+import { WidgetSpec, WidgetType, type WidgetStyle } from '../types';
 import { tipeKompatibel, GRUP_VISUALISASI } from '../services/spec/widgetTypes';
+import { selaraskanTipe } from '../services/spec/tipeSelaras';
+import { adaGaya, bersihkanGaya } from './widgets/widgetStyle';
+import { StyleControls } from './StyleControls';
 
 interface WidgetEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   widget: WidgetSpec | null;
   onSave: (updatedWidget: WidgetSpec) => void;
-  initialTab?: 'config' | 'correction';
+  initialTab?: 'config' | 'tampilan' | 'correction';
 }
 
 export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
@@ -31,7 +35,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
   onSave,
   initialTab = 'config',
 }) => {
-  const [activeTab, setActiveTab] = useState<'config' | 'correction'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'config' | 'tampilan' | 'correction'>(initialTab);
 
   // Form State
   const [title, setTitle] = useState(widget?.title || '');
@@ -60,6 +64,43 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
     widget?.manualCorrection?.isCorrected || false
   );
 
+  // ── Gaya tampilan (tab "Tampilan") ──
+  // Kontrolnya ada di <StyleControls/>; di sini hanya disimpan nilai terpilih.
+  const [style, setStyle] = useState<WidgetStyle>(widget?.style || {});
+
+  /**
+   * Muat ulang seluruh isian setiap kali editor dibuka untuk widget (lain).
+   *
+   * Tanpa ini, komponen yang SELALU ter-mount — seperti di halaman tautan publik
+   * `/share/:token` — hanya mengambil nilai `widget` saat pertama kali dipasang
+   * (masih null), sehingga field terbuka KOSONG lalu tersimpan kosong juga
+   * (judul/subtitle widget ikut terhapus).
+   */
+  useEffect(() => {
+    if (!isOpen || !widget) return;
+    const nilaiSekarang =
+      widget.kpi?.value ??
+      widget.chart?.series?.[0]?.data?.[widget.chart.series[0].data.length - 1] ??
+      '-';
+    setActiveTab(initialTab);
+    setTitle(widget.title || '');
+    setSubtitle(widget.subtitle || '');
+    setType(widget.type || 'kpi');
+    setCategory(widget.category || 'Operasional');
+    setPeriode(widget.periode || '2026-Q1');
+    setUnitKerja(widget.unitKerja || 'Semua Unit');
+    setCorrectedValue(
+      widget.manualCorrection?.isCorrected ? String(widget.manualCorrection.correctedValue) : String(nilaiSekarang)
+    );
+    setCorrectedBy(widget.manualCorrection?.correctedBy || 'Siti Rahmawati, S.E. (Analis BUMD)');
+    setCorrectionReason(widget.manualCorrection?.reason || 'Penyesuaian hasil rekonsiliasi audit internal');
+    setIsApplyingCorrection(widget.manualCorrection?.isCorrected || false);
+    setStyle(widget.style || {});
+    // Dipicu per widget (id), bukan per objek: supaya ketikan pengguna tidak
+    // direset hanya karena induknya menggambar ulang.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, widget?.id]);
+
   if (!isOpen || !widget) return null;
 
   // Hanya tipe yang datanya tersedia di widget ini — supaya tak ada pilihan
@@ -67,14 +108,19 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
   const chartTypes = tipeKompatibel(widget);
 
   const handleSave = () => {
+    // Jaring pengaman: tipe yang dipilih tetap diperiksa gerbang yang sama dengan katalog.
+    // Chip di UI sudah disaring `tipeKompatibel`, jadi ini hanya mencegah tipe tak sah
+    // lolos kalau daftar chip berubah di kemudian hari.
+    const gerbang = selaraskanTipe({ ...widget, type }, type);
     const updated: WidgetSpec = {
       ...widget,
       title,
       subtitle,
-      type,
+      type: gerbang.ok && gerbang.widget ? type : widget.type,
       category,
       periode,
       unitKerja,
+      style: adaGaya(style) ? style : undefined,
       lastUpdated: new Date().toISOString(),
     };
 
@@ -159,6 +205,17 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Tipe Visualisasi & Parameter</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tampilan')}
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tampilan'
+                ? 'border-brand text-brand-ink font-bold'
+                : 'border-transparent text-ink-2 hover:text-ink'
+              }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>Warna & Font</span>
+            {adaGaya(style) && <span className="w-2 h-2 rounded-full bg-brand ml-1" />}
           </button>
           <button
             onClick={() => setActiveTab('correction')}
@@ -276,6 +333,15 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                 </div>
               </div>
             </>
+          ) : activeTab === 'tampilan' ? (
+            /* TAB WARNA & FONT — kontrolnya dipakai bersama dengan modal gaya global */
+            <StyleControls
+              style={style}
+              onChange={setStyle}
+              namaSeri={widget?.chart?.series?.map((s) => s.name)}
+              mode="widget"
+              tipeWidget={type}
+            />
           ) : (
             /* TAB KOREKSI MANUAL (F-14 PRD) */
             <div className="space-y-4">

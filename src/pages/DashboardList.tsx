@@ -266,7 +266,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       <button
                         onClick={() => onShareDashboard(dash)}
                         className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
-                        title="Bagikan Tautan Read-Only"
+                        title="Bagikan Tautan"
                       >
                         <Share2 className="w-3.5 h-3.5" />
                       </button>

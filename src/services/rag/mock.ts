@@ -6,6 +6,88 @@ export class MockRagClient implements RagClient {
   /** Jalur A diminta lebih dulu; generate.ts otomatis turun ke Jalur B bila JSON ditolak. */
   private readonly defaultMode: 'structured' | 'prose' = 'structured';
 
+  /**
+   * Mode mock tidak punya knowledge base nyata. Daftar dokumen dikembalikan dari
+   * kumpulan data contoh supaya panel admin tetap bisa diuji tanpa layanan RAG,
+   * dengan catatan jelas bahwa ini bukan dokumen instansi.
+   */
+  async daftarDokumen(kbId: string): Promise<{
+    kbId: string;
+    jumlah: number;
+    dokumen: Array<{
+      id: string;
+      nama: string;
+      status?: string;
+      halaman?: number;
+      potongan?: number;
+      token?: number;
+      dibuat?: string;
+      ringkasan?: string;
+    }>;
+    catatan?: string;
+  }> {
+    const nama = [...new Set(MOCK_CHUNKS.filter((c) => c.sector === 'pdam').map((c) => c.docName))];
+    return {
+      kbId: kbId || '(mock)',
+      jumlah: nama.length,
+      dokumen: nama.map((n, i) => ({
+        id: `mock-${i + 1}`,
+        nama: n,
+        status: 'contoh',
+        halaman: 1,
+        potongan: MOCK_CHUNKS.filter((c) => c.docName === n).length,
+        token: undefined,
+      })),
+      catatan:
+        'Provider RAG sedang mode "mock": dokumen di bawah adalah data contoh bawaan aplikasi, bukan dokumen instansi nyata.',
+    };
+  }
+
+  /**
+   * Uji API Key pada mode mock: tidak ada layanan nyata untuk diuji, jadi
+   * dilaporkan apa adanya (jangan pura-pura valid).
+   */
+  async ujiApiKey(): Promise<{
+    ok: boolean;
+    status: 'valid' | 'invalid' | 'tidak-terhubung' | 'endpoint-tidak-ada' | 'galat-layanan';
+    httpStatus?: number;
+    latencyMs: number;
+    baseDipakai?: string;
+    pesan: string;
+    kodeGalat?: string;
+  }> {
+    return {
+      ok: false,
+      status: 'galat-layanan',
+      latencyMs: 0,
+      pesan:
+        'Provider RAG sedang mode "Mock" — tidak ada layanan nyata yang bisa diuji. Ubah Provider ke "HTTP" lalu uji lagi.',
+    };
+  }
+
+  /**
+   * Profil instansi dari dokumen KB. Mode mock tidak punya dokumen nyata, jadi
+   * hanya jumlah dokumen contoh yang dilaporkan dan field lainnya dikosongkan.
+   */
+  async profilInstansi(kbId: string): Promise<{
+    kbId: string;
+    nama?: string;
+    kota?: string;
+    sektor?: BumdSector;
+    jumlahDokumen: number;
+    ringkasan?: string;
+    catatan?: string;
+  }> {
+    const daftar = await this.daftarDokumen(kbId);
+    return {
+      kbId: kbId || '(mock)',
+      jumlahDokumen: daftar.jumlah,
+      ringkasan: daftar.dokumen.map((d) => d.nama).join('; '),
+      catatan:
+        'Provider RAG sedang mode "mock": profil instansi tidak bisa dibaca dari dokumen nyata.',
+    };
+  }
+
   async probe(): Promise<{
     latencyMs: number;
     canOutputJson: boolean;

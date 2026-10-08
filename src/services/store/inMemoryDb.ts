@@ -8,6 +8,7 @@ import {
   Chat,
   ChatMessage,
   Dashboard,
+  KetersediaanPreset,
   NotificationItem,
   Tenant,
   User,
@@ -100,6 +101,7 @@ interface PersistedState {
   users?: SafeUser[];
   tenants?: Tenant[];
   credentials?: Record<string, string>;
+  ketersediaanPreset?: KetersediaanPreset[];
 }
 
 export class InMemoryDb {
@@ -186,6 +188,13 @@ export class InMemoryDb {
 
   /** Riwayat percakapan orkestrator — satu chat per dashboard (relasi 1:1). */
   public chats: Chat[] = [];
+
+  /**
+   * Catatan ketersediaan preset katalog per instansi (hasil pemeriksaan nyata
+   * ke dokumen instansi). Dipakai agar katalog "Tambah Widget" hanya menawarkan
+   * preset yang benar-benar bisa diisi.
+   */
+  public ketersediaanPreset: KetersediaanPreset[] = [];
 
   public alertRules: AlertRule[] = [
     {
@@ -291,7 +300,12 @@ export class InMemoryDb {
   constructor() {
     this.seedCredentials();
     this.loadPersisted();
-    this.seedInitialDashboards();
+    // Dashboard demo bawaan HANYA diisi kalau diminta eksplisit.
+    // Aplikasi ini dipakai dengan dokumen instansi nyata (RAG), dan dashboard demo
+    // berisi angka contoh. Dulu seed ini jalan tiap kali daftar dashboard kosong,
+    // sehingga dashboard yang sengaja dihapus user muncul lagi setiap restart.
+    // Nyalakan lagi untuk keperluan demo/QA: SEED_DEMO_DASHBOARDS=1.
+    if (process.env.SEED_DEMO_DASHBOARDS === '1') this.seedInitialDashboards();
   }
 
   // ================= MySQL (Laragon) =================
@@ -311,6 +325,7 @@ export class InMemoryDb {
       users: this.users,
       credentials: this.credentials,
       tenants: this.tenants,
+      ketersediaanPreset: this.ketersediaanPreset,
     };
   }
 
@@ -349,6 +364,9 @@ export class InMemoryDb {
         if (Array.isArray(loaded.auditLogs)) this.auditLogs = loaded.auditLogs;
         if (Array.isArray(loaded.users)) this.users = loaded.users;
         if (Array.isArray(loaded.tenants)) this.tenants = loaded.tenants;
+        if (Array.isArray(loaded.ketersediaanPreset)) {
+          this.ketersediaanPreset = loaded.ketersediaanPreset;
+        }
         if (loaded.shareTokens) this.shareTokens = loaded.shareTokens;
         if (loaded.sharePins) this.sharePins = loaded.sharePins;
         if (loaded.credentials) this.credentials = loaded.credentials;
@@ -463,6 +481,7 @@ export class InMemoryDb {
       }
       if (Array.isArray(parsed.users) && parsed.users.length > 0) this.users = parsed.users;
       if (Array.isArray(parsed.tenants) && parsed.tenants.length > 0) this.tenants = parsed.tenants;
+      if (Array.isArray(parsed.ketersediaanPreset)) this.ketersediaanPreset = parsed.ketersediaanPreset;
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Jamin user seed tetap ada walau file fallback sudah usang.
       this.ensureSeedUsers();
@@ -483,6 +502,42 @@ export class InMemoryDb {
     this.systemConfig = { ...this.systemConfig, ...(partial as object) };
     this.persist();
     return this.systemConfig;
+  }
+
+  // ================= Ketersediaan preset katalog =================
+
+  /** Catatan ketersediaan preset yang berlaku untuk instansi + KB ini. */
+  public ketersediaanUntuk(tenantId: string, kbId: string): KetersediaanPreset[] {
+    return this.ketersediaanPreset.filter((k) => k.tenantId === tenantId && k.kbId === kbId);
+  }
+
+  /**
+   * Simpan/perbarui satu catatan ketersediaan preset. Kunci = tenant|preset|tipe,
+   * jadi pemeriksaan ulang menggantikan catatan lama (tidak menumpuk).
+   */
+  public simpanKetersediaan(catatan: KetersediaanPreset): void {
+    const idx = this.ketersediaanPreset.findIndex((k) => k.id === catatan.id);
+    if (idx >= 0) this.ketersediaanPreset[idx] = catatan;
+    else this.ketersediaanPreset.push(catatan);
+  }
+
+  /**
+   * Buang catatan ketersediaan yang sudah tidak sah: KB instansi berbeda dari
+   * saat pemeriksaan, atau catatan lebih tua dari `ttlHari`. Dipanggil saat boot
+   * supaya instansi yang KB-nya diganti tidak mewarisi hasil pemeriksaan lama.
+   */
+  public bersihkanKetersediaan(kbPerTenant: Record<string, string>, ttlHari = 7): number {
+    const batas = Date.now() - ttlHari * 24 * 60 * 60 * 1000;
+    const sebelum = this.ketersediaanPreset.length;
+    this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => {
+      const kbKini = kbPerTenant[k.tenantId];
+      if (kbKini !== undefined && kbKini !== k.kbId) return false;
+      const waktu = Date.parse(k.checkedAt);
+      return Number.isFinite(waktu) ? waktu >= batas : false;
+    });
+    const dibuang = sebelum - this.ketersediaanPreset.length;
+    if (dibuang > 0) this.persist();
+    return dibuang;
   }
 
   /** Tulis state ke disk (jaring pengaman) + mirror ke MySQL bila tersedia. */
@@ -639,7 +694,7 @@ export class InMemoryDb {
         {
           id: `msg-welcome-${Date.now()}`,
           sender: 'system',
-          text: 'Halo! Saya asisten orkestrator ApexPulse. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
+          text: 'Halo! Saya asisten orkestrator Aiones Boards. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
           timestamp: now,
         },
       ],

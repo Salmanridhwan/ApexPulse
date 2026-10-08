@@ -21,6 +21,17 @@ export interface Tenant {
    * PDAM Tirta Kencana justru berisi laporan Bank BJB.
    */
   knowledgeBaseId?: string;
+  /**
+   * Nama dokumen yang terakhir terbaca dari KB instansi ini.
+   *
+   * Dipakai untuk mendeteksi dokumen BARU: saat admin menekan "Perbarui RAG",
+   * daftar terbaru dibandingkan dengan daftar ini sehingga aplikasi bisa
+   * menyebutkan dokumen mana yang baru diunggah (bukan sekadar jumlah).
+   * Kosong = belum pernah disinkronkan, jadi jangan mengaku ada dokumen baru.
+   */
+  dokumenTerakhir?: string[];
+  /** Waktu sinkronisasi KB terakhir (ISO). Ditampilkan di kartu instansi. */
+  kbTersinkronPada?: string;
 }
 
 export interface User {
@@ -70,13 +81,23 @@ export type WidgetType =
   | 'gauge'
   | 'bullet-target'
   | 'table'
-  | 'narasi';
+  | 'narasi'
+  // Analitik prediktif (menghitung proyeksi/pola dari angka dokumen)
+  | 'trend-line'
+  | 'forecast'
+  | 'anomaly'
+  | 'cluster'
+  // Analitik preskriptif (membantu keputusan; hasilnya simulasi/uraian kontribusi)
+  | 'dekomposisi'
+  | 'skenario'
+  | 'sensitivitas';
 
 /** Tipe yang butuh data seri (xAxis + minimal satu seri) untuk dirender. */
 export const TIPE_SERI: WidgetType[] = [
   'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
   'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
   'radar', 'map', 'gantt',
+  'trend-line', 'forecast', 'anomaly', 'cluster', 'dekomposisi', 'skenario', 'sensitivitas',
 ];
 
 export type ConfidenceLevel = 'sumber' | 'inferensi AI' | 'manual';
@@ -108,6 +129,34 @@ export interface WidgetGrid {
   h: number;
 }
 
+/**
+ * Gaya tampilan widget yang bisa diatur pengguna.
+ *
+ * Semua opsional: field yang kosong berarti "pakai bawaan tema", sehingga widget
+ * lama (yang belum punya `style`) tampil persis seperti sebelumnya.
+ */
+export interface WidgetStyle {
+  /** Palet siap pakai. Menimpa warna seri bawaan tema. */
+  palette?: 'default' | 'brand' | 'hijau' | 'ungu' | 'oranye' | 'monokrom' | 'hangat' | 'sejuk';
+  /** Warna kustom per-seri (menimpa palet). Indeks 0 = seri pertama. */
+  warnaSeri?: string[];
+  /** Font untuk label/sumbu/legenda. */
+  font?: 'Inter' | 'JetBrains Mono';
+  /** Ukuran dasar font chart (px). Label kecil ikut menyesuaikan. */
+  fontUkuran?: number;
+  /** Ketebalan garis (px) untuk tipe garis/area. */
+  garisTebal?: number;
+  /** Sudut lengkung batang (px) untuk tipe batang. */
+  batangRadius?: number;
+  /**
+   * Warna latar KARTU widget (hex). Kosong = pakai bawaan tema.
+   *
+   * Teks, border, dan label chart diturunkan otomatis dari warna ini dengan
+   * perhitungan kontras WCAG (lihat `widgetCardTheme.ts`) supaya tetap terbaca.
+   */
+  kartu?: string;
+}
+
 export interface WidgetSpec {
   id: string;
   presetId?: string;
@@ -125,6 +174,8 @@ export interface WidgetSpec {
     target?: number;
     targetLabel?: string;
     sparkline?: number[];
+    /** Asal grafik tren: seri dokumen, turunan dari delta, atau turunan dari nilai saja. */
+    sparklineAsal?: 'dokumen-seri' | 'turunan-delta' | 'turunan-nilai';
   };
   chart?: {
     xAxis: string[];
@@ -210,6 +261,11 @@ export interface WidgetSpec {
   unitKerja?: string;
   periode?: string;
   lastUpdated?: string;
+  /**
+   * Gaya tampilan pilihan pengguna (warna, font, ketebalan garis).
+   * Semua field opsional: kalau kosong, widget memakai tampilan bawaan tema.
+   */
+  style?: WidgetStyle;
 }
 
 export interface GlobalFilters {
@@ -239,11 +295,42 @@ export interface CatalogPreset {
   nama: string;
   sektor: PresetSector[];
   tipeChart: WidgetType[];
-  kategori: 'Keuangan' | 'Operasional' | 'Pelayanan' | 'Kepatuhan & Risiko';
+  kategori: 'Keuangan' | 'Operasional' | 'Pelayanan' | 'Kepatuhan & Risiko' | 'Analitik';
   satuan: string;
   queryRagContoh: string;
   deskripsi: string;
   defaultLayout: { w: number; h: number };
+}
+
+/**
+ * Catatan "preset ini benar-benar bisa ditambahkan untuk instansi ini".
+ *
+ * Diisi hasil pemeriksaan yang memakai panggilan SAMA dengan tombol Tambah
+ * (`ambilDataWidget` dengan KB instansi), lalu di-cache supaya katalog tidak
+ * menawarkan preset yang mustahil diisi. Terikat ke `kbId`: begitu KB instansi
+ * berubah, catatan lama tidak dipakai lagi.
+ */
+export interface KetersediaanPreset {
+  /** `${tenantId}|${presetId}|${tipe}` — kunci unik cache. */
+  id: string;
+  tenantId: string;
+  kbId: string;
+  presetId: string;
+  tipe: WidgetType;
+  tersedia: boolean;
+  /** Alasan singkat saat tidak tersedia (untuk tombol "tampilkan juga"). */
+  alasan?: string;
+  /**
+   * Pemeriksaan tidak bisa disimpulkan (mis. layanan RAG membalas 502). Dibedakan
+   * dari "dokumen tidak memuat" supaya galat sesaat tidak menyembunyikan preset
+   * dan tidak dilaporkan sebagai kesimpulan dokumen.
+   */
+  tidakDiketahui?: boolean;
+  /** Payload hasil dokumen — hanya disimpan kalau tersedia. */
+  widget?: WidgetSpec;
+  judul?: string;
+  deskripsi?: string;
+  checkedAt: string;
 }
 
 export interface AlertRule {

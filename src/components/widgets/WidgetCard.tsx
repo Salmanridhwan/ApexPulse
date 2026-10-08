@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   Copy,
@@ -10,6 +11,8 @@ import {
 import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
+import { temaKartu, warnaKartuValid } from './widgetCardTheme';
+import { useThemeMode } from '../../theme';
 
 /** Label pendek untuk tombol ganti tipe cepat di menu widget. */
 const LABEL_TIPE: Record<string, string> = {
@@ -26,6 +29,8 @@ interface WidgetCardProps {
   onManualCorrection: (widget: WidgetSpec) => void;
   onDelete: (widgetId: string) => void;
   onDuplicate: (widget: WidgetSpec) => void;
+  /** Mode pratinjau (mis. galeri template): sembunyikan menu ⋯ karena widget belum nyata. */
+  preview?: boolean;
 }
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
@@ -34,14 +39,70 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   onManualCorrection,
   onDelete,
   onDuplicate,
+  preview = false,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  /**
+   * Menu (⋯) digambar lewat PORTAL ke `document.body` dengan posisi `fixed`, bukan
+   * `absolute` di dalam kartu. Sebabnya kartu widget memakai `overflow-hidden` (perlu
+   * untuk memotong isi ke sudut membulat), sehingga menu `absolute` ikut TERPOTONG di
+   * dalam kartu. Dengan portal, menu melayang DI ATAS kartu seperti seharusnya.
+   */
+  const tombolMenuRef = useRef<HTMLButtonElement>(null);
+  const [posisiMenu, setPosisiMenu] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+
+  const bukaMenu = () => {
+    const r = tombolMenuRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const LEBAR_MENU = 256; // w-64
+    const PERKIRAAN_TINGGI = 380; // grid tipe grafik (3 baris) + 4 aksi
+    const right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - LEBAR_MENU - 8));
+    const tidakMuatKeBawah = r.bottom + PERKIRAAN_TINGGI > window.innerHeight - 8 && r.top > PERKIRAAN_TINGGI;
+    setPosisiMenu(
+      tidakMuatKeBawah
+        ? { bottom: window.innerHeight - r.top + 4, right }
+        : { top: r.bottom + 4, right }
+    );
+    setShowMenu(true);
+  };
+
+  // Menu posisinya dihitung sekali saat dibuka; kalau halaman digeser/diubah ukurannya,
+  // lebih baik ditutup daripada melayang di tempat yang salah.
+  useEffect(() => {
+    if (!showMenu) return;
+    const tutup = () => setShowMenu(false);
+    window.addEventListener('scroll', tutup, true);
+    window.addEventListener('resize', tutup);
+    return () => {
+      window.removeEventListener('scroll', tutup, true);
+      window.removeEventListener('resize', tutup);
+    };
+  }, [showMenu]);
 
   const isManual = widget.confidence === 'manual' || widget.manualCorrection?.isCorrected;
   const isSource = widget.confidence === 'sumber' && !isManual;
 
+  /**
+   * Warna latar kartu pilihan pengguna.
+   *
+   * Diterapkan dengan MENIMPA variabel CSS di elemen kartu, bukan dengan
+   * menambahkan kelas ke tiap anak. Semua keturunan (judul, subtitle, border,
+   * tombol ⋯, menu) otomatis ikut berubah, dan teksnya tetap terbaca karena
+   * warna tinta dihitung dari kontras terhadap latar (`temaKartu`).
+   * Saat pengguna tidak memilih warna, `vars` dikosongkan agar kartu memakai
+   * token tema seperti biasa (tidak ada perubahan perilaku).
+   */
+  const mode = useThemeMode();
+  const tema = temaKartu(widget.style?.kartu, mode);
+  const pakaiWarnaKartu = warnaKartuValid(widget.style?.kartu);
+  const gayaKartu = pakaiWarnaKartu ? (tema.vars as React.CSSProperties) : undefined;
+
   return (
-    <div className="relative card card-lift flex flex-col h-full overflow-hidden group">
+    <div
+      className="relative card card-lift flex flex-col h-full overflow-hidden group"
+      style={gayaKartu}
+      data-kartu-warna={pakaiWarnaKartu ? widget.style?.kartu : undefined}
+    >
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -69,41 +130,49 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             </span>
           )}
 
-          {/* Menu opsi (⋯) — satu-satunya tombol yang selalu tampak */}
+          {/* Menu opsi (⋯) — satu-satunya tombol yang selalu tampak. Disembunyikan
+              di mode pratinjau (widget template belum nyata, jadi tidak ada aksi). */}
+          {!preview && (
           <div className="relative">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              ref={tombolMenuRef}
+              onClick={() => (showMenu ? setShowMenu(false) : bukaMenu())}
               className="p-1 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
               title="Menu Opsi Widget"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
 
-            {showMenu && (
+            {showMenu && posisiMenu && createPortal(
               <>
-                <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-control shadow-pop border border-line py-1 z-30 text-xs text-ink-2">
+                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                <div
+                  className="fixed w-64 bg-surface rounded-control shadow-pop border border-line py-1 z-[45] text-xs text-ink-2"
+                  style={{ top: posisiMenu.top, bottom: posisiMenu.bottom, right: posisiMenu.right }}
+                >
                   {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
                         Tipe Grafik
                       </div>
-                      <div className="px-3 pb-1.5">
-                        <div className="segmented w-full">
-                          {(['line', 'bar', 'area', 'pie', 'hbar', 'scatter', 'funnel'] as const).map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => onEdit({ ...widget, type: t })}
-                              className={`segmented-item flex-1 ${
-                                widget.type === t ? 'segmented-item-active' : ''
-                              }`}
-                              title={LABEL_TIPE[t]}
-                            >
-                              {LABEL_TIPE[t]}
-                            </button>
-                          ))}
-                        </div>
+                      {/* Grid 3 kolom: 7 pilihan tetap terbaca tanpa terpotong,
+                          berbeda dari deretan pil satu baris yang bikin sesak. */}
+                      <div className="px-3 pb-2 grid grid-cols-3 gap-1">
+                        {(['line', 'bar', 'area', 'pie', 'hbar', 'scatter', 'funnel'] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => onEdit({ ...widget, type: t })}
+                            className={`text-[11px] font-semibold px-1.5 py-1.5 rounded-chip border transition-colors truncate ${
+                              widget.type === t
+                                ? 'bg-ink text-surface border-ink'
+                                : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
+                            }`}
+                            title={LABEL_TIPE[t]}
+                          >
+                            {LABEL_TIPE[t]}
+                          </button>
+                        ))}
                       </div>
                       <div className="border-t border-line my-1" />
                     </>
@@ -123,9 +192,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                       setShowMenu(false);
                       onManualCorrection(widget);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-warn/10 flex items-center gap-2 text-warn"
+                    className="w-full text-left px-3 py-1.5 hover:bg-warn/10 flex items-center gap-2 text-warn whitespace-nowrap"
                   >
-                    <AlertTriangle className="w-3.5 h-3.5 text-warn" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0" />
                     <span>Koreksi Angka Manual (F-14)</span>
                   </button>
                   <button
@@ -150,9 +219,11 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                     <span>Hapus dari Dashboard</span>
                   </button>
                 </div>
-              </>
+              </>,
+              document.body
             )}
           </div>
+          )}
         </div>
       </div>
 

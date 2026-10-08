@@ -14,6 +14,8 @@ const TIPE_CHART = [
   'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
   'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
   'radar', 'map', 'gantt', 'gauge',
+  // Analitik prediktif & preskriptif — dirender sebagai chart dari deret dokumen.
+  'trend-line', 'forecast', 'anomaly', 'cluster', 'dekomposisi', 'skenario', 'sensitivitas',
 ];
 
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
@@ -39,6 +41,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
         treemapData={widget.treemap}
         geoData={widget.geo}
         ganttData={widget.gantt}
+        style={widget.style}
       />
     );
   }
@@ -53,9 +56,11 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
           deltaLabel={widget.kpi?.deltaLabel}
           target={widget.kpi?.target}
           targetLabel={widget.kpi?.targetLabel}
+          tampilkanTarget={false}
           sparkline={widget.kpi?.sparkline}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
+          style={widget.style}
         />
       );
 
@@ -87,6 +92,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
           sparkline={widget.kpi?.sparkline}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
+          style={widget.style}
         />
       );
 

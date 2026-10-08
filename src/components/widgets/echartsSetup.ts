@@ -1,5 +1,5 @@
 /**
- * ECharts tree-shaken: hanya modul yang dipakai ApexPulse yang di-register.
+ * ECharts tree-shaken: hanya modul yang dipakai Aiones Boards yang di-register.
  *
  * Kenapa: `import('echarts')` menarik SELURUH pustaka (~1.12 MB) ke satu chunk.
  * Dengan mengimpor dari `echarts/core` + register manual, bundel menyusut ke

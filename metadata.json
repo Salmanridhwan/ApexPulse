@@ -1,5 +1,5 @@
 {
-  "name": "ApexPulse",
+  "name": "Aiones Boards",
   "description": "Platform dashboard otomatis dari data RAG BUMD lewat antarmuka chat cerdas dan kustomisasi visual penuh.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

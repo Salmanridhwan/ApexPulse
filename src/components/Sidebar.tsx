@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
   Activity,
-  Bell,
+  BarChart3,
   History,
   Layers,
   LayoutGrid,
+  LayoutTemplate,
   LogOut,
   Plus,
   Search,
@@ -14,6 +15,8 @@ import {
 } from 'lucide-react';
 import { LogoTile, AvatarTile } from './BrandMark';
 import { Dashboard, Tenant, User } from '../types';
+import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
+import { ADMIN_TABS, AdminTabId } from './adminTabs';
 
 function waktuRelatif(iso?: string): string {
   if (!iso) return '';
@@ -46,8 +49,16 @@ export interface SidebarProps {
   onOpenAudit: () => void;
   onOpenAlerts: () => void;
   unreadAlertsCount: number;
-  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'admin';
+  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'admin';
   onOpenAdmin: () => void;
+  /** Tab Panel Admin yang sedang aktif (dipakai saat currentView === 'admin'). */
+  adminTab?: AdminTabId;
+  /** Pindah tab Panel Admin; juga membuka mode admin. */
+  onSelectAdminTab?: (tab: AdminTabId) => void;
+  /** Buka galeri Template Chart (semua tipe visualisasi + rekomendasi pemakaian). */
+  onOpenChartGallery?: () => void;
+  /** Buka galeri Template Dashboard (dashboard siap pakai per sektor BUMD). */
+  onOpenDashboardTemplates?: () => void;
   currentUser: User | null;
   onLogout: () => void;
 }
@@ -68,6 +79,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   unreadAlertsCount,
   currentView = 'workspace',
   onOpenAdmin,
+  adminTab = 'overview',
+  onSelectAdminTab,
+  onOpenChartGallery,
+  onOpenDashboardTemplates,
   currentUser,
   onLogout,
 }) => {
@@ -102,14 +117,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm tracking-tight text-shell-ink leading-none">ApexPulse</span>
+                <span className="font-bold text-sm tracking-tight text-shell-ink leading-none">Aiones Boards</span>
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-chip text-[9px] font-semibold bg-brand/25 text-brand-ink">Studio</span>
               </div>
               <p className="text-[10px] text-shell-ink-2 font-medium truncate mt-0.5">Dashboard Generator BUMD</p>
             </div>
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center" title="ApexPulse Studio">
+          <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center" title="Aiones Boards Studio">
             <Activity className="w-4 h-4" />
           </div>
         )}
@@ -206,7 +221,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* GRUP 2: Tata Kelola & Sistem */}
+        {/* GRUP 2: Referensi */} 
+        {(onOpenChartGallery || onOpenDashboardTemplates) && (
+          <div>
+            {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Referensi</div>}
+            <div className="space-y-0.5">
+              {onOpenDashboardTemplates && (
+                <button
+                  onClick={onOpenDashboardTemplates}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'templates' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Template Dashboard — dashboard siap pakai per sektor BUMD (angka contoh)"
+                  data-testid="buka-template-dashboard"
+                >
+                  {currentView === 'templates' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <LayoutTemplate className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'templates' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Template Dashboard</span>}
+                </button>
+              )}
+              {onOpenChartGallery && (
+                <button
+                  onClick={onOpenChartGallery}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'charts' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title={`Template Chart — ${TIPE_VISUALISASI.length} tipe chart beserta rekomendasi pemakaiannya`}
+                  data-testid="buka-galeri-chart"
+                >
+                  {currentView === 'charts' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <BarChart3 className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'charts' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Template Chart</span>}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* GRUP 3: Tata Kelola & Sistem */}
         <div>
           {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Sistem & Tata Kelola</div>}
           <div className="space-y-0.5">
@@ -215,23 +263,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <History className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'audit' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
               {!isCollapsed && <span className="flex-1 truncate">Jejak Audit</span>}
             </button>
-            <button onClick={onOpenAlerts} className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'alerts' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title={`Ambang Batas & Alert (${unreadAlertsCount} peringatan baru)`}>
-              {currentView === 'alerts' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-              <Bell className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'alerts' ? 'text-brand' : unreadAlertsCount > 0 ? 'text-neg' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-              {!isCollapsed && <span className="flex-1 truncate">Ambang Batas & Alert</span>}
-              {unreadAlertsCount > 0 && <span className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-auto'} px-1.5 py-0.2 rounded-full ${currentView === 'alerts' ? 'bg-surface text-brand' : 'bg-neg text-on-neg'} text-[10px] font-bold`}>{unreadAlertsCount}</span>}
-            </button>
             {currentUser?.role === 'admin' && (
-              <button onClick={onOpenAdmin} className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'admin' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title="Panel Admin & Pengaturan Studio">
-                {currentView === 'admin' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-                <Shield className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'admin' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+              <div>
                 {!isCollapsed && (
-                  <>
-                    <span className="flex-1 truncate">Panel Admin</span>
-                    <span className={`text-[9px] font-semibold uppercase px-1 py-0.5 rounded-chip ${currentView === 'admin' ? 'bg-brand/20 text-brand' : 'bg-shell-hover text-shell-ink-2'}`}>Admin</span>
-                  </>
+                  <div className="px-2 pb-1.5 mt-3 flex items-center justify-between text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">
+                    <span className="flex items-center gap-1.5">
+                      <Shield className="w-3 h-3" /> Panel Admin
+                    </span>
+                  </div>
                 )}
-              </button>
+                <div className="space-y-0.5">
+                  {ADMIN_TABS.map((tab) => {
+                    const Icon = tab.icon;
+                    const aktif = currentView === 'admin' && adminTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          if (onSelectAdminTab) onSelectAdminTab(tab.id);
+                          else onOpenAdmin();
+                        }}
+                        className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${aktif ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                        title={`Panel Admin · ${tab.label}`}
+                        data-testid={`admin-tab-${tab.id}`}
+                      >
+                        {aktif && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                        <Icon className={`w-4 h-4 shrink-0 transition-colors ${aktif ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                        {!isCollapsed && <span className="flex-1 truncate">{tab.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>

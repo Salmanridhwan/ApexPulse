@@ -5,10 +5,10 @@ import { GlobalFilters, WidgetSpec } from '../types';
 interface GlobalFiltersBarProps {
   filters: GlobalFilters;
   onChange: (updatedFilters: GlobalFilters) => void;
-  /** Widget pada dashboard — sumber opsi filter & hitungan. */
+  /** Widget pada dashboard — sumber opsi filter. */
   widgets: WidgetSpec[];
-  /** Jumlah widget yang benar-benar tampil setelah filter diterapkan. */
-  shownCount: number;
+  /** Jumlah widget yang tampil (tidak lagi ditampilkan di UI, dipertahankan untuk kompatibilitas caller). */
+  shownCount?: number;
 }
 
 /** Nilai unik yang benar-benar ada pada widget (bukan daftar hardcode). */
@@ -17,7 +17,7 @@ function opsiUnik(nilai: (string | undefined)[]): string[] {
 }
 
 const chipDasar =
-  'inline-flex items-center gap-1.5 bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card px-3 py-1.5 transition-all';
+  'inline-flex items-center gap-1.5 bg-surface hover:bg-surface-2/60 border border-line rounded-card px-3 py-1.5 transition-all shadow-sm';
 const selectDasar = 'bg-transparent font-bold text-ink focus:outline-none cursor-pointer pr-1';
 
 /** Bar filter dashboard: Periode / Unit Kerja / Kategori, dipakai di workspace internal & halaman publik. */
@@ -25,7 +25,6 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
   filters,
   onChange,
   widgets,
-  shownCount,
 }) => {
   const opsiPeriode = useMemo(() => ['Semua', ...opsiUnik(widgets.map((w) => w.periode))], [widgets]);
   const opsiUnit = useMemo(() => ['Semua', ...opsiUnik(widgets.map((w) => w.unitKerja))], [widgets]);
@@ -36,9 +35,6 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
 
   return (
     <div className="flex items-center gap-2.5 flex-wrap text-xs" data-testid="dashboard-filter-bar">
-      <span className="inline-flex items-center px-3 py-1.5 font-semibold text-ink-2 bg-surface-2/90 border border-line/80 rounded-card">
-        {shownCount}/{widgets.length} Widget
-      </span>
 
       {opsiPeriode.length > 1 && (
         <div className={`${chipDasar} focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand`}>

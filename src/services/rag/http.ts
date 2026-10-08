@@ -4,6 +4,8 @@ import { RAG_PROMPTS } from './prompts';
 import { RagClient, RagQueryOptions, RagResult } from './types';
 import { SectorDocumentChunk } from './mockData';
 import { KB_CAMPUR } from './kbDefaults';
+import { angkaDariTeks } from '../spec/kpiSparkline';
+import { selaraskanTipe } from '../spec/tipeSelaras';
 
 /**
  * Pilih KB pertama yang layak dari daftar kandidat (KB instansi → KB global),
@@ -48,6 +50,8 @@ export const SKEMA_KPI_ITEM = {
     label: { type: 'string' },
     nilai: { type: 'string' },
     satuan: { type: 'string' },
+    /** Angka periode sebelumnya (tahun lalu / triwulan lalu) BILA dokumen memuatnya. */
+    nilaiLalu: { type: 'string' },
     deltaLabel: { type: 'string' },
     periode: { type: 'string' },
     unitKerja: { type: 'string' },
@@ -288,7 +292,22 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       title: judul,
       subtitle: potong(k?.unitKerja, 32) || undefined,
       grid: penata.kotak(lebarKpi, 3),
-      kpi: { value, unit, deltaLabel: deltaMasukAkal(k?.deltaLabel) },
+      // Delta (persentase perubahan) = bandingkan dengan angka periode sebelumnya bila
+      // dokumen memuatnya. Kalau tidak ada, dibiarkan kosong supaya tidak mengarang angka.
+      kpi: (() => {
+        const kini = angkaDariTeks(value);
+        const lalu = angkaDariTeks((k as any)?.nilaiLalu);
+        if (kini !== null && lalu !== null && lalu !== 0) {
+          const delta = Number((((kini - lalu) / lalu) * 100).toFixed(1));
+          return {
+            value,
+            unit,
+            delta,
+            deltaLabel: deltaMasukAkal(k?.deltaLabel) || 'vs periode sebelumnya',
+          };
+        }
+        return { value, unit, deltaLabel: deltaMasukAkal(k?.deltaLabel) };
+      })(),
       citations: [kutipanExtract(`kpi-${i + 1}`, k?.docName, k?.page, k?.chunkSnippet)],
       unitKerja: potong(k?.unitKerja, 40) || undefined,
       periode: potong(k?.periode, 12) || '',
@@ -487,10 +506,11 @@ export class ConfigurableRagClient implements RagClient {
   /** Panggil /extract dan kembalikan satu item payload (null kalau gagal atau kosong). */
   private async ambilPayloadExtract(
     base: string,
-    cfg: { apiKey: string; kbId?: string; timeoutMs: number },
+    cfg: { apiKey?: string; kbId?: string; timeoutMs: number },
     instruksi: string,
     skema: any = SKEMA_EKSTRAKSI,
-    kbId?: string
+    kbId?: string,
+    opsi?: { lemparSaatGagal?: boolean }
   ): Promise<any | null> {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), Math.max(5, cfg.timeoutMs || 60) * 1000);
@@ -514,15 +534,33 @@ export class ConfigurableRagClient implements RagClient {
       });
       if (!res.ok) {
         console.warn(`[rag] /extract dibalas ${res.status}`);
+        // Pemanggil yang butuh membedakan "dokumen tidak memuat" dari "layanan
+        // bermasalah" (mis. pemeriksa ketersediaan preset) minta dilempar.
+        if (opsi?.lemparSaatGagal) {
+          throw new Error(`Layanan RAG membalas ${res.status}.`);
+        }
         return null;
       }
-      const raw: any = await res.json().catch(() => null);
+      const teksRespons = await res.text();
+      let raw: any = null;
+      try {
+        raw = JSON.parse(teksRespons);
+      } catch {
+        // Badan non-JSON = halaman galat (502/504 dari gerbang layanan), bukan
+        // "dokumen kosong". Dibedakan supaya tidak dilaporkan sebagai "tidak ada data".
+        console.warn('[rag] /extract membalas badan non-JSON');
+        if (opsi?.lemparSaatGagal) {
+          throw new Error('Layanan RAG membalas badan non-JSON (kemungkinan galat gerbang).');
+        }
+        return null;
+      }
       const wadah = raw?.data && raw.success !== undefined ? raw.data : raw;
       const item = Array.isArray(wadah?.items) ? wadah.items[0] : null;
       if (!item) console.warn('[rag] /extract tidak mengembalikan item');
       return item;
     } catch (err) {
       console.warn('[rag] /extract gagal:', jelaskanError(err));
+      if (opsi?.lemparSaatGagal) throw err;
       return null;
     } finally {
       clearTimeout(timer);
@@ -628,8 +666,9 @@ export class ConfigurableRagClient implements RagClient {
     sector: BumdSector,
     tipeTarget: string,
     instansi?: string,
-    kbId?: string
-  ): Promise<{ data: any; judul?: string; deskripsi?: string } | null> {
+    kbId?: string,
+    opsi?: { lemparSaatGagal?: boolean }
+  ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
     const cfg = this.getRagConfig();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
     const { dipakai } = await this.resolveBase(cfg);
@@ -645,7 +684,8 @@ export class ConfigurableRagClient implements RagClient {
             : 'narasi';
     const aturanFokus =
       fokus === 'kpi'
-        ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". '
+        ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". ' +
+          'Kalau dokumen juga memuat angka PERIODE SEBELUMNYA untuk indikator ini (tahun lalu/triwulan lalu), isi "nilaiLalu" dengan angka itu; kalau tidak ada, kosongkan. '
         : fokus === 'grafik'
           ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. '
           : fokus === 'tabel'
@@ -679,7 +719,7 @@ export class ConfigurableRagClient implements RagClient {
         sector
       );
 
-    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId);
+    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId, opsi);
     if (!item) return null;
     let widgets = bungkus(item);
 
@@ -703,7 +743,7 @@ export class ConfigurableRagClient implements RagClient {
         `atau rasio yang tersedia) dan sebutkan dasar angkanya secara singkat pada label atau judul (maksimal 8 kata). ` +
         aturanFokus +
         `Semua angka wajib dari dokumen, tidak boleh dikarang. Wajib mengisi docName, page, dan chunkSnippet asli.`;
-      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId);
+      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId, opsi);
       if (item2) {
         item = item2;
         widgets = bungkus(item2);
@@ -721,11 +761,32 @@ export class ConfigurableRagClient implements RagClient {
     }
     const cocok =
       widgets.find((w: any) => w.type === tipeTarget) ||
+      (['kpi', 'bullet-target', 'gauge'].includes(tipeTarget)
+        ? widgets.find((w: any) => !!w.kpi)
+        : undefined) ||
+      (['bar', 'hbar', 'line', 'area', 'combo', 'pie', 'donut', 'treemap', 'funnel', 'radar',
+        'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap', 'waterfall', 'sankey', 'map',
+        'gantt'].includes(tipeTarget)
+        ? widgets.find((w: any) => !!w.chart || !!w.geo || !!w.gantt)
+        : undefined) ||
       widgets.find((w: any) => w.type === fokus) ||
-      widgets.find((w: any) => w.type === 'kpi') ||
       widgets[0];
     if (!cocok) return null;
-    return { data: cocok, judul: item.dashboardTitle, deskripsi: item.description };
+
+    // Tipe yang dipilih di katalog WAJIB dihormati. Kalau bentuk datanya tidak
+    // mendukung (mis. peta tanpa rincian wilayah), jangan diam-diam mengembalikan
+    // batang — kembalikan alasan supaya katalog jujur dan kartu di kanvas sama
+    // dengan pratinjaunya.
+    const selaras = selaraskanTipe(cocok, tipeTarget);
+    if (!selaras.ok || !selaras.widget) {
+      return {
+        data: null,
+        judul: item.dashboardTitle,
+        deskripsi: item.description,
+        alasan: selaras.alasan || `Tipe ${tipeTarget} tidak bisa dibuat dari data dokumen ini.`,
+      };
+    }
+    return { data: selaras.widget, judul: item.dashboardTitle, deskripsi: item.description };
   }
 
   async query(options: RagQueryOptions): Promise<RagResult> {
@@ -831,7 +892,381 @@ export class ConfigurableRagClient implements RagClient {
     }
   }
 
-  async probe(): Promise<{
+  /**
+   * Daftar dokumen di sebuah knowledge base — dipakai panel admin supaya saat KB ID
+   * dimasukkan, langsung terlihat ADA BERAPA dokumen dan dokumen APA SAJA.
+   *
+   * Memakai endpoint `GET {base}/knowledge?knowledge_base_id=<kb>`. Bentuk respons
+   * layanan RAG bisa berbeda-beda, jadi beberapa bentuk wadah dicoba. Kalau endpoint
+   * tidak ada (404/405), mengembalikan `jumlah: 0` dengan `catatan` yang jujur —
+   * JANGAN diartikan "KB kosong" tanpa membedakan galat layanan.
+   */
+  async daftarDokumen(kbId: string): Promise<{
+    kbId: string;
+    jumlah: number;
+    dokumen: Array<{
+      id: string;
+      nama: string;
+      status?: string;
+      halaman?: number;
+      potongan?: number;
+      token?: number;
+      dibuat?: string;
+      ringkasan?: string;
+    }>;
+    catatan?: string;
+  }> {
+    const cfg = this.getRagConfig();
+    const kb = String(kbId || '').trim();
+    if (!kb) {
+      return { kbId: '', jumlah: 0, dokumen: [], catatan: 'Knowledge Base ID masih kosong.' };
+    }
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) {
+      return {
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: 'Provider RAG bukan "HTTP" (mode mock) — daftar dokumen hanya tersedia untuk layanan RAG nyata.',
+      };
+    }
+    const { dipakai } = await this.resolveBase(cfg);
+    const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 30000);
+    let res: Response;
+    try {
+      res = await fetch(`${dipakai}/knowledge?knowledge_base_id=${encodeURIComponent(kb)}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${cfg.apiKey}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      return {
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: `Tidak bisa menghubungi layanan RAG: ${err instanceof Error ? err.message : 'kesalahan jaringan'}`,
+      };
+    }
+    if (res.status === 404 || res.status === 405) {
+      return {
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: 'Layanan RAG ini tidak menyediakan endpoint /knowledge, jadi daftar dokumen tidak bisa dibaca.',
+      };
+    }
+    if (!res.ok) {
+      return {
+        kbId: kb,
+        jumlah: 0,
+        dokumen: [],
+        catatan: `Layanan RAG menjawab HTTP ${res.status} — ini galat layanan, bukan berarti KB kosong.`,
+      };
+    }
+    const mentah: any = await res.json().catch(() => null);
+    // Beberapa bentuk wadah yang pernah terlihat: {data:{documents}}, {documents}, {data:[...]}, [...]
+    const daftarMentah: any[] =
+      (Array.isArray(mentah?.data?.documents) && mentah.data.documents) ||
+      (Array.isArray(mentah?.documents) && mentah.documents) ||
+      (Array.isArray(mentah?.data) && mentah.data) ||
+      (Array.isArray(mentah?.data?.items) && mentah.data.items) ||
+      (Array.isArray(mentah?.items) && mentah.items) ||
+      (Array.isArray(mentah) && mentah) ||
+      [];
+
+    const dokumen = daftarMentah
+      .map((d: any) => ({
+        id: String(d?.document_id ?? d?.id ?? d?.doc_id ?? ''),
+        nama: String(d?.document_name ?? d?.name ?? d?.filename ?? d?.title ?? '(tanpa nama)'),
+        status: d?.status ? String(d.status) : undefined,
+        halaman: Number.isFinite(Number(d?.pages)) ? Number(d.pages) : undefined,
+        potongan: Number.isFinite(Number(d?.chunks)) ? Number(d.chunks) : undefined,
+        token: Number.isFinite(Number(d?.tokens)) ? Number(d.tokens) : undefined,
+        dibuat: d?.created_at ? String(d.created_at) : undefined,
+        ringkasan: d?.summary ? String(d.summary) : undefined,
+      }))
+      .filter((d) => d.id || d.nama !== '(tanpa nama)');
+
+    return {
+      kbId: kb,
+      jumlah: dokumen.length,
+      dokumen,
+      catatan:
+        dokumen.length === 0
+          ? 'KB ini tidak memuat dokumen (atau ID-nya salah). Pastikan dokumen sudah diunggah ke KB tersebut.'
+          : undefined,
+    };
+  }
+
+  /**
+   * Profil instansi dari dokumen KB: nama, kota, sektor, ringkasan.
+   *
+   * Nama instansi dipakai apa adanya saat menyusun dashboard (nama yang tidak cocok
+   * dengan dokumen membuat model menolak dokumen dan turun ke jalur miskin widget),
+   * jadi field ini harus berasal dari dokumen — bukan dari tebakan.
+   *
+   * Nilainya diambil dari dokumen lewat /query (bukan dikarang). Kalau dokumen tidak
+   * memuat, field dibiarkan kosong supaya admin mengisinya manual.
+   */
+  async profilInstansi(kbId: string): Promise<{
+    kbId: string;
+    nama?: string;
+    kota?: string;
+    sektor?: BumdSector;
+    jumlahDokumen: number;
+    ringkasan?: string;
+    catatan?: string;
+  }> {
+    const cfg = this.getRagConfig();
+    const kb = String(kbId || '').trim();
+    if (!kb) return { kbId: '', jumlahDokumen: 0, catatan: 'Knowledge Base ID masih kosong.' };
+
+    // Daftar dokumen lebih dulu: jumlahnya selalu dilaporkan, dan kalau KB kosong
+    // tidak perlu memanggil LLM sama sekali.
+    const daftar = await this.daftarDokumen(kb);
+    if (daftar.jumlah === 0) {
+      return {
+        kbId: kb,
+        jumlahDokumen: 0,
+        catatan: daftar.catatan || 'KB ini tidak memuat dokumen.',
+      };
+    }
+
+    // Ringkasan isi = daftar nama dokumen (selalu ada, tanpa memanggil LLM).
+    const ringkasan = daftar.dokumen.map((d) => d.nama).join('; ');
+
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) {
+      return {
+        kbId: kb,
+        jumlahDokumen: daftar.jumlah,
+        ringkasan,
+        catatan: 'Provider RAG bukan "HTTP" (mode mock) — profil instansi tidak bisa dibaca dari dokumen.',
+      };
+    }
+
+    const { dipakai } = await this.resolveBase(cfg);
+    const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 60000);
+    const prompt =
+      'Dari dokumen resmi instansi ini, jawab SINGKAT dalam format persis seperti ini:\n' +
+      'NAMA: <nama lengkap perusahaan/instansi>\n' +
+      'KOTA: <kota atau kabupaten domisili>\n' +
+      'SEKTOR: <satu kata: air, bank, pasar, rsud, transportasi, atau aneka_usaha>\n' +
+      'Hanya isi dari dokumen. Kalau tidak ada di dokumen, tulis "-".';
+
+    try {
+      const res = await fetch(`${dipakai}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+        body: JSON.stringify({
+          query: prompt,
+          knowledge_base_id: kb,
+          options: { top_k: 5, include_sources: false },
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!res.ok) {
+        return {
+          kbId: kb,
+          jumlahDokumen: daftar.jumlah,
+          ringkasan,
+          catatan: `Layanan RAG menjawab HTTP ${res.status} saat membaca profil instansi (bukan berarti KB kosong).`,
+        };
+      }
+      const mentah: any = await res.json().catch(() => null);
+      const wadah = mentah?.data && mentah.success !== undefined ? mentah.data : mentah;
+      const jawaban = String(wadah?.answer ?? wadah?.result ?? wadah?.text ?? '');
+
+      const ambil = (label: string): string | undefined => {
+        const m = jawaban.match(new RegExp(`${label}\\s*[:=]\\s*(.+)`, 'i'));
+        const v = m?.[1]?.split('\n')[0]?.trim();
+        // Model sering menulis "-" saat tidak ada di dokumen; itu bukan nilai.
+        if (!v || /^-+$/.test(v) || /^(tidak ada|n\/a|unknown)$/i.test(v)) return undefined;
+        return v.replace(/\[[0-9,\s]+\]/g, '').replace(/\s+/g, ' ').trim() || undefined;
+      };
+
+      const nama = ambil('NAMA');
+      const kota = ambil('KOTA');
+      const sektorMentah = (ambil('SEKTOR') || '').toLowerCase();
+      // Petakan jawaban bebas ke sektor baku aplikasi (harus salah satu dari BumdSector).
+      const petaSektor: Array<[RegExp, BumdSector]> = [
+        [/\bair\b|pdam|perumda air|tirta|air minum/, 'pdam'],
+        [/bank|bpr|kredit/, 'bank'],
+        [/pasar|retribusi pasar/, 'pasar'],
+        [/rsud|rumah sakit|klinik|kesehatan/, 'rsud'],
+        [/transportasi|angkutan|bus|trans/, 'transportasi'],
+        [/aneka|pariwisata|jasa lainnya|perdagangan/, 'aneka_usaha'],
+      ];
+      const sektor = petaSektor.find(([re]) => re.test(sektorMentah))?.[1];
+
+      return {
+        kbId: kb,
+        nama,
+        kota,
+        sektor,
+        jumlahDokumen: daftar.jumlah,
+        ringkasan,
+        catatan:
+          !nama && !kota
+            ? 'Dokumen tidak menyebutkan nama/kota instansi secara eksplisit — isi manual.'
+            : undefined,
+      };
+    } catch (err) {
+      return {
+        kbId: kb,
+        jumlahDokumen: daftar.jumlah,
+        ringkasan,
+        catatan: `Gagal membaca profil instansi: ${err instanceof Error ? err.message : 'kesalahan jaringan'}`,
+      };
+    }
+  }
+
+  /**
+   * Uji API Key RAG dengan benar-benar memanggil layanan.
+   *
+   * Endpoint yang dipakai: GET {base}/knowledge (tanpa parameter KB). Ini endpoint
+   * yang TERBUKTI memeriksa kredensial — key salah dijawab 401 `AUTH_INVALID`,
+   * sedangkan `/health` selalu 200 walaupun key-nya ngawur, jadi `/health` tidak
+   * bisa dipakai untuk menguji key.
+   */
+  async ujiApiKey(): Promise<{
+   ok: boolean;
+   status: 'valid' | 'invalid' | 'tidak-terhubung' | 'endpoint-tidak-ada' | 'galat-layanan';
+   httpStatus?: number;
+   latencyMs: number;
+   baseDipakai?: string;
+   pesan: string;
+   kodeGalat?: string;
+ }> {
+   const cfg = this.getRagConfig();
+   if (cfg.provider !== 'http') {
+     return {
+       ok: false,
+       status: 'galat-layanan',
+       latencyMs: 0,
+       pesan:
+         'Provider masih "Mock", jadi API Key tidak dipakai sama sekali. Ubah Provider ke "HTTP" lebih dulu.',
+     };
+   }
+   if (!cfg.baseUrl) {
+     return { ok: false, status: 'galat-layanan', latencyMs: 0, pesan: 'Base URL RAG masih kosong.' };
+   }
+   if (!cfg.apiKey) {
+     return { ok: false, status: 'galat-layanan', latencyMs: 0, pesan: 'API Key masih kosong.' };
+   }
+
+   const mulai = Date.now();
+   let dipakai: string;
+   try {
+     const r = await this.resolveBase(cfg);
+     dipakai = r.dipakai;
+   } catch (err) {
+     return {
+       ok: false,
+       status: 'tidak-terhubung',
+       latencyMs: Date.now() - mulai,
+       pesan: `Base URL tidak bisa dipakai: ${err instanceof Error ? err.message : 'alamat tidak sah'}`,
+     };
+   }
+
+   const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 30000);
+   try {
+     const res = await fetch(`${dipakai}/knowledge`, {
+       method: 'GET',
+       headers: { Authorization: `Bearer ${cfg.apiKey}` },
+       signal: AbortSignal.timeout(timeoutMs),
+     });
+     const latencyMs = Date.now() - mulai;
+
+     if (res.status === 401 || res.status === 403) {
+       let kodeGalat: string | undefined;
+       try {
+         const j: any = await res.json();
+         kodeGalat = j?.error?.code || j?.code;
+       } catch {
+         /* balasan bukan JSON — biarkan kosong */
+       }
+       return {
+         ok: false,
+         status: 'invalid',
+         httpStatus: res.status,
+         latencyMs,
+         baseDipakai: dipakai,
+         kodeGalat,
+         pesan:
+           res.status === 401
+             ? 'API Key DITOLAK layanan RAG (401 Unauthorized). Periksa kembali key-nya.'
+             : 'API Key tidak punya izin (403 Forbidden).',
+       };
+     }
+
+     if (res.status === 404 || res.status === 405) {
+       return {
+         ok: false,
+         status: 'endpoint-tidak-ada',
+         httpStatus: res.status,
+         latencyMs,
+         baseDipakai: dipakai,
+         pesan: `Layanan menjawab HTTP ${res.status}: endpoint /knowledge tidak ada di alamat ini. Periksa Base URL.`,
+       };
+     }
+
+     if (!res.ok) {
+       return {
+         ok: false,
+         status: 'galat-layanan',
+         httpStatus: res.status,
+         latencyMs,
+         baseDipakai: dipakai,
+         pesan: `Layanan RAG menjawab HTTP ${res.status}. Ini galat layanan, bukan berarti key salah.`,
+       };
+     }
+
+     // 200 = key diterima.
+     let jumlahDokumen: number | undefined;
+     try {
+       const j: any = await res.json();
+       const arr = j?.data?.documents ?? j?.documents ?? j?.data ?? j?.items;
+       if (Array.isArray(arr)) jumlahDokumen = arr.length;
+     } catch {
+       /* balasan bukan JSON — key tetap dianggap valid karena 200 */
+     }
+
+     return {
+       ok: true,
+       status: 'valid',
+       httpStatus: res.status,
+       latencyMs,
+       baseDipakai: dipakai,
+       pesan: `API Key VALID — layanan menerima kredensial ini (HTTP 200, ${latencyMs} ms)${
+         jumlahDokumen !== undefined
+           ? `. Layanan ini memuat ${jumlahDokumen} dokumen (seluruh KB, bukan satu KB saja)`
+           : ''
+       }.`,
+     };
+   } catch (err: any) {
+     const latencyMs = Date.now() - mulai;
+     const kode = err?.cause?.code || '';
+     // ENOTFOUND = nama domainnya tidak ada di DNS. Ini BEDA dari internet mati,
+     // dan bedanya penting: user perlu tahu yang salah adalah alamatnya, bukan
+     // koneksinya, supaya tidak mengecek hal yang tidak perlu.
+     const pesan =
+       kode === 'ENOTFOUND'
+         ? `Domain "${dipakai.replace(/^https?:\/\//, '').split('/')[0]}" TIDAK ADA di DNS (ENOTFOUND). Alamatnya salah ketik atau subdomain-nya belum dibuat — periksa ejaan Base URL.`
+         : kode === 'ECONNREFUSED'
+           ? `Layanan di ${dipakai} menolak koneksi (ECONNREFUSED). Alamat benar tetapi tidak ada layanan yang mendengarkan di sana.`
+           : kode === 'CERT_HAS_EXPIRED' || /certificate/i.test(String(err?.message))
+             ? `Sertifikat HTTPS di ${dipakai} bermasalah. Hubungi penyedia layanan RAG.`
+             : `Tidak bisa menghubungi layanan RAG di ${dipakai} (${kode || err?.message || 'kesalahan jaringan'}). Periksa Base URL dan koneksi internet.`;
+     return {
+       ok: false,
+       status: 'tidak-terhubung',
+       latencyMs,
+       baseDipakai: dipakai,
+       pesan,
+     };
+   }
+ }
+
+ async probe(): Promise<{
     latencyMs: number;
     canOutputJson: boolean;
     hasMetadata: boolean;
@@ -850,6 +1285,41 @@ export class ConfigurableRagClient implements RagClient {
     const catatan: string[] = [];
     const { dipakai, disesuaikan } = await this.resolveBase(cfg);
     if (disesuaikan) catatan.push(`Base URL disesuaikan otomatis menjadi ${dipakai}`);
+
+    // Layanan RAG ini MEWAJIBKAN knowledge_base_id pada /search dan /query
+    // ("retrieval is always scoped to a knowledge base") — tanpa itu dijawab 422.
+    // KB global di panel boleh kosong (KB dipasang per-instansi), jadi kalau kosong
+    // kita pakai KB pertama yang tersedia agar uji koneksi tetap bisa berjalan.
+    let kbUji = cfg.kbId;
+    if (!kbUji) {
+      try {
+        const kbRes = await fetch(`${dipakai}/knowledge`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${cfg.apiKey}` },
+          signal: AbortSignal.timeout(Math.min(timeoutMs, 20000)),
+        });
+        if (kbRes.ok) {
+          const j: any = await kbRes.json().catch(() => null);
+          const docs = j?.data?.documents ?? j?.documents ?? [];
+          const idPertama = Array.isArray(docs)
+            ? docs.map((d: any) => d?.knowledge_base_id).filter(Boolean)[0]
+            : undefined;
+          if (idPertama) {
+            kbUji = String(idPertama);
+            catatan.push(
+              `Knowledge Base global kosong — uji memakai KB "${kbUji}" (KB pertama yang tersedia di layanan)`
+            );
+          }
+        }
+      } catch {
+        /* tidak fatal — biarkan jatuh ke pesan di bawah */
+      }
+    }
+    if (!kbUji) {
+      catatan.push(
+        'Tidak ada Knowledge Base yang bisa dipakai untuk uji. Layanan ini mewajibkan knowledge_base_id, jadi uji retrieval dilewati.'
+      );
+    }
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
@@ -885,7 +1355,7 @@ export class ConfigurableRagClient implements RagClient {
         },
         body: JSON.stringify({
           query: RAG_PROMPTS.PROBE_TEST,
-          ...(cfg.kbId ? { knowledge_base_id: cfg.kbId } : {}),
+          ...(kbUji ? { knowledge_base_id: kbUji } : {}),
           top_k: 5,
           options: { top_k: 5, include_sources: true },
         }),
@@ -912,7 +1382,7 @@ export class ConfigurableRagClient implements RagClient {
           },
           body: JSON.stringify({
             query: RAG_PROMPTS.PROBE_TEST,
-            ...(cfg.kbId ? { knowledge_base_id: cfg.kbId } : {}),
+            ...(kbUji ? { knowledge_base_id: kbUji } : {}),
             options: { top_k: 5, include_sources: true },
           }),
           signal: ac.signal,

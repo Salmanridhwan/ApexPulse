@@ -1,11 +1,12 @@
-import { WidgetSpec, WidgetType } from '../../types';
+import type { WidgetSpec, WidgetType } from '../../types';
+import { selaraskanTipe } from './tipeSelaras';
 
 export interface TipeVisualisasi {
   type: WidgetType;
   label: string;
   desc: string;
   /** Kelompok untuk pengelompokan di editor. */
-  grup: 'Kartu' | 'Kartesius' | 'Komposisi' | 'Sebaran' | 'Matriks' | 'Lainnya';
+  grup: 'Kartu' | 'Kartesius' | 'Komposisi' | 'Sebaran' | 'Matriks' | 'Prediktif' | 'Preskriptif' | 'Lainnya';
 }
 
 /** Tipe visualisasi yang bisa dipilih pengguna, beserta label & deskripsinya. */
@@ -45,11 +46,21 @@ export const TIPE_VISUALISASI: TipeVisualisasi[] = [
 
   // Lainnya
   { type: 'gantt', label: 'Gantt Chart', desc: 'Timeline / jadwal proyek', grup: 'Lainnya' },
+  // Analitik prediktif — "apa yang mungkin terjadi?" (hasil hitungan dari angka dokumen)
+  { type: 'trend-line', label: 'Garis Tren + Regresi', desc: 'Kecenderungan data dengan R² dan persamaan garis', grup: 'Prediktif' },
+  { type: 'forecast', label: 'Forecast + Pita Prediksi', desc: 'Proyeksi periode berikutnya beserta rentang kemungkinannya', grup: 'Prediktif' },
+  { type: 'anomaly', label: 'Deteksi Anomali', desc: 'Menandai nilai yang menyimpang (z-score)', grup: 'Prediktif' },
+  { type: 'cluster', label: 'Clustering (k-means)', desc: 'Mengelompokkan nilai yang serupa', grup: 'Prediktif' },
+
+  // Analitik preskriptif — "apa yang sebaiknya dilakukan?"
+  { type: 'dekomposisi', label: 'Dekomposisi Kontribusi', desc: 'Porsi tiap kategori & andilnya pada perubahan', grup: 'Preskriptif' },
+  { type: 'skenario', label: 'Analisis Skenario', desc: 'Pesimis / dasar / optimis — simulasi dari laju dokumen', grup: 'Preskriptif' },
+  { type: 'sensitivitas', label: 'Sensitivitas (What-if)', desc: 'Dampak perubahan nilai terhadap hasil', grup: 'Preskriptif' },
 ];
 
 /** Kelompok tipe visualisasi dalam urutan tampil. */
 export const GRUP_VISUALISASI: Array<TipeVisualisasi['grup']> = [
-  'Kartu', 'Kartesius', 'Komposisi', 'Sebaran', 'Matriks', 'Lainnya',
+  'Kartu', 'Kartesius', 'Komposisi', 'Sebaran', 'Matriks', 'Prediktif', 'Preskriptif', 'Lainnya',
 ];
 
 /** Widget punya data seri grafik (xAxis + minimal satu seri). */
@@ -61,70 +72,22 @@ export function punyaDataChart(widget?: WidgetSpec | null): boolean {
   );
 }
 
-/** Tipe seri yang bisa dipilih dari data xAxis+series generik. */
-const SERI_GENERIK: WidgetType[] = [
-  'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
-  'waterfall', 'heatmap', 'radar',
-];
-
 /**
  * Tipe visualisasi yang datanya BENAR-BENAR tersedia di widget ini.
  * Tujuannya: pengguna hanya melihat pilihan yang bisa dipakai — beralih ke tipe
  * yang datanya tak ada (mis. peta tanpa geo) menghasilkan kartu kosong.
- * Tipe yang sedang aktif selalu disertakan agar tetap terlihat terpilih.
+ *
+ * SATU SUMBER KEBENARAN: daftar ini disaring oleh gerbang yang sama dengan katalog
+ * "Tambah Widget" dan jalur copilot (`selaraskanTipe`). Sebelumnya fungsi ini punya
+ * aturan sendiri, dan aturan itu menyimpang: editor menawarkan `combo` pada data satu
+ * seri, padahal combo butuh dua seri sehingga bentuknya di kanvas berbeda dari
+ * pratinjau combo di Template Chart.
  */
 export function tipeKompatibel(widget?: WidgetSpec | null): TipeVisualisasi[] {
   if (!widget) return TIPE_VISUALISASI;
-
-  const boleh = new Set<WidgetType>();
-
-  // Seri generik: dari xAxis + series.
-  if (punyaDataChart(widget)) {
-    SERI_GENERIK.forEach((t) => boleh.add(t));
-  }
-
-  // Tipe yang butuh bentuk data khusus.
-  if (widget.chart?.points?.length) {
-    boleh.add('scatter');
-    boleh.add('bubble');
-  }
-  if (widget.chart?.links?.length) {
-    boleh.add('sankey');
-  }
-  if (widget.chart?.radar) {
-    boleh.add('radar');
-  }
-  if (widget.chart?.boxRaw?.length || punyaDataChart(widget)) {
-    boleh.add('histogram');
-    boleh.add('boxplot');
-  }
-  if (widget.treemap?.children?.length) {
-    boleh.add('treemap');
-  }
-  if (widget.geo?.regions?.length) {
-    boleh.add('map');
-  }
-  if (widget.gantt?.tasks?.length) {
-    boleh.add('gantt');
-  }
-
-  // Kartu & teks.
-  if (widget.kpi && widget.kpi.value !== undefined && widget.kpi.value !== null) {
-    boleh.add('kpi');
-    boleh.add('bullet-target');
-  }
-  if (widget.kpi?.target !== undefined) {
-    boleh.add('gauge');
-  }
-  if (widget.table?.columns?.length) {
-    boleh.add('table');
-  }
-  if (widget.narasi?.text) {
-    boleh.add('narasi');
-  }
-
-  // Jangan sembunyikan tipe yang sedang dipakai.
-  boleh.add(widget.type);
-
-  return TIPE_VISUALISASI.filter((t) => boleh.has(t.type));
+  return TIPE_VISUALISASI.filter((t) => {
+    // Tipe yang sedang dipakai selalu terlihat supaya tetap tampak terpilih.
+    if (t.type === widget.type) return true;
+    return selaraskanTipe(widget, t.type).ok;
+  });
 }

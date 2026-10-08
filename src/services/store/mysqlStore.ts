@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AuditLog, Chat, Dashboard, NotificationItem, Tenant } from '../../types';
+import { AlertRule, AuditLog, Chat, Dashboard, KetersediaanPreset, NotificationItem, Tenant } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 export interface MysqlConfig {
@@ -32,6 +32,7 @@ export interface DbSnapshot {
   users: SafeUser[];
   credentials: Record<string, string>;
   tenants: Tenant[];
+  ketersediaanPreset: KetersediaanPreset[];
 }
 
 export interface LoadedState {
@@ -46,6 +47,7 @@ export interface LoadedState {
   users?: SafeUser[];
   credentials?: Record<string, string>;
   tenants?: Tenant[];
+  ketersediaanPreset?: KetersediaanPreset[];
 }
 
 export class MysqlStore {
@@ -132,6 +134,9 @@ export class MysqlStore {
     if (arrays.auditLogs) hasil.auditLogs = arrays.auditLogs as AuditLog[];
     if (arrays.users) hasil.users = arrays.users as SafeUser[];
     if (arrays.tenants) hasil.tenants = arrays.tenants as Tenant[];
+    if (arrays.ketersediaanPreset) {
+      hasil.ketersediaanPreset = arrays.ketersediaanPreset as KetersediaanPreset[];
+    }
 
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
     for (const row of kvRows as Array<{ k: string; data: any }>) {
@@ -190,6 +195,10 @@ export class MysqlStore {
       await masukkan(
         'tenants',
         s.tenants.map((t) => ({ id: t.id, data: t }))
+      );
+      await masukkan(
+        'ketersediaanPreset',
+        (s.ketersediaanPreset || []).map((k) => ({ id: k.id, data: k }))
       );
 
       const kv: Array<[string, string]> = [
