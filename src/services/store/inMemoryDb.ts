@@ -694,7 +694,7 @@ export class InMemoryDb {
         {
           id: `msg-welcome-${Date.now()}`,
           sender: 'system',
-          text: 'Halo! Saya asisten orkestrator Aiones Boards. Tuliskan kebutuhan dashboard BUMD Anda, dan saya akan mengekstraksi data dokumen RAG instansi secara langsung tanpa ketergantungan model LLM eksternal.',
+          text: 'Halo! Saya Aiones Boards Orchestrator, asisten dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
           timestamp: now,
         },
       ],
@@ -778,6 +778,20 @@ export class InMemoryDb {
     this.tenants[idx] = { ...this.tenants[idx], ...partial };
     this.persist();
     return this.tenants[idx];
+  }
+
+  deleteTenant(id: string): boolean {
+    const len = this.tenants.length;
+    this.tenants = this.tenants.filter((t) => t.id !== id);
+    const deleted = this.tenants.length < len;
+    if (deleted) {
+      this.dashboards = this.dashboards.filter((d) => d.tenantId !== id);
+      this.chats = this.chats.filter((c) => c.tenantId !== id);
+      this.notifications = this.notifications.filter((n) => n.tenantId !== id);
+      this.alertRules = this.alertRules.filter((a) => a.tenantId !== id);
+      this.persist();
+    }
+    return deleted;
   }
 }
 

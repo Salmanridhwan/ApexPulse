@@ -1,6 +1,6 @@
 import { BumdSector, Dashboard, ProgressStep, WidgetSpec } from '../../types';
 import { RagClient } from '../rag/types';
-import { mockRag } from '../rag/mock';
+import { RagServiceError } from '../rag/http';
 import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
@@ -34,6 +34,7 @@ export type GenerateMode =
   | 'Jalur A (LLM JSON)'
   | 'Jalur B (Agregasi Metadata)'
   | 'Fallback (Template Snapshot)'
+  | 'Gagal (Layanan RAG)'
   | 'Gagal (Dokumen Tidak Memadai)';
 
 export interface GenerateResult {
@@ -80,12 +81,50 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     .map((p) => p.id)
     .join(', ');
 
-  const ragRes = await (options.ragClient || mockRag).query({
-    prompt: userPrompt,
-    sector,
-    instansi,
-    kbId,
-  });
+  // Panggil layanan RAG. Kalau layanan tidak terhubung / key ditolak, JANGAN
+  // diam-diam memakai data contoh — kembalikan hasil gagal dengan pesan jujur.
+  let ragRes;
+  try {
+    if (!options.ragClient) {
+      throw new RagServiceError('Klien RAG belum tersedia di server.');
+    }
+    ragRes = await options.ragClient.query({
+      prompt: userPrompt,
+      sector,
+      instansi,
+      kbId,
+    });
+  } catch (err) {
+    const pesan =
+      err instanceof RagServiceError
+        ? err.message
+        : `Tidak bisa menghubungi layanan RAG (${err instanceof Error ? err.message : 'kesalahan jaringan'}).`;
+    logSummary.push(`[RAG Client Gagal] ${pesan}`);
+    onProgress?.({
+      id: 'step-2',
+      title: 'Layanan RAG tidak dapat dihubungi — dashboard tidak dibuat',
+      status: 'failed',
+    });
+    return {
+      dashboard: {
+        id: `dash-${Date.now()}`,
+        tenantId,
+        title: `Dashboard Kinerja ${sector.toUpperCase()} 2026`,
+        description: '',
+        sector,
+        widgets: [],
+        globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      modeUsed: 'Gagal (Layanan RAG)',
+      ok: false,
+      alasanGagal: pesan,
+      latencyMs: Date.now() - start,
+      citationsCount: 0,
+      logSummary,
+    };
+  }
 
   logSummary.push(`[RAG Client] Respons diterima dalam ${ragRes.latencyMs}ms. Mode: ${ragRes.mode}`);
   onProgress?.({

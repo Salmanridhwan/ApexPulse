@@ -43,6 +43,13 @@ export interface User {
   avatar?: string;
   /** Hash scrypt (salt:hash) — hanya dipakai di server, jangan pernah dikirim ke client. */
   passwordHash?: string;
+  /**
+   * ID akun Google (`sub`) bila user terhubung dengan login Google.
+   * Kosong = akun lokal (email + kata sandi).
+   */
+  googleSub?: string;
+  /** Akun ini masuk lewat Google (bukan kata sandi lokal). */
+  viaGoogle?: boolean;
 }
 
 /**
@@ -166,6 +173,14 @@ export interface WidgetSpec {
   category?: string;
   confidence: ConfidenceLevel;
   grid: WidgetGrid;
+  /**
+   * true = kartu ini SENGAJA dikosongkan karena indikatornya tidak ada di
+   * dokumen instansi (dipakai saat "Pakai Template Ini" mengisi angka dari RAG).
+   * Kanvas menampilkan penanda "belum ada di dokumen" — TIDAK ada angka contoh.
+   */
+  dataKosong?: boolean;
+  /** Alasan singkat kenapa kartu dikosongkan (ditampilkan di kanvas). */
+  catatanData?: string;
   kpi?: {
     value: number | string;
     unit?: string;
@@ -382,9 +397,9 @@ export interface ChatMessage {
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'recommend';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'recommend' | 'qa_answer' | 'no_kb' | 'rag_error';
   affectedWidgetId?: string;
-  modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Fallback (Template Snapshot)' | 'Gagal (Dokumen Tidak Memadai)';
+  modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;
   progressSteps?: ProgressStep[];
   recommendations?: ChatRecommendation[];

@@ -123,7 +123,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ Buat Aturan Baru</span>
+            <span>Buat Aturan Baru</span>
           </button>
         </div>
 

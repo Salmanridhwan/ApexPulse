@@ -22,6 +22,19 @@ export interface RagQueryOptions {
   kbId?: string;
   /** Mode yang diminta ke layanan RAG. Default Jalur A (JSON terstruktur). */
   mode?: 'structured' | 'prose';
+  /**
+   * Riwayat percakapan (multi-turn) untuk mode `prose` (chatbot). Disisipkan ke
+   * query supaya jawaban sadar konteks pertanyaan sebelumnya.
+   */
+  riwayat?: string;
+  /** Persona/sistem framing untuk mode percakapan (chatbot). */
+  persona?: string;
+  /**
+   * strict_grounding ke layanan RAG. Default true: jawaban hanya dari dokumen.
+   * Set false HANYA untuk obrolan ringan (sapaan) supaya asisten bisa membalas
+   * natural tanpa mengarang fakta instansi.
+   */
+  strictGrounding?: boolean;
   timeoutMs?: number;
 }
 
@@ -33,6 +46,12 @@ export interface RagResult {
   structuredJson?: any;
   chunks: SectorDocumentChunk[];
   citations: Citation[];
+  /**
+   * true = jawaban benar-benar bersandar dokumen (grounded).
+   * false = dokumen tidak memuat jawabannya.
+   * undefined = layanan tidak melaporkan status grounding.
+   */
+  grounded?: boolean;
 }
 
 export interface RagClient {

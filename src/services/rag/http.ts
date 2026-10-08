@@ -1,11 +1,27 @@
 import { BumdSector, Citation } from '../../types';
-import { mockRag } from './mock';
 import { RAG_PROMPTS } from './prompts';
 import { RagClient, RagQueryOptions, RagResult } from './types';
 import { SectorDocumentChunk } from './mockData';
 import { KB_CAMPUR } from './kbDefaults';
 import { angkaDariTeks } from '../spec/kpiSparkline';
 import { selaraskanTipe } from '../spec/tipeSelaras';
+
+/**
+ * Galat layanan RAG. Dipakai supaya pemanggil bisa MEMBEDAKAN "layanan tidak
+ * bisa dihubungi / key ditolak" dari "dokumen tidak memuat jawabannya" — dan
+ * supaya chat TIDAK pernah diam-diam menampilkan data contoh (mock) saat layanan
+ * RAG nyata sedang bermasalah.
+ */
+export class RagServiceError extends Error {
+  readonly status?: number;
+  readonly detail: string;
+  constructor(message: string, detail = '', status?: number) {
+    super(message);
+    this.name = 'RagServiceError';
+    this.detail = detail;
+    this.status = status;
+  }
+}
 
 /**
  * Pilih KB pertama yang layak dari daftar kandidat (KB instansi → KB global),
@@ -452,9 +468,6 @@ export function jelaskanError(err: unknown): string {
 }
 
 export class ConfigurableRagClient implements RagClient {
-  // Pakai instance mock bersama (mockRag) sebagai fallback bila provider HTTP
-  // tidak dikonfigurasi atau gagal dihubungi.
-  private mock = mockRag;
   private getRagConfig: RagConfigFetcher;
   /** Hasil penyesuaian base URL (di-cache per nilai yang dikonfigurasi). */
   private baseTerpakai: { dikonfigurasi: string; dipakai: string; disesuaikan: boolean } | null = null;
@@ -791,12 +804,26 @@ export class ConfigurableRagClient implements RagClient {
 
   async query(options: RagQueryOptions): Promise<RagResult> {
     const cfg = this.getRagConfig();
-    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) {
-      return this.mock.query(options);
+    // TIDAK ADA fallback ke data contoh (mock) di sini. Kalau layanan RAG belum
+    // dikonfigurasi atau sedang bermasalah, pemanggil menerima galat jujur —
+    // chat tidak boleh menampilkan angka contoh seolah-olah dokumen resmi.
+    if (cfg.provider !== 'http') {
+      throw new RagServiceError(
+        'Provider RAG sedang mode "Mock" (data contoh), bukan dokumen instansi.',
+        'Buka Admin → Konfigurasi RAG, ubah Provider ke "HTTP", isi Base URL & API Key, lalu simpan.',
+        0
+      );
+    }
+    if (!cfg.baseUrl || !cfg.apiKey) {
+      throw new RagServiceError(
+        'Layanan RAG belum dikonfigurasi (Base URL / API Key kosong).',
+        'Lengkapi Base URL & API Key di Admin → Konfigurasi RAG, lalu simpan.',
+        0
+      );
     }
 
     const start = Date.now();
-    const timeoutMs = Math.max(5, cfg.timeoutMs || 60) * 1000;
+    const timeoutMs = Math.max(5, options.timeoutMs || cfg.timeoutMs || 60) * 1000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
@@ -820,6 +847,14 @@ export class ConfigurableRagClient implements RagClient {
         }
       }
 
+      // Mode percakapan (chatbot): rangkai persona + riwayat + pertanyaan jadi satu
+      // query supaya jawaban sadar konteks (multi-turn) dan tetap dari dokumen.
+      const teksQuery = options.mode === 'prose'
+        ? [options.persona?.trim(), options.riwayat?.trim(), options.prompt]
+            .filter(Boolean)
+            .join('\n\n')
+        : options.prompt;
+
       const res = await fetch(`${dipakai}/query`, {
         method: 'POST',
         headers: {
@@ -828,19 +863,31 @@ export class ConfigurableRagClient implements RagClient {
         },
         body: JSON.stringify({
           // Kontrak ragjev: field bernama `query`, retrieval selalu scoped KB.
-          query: options.prompt,
+          query: teksQuery,
           // KB per-instansi menimpa KB global — inilah yang mencegah dashboard
           // instansi A dijawab dokumen instansi B. KB campur dilewati (kbAman).
           ...(() => {
             const kb = kbAman(options.kbId, cfg.kbId);
             return kb ? { knowledge_base_id: kb } : {};
           })(),
-          options: { top_k: 8, include_sources: true },
+          options: {
+            top_k: 8,
+            include_sources: true,
+            // strict_grounding=false HANYA untuk obrolan ringan (sapaan) — jawaban
+            // tetap dilarang mengarang fakta instansi lewat persona di prompt.
+            ...(options.strictGrounding === false ? { strict_grounding: false } : {}),
+          },
         }),
         signal: ac.signal,
       });
       if (!res.ok) {
-        throw new Error(`RAG HTTP ${res.status}`);
+        throw new RagServiceError(
+          `Layanan RAG menolak permintaan (HTTP ${res.status}).`,
+          res.status === 401 || res.status === 403
+            ? 'API Key RAG ditolak. Periksa Base URL & API Key di Admin → Konfigurasi RAG.'
+            : `Endpoint /query membalas ${res.status}.`,
+          res.status
+        );
       }
       const raw = await res.json();
 
@@ -882,11 +929,16 @@ export class ConfigurableRagClient implements RagClient {
         structuredJson,
         chunks,
         citations,
+        // true = jawaban benar-benar bersandar dokumen; false = dokumen tidak memuat.
+        grounded: typeof payload?.grounded === 'boolean' ? payload.grounded : undefined,
       };
     } catch (err) {
-      console.error('[RAG HTTP] Gagal, fallback ke mock:', jelaskanError(err));
-      const fallback = await this.mock.query(options);
-      return { ...fallback, provider: 'mock' };
+      // Semua galat layanan (jaringan, timeout, status non-OK) dilempar sebagai
+      // RagServiceError supaya pemanggil menampilkan pesan jujur — BUKAN data contoh.
+      const detail = jelaskanError(err);
+      console.error('[RAG HTTP] Query gagal (tanpa fallback mock):', detail);
+      if (err instanceof RagServiceError) throw err;
+      throw new RagServiceError(`Tidak bisa menghubungi layanan RAG: ${detail}`, detail);
     } finally {
       clearTimeout(timer);
     }
@@ -1279,7 +1331,20 @@ export class ConfigurableRagClient implements RagClient {
     const cfg = this.getRagConfig();
     const start = Date.now();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) {
-      return this.mock.probe();
+      // Probe tidak bisa dijalankan tanpa konfigurasi HTTP nyata. Laporkan jujur
+      // (jangan pura-pura sehat memakai data contoh).
+      return {
+        latencyMs: Date.now() - start,
+        canOutputJson: false,
+        hasMetadata: false,
+        sampleChunksCount: 0,
+        detectedMode: 'Jalur B',
+        catatan: [
+          cfg.provider !== 'http'
+            ? 'Provider RAG masih "Mock" (data contoh) — tidak ada layanan nyata untuk diuji.'
+            : 'Base URL / API Key RAG belum diisi — tidak ada layanan nyata untuk diuji.',
+        ],
+      };
     }
     const timeoutMs = Math.max(5, cfg.timeoutMs || 60) * 1000;
     const catatan: string[] = [];

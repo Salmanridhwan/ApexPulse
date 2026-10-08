@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   Copy,
+  Database,
   Edit2,
   MoreVertical,
   Trash2,
@@ -235,7 +236,20 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             'radar', 'map', 'gantt', 'table'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
         }`}
       >
-        <WidgetRenderer widget={widget} />
+        {widget.dataKosong ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center gap-1.5 py-3">
+            <Database className="w-6 h-6 text-ink-3 opacity-60" />
+            <p className="text-[12px] font-semibold text-ink-2">Belum ada di dokumen</p>
+            <p className="text-[10.5px] text-ink-3 leading-relaxed max-w-[34ch]">
+              {widget.catatanData || 'Indikator ini tidak ditemukan di dokumen instansi.'}
+            </p>
+            <p className="text-[10px] text-ink-3 italic">
+              Tidak ada angka contoh yang ditampilkan.
+            </p>
+          </div>
+        ) : (
+          <WidgetRenderer widget={widget} />
+        )}
       </div>
     </div>
   );

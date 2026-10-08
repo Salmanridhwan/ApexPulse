@@ -308,6 +308,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           sector,
           tenantId,
           dashboardId,
+          // Riwayat percakapan untuk chatbot multi-turn (dipakai saat belum ada
+          // dashboard tempat server menyimpan riwayat).
+          history: messages.slice(-12).map((m) => ({ sender: m.sender, text: m.text })),
         }),
       });
 
@@ -571,6 +574,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <span className="inline-flex items-center gap-1 text-warn font-semibold bg-warn/15 px-2 py-0.5 rounded border border-warn/40">
                         <AlertTriangle className="w-3 h-3 text-warn" />
                         DATA CONTOH — bukan dokumen instansi
+                      </span>
+                    ) : msg.modeUsed === 'Gagal (Layanan RAG)' ? (
+                      <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
+                        <AlertCircle className="w-3 h-3 text-neg" />
+                        Layanan RAG tidak terhubung
                       </span>
                     ) : msg.modeUsed === 'Gagal (Dokumen Tidak Memadai)' ? (
                       <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">

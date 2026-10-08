@@ -371,6 +371,26 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  /** Hapus Instansi BUMD beserta data terkait */
+  const handleDeleteTenant = async (tenant: Tenant) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus instansi "${tenant.name}"?\nSemua dashboard dan data terkait instansi ini akan dihapus.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/tenants/${encodeURIComponent(tenant.id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Gagal menghapus instansi: ${err.error || 'Terjadi kesalahan'}`);
+        return;
+      }
+      setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
+    } catch (err: any) {
+      alert(`Gagal menghapus instansi: ${err?.message || 'Kesalahan jaringan'}`);
+    }
+  };
+
   /**
    * Perbarui SEMUA instansi berurutan (sengaja tidak paralel supaya layanan RAG
    * tidak dihujani permintaan sekaligus), lalu rangkum hasilnya.
@@ -649,7 +669,7 @@ export const Admin: React.FC<AdminProps> = ({
                     className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Instansi BUMD</span>
+                    <span>Tambah Instansi BUMD</span>
                   </button>
                 </div>
 
@@ -734,7 +754,7 @@ export const Admin: React.FC<AdminProps> = ({
                   className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>+ Tambah Pengguna Baru</span>
+                  <span>Tambah Pengguna Baru</span>
                 </button>
               </div>
 
@@ -835,7 +855,7 @@ export const Admin: React.FC<AdminProps> = ({
                     className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Daftarkan BUMD Baru</span>
+                    <span>Daftarkan BUMD Baru</span>
                   </button>
                 </div>
               </div>
@@ -917,11 +937,11 @@ export const Admin: React.FC<AdminProps> = ({
                           : 'Belum pernah disinkronkan dari panel ini'}
                       </span>
                     </span>
-                    <div className="pt-2 mt-2 border-t border-line/70">
+                    <div className="pt-2 mt-2 border-t border-line/70 flex items-center gap-2">
                       <button
                         onClick={() => handleSinkronTenant(t.id)}
                         disabled={sinkronLoading !== null || !t.knowledgeBaseId}
-                        className="w-full px-3 py-1.5 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-3 py-1.5 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={
                           t.knowledgeBaseId
                             ? `Baca ulang isi KB ${t.knowledgeBaseId} dari layanan RAG`
@@ -930,6 +950,13 @@ export const Admin: React.FC<AdminProps> = ({
                       >
                         <RefreshCw className={`w-3 h-3 ${sinkronLoading === t.id ? 'animate-spin' : ''}`} />
                         <span>{sinkronLoading === t.id ? 'Memperbarui…' : 'Perbarui RAG'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTenant(t)}
+                        className="p-1.5 border border-line hover:bg-neg/10 text-ink-3 hover:text-neg rounded-control transition-colors"
+                        title="Hapus Instansi BUMD"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </ItemCard>

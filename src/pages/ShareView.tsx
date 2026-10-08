@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Lock, Pencil, Shield, ShieldCheck, X } from 'lucide-react';
+import { Activity, Database, Lock, Pencil, Shield, ShieldCheck, X } from 'lucide-react';
 import { LogoTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GlobalFiltersBar } from '../components/GlobalFiltersBar';
@@ -455,7 +455,18 @@ const ShareWidgetCard: React.FC<ShareWidgetCardProps> = ({ widget, canEdit = fal
         </div>
 
         <div className="flex-1 min-h-[160px]">
-          <WidgetRenderer widget={widget} />
+          {widget.dataKosong ? (
+            <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center gap-1.5">
+              <Database className="w-6 h-6 text-ink-3 opacity-60" />
+              <p className="text-[12px] font-semibold text-ink-2">Belum ada di dokumen</p>
+              <p className="text-[10.5px] text-ink-3 leading-relaxed max-w-[36ch]">
+                {widget.catatanData || 'Indikator ini tidak ditemukan di dokumen instansi.'}
+              </p>
+              <p className="text-[10px] text-ink-3 italic">Tidak ada angka contoh yang ditampilkan.</p>
+            </div>
+          ) : (
+            <WidgetRenderer widget={widget} />
+          )}
         </div>
       </div>
 

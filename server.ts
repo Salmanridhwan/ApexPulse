@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
-import { ConfigurableRagClient, jelaskanError, maskKey } from './src/services/rag/http';
+import { ConfigurableRagClient, RagServiceError, jelaskanError, maskKey } from './src/services/rag/http';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
@@ -28,6 +28,39 @@ import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
+import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
+import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
+import { GoogleAuthError, verifikasiIdTokenGoogle } from './src/services/auth/google';
+
+/**
+ * Persona chatbot Aiones Boards. Disisipkan ke setiap query percakapan supaya
+ * jawaban terasa seperti chatbot LLM yang ramah, TETAP bersandar dokumen resmi,
+ * dan TIDAK mengarang angka saat dokumen tidak memuatnya.
+ */
+const CHATBOT_PERSONA =
+  'Kamu adalah "Aiones Boards Orchestrator", asisten AI ramah untuk instansi BUMD (Badan Usaha Milik Daerah). ' +
+  'Jawab dalam Bahasa Indonesia yang natural, ringkas, dan profesional. ' +
+  'ATURAN WAJIB: (1) Untuk pertanyaan tentang data, angka, kinerja, atau isi dokumen instansi, jawab HANYA berdasarkan ' +
+  'dokumen resmi di knowledge base ini dan sebutkan sumbernya; kalau dokumen tidak memuat, katakan jujur bahwa datanya ' +
+  'tidak ditemukan — JANGAN mengarang angka. (2) Untuk sapaan atau obrolan ringan (halo, terima kasih, siapa kamu), ' +
+  'balas hangat dan tawarkan bantuan seputar dokumen instansi. (3) Jangan pernah menampilkan data contoh atau angka karangan.';
+
+/**
+ * Bangun ringkasan riwayat percakapan (multi-turn) untuk dikirim ke layanan RAG.
+ * Dibatasi beberapa giliran terakhir agar prompt tetap ringkas dan relevan.
+ */
+function rangkaiRiwayat(messages: ChatMessage[], maksGiliran = 6): string {
+  const relevan = messages
+    .filter((m) => m.text && !/^Halo! Saya asisten orkestrator/i.test(m.text))
+    .slice(-maksGiliran * 2);
+  if (relevan.length === 0) return '';
+  const baris = relevan.map((m) => {
+    const peran = m.sender === 'user' ? 'Pengguna' : 'Asisten';
+    const teks = m.text.replace(/\s+/g, ' ').trim().slice(0, 500);
+    return `${peran}: ${teks}`;
+  });
+  return `Riwayat percakapan sebelumnya (konteks, jangan diulang apa adanya):\n${baris.join('\n')}`;
+}
 
 // ============ AUTH HELPERS ============
 
@@ -165,6 +198,150 @@ async function startServer() {
     });
   });
 
+  /**
+   * Konfigurasi auth yang boleh diketahui klien (TANPA rahasia).
+   * Dipakai halaman login untuk menampilkan tombol "Masuk dengan Google" hanya
+   * saat Client ID tersedia.
+   */
+  app.get('/api/auth/config', (_req: Request, res: Response) => {
+    res.json({
+      googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+      googleAktif: !!process.env.GOOGLE_CLIENT_ID,
+    });
+  });
+
+  /** Terbitkan sesi + audit log untuk user yang sudah lolos verifikasi. */
+  function terbitkanSesi(res: Response, user: SafeUser, cara: string) {
+    const token = signSession({
+      userId: user.id,
+      role: user.role,
+      tenantId: user.tenantId,
+      name: user.name,
+    });
+    db.addAuditLog({
+      tenantId: user.tenantId,
+      userId: user.id,
+      userName: user.name,
+      action: 'Login Pengguna',
+      target: 'Portal Aiones Boards BUMD',
+      details: `Masuk sebagai ${user.role.toUpperCase()} (${user.email}) — ${cara}`,
+    });
+    res.setHeader('Set-Cookie', sessionCookieHeader(token));
+    return res.json({ user: safeUser(user) });
+  }
+
+  /**
+   * REGISTRASI akun baru (email + kata sandi).
+   *
+   * Akun baru dibuat dengan peran 'analis' dan instansi default. Untuk mencegah
+   * penyalahgunaan, pendaftaran bisa ditutup lewat env `ALLOW_REGISTRATION=false`.
+   */
+  app.post('/api/auth/register', (req: Request, res: Response) => {
+    if (process.env.ALLOW_REGISTRATION === 'false') {
+      return res.status(403).json({ error: 'Pendaftaran akun sedang ditutup. Hubungi admin instansi.' });
+    }
+
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    const name = String(req.body?.name || '').trim();
+    const tenantId = String(req.body?.tenantId || '').trim() || 'tenant-pdam';
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Nama, email, dan kata sandi wajib diisi.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Format email tidak valid.' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Kata sandi minimal 8 karakter.' });
+    }
+    if (db.users.some((u) => u.email.toLowerCase() === email)) {
+      return res.status(409).json({
+        error: 'Email sudah terdaftar. Silakan masuk, atau gunakan tombol "Masuk dengan Google".',
+      });
+    }
+    if (!db.tenants.some((t) => t.id === tenantId)) {
+      return res.status(400).json({ error: 'Instansi yang dipilih tidak dikenal.' });
+    }
+
+    const newUser: SafeUser = {
+      id: `user-${Date.now()}`,
+      email,
+      name,
+      role: 'analis',
+      tenantId,
+      avatar: '👤',
+    };
+    db.createUser(newUser, hashPassword(password));
+    return terbitkanSesi(res, newUser, 'pendaftaran akun baru');
+  });
+
+  /**
+   * LOGIN / REGISTRASI dengan GOOGLE.
+   *
+   * Klien mengirim ID token dari Google Identity Services; server memverifikasi
+   * tanda tangannya ke kunci publik Google. Bila email belum terdaftar, akun
+   * dibuat otomatis (peran 'analis', instansi default) — jadi "Masuk dengan
+   * Google" sekaligus berfungsi sebagai pendaftaran.
+   */
+  app.post('/api/auth/google', async (req: Request, res: Response) => {
+    const idToken = String(req.body?.credential || req.body?.idToken || '');
+    if (!idToken) {
+      return res.status(400).json({ error: 'Token Google tidak dikirim.' });
+    }
+
+    let profil;
+    try {
+      profil = await verifikasiIdTokenGoogle(idToken, process.env.GOOGLE_CLIENT_ID || '');
+    } catch (err) {
+      const pesan =
+        err instanceof GoogleAuthError
+          ? err.message
+          : 'Verifikasi login Google gagal.';
+      return res.status(401).json({ error: pesan });
+    }
+
+    let user = db.users.find(
+      (u) => u.googleSub === profil.sub || u.email.toLowerCase() === profil.email
+    );
+
+    if (!user) {
+      // Pendaftaran otomatis via Google (bisa ditutup dengan ALLOW_REGISTRATION=false).
+      if (process.env.ALLOW_REGISTRATION === 'false') {
+        return res.status(403).json({
+          error: 'Akun Google ini belum terdaftar dan pendaftaran sedang ditutup. Hubungi admin instansi.',
+        });
+      }
+      const tenantId = String(req.body?.tenantId || '').trim() || 'tenant-pdam';
+      const baru: SafeUser = {
+        id: `user-g-${profil.sub || Date.now()}`,
+        email: profil.email,
+        name: profil.name,
+        role: 'analis',
+        tenantId: db.tenants.some((t) => t.id === tenantId) ? tenantId : 'tenant-pdam',
+        avatar: profil.picture || '👤',
+        googleSub: profil.sub,
+        viaGoogle: true,
+      };
+      db.createUser(baru);
+      db.addAuditLog({
+        tenantId: baru.tenantId,
+        userId: baru.id,
+        userName: baru.name,
+        action: 'Registrasi via Google',
+        target: baru.name,
+        details: `Akun baru dibuat otomatis dari login Google (${baru.email})`,
+      });
+      user = baru;
+    } else if (!user.googleSub) {
+      // Akun lokal dengan email sama: tautkan ke Google agar login berikutnya mulus.
+      const updated = db.updateUser(user.id, { googleSub: profil.sub } as any);
+      if (updated) user = updated;
+    }
+
+    return terbitkanSesi(res, user, 'Google Sign-In');
+  });
+
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     const session = verifySession(parseSessionCookie(req));
     if (session) {
@@ -264,6 +441,82 @@ async function startServer() {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
     res.json(updated);
+  });
+
+  /**
+   * Pakai TEMPLATE DASHBOARD dengan angka dari DOKUMEN RAG (bukan angka contoh).
+   *
+   * Memakai SUSUNAN kartu template, tetapi setiap kartu diisi angka NYATA dari
+   * dokumen instansi. Kartu yang indikatornya tidak ada di dokumen dikosongkan
+   * dengan penanda jujur — tidak ada angka contoh yang ditampilkan.
+   */
+  app.post('/api/dashboards/dari-template', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const templateId = String(req.body?.templateId || '').trim();
+    const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+
+    try {
+      // Salin widget template (id baru & segar) lalu isi angkanya dari dokumen.
+      const seed = Date.now();
+      const dasar = widgetDariTemplate(template, seed);
+      const hasil = await isiTemplateDariRag(
+        { ...template, widgets: dasar },
+        { sector: (req.body?.sector || tenant.sector || template.sektor) as BumdSector, instansi: tenant.name, kbId, rag: ragClient }
+      );
+
+      // Judul dashboard: buang penanda "(Contoh)" karena kini angkanya dari dokumen.
+      const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
+
+      const newDash: Dashboard = {
+        id: `dash-${Date.now()}`,
+        tenantId,
+        title: judulBersih,
+        description: template.deskripsiDashboard.replace(
+          /Angka bersifat contoh[^.]*\./i,
+          'Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.'
+        ),
+        sector: template.sektor,
+        widgets: hasil.widgets,
+        globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createDashboard(newDash);
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Buat Dashboard dari Template',
+        target: newDash.title,
+        details: `Template ${template.sektor}: ${hasil.terisi} kartu terisi dari dokumen, ${hasil.kosong} kartu belum ada di dokumen.`,
+      });
+
+      return res.status(201).json({
+        dashboard: newDash,
+        terisi: hasil.terisi,
+        kosong: hasil.kosong,
+        total: template.widgets.length,
+        catatan: hasil.catatan,
+      });
+    } catch (err) {
+      // Layanan RAG tidak terhubung → jujur, tanpa angka contoh.
+      if (err instanceof RagServiceError) {
+        return res.status(502).json({
+          error: `Layanan RAG tidak dapat dihubungi: ${err.message}`,
+          petunjuk: err.detail,
+        });
+      }
+      return res.status(500).json({ error: jelaskanError(err) });
+    }
   });
 
   app.delete('/api/dashboards/:id', (req: Request, res: Response) => {
@@ -709,59 +962,64 @@ async function startServer() {
         return res.end();
       }
 
-      // Case 2.5: Pertanyaan bebas (chatbot) — jawab via /query RAG tanpa generate dashboard
-      // Deteksi: pertanyaan informatif, bukan perintah membuat/mengubah dashboard
+      // Case 2.5: ROUTING — dashboard command vs chatbot.
+      // Perintah membuat/memperbarui dashboard (kata kerja eksplisit) masuk jalur
+      // orkestrator; SEMUA pesan lain dijawab sebagai chatbot LLM (sapaan, tanya
+      // data, obrolan) lewat /query RAG dengan persona + riwayat percakapan.
       const isGenerateDash =
         lower.includes('buat dashboard') ||
         lower.includes('buatkan dashboard') ||
+        lower.includes('bikin dashboard') ||
         lower.includes('generate dashboard') ||
         lower.includes('buat laporan') ||
         lower.includes('buatkan laporan') ||
+        lower.includes('bikin laporan') ||
         lower.includes('tampilkan dashboard') ||
         lower.includes('perbarui dashboard') ||
+        lower.includes('perbaharui dashboard') ||
         lower.includes('update dashboard') ||
+        lower.includes('refresh dashboard') ||
         lower.includes('buat kpi') ||
-        lower.includes('buatkan kpi');
+        lower.includes('buatkan kpi') ||
+        lower.includes('susun dashboard') ||
+        lower.includes('rancang dashboard');
 
-      const isPertanyaanBebas =
-        !isGenerateDash && (
-          lower.includes('?') ||
-          lower.startsWith('berapa') ||
-          lower.startsWith('apa') ||
-          lower.startsWith('siapa') ||
-          lower.startsWith('bagaimana') ||
-          lower.startsWith('mengapa') ||
-          lower.startsWith('kenapa') ||
-          lower.startsWith('kapan') ||
-          lower.startsWith('di mana') ||
-          lower.startsWith('dimana') ||
-          lower.startsWith('jelaskan') ||
-          lower.startsWith('ceritakan') ||
-          lower.startsWith('sebutkan') ||
-          lower.startsWith('tolong jelaskan') ||
-          lower.startsWith('tolong ceritakan') ||
-          lower.startsWith('tolong sebutkan') ||
-          lower.startsWith('cari') ||
-          lower.startsWith('cari tahu') ||
-          lower.startsWith('info') ||
-          lower.startsWith('informasi') ||
-          lower.includes('total') ||
-          lower.includes('berapa besar') ||
-          lower.includes('berapa total') ||
-          lower.includes('berapa jumlah') ||
-          lower.includes('berapa nilai') ||
-          lower.includes('tunjukkan') ||
-          lower.includes('persentase') ||
-          lower.includes('rasio') ||
-          lower.includes('pertumbuhan') ||
-          lower.includes('perkembangan') ||
-          lower.includes('kinerja') ||
-          lower.includes('capaian') ||
-          lower.includes('ringkasan')
-        );
+      // Deteksi obrolan ringan (sapaan/terima kasih) → persona boleh membalas
+      // natural tanpa strict grounding. Pertanyaan data tetap grounded.
+      const isSapaan =
+        /^(halo|hai|hi|hello|helo|hey|test|tes|pagi|siang|sore|malam|assalamualaikum|salam)\b/i.test(
+          lower.trim()
+        ) ||
+        lower.includes('apa kabar') ||
+        lower.includes('terima kasih') ||
+        lower.includes('makasih') ||
+        lower.includes('thanks') ||
+        lower.includes('thank you') ||
+        lower.includes('siapa kamu') ||
+        lower.includes('kamu siapa') ||
+        lower.includes('apa ini') ||
+        lower.includes('bisa apa');
 
-      if (isPertanyaanBebas) {
-        sendEvent('step', { id: 'sc0', title: 'Mencari jawaban di dokumen resmi...', status: 'in_progress' });
+      if (!isGenerateDash) {
+        // ---- CHATBOT LLM (multi-turn, grounded ke dokumen instansi) ----
+        sendEvent('step', { id: 'sc0', title: 'Menyiapkan jawaban dari dokumen resmi...', status: 'in_progress' });
+
+        // Riwayat percakapan: utamakan yang tersimpan di server (per dashboard);
+        // kalau tidak ada, pakai riwayat yang dikirim klien (untuk mode tanpa dashboard).
+        const riwayatServer = chat ? rangkaiRiwayat(chat.messages) : '';
+        const riwayatKlien = Array.isArray(req.body.history)
+          ? rangkaiRiwayat(
+              (req.body.history as Array<{ sender?: string; text?: string }>)
+                .filter((m) => m && typeof m.text === 'string')
+                .map((m, i) => ({
+                  id: `h-${i}`,
+                  sender: m.sender === 'user' ? 'user' : 'system',
+                  text: m.text as string,
+                  timestamp: '',
+                })) as ChatMessage[]
+            )
+          : '';
+        const riwayat = riwayatServer || riwayatKlien;
 
         try {
           const ragResult = await ragClient.query({
@@ -770,43 +1028,78 @@ async function startServer() {
             mode: 'prose',
             instansi: tenantChat?.name,
             kbId: kbChat,
+            riwayat,
+            persona: CHATBOT_PERSONA,
+            strictGrounding: !isSapaan,
           });
 
-          sendEvent('step', { id: 'sc0', title: 'Dokumen ditemukan, menyusun jawaban...', status: 'completed' });
+          sendEvent('step', { id: 'sc0', title: 'Jawaban siap', status: 'completed' });
 
-          const answer = ragResult.answer || 'Maaf, jawaban tidak ditemukan di dokumen yang tersedia.';
+          const answer = ragResult.answer || 'Maaf, saya tidak menemukan jawabannya di dokumen yang tersedia.';
           const citationsCount = ragResult.citations?.length || 0;
 
-          // Bangun teks balasan: jawaban + sumber
+          // Bangun teks balasan: jawaban + daftar sumber dokumen (kalau ada).
           let replyText = answer;
           if (citationsCount > 0) {
-            const sumberUnik = ragResult.citations
-              .slice(0, 3)
+            const sumberUnik = Array.from(
+              new Map(
+                ragResult.citations
+                  .filter((c) => c.docName)
+                  .map((c) => [c.docName, c])
+              ).values()
+            )
+              .slice(0, 4)
               .map((c) => `• ${c.docName}${c.page ? ` (hal. ${c.page})` : ''}`)
               .join('\n');
-            replyText += `\n\n📄 **Sumber Dokumen:**\n${sumberUnik}`;
+            if (sumberUnik) replyText += `\n\n📄 **Sumber Dokumen:**\n${sumberUnik}`;
           }
 
           catatAsisten({
             sender: 'system',
             text: replyText,
-            actionTaken: 'qa_answer' as any,
-            modeUsed: ragResult.mode,
+            actionTaken: 'qa_answer',
+            modeUsed: 'Chatbot RAG',
             citationsCount,
           } as any);
 
           sendEvent('result', {
             actionTaken: 'qa_answer',
             message: replyText,
-            modeUsed: ragResult.mode,
+            modeUsed: 'Chatbot RAG',
             citationsCount,
             latencyMs: ragResult.latencyMs,
           });
           sendEvent('done', { ok: true });
           return res.end();
         } catch (err: any) {
-          // Jika RAG gagal untuk pertanyaan, lanjut ke default generate dashboard
-          console.warn('[chat] chatbot RAG gagal, lanjut ke generate dashboard:', err?.message);
+          // Layanan RAG gagal / belum dikonfigurasi: tampilkan galat jujur.
+          // JANGAN jatuh ke data contoh atau ke generate dashboard.
+          const detail =
+            err instanceof RagServiceError
+              ? err.detail || err.message
+              : err?.message || 'kesalahan jaringan';
+          const pesanGalat =
+            `⚠️ Maaf, saya belum bisa menjawab karena **layanan RAG tidak dapat dihubungi**.\n\n` +
+            `Penyebab: ${detail}\n\n` +
+            `Silakan periksa koneksi layanan RAG (Admin → Konfigurasi RAG), lalu coba lagi. ` +
+            `Saya tidak menampilkan data contoh agar jawaban tidak menyesatkan.`;
+          console.warn('[chat] chatbot RAG gagal:', detail);
+
+          catatAsisten({
+            sender: 'system',
+            text: pesanGalat,
+            actionTaken: 'rag_error',
+            modeUsed: 'Gagal (Layanan RAG)',
+          } as any);
+
+          sendEvent('step', { id: 'sc0', title: 'Layanan RAG tidak dapat dihubungi', status: 'failed' });
+          sendEvent('result', {
+            actionTaken: 'rag_error',
+            message: pesanGalat,
+            modeUsed: 'Gagal (Layanan RAG)',
+          });
+          sendEvent('done', { ok: false });
+          return res.end();
         }
       }
 
@@ -834,21 +1127,35 @@ async function startServer() {
       // dashboard. Menampilkan template contoh di sini membuat kanvas terlihat
       // resmi padahal angkanya karangan.
       if (!genResult.ok) {
-        const pesanGagal =
-          `Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}". ` +
-          (genResult.alasanGagal || 'Dokumen instansi ini tidak memadai.') +
-          ` Yang bisa dilakukan: tambahkan atau rapikan dokumen instansi ini di knowledge base ` +
-          `(${kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || 'KB belum ditautkan'}), lalu coba lagi.`;
-        catatAsisten({ sender: 'system', text: pesanGagal, actionTaken: 'none', modeUsed: genResult.modeUsed } as any);
+        const gagalLayanan = genResult.modeUsed === 'Gagal (Layanan RAG)';
+        const pesanGagal = gagalLayanan
+          ? `⚠️ Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}" karena **layanan RAG tidak dapat dihubungi**.\n\n` +
+            `Penyebab: ${genResult.alasanGagal || 'layanan tidak merespons'}\n\n` +
+            `Periksa koneksi layanan RAG (Admin → Konfigurasi RAG) lalu coba lagi. ` +
+            `Saya tidak membuat dashboard dari data contoh agar tidak menyesatkan.`
+          : `Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}". ` +
+            (genResult.alasanGagal || 'Dokumen instansi ini tidak memadai.') +
+            ` Yang bisa dilakukan: tambahkan atau rapikan dokumen instansi ini di knowledge base ` +
+            `(${kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || 'KB belum ditautkan'}), lalu coba lagi.`;
+        catatAsisten({
+          sender: 'system',
+          text: pesanGagal,
+          actionTaken: gagalLayanan ? 'rag_error' : 'none',
+          modeUsed: genResult.modeUsed,
+        } as any);
         db.addAuditLog({
           tenantId,
           userId: session.userId,
           userName: session.name,
-          action: 'Generate Dashboard Gagal',
+          action: gagalLayanan ? 'Generate Dashboard Gagal (Layanan RAG)' : 'Generate Dashboard Gagal',
           target: prompt.slice(0, 60),
           details: genResult.alasanGagal || 'Dokumen tidak memadai',
         });
-        sendEvent('result', { actionTaken: 'none', message: pesanGagal, modeUsed: genResult.modeUsed });
+        sendEvent('result', {
+          actionTaken: gagalLayanan ? 'rag_error' : 'none',
+          message: pesanGagal,
+          modeUsed: genResult.modeUsed,
+        });
         sendEvent('done', { ok: false });
         return res.end();
       }
@@ -1388,6 +1695,28 @@ async function startServer() {
       return res.status(404).json({ error: 'Tenant tidak ditemukan.' });
     }
     res.json(updated);
+  });
+
+  app.delete('/api/admin/tenants/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
+    }
+    const target = db.tenants.find((t) => t.id === req.params.id);
+    const success = db.deleteTenant(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: 'Tenant / Instansi BUMD tidak ditemukan.' });
+    }
+    db.addAuditLog({
+      tenantId: req.params.id,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Instansi BUMD',
+      target: target?.name || req.params.id,
+      details: `Instansi BUMD ${target?.name || req.params.id} beserta data terkait dihapus dari sistem`,
+    });
+    res.json({ success: true });
   });
 
   /**

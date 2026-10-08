@@ -79,7 +79,6 @@ import {
 } from './types';
 import {
   DashboardTemplate,
-  widgetDariTemplate,
 } from './services/templates/dashboardTemplates';
 
 export default function App() {
@@ -349,31 +348,35 @@ export default function App() {
   };
 
   /**
-   * Buat dashboard baru dari TEMPLATE (angka contoh), lalu buka kanvasnya.
+   * Buat dashboard baru dari TEMPLATE dengan ANGKA DARI DOKUMEN RAG.
    *
-   * Widget template disalin dengan id baru (lihat `widgetDariTemplate`) supaya
-   * tidak bertabrakan dengan dashboard lain. Setelah dibuat, dashboard ini
-   * berperilaku seperti dashboard biasa: widget bisa diubah/dihapus/ditambah.
+   * Susunan kartu mengikuti template, tetapi setiap kartu diisi angka nyata dari
+   * dokumen instansi lewat `/api/dashboards/dari-template`. Kartu yang indikatornya
+   * tidak ada di dokumen dikosongkan (tanpa angka contoh). Melempar galat bila
+   * layanan RAG tidak terhubung supaya UI menampilkan pesan jujur.
    */
-  const handleUseTemplate = async (template: DashboardTemplate) => {
-    if (!currentTenant) return;
-    const seed = Date.now();
-    const res = await fetch('/api/dashboards', {
+  const handleUseTemplate = async (
+    template: DashboardTemplate
+  ): Promise<{ terisi: number; kosong: number; total: number }> => {
+    if (!currentTenant) throw new Error('Pilih instansi terlebih dahulu.');
+    const res = await fetch('/api/dashboards/dari-template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tenantId: currentTenant.id,
-        title: template.judulDashboard,
-        description: template.deskripsiDashboard,
+        templateId: template.id,
         sector: template.sektor,
-        widgets: widgetDariTemplate(template, seed),
       }),
     });
-    if (!res.ok) return;
-    const newDash: Dashboard = await res.json();
+    const isi = await res.json().catch(() => null);
+    if (!res.ok || !isi?.dashboard) {
+      throw new Error(isi?.error || 'Gagal memuat angka dari dokumen instansi.');
+    }
+    const newDash: Dashboard = isi.dashboard;
     setDashboards((prev) => [newDash, ...prev]);
     setActiveDashboard(newDash);
     setViewMode('workspace');
+    return { terisi: isi.terisi ?? 0, kosong: isi.kosong ?? 0, total: isi.total ?? 0 };
   };
 
   const handleDeleteDashboard = async (dashboardId: string) => {

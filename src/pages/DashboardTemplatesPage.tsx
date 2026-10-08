@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   Building2,
@@ -8,6 +9,7 @@ import {
   Database,
   LayoutGrid,
   LayoutTemplate,
+  Loader2,
   Sparkles,
 } from 'lucide-react';
 import { BumdSector, Tenant } from '../types';
@@ -17,8 +19,14 @@ import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/wid
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
-  /** Buat dashboard baru dari template, lalu buka kanvasnya. */
-  onUseTemplate: (template: DashboardTemplate) => void;
+  /**
+   * Buat dashboard baru dari template DENGAN ANGKA DARI DOKUMEN RAG, lalu buka
+   * kanvasnya. Mengembalikan ringkasan berapa kartu terisi dari dokumen dan
+   * berapa yang belum ada di dokumen; melempar galat bila layanan RAG gagal.
+   */
+  onUseTemplate: (
+    template: DashboardTemplate
+  ) => Promise<{ terisi: number; kosong: number; total: number }>;
 }
 
 /** Label sektor untuk ditampilkan di tab. */
@@ -74,6 +82,10 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     return (relevan ?? DASHBOARD_TEMPLATES[0]).id;
   });
 
+  /** Status pengambilan angka dari dokumen saat tombol "Pakai Template Ini" ditekan. */
+  const [memuat, setMemuat] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+
   const aktif = useMemo(
     () => DASHBOARD_TEMPLATES.find((t) => t.id === aktifId) ?? DASHBOARD_TEMPLATES[0],
     [aktifId]
@@ -84,6 +96,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
   const relevan = currentTenant?.sector === aktif.sektor;
+
+  const pakai = async () => {
+    if (memuat) return;
+    setMemuat(true);
+    setGalat(null);
+    try {
+      await onUseTemplate(aktif);
+    } catch (err) {
+      setGalat(err instanceof Error ? err.message : 'Gagal mengambil angka dari dokumen.');
+      setMemuat(false);
+    }
+  };
 
   return (
     <div className="flex-1 bg-canvas min-h-screen flex flex-col">
@@ -102,14 +126,15 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
               Pratinjau dashboard siap pakai per sektor BUMD, ditampilkan seperti kanvas aslinya.
-              Pilih tab sektor di bawah, lalu tekan <strong>Pakai Template Ini</strong> untuk membuat
-              dashboard baru berisi widget yang sama.
+              Pilih tab sektor di bawah, lalu tekan <strong>Pakai Template Ini</strong> — angka setiap
+              kartu akan diambil dari dokumen resmi instansi Anda.
             </p>
-            <p className="text-[10.5px] text-warn mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
+            <p className="text-[10.5px] text-brand-ink mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
               <span>
-                Semua angka pada template adalah <strong>data contoh</strong> (bukan dari dokumen instansi).
-                Untuk mengisi angka resmi, gunakan katalog preset atau chat RAG setelah dashboard dibuat.
+                Pratinjau di bawah memakai <strong>angka contoh</strong> untuk memperlihatkan susunan
+                kartu. Setelah tombol ditekan, angka diganti dari dokumen RAG; kartu yang indikatornya
+                belum ada di dokumen ditandai <strong>kosong</strong> (tanpa angka contoh).
               </span>
             </p>
           </div>
@@ -199,19 +224,37 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             <div className="flex items-center gap-1.5 min-w-0">
               <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
               <span className="text-[11px] text-ink-3 font-medium truncate">
-                Pratinjau template · widget belum dibuat sampai Anda menekan tombol
+                {memuat
+                  ? 'Mengambil angka dari dokumen instansi…'
+                  : 'Angka setiap kartu diambil dari dokumen resmi instansi'}
               </span>
             </div>
             <button
-              onClick={() => onUseTemplate(aktif)}
+              onClick={pakai}
+              disabled={memuat || !currentTenant}
               data-testid={`pakai-template-${aktif.sektor}`}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors"
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <LayoutTemplate className="w-4 h-4" />
-              <span>Pakai Template Ini</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
+              <span>{memuat ? 'Mengambil dari dokumen…' : 'Pakai Template Ini'}</span>
+              {!memuat && <ArrowRight className="w-3.5 h-3.5" />}
             </button>
           </div>
+
+          {/* Galat jujur: layanan RAG tidak terhubung / dokumen tidak menjawab. */}
+          {galat && (
+            <div className="border-t border-neg/30 bg-neg/10 px-4 sm:px-5 py-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-[11.5px] font-semibold text-neg">Gagal mengambil angka dari dokumen</p>
+                <p className="text-[11px] text-ink-2 mt-0.5 leading-relaxed">{galat}</p>
+                <p className="text-[10.5px] text-ink-3 mt-1 leading-relaxed">
+                  Tidak ada angka contoh yang ditampilkan. Periksa konfigurasi RAG (Admin → Konfigurasi RAG)
+                  lalu coba lagi.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Kanvas — dirender PERSIS seperti workspace (mode pratinjau).
