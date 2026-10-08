@@ -453,6 +453,10 @@ export class InMemoryDb {
   private ensureSeedUsers() {
     let berubah = false;
     for (const seed of SEED_USERS) {
+      // Jangan hidupkan kembali user seed milik instansi yang sudah dihapus —
+      // kalau tidak, menghapus instansi tidak benar-benar bersih (user-nya
+      // muncul lagi setiap boot).
+      if (!this.tenants.some((t) => t.id === seed.tenantId)) continue;
       if (!this.users.some((u) => u.id === seed.id)) {
         this.users.push({ ...seed });
         berubah = true;
@@ -856,18 +860,62 @@ export class InMemoryDb {
     return this.tenants[idx];
   }
 
-  deleteTenant(id: string): boolean {
-    const len = this.tenants.length;
-    this.tenants = this.tenants.filter((t) => t.id !== id);
-    const deleted = this.tenants.length < len;
-    if (deleted) {
-      this.dashboards = this.dashboards.filter((d) => d.tenantId !== id);
-      this.chats = this.chats.filter((c) => c.tenantId !== id);
-      this.notifications = this.notifications.filter((n) => n.tenantId !== id);
-      this.alertRules = this.alertRules.filter((a) => a.tenantId !== id);
-      this.persist();
+  /**
+   * Hapus satu instansi BUMD BESERTA SELURUH data yang terikat padanya.
+   *
+   * Satu instansi = satu Knowledge Base di layanan RAG, jadi menghapus instansi
+   * harus ikut membersihkan semua jejaknya: pengguna + kredensialnya (termasuk di
+   * tabel auth MySQL agar tidak "hidup lagi" lewat sinkronisasi multi-instance),
+   * dashboard + percakapan, tautan bagikan (token & PIN) milik dashboard itu,
+   * notifikasi, aturan alert, catatan ketersediaan preset katalog, dan log audit
+   * instansi tersebut. Kalau tidak, sisa data ini masih tampil/terbaca walau
+   * instansinya sudah dihilangkan.
+   */
+  async deleteTenant(id: string): Promise<boolean> {
+    if (!this.tenants.some((t) => t.id === id)) return false;
+
+    // 1) Pengguna instansi + kredensialnya. Hapus juga di tabel auth MySQL,
+    //    supaya sinkronisasi multi-instance / findUserForLogin tidak
+    //    mengembalikannya dari database.
+    const userIds = this.users.filter((u) => u.tenantId === id).map((u) => u.id);
+    this.users = this.users.filter((u) => u.tenantId !== id);
+    for (const uid of userIds) {
+      delete this.credentials[uid];
+      if (this.mysql) {
+        try {
+          await this.mysql.deleteAuthUser(uid);
+        } catch (err: any) {
+          console.error('[AionesBoard DB] deleteAuthUser gagal:', err?.message || err);
+        }
+      }
     }
-    return deleted;
+
+    // 2) Dashboard instansi + turunannya: percakapan & tautan bagikan.
+    const dashIds = new Set(
+      this.dashboards.filter((d) => d.tenantId === id).map((d) => d.id)
+    );
+    this.dashboards = this.dashboards.filter((d) => d.tenantId !== id);
+    this.chats = this.chats.filter(
+      (c) => c.tenantId !== id && !dashIds.has(c.dashboardId)
+    );
+    for (const [token, dashId] of Object.entries(this.shareTokens)) {
+      if (dashIds.has(dashId)) {
+        delete this.shareTokens[token];
+        delete this.sharePins[token];
+      }
+    }
+
+    // 3) Sisa data yang terikat tenantId.
+    this.notifications = this.notifications.filter((n) => n.tenantId !== id);
+    this.alertRules = this.alertRules.filter((a) => a.tenantId !== id);
+    this.auditLogs = this.auditLogs.filter((a) => a.tenantId !== id);
+    this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => k.tenantId !== id);
+
+    // 4) Instansinya sendiri.
+    this.tenants = this.tenants.filter((t) => t.id !== id);
+
+    this.persist();
+    return true;
   }
 }
 

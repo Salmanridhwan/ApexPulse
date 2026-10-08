@@ -1704,24 +1704,26 @@ async function startServer() {
     res.json(updated);
   });
 
-  app.delete('/api/admin/tenants/:id', (req: Request, res: Response) => {
+  app.delete('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
     const target = db.tenants.find((t) => t.id === req.params.id);
-    const success = db.deleteTenant(req.params.id);
+    const success = await db.deleteTenant(req.params.id);
     if (!success) {
       return res.status(404).json({ error: 'Tenant / Instansi BUMD tidak ditemukan.' });
     }
     db.addAuditLog({
-      tenantId: req.params.id,
+      // Dicatat pada instansi ADMIN pelaku, bukan instansi yang dihapus —
+      // audit milik instansi target sudah ikut dibersihkan oleh cascade.
+      tenantId: session.tenantId,
       userId: session.userId,
       userName: session.name,
       action: 'Hapus Instansi BUMD',
       target: target?.name || req.params.id,
-      details: `Instansi BUMD ${target?.name || req.params.id} beserta data terkait dihapus dari sistem`,
+      details: `Instansi BUMD ${target?.name || req.params.id} beserta seluruh data terkait (pengguna, dashboard, tautan bagikan, notifikasi, aturan alert, cache katalog) dihapus dari sistem`,
     });
     res.json({ success: true });
   });

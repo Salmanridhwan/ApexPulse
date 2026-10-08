@@ -373,7 +373,7 @@ export const Admin: React.FC<AdminProps> = ({
 
   /** Hapus Instansi BUMD beserta data terkait */
   const handleDeleteTenant = async (tenant: Tenant) => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus instansi "${tenant.name}"?\nSemua dashboard dan data terkait instansi ini akan dihapus.`)) {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus instansi "${tenant.name}"?\nSeluruh data terkait instansi ini (pengguna, dashboard, tautan bagikan, notifikasi, aturan alert, riwayat audit) akan dihapus.`)) {
       return;
     }
     try {
@@ -385,7 +385,11 @@ export const Admin: React.FC<AdminProps> = ({
         alert(`Gagal menghapus instansi: ${err.error || 'Terjadi kesalahan'}`);
         return;
       }
+      // Buang instansi + penggunanya dari state lokal, lalu muat ulang agar
+      // daftar pengguna/log audit/dashboard benar-benar sinkron dengan server.
       setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
+      setUsers((prev) => prev.filter((u) => u.tenantId !== tenant.id));
+      void loadData();
     } catch (err: any) {
       alert(`Gagal menghapus instansi: ${err?.message || 'Kesalahan jaringan'}`);
     }
