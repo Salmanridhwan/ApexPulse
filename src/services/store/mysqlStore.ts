@@ -33,6 +33,8 @@ export interface DbSnapshot {
   credentials: Record<string, string>;
   tenants: Tenant[];
   ketersediaanPreset: KetersediaanPreset[];
+  /** id instansi yang sudah dihapus admin — agar user seed-nya tidak dibuat ulang. */
+  deletedTenantIds: string[];
 }
 
 export interface LoadedState {
@@ -48,6 +50,7 @@ export interface LoadedState {
   credentials?: Record<string, string>;
   tenants?: Tenant[];
   ketersediaanPreset?: KetersediaanPreset[];
+  deletedTenantIds?: string[];
 }
 
 export class MysqlStore {
@@ -131,6 +134,48 @@ export class MysqlStore {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel TENANT khusus, terpisah dari `collections`.
+     *
+     * Alasan sama dengan `auth_users`: `saveAll` menulis SNAPSHOT PENUH, sehingga
+     * tenant yang dibuat/dihapus di satu instance backend hilang/balik lagi karena
+     * ditimpa snapshot instance lain ("Tenant tidak ditemukan" padahal baru dibuat
+     * dari instance yang lain). Di sini tenant ditulis PER-BARIS (upsert/delete),
+     * dibaca ulang sebelum operasi yang bergantung padanya.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS tenants (
+        id VARCHAR(128) PRIMARY KEY,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB
+    `);
+  }
+
+  /** Tambah/perbarui SATU tenant (upsert per-baris, aman multi-instance). */
+  async upsertTenant(id: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO tenants (id, data) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+      [id, JSON.stringify(data)]
+    );
+  }
+
+  /** Muat SEMUA tenant dari tabel tenant khusus. */
+  async loadTenants(): Promise<Tenant[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM tenants');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  /** Hapus satu tenant dari tabel tenant khusus. */
+  async deleteTenantRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM tenants WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU user + kredensialnya (upsert per-baris, aman multi-instance). */
@@ -183,10 +228,16 @@ export class MysqlStore {
     if (arrays.notifications) hasil.notifications = arrays.notifications as NotificationItem[];
     if (arrays.auditLogs) hasil.auditLogs = arrays.auditLogs as AuditLog[];
     if (arrays.users) hasil.users = arrays.users as SafeUser[];
-    if (arrays.tenants) hasil.tenants = arrays.tenants as Tenant[];
     if (arrays.ketersediaanPreset) {
       hasil.ketersediaanPreset = arrays.ketersediaanPreset as KetersediaanPreset[];
     }
+
+    // Tenant dibaca dari TABEL KHUSUS (bukan snapshot `collections`) supaya tahan
+    // multi-instance. Kalau tabel khusus masih kosong (deployment lama), pakai
+    // sisa baris `collections` sebagai migrasi awal.
+    const tenantsKhusus = await this.loadTenants();
+    if (tenantsKhusus.length > 0) hasil.tenants = tenantsKhusus;
+    else if (arrays.tenants) hasil.tenants = arrays.tenants as Tenant[];
 
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
     for (const row of kvRows as Array<{ k: string; data: any }>) {
@@ -196,12 +247,32 @@ export class MysqlStore {
       if (row.k === 'sharePins') hasil.sharePins = val;
       if (row.k === 'systemConfig') hasil.systemConfig = val;
       if (row.k === 'credentials') hasil.credentials = val;
+      if (row.k === 'deletedTenantIds') hasil.deletedTenantIds = val;
     }
     return ada ? hasil : null;
   }
 
   /** Simpan snapshot penuh dalam satu transaksi. */
   async saveAll(s: DbSnapshot): Promise<void> {
+    // Retry singkat: dua instance backend bisa menulis bersamaan → MySQL
+    // melempar 'Deadlock found'. Cukup ulang beberapa kali.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.saveAllOnce(s);
+        return;
+      } catch (err: any) {
+        const pesan = String(err?.message || err);
+        const deadlock = err?.code === 'ER_LOCK_DEADLOCK' || /deadlock/i.test(pesan);
+        if (deadlock && attempt < 4) {
+          await new Promise((r) => setTimeout(r, 120 * attempt));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  private async saveAllOnce(s: DbSnapshot): Promise<void> {
     if (!this.pool) return;
     const conn = await this.pool.getConnection();
     try {
@@ -242,10 +313,10 @@ export class MysqlStore {
         'users',
         s.users.map((u) => ({ id: u.id, data: u }))
       );
-      await masukkan(
-        'tenants',
-        s.tenants.map((t) => ({ id: t.id, data: t }))
-      );
+      // CATATAN: tenant TIDAK ditulis ke snapshot `collections` — tenant dikelola
+      // per-baris di tabel `tenants` (upsertTenant/deleteTenantRow). Kalau ikut
+      // snapshot, tenant yang baru dihapus bisa "balik lagi" karena ditimpa
+      // snapshot instance lain.
       await masukkan(
         'ketersediaanPreset',
         (s.ketersediaanPreset || []).map((k) => ({ id: k.id, data: k }))
@@ -256,6 +327,7 @@ export class MysqlStore {
         ['sharePins', JSON.stringify(s.sharePins)],
         ['systemConfig', JSON.stringify(s.systemConfig)],
         ['credentials', JSON.stringify(s.credentials)],
+        ['deletedTenantIds', JSON.stringify(s.deletedTenantIds || [])],
       ];
       await conn.query('INSERT INTO kv (k, data) VALUES ?', [kv]);
 

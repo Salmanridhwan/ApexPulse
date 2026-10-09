@@ -152,7 +152,10 @@ async function startServer() {
   });
 
   // ================= TENANT & AUTH ROUTES =================
-  app.get('/api/tenants', (_req: Request, res: Response) => {
+  app.get('/api/tenants', async (_req: Request, res: Response) => {
+    // Segarkan dari tabel khusus dulu supaya instance mana pun melihat daftar
+    // instansi yang sama (produksi punya >1 instance backend).
+    await db.segarkanTenantDariMysql();
     res.json(db.tenants);
   });
 
@@ -1667,7 +1670,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.post('/api/admin/tenants', (req: Request, res: Response) => {
+  app.post('/api/admin/tenants', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     if (session.role !== 'admin') {
@@ -1687,17 +1690,19 @@ async function startServer() {
       // ke KB campur dan bisa menampilkan dokumen instansi lain.
       knowledgeBaseId: typeof req.body.knowledgeBaseId === 'string' ? req.body.knowledgeBaseId.trim() : undefined,
     };
-    db.createTenant(newTenant);
+    await db.createTenant(newTenant);
     res.status(201).json(newTenant);
   });
 
-  app.patch('/api/admin/tenants/:id', (req: Request, res: Response) => {
+  app.patch('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
-    const updated = db.updateTenant(req.params.id, req.body);
+    // Segarkan dulu supaya tenant yang dibuat di instance lain tetap bisa diubah.
+    await db.segarkanTenantDariMysql();
+    const updated = await db.updateTenant(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Tenant tidak ditemukan.' });
     }
@@ -1772,7 +1777,7 @@ async function startServer() {
         ? []
         : namaSebelum.filter((n) => !namaSekarang.includes(n));
 
-      const diperbarui = db.updateTenant(tenant.id, {
+      const diperbarui = await db.updateTenant(tenant.id, {
         documentCount: hasil.jumlah,
         dokumenTerakhir: namaSekarang,
         kbTersinkronPada: new Date().toISOString(),

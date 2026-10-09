@@ -102,6 +102,7 @@ interface PersistedState {
   tenants?: Tenant[];
   credentials?: Record<string, string>;
   ketersediaanPreset?: KetersediaanPreset[];
+  deletedTenantIds?: string[];
 }
 
 export class InMemoryDb {
@@ -297,6 +298,13 @@ export class InMemoryDb {
   /** token -> hash PIN (scrypt) untuk mode edit pada tautan publik. */
   public sharePins: Record<string, string> = {};
 
+  /**
+   * id instansi yang sudah dihapus admin. Dipakai agar user seed (mis.
+   * admin@gmail.com) milik instansi yang DIHAPUS tidak dibuat ulang saat boot,
+   * TANPA men-skip user seed milik instansi yang memang belum pernah ada.
+   */
+  public deletedTenantIds: string[] = [];
+
   constructor() {
     this.seedCredentials();
     this.loadPersisted();
@@ -326,6 +334,7 @@ export class InMemoryDb {
       credentials: this.credentials,
       tenants: this.tenants,
       ketersediaanPreset: this.ketersediaanPreset,
+      deletedTenantIds: this.deletedTenantIds,
     };
   }
 
@@ -370,8 +379,18 @@ export class InMemoryDb {
         if (loaded.shareTokens) this.shareTokens = loaded.shareTokens;
         if (loaded.sharePins) this.sharePins = loaded.sharePins;
         if (loaded.credentials) this.credentials = loaded.credentials;
+        if (Array.isArray(loaded.deletedTenantIds)) {
+          // Union: jangan sampai daftar hapus hilang karena snapshot instance lain.
+          this.deletedTenantIds = Array.from(
+            new Set([...this.deletedTenantIds, ...loaded.deletedTenantIds])
+          );
+        }
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
+        }
+        // Buang tenant yang sudah dihapus admin (kalau state lama masih memuatnya).
+        if (this.deletedTenantIds.length > 0) {
+          this.tenants = this.tenants.filter((t) => !this.deletedTenantIds.includes(t.id));
         }
         this.ensureSeedUsers();
         // Tenant dari MySQL bisa belum punya KB — backfill agar tidak jatuh
@@ -384,6 +403,8 @@ export class InMemoryDb {
       }
       // Sinkronkan user/kredensial lewat tabel auth khusus (tahan multi-instance).
       await this.sinkronAuthDariMysql();
+      // Migrasi tenant ke tabel khusus (per-baris) bila belum ada di sana.
+      await this.sinkronTenantKeMysql();
     } catch (err: any) {
       console.error(
         '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
@@ -425,6 +446,49 @@ export class InMemoryDb {
   }
 
   /**
+   * Selaraskan tenant ke tabel `tenants` per-baris (migrasi + jaga multi-instance).
+   *
+   * Kalau tabel khusus masih kosong (deployment lama), seluruh tenant yang ada di
+   * memori dimasukkan satu per satu (migrasi). Kalau sudah berisi, tabel adalah
+   * SUMBER KEBENARAN: daftar tenant di memori diganti isi tabel, supaya tenant yang
+   * sudah dihapus instance lain tidak "bangkit lagi" dari snapshot lama.
+   */
+  private async sinkronTenantKeMysql(): Promise<void> {
+    if (!this.mysql) return;
+    try {
+      const adaDiTabel = await this.mysql.loadTenants();
+      if (adaDiTabel.length === 0) {
+        for (const t of this.tenants) {
+          if (!this.deletedTenantIds.includes(t.id)) await this.mysql.upsertTenant(t.id, t);
+        }
+      } else {
+        this.tenants = adaDiTabel.filter((t) => !this.deletedTenantIds.includes(t.id));
+      }
+    } catch (err: any) {
+      console.error('[AionesBoard DB] Sinkron tenants gagal:', err?.message || err);
+    }
+  }
+
+  /**
+   * Baca ulang daftar tenant dari tabel khusus (sumber kebenaran bersama).
+   *
+   * Tabel khusus OToRITATIF: begitu tabel berisi data, daftar tenant di memori
+   * diganti dengan isi tabel (dibuang yang sudah dihapus). Dipakai SEBELUM operasi
+   * hapus supaya instance yang belum melihat tenant (karena dibuat di instance
+   * lain) tetap bisa menghapusnya — bukan malah membalas "Tenant tidak ditemukan".
+   */
+  async segarkanTenantDariMysql(): Promise<void> {
+    if (!this.mysql) return;
+    try {
+      const baris = await this.mysql.loadTenants();
+      if (baris.length === 0) return;
+      this.tenants = baris.filter((t) => !this.deletedTenantIds.includes(t.id));
+    } catch (err: any) {
+      console.error('[AionesBoard DB] segarkanTenantDariMysql gagal:', err?.message || err);
+    }
+  }
+
+  /**
    * Tutup pool MySQL dengan rapi (dipakai graceful shutdown server).
    * Aman dipanggil walau MySQL tidak pernah tersambung.
    */
@@ -453,10 +517,11 @@ export class InMemoryDb {
   private ensureSeedUsers() {
     let berubah = false;
     for (const seed of SEED_USERS) {
-      // Jangan hidupkan kembali user seed milik instansi yang sudah dihapus —
-      // kalau tidak, menghapus instansi tidak benar-benar bersih (user-nya
-      // muncul lagi setiap boot).
-      if (!this.tenants.some((t) => t.id === seed.tenantId)) continue;
+      // Jangan hidupkan kembali user seed milik instansi yang SUDAH DIHAPUS admin.
+      // Dicek lewat daftar eksplisit `deletedTenantIds`, BUKAN 'tenant tidak ada
+      // di this.tenants' — sebab instansinya sendiri memang dibuat dinamis lewat
+      // UI dan user seed tetap valid walau tenant-nya belum/bukan seed.
+      if (this.deletedTenantIds.includes(seed.tenantId)) continue;
       if (!this.users.some((u) => u.id === seed.id)) {
         this.users.push({ ...seed });
         berubah = true;
@@ -519,6 +584,9 @@ export class InMemoryDb {
       if (Array.isArray(parsed.users) && parsed.users.length > 0) this.users = parsed.users;
       if (Array.isArray(parsed.tenants) && parsed.tenants.length > 0) this.tenants = parsed.tenants;
       if (Array.isArray(parsed.ketersediaanPreset)) this.ketersediaanPreset = parsed.ketersediaanPreset;
+      if (Array.isArray(parsed.deletedTenantIds)) {
+        this.deletedTenantIds = parsed.deletedTenantIds;
+      }
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Jamin user seed tetap ada walau file fallback sudah usang.
       this.ensureSeedUsers();
@@ -593,6 +661,7 @@ export class InMemoryDb {
         users: this.users,
         tenants: this.tenants,
         credentials: this.credentials,
+        deletedTenantIds: this.deletedTenantIds,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
@@ -846,16 +915,32 @@ export class InMemoryDb {
   }
 
   // Tenant Management
-  createTenant(tenant: Tenant): Tenant {
+  async createTenant(tenant: Tenant): Promise<Tenant> {
     this.tenants.push(tenant);
+    // Tulis per-baris ke tabel tenant khusus (tahan multi-instance). Ditunggu
+    // supaya refresh instance lain langsung melihatnya.
+    if (this.mysql) {
+      try {
+        await this.mysql.upsertTenant(tenant.id, tenant);
+      } catch (err: any) {
+        console.error('[AionesBoard DB] upsertTenant gagal:', err?.message || err);
+      }
+    }
     this.persist();
     return tenant;
   }
 
-  updateTenant(id: string, partial: Partial<Tenant>): Tenant | undefined {
+  async updateTenant(id: string, partial: Partial<Tenant>): Promise<Tenant | undefined> {
     const idx = this.tenants.findIndex((t) => t.id === id);
     if (idx === -1) return undefined;
     this.tenants[idx] = { ...this.tenants[idx], ...partial };
+    if (this.mysql) {
+      try {
+        await this.mysql.upsertTenant(id, this.tenants[idx]);
+      } catch (err: any) {
+        console.error('[AionesBoard DB] upsertTenant gagal:', err?.message || err);
+      }
+    }
     this.persist();
     return this.tenants[idx];
   }
@@ -872,7 +957,14 @@ export class InMemoryDb {
    * instansinya sudah dihilangkan.
    */
   async deleteTenant(id: string): Promise<boolean> {
+    // Segarkan dulu dari tabel khusus: tenant mungkin dibuat di instance backend
+    // lain sehingga belum terlihat di memori instance ini.
+    await this.segarkanTenantDariMysql();
     if (!this.tenants.some((t) => t.id === id)) return false;
+
+    // Catat id instansi yang dihapus — agar user seed-nya tidak dibuat ulang
+    // saat boot berikutnya (lihat ensureSeedUsers).
+    if (!this.deletedTenantIds.includes(id)) this.deletedTenantIds.push(id);
 
     // 1) Pengguna instansi + kredensialnya. Hapus juga di tabel auth MySQL,
     //    supaya sinkronisasi multi-instance / findUserForLogin tidak
@@ -911,8 +1003,15 @@ export class InMemoryDb {
     this.auditLogs = this.auditLogs.filter((a) => a.tenantId !== id);
     this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => k.tenantId !== id);
 
-    // 4) Instansinya sendiri.
+    // 4) Instansinya sendiri: dari memori + tabel khusus MySQL.
     this.tenants = this.tenants.filter((t) => t.id !== id);
+    if (this.mysql) {
+      try {
+        await this.mysql.deleteTenantRow(id);
+      } catch (err: any) {
+        console.error('[AionesBoard DB] deleteTenantRow gagal:', err?.message || err);
+      }
+    }
 
     this.persist();
     return true;
