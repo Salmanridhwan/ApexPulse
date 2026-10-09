@@ -137,6 +137,8 @@ export const Admin: React.FC<AdminProps> = ({
     catatan?: string;
   } | null>(null);
   const [tenantKbLoading, setTenantKbLoading] = useState(false);
+  /** Sedang menyimpan instansi + menyinkronkan KB-nya (menunggu layanan RAG). */
+  const [tenantSaving, setTenantSaving] = useState(false);
 
   // Sinkronisasi RAG (tab BUMD & Tenant): null = tidak sedang jalan.
   const [sinkronLoading, setSinkronLoading] = useState<string | null>(null);
@@ -233,6 +235,7 @@ export const Admin: React.FC<AdminProps> = ({
     e.preventDefault();
     if (!tenantName || !tenantCity) return;
 
+    setTenantSaving(true);
     try {
       const res = await fetch('/api/admin/tenants', {
         method: 'POST',
@@ -244,22 +247,44 @@ export const Admin: React.FC<AdminProps> = ({
           city: tenantCity,
           code: tenantCode || `BUMD-${Date.now().toString().slice(-3)}`,
           logo: '🏛️',
-          // Jumlah dokumen diambil dari KB nyata (bukan angka tetap); kalau KB belum
-          // diperiksa, biarkan 0 daripada memakai angka karangan.
-          documentCount: tenantKbInfo?.jumlahDokumen ?? 0,
+          // Jumlah dokumen TIDAK dikirim dari sini — server membacanya dari KB
+          // nyata saat sinkron, jadi tidak ada angka karangan.
           knowledgeBaseId: tenantKbId.trim() || undefined,
         }),
       });
       const newT = await res.json();
+      // Server kini IKUT menyinkronkan KB saat instansi dibuat (menunggu RAG),
+      // jadi instansi yang muncul sudah membawa jumlah dokumen terbaru.
       setTenants((prev) => [...prev, newT]);
       setIsAddTenantOpen(false);
       setTenantName('');
       setTenantCity('');
       setTenantKbId('');
       setTenantKbInfo(null);
+
+      if (newT?.sinkron) {
+        setSinkronHasil(
+          newT.sinkron.ok
+            ? {
+                judul: `${newT.name}: KB langsung tersinkron (${newT.sinkron.jumlahDokumen ?? 0} dokumen)`,
+                dokumenBaru: [],
+                dokumenHilang: [],
+                catatan: 'Jumlah dokumen dibaca langsung dari Knowledge Base, bukan angka contoh.',
+              }
+            : {
+                judul: `${newT.name}: instansi dibuat, tetapi KB belum tersinkron`,
+                dokumenBaru: [],
+                dokumenHilang: [],
+                catatan: newT.sinkron.error,
+                gagal: true,
+              }
+        );
+      }
       loadData();
     } catch (err) {
       console.error('Create tenant failed:', err);
+    } finally {
+      setTenantSaving(false);
     }
   };
 
@@ -1640,10 +1665,17 @@ export const Admin: React.FC<AdminProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={tenantKbLoading || !tenantName || !tenantCity}
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={tenantSaving || tenantKbLoading || !tenantName || !tenantCity}
+                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                   >
-                    Simpan BUMD
+                    {tenantSaving ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Menyimpan &amp; menyinkronkan KB…
+                      </>
+                    ) : (
+                      'Simpan BUMD'
+                    )}
                   </button>
                 </div>
               </form>

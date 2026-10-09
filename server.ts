@@ -23,7 +23,7 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, WidgetSpec } from './src/types';
+import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, Tenant, WidgetSpec } from './src/types';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -1685,13 +1685,27 @@ async function startServer() {
       city: req.body.city || 'Kota Daerah',
       logo: req.body.logo || '🏢',
       primaryColor: req.body.primaryColor || '#0284c7',
-      documentCount: Number(req.body.documentCount) || 12,
+      // Jumlah dokumen diisi dari KB nyata di bawah (sinkron). Jangan pakai angka
+      // karangan: kalau KB belum ada / gagal dibaca, biarkan 0 dan beri tahu jujur.
+      documentCount: Number(req.body.documentCount) || 0,
       // KB milik instansi di layanan RAG — tanpa ini permintaan instansi jatuh
       // ke KB campur dan bisa menampilkan dokumen instansi lain.
       knowledgeBaseId: typeof req.body.knowledgeBaseId === 'string' ? req.body.knowledgeBaseId.trim() : undefined,
     };
-    await db.createTenant(newTenant);
-    res.status(201).json(newTenant);
+    const tersimpan = await db.createTenant(newTenant);
+
+    // Langsung sinkronkan KB-nya supaya bagian lain (jumlah dokumen, dashboard,
+    // chat) tidak menunggu admin klik "Perbarui RAG". Kalau KB belum bisa dibaca,
+    // instansi tetap dibuat dan hasil sinkron dilaporkan jujur (bukan digagalkan).
+    let sinkron: { ok: boolean; jumlahDokumen?: number; error?: string } | null = null;
+    if (newTenant.knowledgeBaseId) {
+      const hasil = await sinkronTenantRag(tersimpan.id, session);
+      sinkron = hasil.ok
+        ? { ok: true, jumlahDokumen: hasil.jumlahDokumen }
+        : { ok: false, error: hasil.error };
+    }
+    const akhir = db.tenants.find((t) => t.id === tersimpan.id) || tersimpan;
+    res.status(201).json({ ...akhir, sinkron });
   });
 
   app.patch('/api/admin/tenants/:id', async (req: Request, res: Response) => {
@@ -1702,11 +1716,23 @@ async function startServer() {
     }
     // Segarkan dulu supaya tenant yang dibuat di instance lain tetap bisa diubah.
     await db.segarkanTenantDariMysql();
+    const sebelum = db.tenants.find((t) => t.id === req.params.id);
     const updated = await db.updateTenant(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Tenant tidak ditemukan.' });
     }
-    res.json(updated);
+    // Kalau KB diisi/diubah, langsung sinkron supaya bagian lain ikut mutakhir.
+    const kbBaru =
+      typeof req.body.knowledgeBaseId === 'string' ? req.body.knowledgeBaseId.trim() : undefined;
+    let sinkron: { ok: boolean; jumlahDokumen?: number; error?: string } | null = null;
+    if (kbBaru && kbBaru !== String(sebelum?.knowledgeBaseId || '')) {
+      const hasil = await sinkronTenantRag(req.params.id, session);
+      sinkron = hasil.ok
+        ? { ok: true, jumlahDokumen: hasil.jumlahDokumen }
+        : { ok: false, error: hasil.error };
+    }
+    const akhir = db.tenants.find((t) => t.id === req.params.id) || updated;
+    res.json({ ...akhir, sinkron });
   });
 
   app.delete('/api/admin/tenants/:id', async (req: Request, res: Response) => {
@@ -1742,24 +1768,40 @@ async function startServer() {
    * berubah — bukan hanya angkanya bergeser tanpa penjelasan.
    *
    * Read-only terhadap layanan RAG: tidak ada dokumen yang diubah/dihapus.
+   *
+   * Dipakai DUA tempat: tombol "Perbarui RAG" DAN otomatis saat instansi dibuat
+   * atau KB-nya diubah — supaya bagian lain (jumlah dokumen, dashboard, chat)
+   * langsung sinkron tanpa admin harus klik sinkron terpisah. Karena itu
+   * pemanggil sebaiknya menampilkan status loading (operasi ini menunggu RAG).
    */
-  app.post('/api/admin/tenants/:id/sinkron-rag', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh menyinkronkan RAG.' });
-    }
-
-    const tenant = db.tenants.find((t) => t.id === req.params.id);
-    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+  async function sinkronTenantRag(
+    tenantId: string,
+    session: SessionPayload
+  ): Promise<
+    | {
+        ok: true;
+        tenant: Tenant;
+        kbId: string;
+        jumlahDokumen: number;
+        dokumenBaru: string[];
+        dokumenHilang: string[];
+        belumPernahSinkron: boolean;
+        catatan?: string;
+      }
+    | { ok: false; status: number; error: string }
+  > {
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return { ok: false, status: 404, error: 'Instansi tidak ditemukan.' };
 
     const kb = String(tenant.knowledgeBaseId || '').trim();
     if (!kb) {
       // Jujur: tanpa KB, tidak ada yang bisa disinkronkan. Jangan mengarang angka.
-      return res.status(400).json({
+      return {
+        ok: false,
+        status: 400,
         error:
           'Instansi ini belum punya Knowledge Base ID. Isi KB ID-nya lebih dulu (tombol "+ Daftarkan BUMD Baru" atau perbaiki data instansi).',
-      });
+      };
     }
 
     try {
@@ -1794,21 +1836,43 @@ async function startServer() {
         userName: session.name,
       });
 
-      res.json({
+      return {
         ok: true,
-        tenant: diperbarui,
+        tenant: diperbarui || tenant,
         kbId: kb,
         jumlahDokumen: hasil.jumlah,
         dokumenBaru,
         dokumenHilang,
         belumPernahSinkron,
         catatan: hasil.catatan,
-      });
+      };
     } catch (err: any) {
-      res.status(502).json({
+      return {
+        ok: false,
+        status: 502,
         error: `Gagal membaca KB "${kb}" dari layanan RAG: ${err?.message || 'kesalahan tidak diketahui'}`,
-      });
+      };
     }
+  }
+
+  app.post('/api/admin/tenants/:id/sinkron-rag', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh menyinkronkan RAG.' });
+    }
+    const hasil = await sinkronTenantRag(req.params.id, session);
+    if (!hasil.ok) return res.status(hasil.status).json({ error: hasil.error });
+    res.json({
+      ok: true,
+      tenant: hasil.tenant,
+      kbId: hasil.kbId,
+      jumlahDokumen: hasil.jumlahDokumen,
+      dokumenBaru: hasil.dokumenBaru,
+      dokumenHilang: hasil.dokumenHilang,
+      belumPernahSinkron: hasil.belumPernahSinkron,
+      catatan: hasil.catatan,
+    });
   });
 
   app.get('/api/admin/config', (req: Request, res: Response) => {
