@@ -1009,26 +1009,21 @@ async function startServer() {
       }
 
       // Case 2.5: ROUTING — dashboard command vs chatbot.
-      // Perintah membuat/memperbarui dashboard (kata kerja eksplisit) masuk jalur
-      // orkestrator; SEMUA pesan lain dijawab sebagai chatbot LLM (sapaan, tanya
-      // data, obrolan) lewat /query RAG dengan persona + riwayat percakapan.
+      // Perintah membuat/memperbarui dashboard (kata kerja eksplisit + objeknya)
+      // masuk jalur orkestrator; SEMUA pesan lain dijawab sebagai chatbot LLM
+      // (sapaan, tanya data, obrolan) lewat /query RAG dengan persona + riwayat.
+      //
+      // PENTING: jangan mensyaratkan kata-kata BERDAMPINGAN. "buatkan saya dashboard
+      // dengan 10-15 widget" tidak memuat frasa "buatkan dashboard" sehingga dulu
+      // salah dijawab sebagai tanya-jawab, bukan membuat dashboard.
+      const KATA_PERINTAH_DASH =
+        /\b(buat|buatkan|bikin|bikinkan|generate|hasilkan|susun|rancang|ciptakan|sediakan|desain|tampilkan|perbarui|perbaharui|update|refresh)\b/;
+      const OBJEK_DASH = /\b(dashboard|kanvas|canvas|kpi|laporan)\b/;
+      // Pertanyaan ("bagaimana cara buat dashboard?") tetap dijawab sebagai obrolan.
+      const KATA_TANYA =
+        /\b(apa|apakah|bagaimana|gimana|cara|kenapa|mengapa|berapa|siapa|kapan|dimana|mana)\b/;
       const isGenerateDash =
-        lower.includes('buat dashboard') ||
-        lower.includes('buatkan dashboard') ||
-        lower.includes('bikin dashboard') ||
-        lower.includes('generate dashboard') ||
-        lower.includes('buat laporan') ||
-        lower.includes('buatkan laporan') ||
-        lower.includes('bikin laporan') ||
-        lower.includes('tampilkan dashboard') ||
-        lower.includes('perbarui dashboard') ||
-        lower.includes('perbaharui dashboard') ||
-        lower.includes('update dashboard') ||
-        lower.includes('refresh dashboard') ||
-        lower.includes('buat kpi') ||
-        lower.includes('buatkan kpi') ||
-        lower.includes('susun dashboard') ||
-        lower.includes('rancang dashboard');
+        KATA_PERINTAH_DASH.test(lower) && OBJEK_DASH.test(lower) && !KATA_TANYA.test(lower);
 
       // Deteksi obrolan ringan (sapaan/terima kasih) → persona boleh membalas
       // natural tanpa strict grounding. Pertanyaan data tetap grounded.
@@ -1084,8 +1079,12 @@ async function startServer() {
           const answer = ragResult.answer || 'Maaf, saya tidak menemukan jawabannya di dokumen yang tersedia.';
           const citationsCount = ragResult.citations?.length || 0;
 
+          // Buang token template yang kadang "bocor" dari LLM (mis. `{-chart-}`)
+          // supaya tidak tampil sebagai teks aneh di jawaban.
+          const answerBersih = answer.replace(/\{-[^}]*-\}/g, '').replace(/[ \t]+\n/g, '\n').trim();
+
           // Bangun teks balasan: jawaban + daftar sumber dokumen (kalau ada).
-          let replyText = answer;
+          let replyText = answerBersih;
           if (citationsCount > 0) {
             const sumberUnik = Array.from(
               new Map(
