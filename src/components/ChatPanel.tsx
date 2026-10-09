@@ -321,6 +321,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // PENTING: `currentEvent` harus bertahan ANTAR potongan (chunk). Balasan
+      // RAG bisa panjang sehingga satu peristiwa (`event:` + `data:`) terbelah
+      // jadi beberapa chunk; kalau nama event di-reset tiap chunk, baris `data:`
+      // tiba tanpa nama event → hasil jawaban ikut terbuang (loading hilang,
+      // tidak ada output).
+      let currentEvent = '';
 
       while (true) {
         const { value, done } = await reader.read();
@@ -330,17 +336,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        let currentEvent = '';
         for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            currentEvent = line.replace('event: ', '').trim();
-          } else if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice('event:'.length).trim();
+          } else if (line.startsWith('data:')) {
+            const dataStr = line.slice('data:'.length).trim();
             if (!dataStr) continue;
+            // Konsumsi nama event SETELAH data diproses (bukan per-chunk).
+            const eventName = currentEvent;
+            currentEvent = '';
 
             try {
               const data = JSON.parse(dataStr);
-              if (currentEvent === 'step') {
+              if (eventName === 'step') {
                 setCurrentSteps((prev) => {
                   const existingIdx = prev.findIndex((s) => s.id === data.id);
                   if (existingIdx !== -1) {
@@ -350,7 +358,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   }
                   return [...prev, data];
                 });
-              } else if (currentEvent === 'result') {
+              } else if (eventName === 'result') {
                 if (data.dashboard) {
                   pendingDashboard = data.dashboard;
                 }
@@ -364,7 +372,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   citationsCount: data.citationsCount,
                   recommendations: data.recommendations,
                 };
-              } else if (currentEvent === 'error') {
+              } else if (eventName === 'error') {
                 pendingBotMsg = {
                   id: `bot-err-${Date.now()}`,
                   sender: 'system',
@@ -391,6 +399,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const MIN_DISPLAY_TIME = 1000;
       if (elapsed < MIN_DISPLAY_TIME) {
         await new Promise((r) => setTimeout(r, MIN_DISPLAY_TIME - elapsed));
+      }
+
+      // Kalau stream berakhir TANPA hasil (mis. koneksi diputus proxy), jangan
+      // diamkan layar — beri tahu jujur daripada loading hilang tanpa jejak.
+      if (!pendingBotMsg && !pendingDashboard) {
+        pendingBotMsg = {
+          id: `bot-empty-${Date.now()}`,
+          sender: 'system',
+          text: 'Tidak ada balasan yang diterima dari server (koneksi terputus atau layanan tidak merespons). Silakan coba lagi.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
       }
 
       if (pendingDashboard) {
