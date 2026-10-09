@@ -405,6 +405,8 @@ export class InMemoryDb {
       await this.sinkronAuthDariMysql();
       // Migrasi tenant ke tabel khusus (per-baris) bila belum ada di sana.
       await this.sinkronTenantKeMysql();
+      // Migrasi/ambil dashboard & chat dari tabel khusus (per-baris).
+      await this.sinkronDashboardChatKeMysql();
     } catch (err: any) {
       console.error(
         '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
@@ -485,6 +487,77 @@ export class InMemoryDb {
       this.tenants = baris.filter((t) => !this.deletedTenantIds.includes(t.id));
     } catch (err: any) {
       console.error('[AionesBoard DB] segarkanTenantDariMysql gagal:', err?.message || err);
+    }
+  }
+
+  /** Jumlah tulis per-baris yang belum selesai — lihat `trackWrite`. */
+  private pendingWrites = 0;
+
+  /**
+   * Bungkus promise tulis MySQL: refreh dari tabel DILEWATI selama masih ada tulis
+   * lokal yang belum selesai, supaya tulis sendiri tidak "ditelan" segarkan.
+   */
+  private trackWrite(p: Promise<unknown> | undefined | void): void {
+    if (!p || typeof (p as Promise<unknown>).then !== 'function') return;
+    this.pendingWrites++;
+    Promise.resolve(p as Promise<unknown>)
+      .catch((err: any) => console.error('[AionesBoard DB] tulis baris gagal:', err?.message || err))
+      .finally(() => {
+        this.pendingWrites--;
+      });
+  }
+
+  /**
+   * Selaraskan dashboard & chat ke tabel khusus (migrasi + multi-instance).
+   *
+   * Tabel kosong (deployment lama) = migrasi dari memori. Tabel berisi = SUMBER
+   * KEBENARAN: daftar di memori diganti isi tabel, supaya dashboard/riwayat yang
+   * dibuat instance lain langsung tampil dan yang dihapus tidak "bangkit lagi".
+   */
+  private async sinkronDashboardChatKeMysql(): Promise<void> {
+    if (!this.mysql) return;
+    try {
+      const dashTabel = await this.mysql.loadDashboards();
+      if (dashTabel.length === 0 && this.dashboards.length > 0) {
+        // seq menurun mengikuti urutan memori (terbaru dulu) supaya urutan terjaga.
+        const total = this.dashboards.length;
+        for (let i = 0; i < total; i++) {
+          const d = this.dashboards[i];
+          await this.mysql.upsertDashboard(d.id, d.tenantId, d, total - i);
+        }
+      } else if (dashTabel.length > 0) {
+        this.dashboards = dashTabel;
+      }
+      const chatTabel = await this.mysql.loadChats();
+      if (chatTabel.length === 0 && this.chats.length > 0) {
+        for (const c of this.chats) {
+          await this.mysql.upsertChat(c.id, c.tenantId, c.dashboardId ?? null, c);
+        }
+      } else if (chatTabel.length > 0) {
+        this.chats = chatTabel;
+      }
+    } catch (err: any) {
+      console.error('[AionesBoard DB] Sinkron dashboard/chat gagal:', err?.message || err);
+    }
+  }
+
+  /**
+   * Baca ulang tenant + dashboard + chat dari tabel khusus. Dipanggil berkala
+   * (middleware /api) agar instance backend mana pun melihat data yang SAMA —
+   * tanpa ini, daftar dashboard/riwayat "berkedip" tergantung instance mana yang
+   * melayani permintaan.
+   */
+  async segarkanMultiInstance(): Promise<void> {
+    if (!this.mysql) return;
+    if (this.pendingWrites > 0) return;
+    await this.segarkanTenantDariMysql();
+    try {
+      const dash = await this.mysql.loadDashboards();
+      if (dash.length > 0) this.dashboards = dash;
+      const chat = await this.mysql.loadChats();
+      if (chat.length > 0 || this.chats.length === 0) this.chats = chat;
+    } catch (err: any) {
+      console.error('[AionesBoard DB] segarkanMultiInstance gagal:', err?.message || err);
     }
   }
 
@@ -708,6 +781,8 @@ export class InMemoryDb {
 
   createDashboard(dashboard: Dashboard): Dashboard {
     this.dashboards.unshift(dashboard);
+    // Tulis per-baris ke tabel dashboard khusus (tahan multi-instance).
+    this.trackWrite(this.mysql?.upsertDashboard(dashboard.id, dashboard.tenantId, dashboard, Date.now()));
     this.persist();
     return dashboard;
   }
@@ -720,6 +795,9 @@ export class InMemoryDb {
       ...partial,
       updatedAt: new Date().toISOString(),
     };
+    this.trackWrite(
+      this.mysql?.upsertDashboard(id, this.dashboards[idx].tenantId, this.dashboards[idx], Date.now())
+    );
     this.persist();
     return this.dashboards[idx];
   }
@@ -729,7 +807,12 @@ export class InMemoryDb {
     this.dashboards = this.dashboards.filter((d) => !(d.id === id && d.tenantId === tenantId));
     const deleted = this.dashboards.length < initialLen;
     // Dashboard hilang = chat-nya tidak ada gunanya lagi (relasi 1:1).
-    if (deleted) this.chats = this.chats.filter((c) => c.dashboardId !== id);
+    if (deleted) {
+      const chatHapus = this.chats.filter((c) => c.dashboardId === id);
+      this.chats = this.chats.filter((c) => c.dashboardId !== id);
+      this.trackWrite(this.mysql?.deleteDashboardRow(id));
+      for (const c of chatHapus) this.trackWrite(this.mysql?.deleteChatRow(c.id));
+    }
     if (deleted) this.persist();
     return deleted;
   }
@@ -745,6 +828,7 @@ export class InMemoryDb {
       updatedAt: new Date().toISOString(),
     };
     this.dashboards.unshift(copy);
+    this.trackWrite(this.mysql?.upsertDashboard(copy.id, copy.tenantId, copy, Date.now()));
     this.persist();
     return copy;
   }
@@ -808,6 +892,7 @@ export class InMemoryDb {
       updatedAt: now,
     };
     this.chats.unshift(chat);
+    this.trackWrite(this.mysql?.upsertChat(chat.id, chat.tenantId, chat.dashboardId ?? null, chat));
     this.persist();
     return chat;
   }
@@ -817,11 +902,47 @@ export class InMemoryDb {
     return this.chats.filter((c) => c.tenantId === tenantId);
   }
 
+  /**
+   * Chat "umum" (tanpa dashboard aktif). Tanpa ini, pertanyaan yang diajukan saat
+   * belum ada dashboard TERBUKA tidak tersimpan sama sekali, sehingga riwayat
+   * "hilang" begitu panel dibuka lagi. Id SENGAJA deterministik supaya dua instance
+   * backend tidak membuat dua chat umum untuk user yang sama.
+   */
+  ensureGeneralChat(tenantId: string, userId: string): Chat {
+    const id = `chat-umum-${tenantId}-${userId}`;
+    const ada = this.getChatById(id, tenantId);
+    if (ada) return ada;
+    const now = new Date().toISOString();
+    const chat: Chat = {
+      id,
+      dashboardId: 'umum',
+      tenantId,
+      userId,
+      title: 'Percakapan Umum',
+      messages: [
+        {
+          id: `msg-welcome-${Date.now()}`,
+          sender: 'system',
+          text: 'Halo! Saya Aiones Boards Orchestrator, asisten dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
+          timestamp: now,
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.chats.unshift(chat);
+    this.trackWrite(this.mysql?.upsertChat(chat.id, chat.tenantId, chat.dashboardId, chat));
+    this.persist();
+    return chat;
+  }
+
   addChatMessage(chatId: string, msg: ChatMessage, tenantId?: string): Chat | undefined {
     const chat = this.getChatById(chatId, tenantId);
     if (!chat) return undefined;
     chat.messages.push(msg);
     chat.updatedAt = new Date().toISOString();
+    // Tulis per-baris: riwayat tidak boleh hilang karena ditimpa snapshot instance lain.
+    this.trackWrite(this.mysql?.upsertChat(chat.id, chat.tenantId, chat.dashboardId ?? null, chat));
     this.persist();
     return chat;
   }
@@ -832,6 +953,7 @@ export class InMemoryDb {
     // Kaitan ke dashboard/tenant tidak boleh dipindah lewat PATCH.
     const { dashboardId: _d, tenantId: _t, id: _i, messages: _m, ...rest } = partial;
     Object.assign(chat, rest, { updatedAt: new Date().toISOString() });
+    this.trackWrite(this.mysql?.upsertChat(chat.id, chat.tenantId, chat.dashboardId ?? null, chat));
     this.persist();
     return chat;
   }
@@ -841,7 +963,10 @@ export class InMemoryDb {
     const len = this.chats.length;
     this.chats = this.chats.filter((c) => !(c.id === id && c.tenantId === tenantId));
     const deleted = this.chats.length < len;
-    if (deleted) this.persist();
+    if (deleted) {
+      this.trackWrite(this.mysql?.deleteChatRow(id));
+      this.persist();
+    }
     return deleted;
   }
 
@@ -987,9 +1112,11 @@ export class InMemoryDb {
       this.dashboards.filter((d) => d.tenantId === id).map((d) => d.id)
     );
     this.dashboards = this.dashboards.filter((d) => d.tenantId !== id);
-    this.chats = this.chats.filter(
-      (c) => c.tenantId !== id && !dashIds.has(c.dashboardId)
-    );
+    const chatHapus = this.chats.filter((c) => c.tenantId === id || dashIds.has(c.dashboardId));
+    this.chats = this.chats.filter((c) => c.tenantId !== id && !dashIds.has(c.dashboardId));
+    // Hapus juga baris di tabel khusus supaya instance lain ikut bersih.
+    for (const did of dashIds) this.trackWrite(this.mysql?.deleteDashboardRow(did));
+    for (const c of chatHapus) this.trackWrite(this.mysql?.deleteChatRow(c.id));
     for (const [token, dashId] of Object.entries(this.shareTokens)) {
       if (dashIds.has(dashId)) {
         delete this.shareTokens[token];

@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 // Default produksi: .env menang atas variabel shell (perilaku lama, dipakai Kroombox).
 // Untuk skrip QA lokal yang butuh port lain: set HONOR_SHELL_ENV=1 agar PORT dari shell menang.
 dotenv.config({ override: process.env.HONOR_SHELL_ENV !== '1' });
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -140,6 +140,28 @@ async function startServer() {
   }
 
   app.use(express.json());
+
+  /**
+   * Sinkronisasi multi-instance: produksi berjalan di >1 instance backend yang
+   * berbagi MySQL. Tanpa ini, data yang ditulis satu instance (dashboard, chat,
+   * tenant) tidak terlihat di instance lain — daftar dashboard/riwayat "berkedip"
+   * tergantung instance mana yang melayani permintaan. Segarkan dibatasi TTL agar
+   * tidak satu SELECT per permintaan, dan dilewati saat ada tulis lokal yang belum
+   * selesai (lihat InMemoryDb.segarkanMultiInstance).
+   */
+  let segarTerakhir = 0;
+  const SEGAR_TTL_MS = 1000;
+  app.use('/api', async (_req: Request, _res: Response, next: NextFunction) => {
+    try {
+      if (Date.now() - segarTerakhir >= SEGAR_TTL_MS) {
+        segarTerakhir = Date.now();
+        await db.segarkanMultiInstance();
+      }
+    } catch {
+      // Kegagalan sinkronisasi tidak boleh menggagalkan permintaan.
+    }
+    next();
+  });
 
   // Health Check
   app.get('/health', (_req: Request, res: Response) => {
@@ -573,6 +595,16 @@ async function startServer() {
     res.json({ chat, dashboard });
   });
 
+  // Riwayat chat UMUM (dipakai saat belum ada dashboard terbuka). Tanpa ini,
+  // pertanyaan bebas tidak tersimpan dan riwayat tampak "hilang" saat panel dibuka lagi.
+  app.get('/api/chat/umum', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const chat = db.ensureGeneralChat(tenantId, session.userId);
+    res.json({ chat });
+  });
+
   // Ringkasan (tanpa isi pesan) — untuk indikator riwayat di kartu dashboard.
   app.get('/api/chats', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -751,13 +783,17 @@ async function startServer() {
       const activeDash = dashboardId ? db.getDashboardById(dashboardId, tenantId) : undefined;
 
       // Riwayat menempel pada dashboard-nya; dibuat kalau belum ada (lazy).
+      // Kalau BELUM ada dashboard terbuka, pakai chat UMUM supaya pertanyaan tetap
+      // tersimpan (dulu: tidak disimpan sama sekali → riwayat tampak hilang).
       let chat = activeDash
         ? db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title)
-        : undefined;
+        : db.ensureGeneralChat(tenantId, session.userId);
       let pesanUserTercatat = false;
       const pesanBaru = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-        if (!chat && activeDash) {
-          chat = db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title);
+        if (!chat) {
+          chat = activeDash
+            ? db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title)
+            : db.ensureGeneralChat(tenantId, session.userId);
         }
         if (!chat) return;
         db.addChatMessage(

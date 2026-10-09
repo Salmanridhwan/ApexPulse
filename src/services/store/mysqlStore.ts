@@ -151,6 +151,89 @@ export class MysqlStore {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel DASHBOARD khusus, per-baris. Alasan sama: `saveAll` snapshot penuh
+     * membuat dashboard yang dibuat di satu instance HILANG/balik lagi karena
+     * ditimpa snapshot instance lain (daftar dashboard "berkedip" 3↔1). `seq`
+     * menyimpan urutan (terbaru dulu) tanpa ikut berubah saat baris di-upsert.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS dashboards (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        seq BIGINT NOT NULL DEFAULT 0,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_dash_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel CHAT khusus, per-baris (riwayat percakapan per dashboard).
+     * Kalau chat ikut snapshot penuh, riwayat yang ditulis di satu instance
+     * terhapus oleh snapshot instance lain — "history tidak ada".
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS chats (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        dashboard_id VARCHAR(128) NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_chat_tenant (tenant_id),
+        INDEX idx_chat_dash (dashboard_id)
+      ) ENGINE=InnoDB
+    `);
+  }
+
+  /** Tambah/perbarui SATU dashboard (upsert per-baris, aman multi-instance). */
+  async upsertDashboard(id: string, tenantId: string, data: unknown, seq: number): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO dashboards (id, tenant_id, seq, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, seq, JSON.stringify(data)]
+    );
+  }
+
+  /** Muat SEMUA dashboard dari tabel khusus (terbaru dulu). */
+  async loadDashboards(): Promise<Dashboard[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM dashboards ORDER BY seq DESC');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteDashboardRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM dashboards WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU chat (upsert per-baris, aman multi-instance). */
+  async upsertChat(id: string, tenantId: string, dashboardId: string | null, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO chats (id, tenant_id, dashboard_id, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id),
+         dashboard_id = VALUES(dashboard_id), data = VALUES(data)`,
+      [id, tenantId, dashboardId, JSON.stringify(data)]
+    );
+  }
+
+  /** Muat SEMUA chat dari tabel khusus. */
+  async loadChats(): Promise<Chat[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM chats ORDER BY updated_at DESC');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteChatRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM chats WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU tenant (upsert per-baris, aman multi-instance). */
@@ -239,6 +322,16 @@ export class MysqlStore {
     if (tenantsKhusus.length > 0) hasil.tenants = tenantsKhusus;
     else if (arrays.tenants) hasil.tenants = arrays.tenants as Tenant[];
 
+    // Dashboard & chat juga dari tabel khusus (alasan sama). Fallback ke snapshot
+    // `collections` hanya untuk migrasi deployment lama.
+    const dashKhusus = await this.loadDashboards();
+    if (dashKhusus.length > 0) hasil.dashboards = dashKhusus;
+    else if (arrays.dashboards) hasil.dashboards = arrays.dashboards as Dashboard[];
+
+    const chatKhusus = await this.loadChats();
+    if (chatKhusus.length > 0) hasil.chats = chatKhusus;
+    else if (arrays.chats) hasil.chats = arrays.chats as Chat[];
+
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
     for (const row of kvRows as Array<{ k: string; data: any }>) {
       ada = true;
@@ -289,14 +382,6 @@ export class MysqlStore {
         );
       };
 
-      await masukkan(
-        'dashboards',
-        s.dashboards.map((d) => ({ id: d.id, data: d }))
-      );
-      await masukkan(
-        'chats',
-        s.chats.map((c) => ({ id: c.id, data: c }))
-      );
       await masukkan(
         'alertRules',
         s.alertRules.map((a) => ({ id: a.id, data: a }))

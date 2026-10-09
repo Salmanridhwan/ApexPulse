@@ -244,9 +244,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (isStreaming) return; // Jangan bersihkan atau muat ulang riwayat saat sedang streaming respon!
 
     if (!dashboardId) {
-      setChatId(undefined);
-      // PERBAIKAN: Jangan panggil setMessages([]) agar pesan lokal yang baru dikirim tidak hilang!
-      return;
+      // Belum ada dashboard terbuka: muat riwayat "percakapan umum" user ini,
+      // supaya pertanyaan bebas yang tadi diajukan tidak hilang saat panel dibuka lagi.
+      let batalUmum = false;
+      (async () => {
+        try {
+          const res = await fetch('/api/chat/umum');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (batalUmum) return;
+          setChatId(data.chat?.id);
+          if (Array.isArray(data.chat?.messages) && data.chat.messages.length > 0) {
+            setMessages(data.chat.messages);
+          }
+        } catch (err) {
+          if (!batalUmum) console.error('Gagal memuat riwayat chat umum:', err);
+        }
+      })();
+      return () => {
+        batalUmum = true;
+      };
     }
     let batal = false;
     (async () => {
