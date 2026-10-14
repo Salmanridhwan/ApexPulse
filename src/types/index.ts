@@ -442,3 +442,689 @@ export interface AuditLog {
   details: string;
   timestamp: string;
 }
+
+/* ================= PELAPORAN PERIODIK & KEPATUHAN ================= */
+
+/** Jenis periode pelaporan BUMD. */
+export type JenisLaporan = 'bulanan' | 'triwulanan' | 'semesteran' | 'tahunan';
+
+/**
+ * Status satu laporan periodik.
+ * `belum` = belum disusun, `draf` = masih dikerjakan, `terkirim` = sudah
+ * disampaikan, `terverifikasi` = sudah diperiksa & diterima, `revisi` = perlu
+ * diperbaiki sebelum diterima.
+ */
+export type StatusLaporan = 'belum' | 'draf' | 'terkirim' | 'terverifikasi' | 'revisi';
+
+/**
+ * Kewajiban lapor — SATU jenis laporan yang wajib disampaikan instansi
+ * (mis. "Laporan Kinerja Triwulanan", "Laporan Keuangan Bulanan").
+ *
+ * Dipisah dari `LaporanPeriodik` supaya admin mendefinisikan kewajiban SEKALI,
+ * lalu sistem menghitung sendiri periode mana yang belum dilaporkan — tanpa
+ * perlu membuat entri baru tiap bulan.
+ */
+export interface KewajibanLapor {
+  id: string;
+  tenantId: string;
+  nama: string;
+  jenis: JenisLaporan;
+  /** Dasar hukum / dasar permintaan laporan (opsional, ditampilkan sebagai konteks). */
+  dasar?: string;
+  /** Pihak yang menerima laporan (mis. "Pemda", "BPKP", "Dewan Pengawas"). */
+  penerima?: string;
+  /** Tenggat dalam HARI setelah periode berakhir (mis. 10 = tanggal 10 bulan berikutnya). */
+  tenggatHari: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+/** Satu berkas lampiran laporan (metadata saja — file disimpan di luar aplikasi). */
+export interface LampiranLaporan {
+  nama: string;
+  /** Ukuran dalam byte bila diketahui. */
+  ukuran?: number;
+  /** Catatan singkat tentang berkas. */
+  catatan?: string;
+}
+
+/**
+ * Satu tahap dalam rantai persetujuan laporan.
+ *
+ * Contoh: `{ urutan: 1, nama: 'Verifikasi Kabag Keuangan', peran: 'analis' }`.
+ * `peran` menentukan siapa yang berhak MENYELESAIKAN tahap ini (admin selalu boleh).
+ */
+export interface TahapAlur {
+  urutan: number;
+  nama: string;
+  peran: UserRole;
+}
+
+/**
+ * Alur verifikasi — rantai persetujuan laporan milik satu instansi.
+ *
+ * Dipisah dari laporan supaya instansi mendefinisikan alurnya SEKALI, lalu
+ * setiap laporan cukup menunjuk `alurId`. Bila laporan tidak menunjuk alur
+ * apa pun, sistem memakai `ALUR_BAWAAN` (lihat `services/laporan/alur.ts`).
+ */
+export interface AlurVerifikasi {
+  id: string;
+  tenantId: string;
+  nama: string;
+  tahap: TahapAlur[];
+  /** Alur yang dipakai otomatis saat laporan baru dibuat tanpa alur eksplisit. */
+  isDefault: boolean;
+  createdAt: string;
+}
+
+/**
+ * Satu aksi yang SUDAH terjadi pada rantai verifikasi (append-only, jadi
+ * riwayatnya bisa diaudit: siapa, kapan, dengan catatan apa).
+ */
+export interface AksiVerifikasi {
+  /** Tahap yang diselesaikan. 0 = aksi pengiriman oleh penyusun. */
+  urutan: number;
+  aksi: 'kirim' | 'setujui' | 'revisi';
+  oleh: string;
+  olehId: string;
+  peran: UserRole;
+  catatan?: string;
+  pada: string;
+}
+
+/** Posisi sebuah laporan di dalam rantai verifikasinya (dihitung, bukan disimpan). */
+export interface PosisiVerifikasi {
+  /** Jumlah tahap yang sudah disetujui. */
+  selesai: number;
+  total: number;
+  /** Tahap yang sedang menunggu; `null` bila rantai sudah selesai / perlu revisi. */
+  tahapAktif: TahapAlur | null;
+  /** true bila seluruh tahap sudah disetujui. */
+  tuntas: boolean;
+  /** true bila laporan sedang berstatus revisi. */
+  perluRevisi: boolean;
+}
+
+/**
+ * LaporanPeriodik — REALISASI pelaporan untuk satu periode tertentu.
+ *
+ * Hanya dibuat saat instansi benar-benar menyusun/mengirim laporan. Ketiadaan
+ * entri = belum lapor (sistem menghitungnya sebagai "belum"), jadi tidak ada
+ * status yang dikarang.
+ */
+export interface LaporanPeriodik {
+  id: string;
+  tenantId: string;
+  /** Menunjuk `KewajibanLapor.id` yang dipenuhi laporan ini. */
+  kewajibanId: string;
+  /** Salinan nama kewajiban agar riwayat tetap terbaca walau kewajiban diubah. */
+  nama: string;
+  jenis: JenisLaporan;
+  /** Kode periode, mis. `2026-01` (bulanan), `2026-Q1` (triwulanan), `2026`. */
+  periode: string;
+  status: StatusLaporan;
+  /** Tenggat efektif (ISO). Dihitung saat entri dibuat dari kewajiban. */
+  deadline?: string;
+  /** Waktu laporan disampaikan (ISO) — diisi saat status menjadi terkirim. */
+  tanggalKirim?: string;
+  /** Nama penyusun laporan. */
+  disusunOleh?: string;
+  /** Catatan / ringkasan isi laporan. */
+  catatan?: string;
+  /** Berkas yang menyertai laporan. */
+  lampiran: LampiranLaporan[];
+  /** Alur verifikasi yang dipakai laporan ini (kosong = alur bawaan). */
+  alurId?: string;
+  /** Jejak persetujuan bertingkat (append-only). Kosong untuk laporan lama. */
+  riwayatVerifikasi?: AksiVerifikasi[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan kepatuhan pelaporan satu periode — DIHITUNG server dari kewajiban
+ * aktif vs laporan yang ada. Semua angka berasal dari data nyata; periode yang
+ * belum punya kewajiban tidak dihitung agar tidak menyesatkan.
+ */
+export interface RingkasanKepatuhan {
+  periode: string;
+  totalKewajiban: number;
+  sudahTerverifikasi: number;
+  sudahTerkirim: number;
+  draf: number;
+  perluRevisi: number;
+  belumLapor: number;
+  /** Persentase kepatuhan = (terverifikasi + terkirim) / totalKewajiban × 100. */
+  persenKepatuhan: number;
+  /** Jumlah yang sudah lewat tenggat tetapi belum terkirim/terverifikasi. */
+  terlambat: number;
+}
+
+/* ================= TINDAK LANJUT AUDIT (BPK / Inspektorat / BPKP) ================= */
+
+/** Lembaga pemeriksa yang menerbitkan temuan. */
+export type SumberAudit = 'bpk' | 'inspektorat' | 'bpkp' | 'kpk' | 'lainnya';
+
+/**
+ * Status tindak lanjut sebuah temuan.
+ * `belum` = belum ada aksi, `proses` = sedang ditindaklanjuti,
+ * `selesai` = tuntas (wajib punya minimal satu aksi), `tidak_ditindaklanjuti`
+ * = dinyatakan tidak dapat ditindaklanjuti (wajib alasan, mis. objek sudah tidak ada).
+ */
+export type StatusTindakLanjut = 'belum' | 'proses' | 'selesai' | 'tidak_ditindaklanjuti';
+
+/** Satu aksi tindak lanjut yang SUDAH dilakukan (append-only, bisa diaudit). */
+export interface AksiTindakLanjut {
+  id: string;
+  tanggal: string;
+  uraian: string;
+  oleh: string;
+  olehId: string;
+  /** Nama berkas bukti (metadata saja — berkas disimpan di luar aplikasi). */
+  bukti: LampiranLaporan[];
+  /** Status temuan SETELAH aksi ini dicatat. */
+  statusSesudah: StatusTindakLanjut;
+  pada: string;
+}
+
+/**
+ * TemuanAudit — SATU temuan hasil pemeriksaan beserta rekomendasinya.
+ *
+ * Dipisah dari aksi tindak lanjut supaya temuan didefinisikan SEKALI (dari LHP),
+ * lalu setiap langkah tindak lanjut dicatat sebagai entri append-only — persis
+ * pola `KewajibanLapor` + `LaporanPeriodik`.
+ */
+export interface TemuanAudit {
+  id: string;
+  tenantId: string;
+  sumber: SumberAudit;
+  /** Nomor Laporan Hasil Pemeriksaan, mis. "05/LHP/XX/2025". */
+  nomorLHP: string;
+  /** Tanggal LHP terbit (ISO). */
+  tanggalLHP: string;
+  /** Periode yang diperiksa, mis. "2024" atau "2024-2025". */
+  periodePemeriksaan?: string;
+  /** Judul temuan singkat. */
+  judul: string;
+  /** Uraian temuan (kondisi, kriteria, sebab, akibat). */
+  uraian?: string;
+  /** Nilai temuan / kerugian (Rp) bila disebutkan di LHP. */
+  nilaiTemuan?: number;
+  /** Rekomendasi dari pemeriksa — inti yang harus ditindaklanjuti. */
+  rekomendasi: string;
+  status: StatusTindakLanjut;
+  /** Batas waktu tindak lanjut (ISO) — dari LHP atau ditetapkan sendiri. */
+  batasWaktu?: string;
+  /** Pejabat/unit penanggung jawab tindak lanjut. */
+  penanggungJawab?: string;
+  /** Alasan bila status `tidak_ditindaklanjuti`. */
+  alasanTidakLanjut?: string;
+  /** Jejak tindak lanjut (append-only). Kosong = belum ada aksi. */
+  aksiTindakLanjut: AksiTindakLanjut[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan tindak lanjut audit — DIHITUNG server dari temuan nyata.
+ * `persenTindakLanjut` adalah indikator kinerja resmi daerah
+ * (persentase tindak lanjut rekomendasi hasil pemeriksaan).
+ */
+export interface RingkasanAudit {
+  total: number;
+  belum: number;
+  proses: number;
+  selesai: number;
+  tidakDitindaklanjuti: number;
+  /** Jumlah temuan yang lewat `batasWaktu` dan belum `selesai`. */
+  lewatTenggat: number;
+  /** (selesai + tidak_ditindaklanjuti) / total × 100 — sesuai konvensi IKU. */
+  persenTindakLanjut: number;
+  /** Total nilai temuan (Rp) dari temuan yang nilainya diketahui. */
+  totalNilai: number;
+  /** Rincian per sumber pemeriksa. */
+  perSumber: Array<{
+    sumber: SumberAudit;
+    total: number;
+    selesai: number;
+    persenTindakLanjut: number;
+  }>;
+}
+
+/* ================= KESEHATAN KEUANGAN & RASIO ================= */
+
+/**
+ * Komponen neraca/laba-rugi yang ditarik dari dokumen resmi.
+ *
+ * Semua field OPSIONAL: dokumen BUMD tidak selalu memuat semuanya. Nilai yang
+ * tidak ada di dokumen dibiarkan `undefined` (BUKAN 0) — rasio yang bergantung
+ * padanya lalu dihitung sebagai `null`, bukan angka palsu.
+ */
+export interface KomponenKeuangan {
+  totalAset?: number;
+  asetLancar?: number;
+  liabilitas?: number;
+  liabilitasLancar?: number;
+  ekuitas?: number;
+  pendapatan?: number;
+  labaBersih?: number;
+  /** Untuk sektor perbankan: kredit bermasalah (NPL) & kredit total. */
+  kreditBermasalah?: number;
+  totalKredit?: number;
+  /** Untuk sektor air: angka kehilangan air (NRW) dalam %. */
+  nrw?: number;
+  /** Untuk sektor perbankan: beban operasional & pendapatan operasional (BOPO). */
+  bebanOperasional?: number;
+  pendapatanOperasional?: number;
+  /** Kas & setara kas (untuk cash ratio). */
+  kas?: number;
+}
+
+/** Nama akun yang bisa dikoreksi/dikonfirmasi pengguna per field. */
+export type KunciKomponen = keyof KomponenKeuangan;
+
+/**
+ * Satu rasio keuangan yang DIHITUNG server dari `komponen`.
+ * `nilai` = null bila komponen pembilang/penyebut tidak tersedia di dokumen.
+ */
+export interface RasioKeuangan {
+  kunci: string;
+  label: string;
+  /** Nilai rasio dalam persen (mis. 3.05 berarti 3,05%) atau kali (DER). */
+  nilai: number | null;
+  /** Satuan tampil: '%' atau '×'. */
+  satuan: '%' | '×';
+  /** Kategori kesehatan menurut ambang Permen EKON 2/2023 (bila berlaku). */
+  kategori?: 'sangat_sehat' | 'sehat' | 'cukup_sehat' | 'kurang_sehat' | 'tidak_sehat';
+  /** Ambang yang dipakai, untuk ditampilkan (transparansi). */
+  ambang?: string;
+  /** Rumus singkat, ditampilkan agar bisa diaudit. */
+  rumus: string;
+  /** true bila hanya berlaku untuk sektor tertentu (mis. NPL/BOPO untuk bank). */
+  sektorKhusus?: BumdSector[];
+}
+
+/**
+ * Snapshot kesehatan keuangan satu periode.
+ *
+ * `komponen` = angka mentah dari dokumen (dengan sitasi), `rasio` = hasil
+ * hitungan server. Rasio TIDAK PERNAH diterima dari klien — selalu dihitung
+ * ulang dari `komponen` supaya tidak bisa dipalsukan.
+ */
+export interface SnapshotKeuangan {
+  id: string;
+  tenantId: string;
+  /** Kode periode, mis. `2026-Q1` atau `2025`. */
+  periode: string;
+  /** Label periode untuk tampilan, mis. "Triwulan I 2026". */
+  periodeLabel: string;
+  komponen: KomponenKeuangan;
+  /** Sitasi per field komponen — angka bisa dilacak ke dokumen. */
+  sitasi: Partial<Record<KunciKomponen, Citation>>;
+  /** Rasio terhitung (diisi server). */
+  rasio: RasioKeuangan[];
+  /** Skor kesehatan gabungan 0-100 (bila cukup data). */
+  skorKesehatan?: number;
+  catatan?: string;
+  disusunOleh?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan kesehatan keuangan: snapshot periode terbaru + perbandingan dengan
+ * periode sebelumnya (delta tiap rasio). Dihitung server dari data nyata.
+ */
+export interface RingkasanKeuangan {
+  /** Snapshot periode terbaru (null bila belum ada). */
+  terbaru: SnapshotKeuangan | null;
+  /** Snapshot periode sebelumnya (untuk delta), bila ada. */
+  sebelumnya: SnapshotKeuangan | null;
+  /** Delta nilai rasio (terbaru − sebelumnya) per kunci rasio. */
+  delta: Record<string, number | null>;
+  /** Daftar periode yang tersedia (terbaru lebih dulu). */
+  periodeTersedia: string[];
+}
+
+/* ================= MANAJEMEN RISIKO ================= */
+
+/** Kategori risiko mengikuti taksonomi lazim SPIP/manajemen risiko BUMD. */
+export type KategoriRisiko =
+  | 'strategis'
+  | 'operasional'
+  | 'keuangan'
+  | 'kepatuhan'
+  | 'reputasi';
+
+/**
+ * Level risiko = hasil pemetaan skor (kemungkinan × dampak) ke pita.
+ * Dipakai untuk warna heat map dan penentuan prioritas mitigasi.
+ */
+export type LevelRisiko = 'rendah' | 'sedang' | 'tinggi' | 'ekstrem';
+
+/**
+ * Status siklus hidup risiko:
+ * `teridentifikasi` = baru terdaftar, belum ada mitigasi;
+ * `dimitigasi` = mitigasi sedang dijalankan;
+ * `terkendali` = risiko sudah turun ke level yang dapat diterima;
+ * `ditutup` = risiko tidak lagi relevan (wajib alasan).
+ */
+export type StatusRisiko = 'teridentifikasi' | 'dimitigasi' | 'terkendali' | 'ditutup';
+
+/** Satu langkah mitigasi yang SUDAH dilakukan (append-only, bisa diaudit). */
+export interface AksiMitigasi {
+  id: string;
+  tanggal: string;
+  uraian: string;
+  oleh: string;
+  olehId: string;
+  /** Nama berkas bukti (metadata saja — berkas disimpan di luar aplikasi). */
+  bukti: LampiranLaporan[];
+  /** Status risiko SETELAH aksi ini dicatat. */
+  statusSesudah: StatusRisiko;
+  /** Level risiko residual yang dinilai setelah mitigasi (opsional). */
+  levelResidual?: LevelRisiko;
+  pada: string;
+}
+
+/**
+ * Risiko — SATU entri register risiko instansi.
+ *
+ * `skor` dan `level` DIHITUNG server dari `kemungkinan` × `dampak`; nilai yang
+ * dikirim klien diabaikan supaya tingkat risiko tidak bisa dipalsukan (prinsip
+ * yang sama dengan rasio kesehatan keuangan).
+ */
+export interface Risiko {
+  id: string;
+  tenantId: string;
+  /** Kode unik risiko, mis. "R-01". */
+  kode: string;
+  kategori: KategoriRisiko;
+  /** Pernyataan risiko: "Kemungkinan ... yang menyebabkan ...". */
+  pernyataan: string;
+  /** Penyebab risiko. */
+  penyebab?: string;
+  /** Uraian dampak bila risiko terjadi. */
+  dampakUraian?: string;
+  /** Sasaran/tujuan yang terancam (tautan ke kinerja). */
+  sasaran?: string;
+  /** Skala 1-5: kemungkinan (likelihood). */
+  kemungkinan: number;
+  /** Skala 1-5: dampak (impact). */
+  dampak: number;
+  /** kemungkinan × dampak (dihitung server). */
+  skor: number;
+  /** Level dari skor (dihitung server). */
+  level: LevelRisiko;
+  status: StatusRisiko;
+  /** Unit/pemilik risiko. */
+  pemilikRisiko?: string;
+  /** Rencana mitigasi (uraian rencana yang akan dijalankan). */
+  rencanaMitigasi?: string;
+  /** Batas waktu mitigasi (ISO). */
+  batasWaktu?: string;
+  /** Level risiko residual terakhir yang dinilai (dari aksi mitigasi terbaru). */
+  levelResidual?: LevelRisiko;
+  /** Jejak mitigasi (append-only). Kosong = belum ada aksi. */
+  aksiMitigasi: AksiMitigasi[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan risiko — DIHITUNG server dari register nyata.
+ * `risikoTinggi` (level tinggi + ekstrem) adalah angka yang dicari direksi;
+ * `matriks` 5×5 adalah heat map standar (baris = kemungkinan, kolom = dampak).
+ */
+export interface RingkasanRisiko {
+  total: number;
+  perLevel: Record<LevelRisiko, number>;
+  perKategori: Array<{
+    kategori: KategoriRisiko;
+    total: number;
+    levelTertinggi: LevelRisiko | null;
+  }>;
+  /** Jumlah risiko level tinggi + ekstrem (prioritas perhatian direksi). */
+  risikoTinggi: number;
+  /** Jumlah risiko yang lewat `batasWaktu` dan belum terkendali/ditutup. */
+  lewatTenggat: number;
+  /** Matriks 5×5: `matriks[kemungkinan-1][dampak-1]` = jumlah risiko. */
+  matriks: number[][];
+  /** Rata-rata skor risiko (0 bila kosong). */
+  rataSkor: number;
+}
+
+/* ================= MANAJEMEN ASET ================= */
+
+/**
+ * Kategori aset BUMD mengikuti penggolongan barang milik daerah / aset
+ * operasional (Permendagri 19/2016 tentang pengelolaan BMD).
+ */
+export type KategoriAset =
+  | 'tanah'
+  | 'bangunan'
+  | 'mesin'
+  | 'jaringan'
+  | 'kendaraan'
+  | 'peralatan'
+  | 'lainnya';
+
+/**
+ * Kondisi fisik aset — dasar prioritas pemeliharaan/penggantian.
+ * `rusak_berat` adalah angka yang dicari direksi (aset berisiko mangkrak).
+ */
+export type KondisiAset = 'baik' | 'rusak_ringan' | 'rusak_berat';
+
+/**
+ * Status pemanfaatan aset:
+ * `digunakan` = dipakai operasional; `idle` = menganggur (potensi pemborosan);
+ * `disewakan` = sumber pendapatan lain; `dilepas` = sudah dihapuskan/dijual.
+ */
+export type StatusPemanfaatan = 'digunakan' | 'idle' | 'disewakan' | 'dilepas';
+
+/**
+ * Aset — SATU entri daftar aset instansi.
+ *
+ * `nilaiBuku` dan `akumulasiPenyusutan` TIDAK disimpan sebagai input: keduanya
+ * DIHITUNG server dari `nilaiPerolehan`, `nilaiResidu`, `umurEkonomis`, dan
+ * tahun berjalan (metode garis lurus). Tanah tidak disusutkan. Prinsip yang
+ * sama dengan risiko & rasio keuangan: angka turunan dihitung, bukan diterima.
+ */
+export interface Aset {
+  id: string;
+  tenantId: string;
+  /** Kode aset, mis. "AST-01" atau nomor register barang. */
+  kode: string;
+  nama: string;
+  kategori: KategoriAset;
+  /** Lokasi/unit pemakai aset. */
+  lokasi?: string;
+  /** Tahun perolehan (dipakai menghitung umur berjalan). */
+  tahunPerolehan: number;
+  /** Harga perolehan (Rupiah). */
+  nilaiPerolehan: number;
+  /** Umur ekonomis dalam tahun (1-50). */
+  umurEkonomis: number;
+  /** Nilai residu/sisa (Rupiah) — dasar penyusutan. */
+  nilaiResidu: number;
+  kondisi: KondisiAset;
+  pemanfaatan: StatusPemanfaatan;
+  catatan?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan aset — DIHITUNG server dari daftar nyata.
+ * `nilaiBukuTotal` = nilai aset saat ini setelah penyusutan; `jumlahRusakBerat`
+ * dan `jumlahIdle` adalah angka pengawasan direksi/inspektorat.
+ */
+export interface RingkasanAset {
+  total: number;
+  nilaiPerolehanTotal: number;
+  nilaiBukuTotal: number;
+  akumulasiPenyusutanTotal: number;
+  perKategori: Array<{
+    kategori: KategoriAset;
+    total: number;
+    nilaiBuku: number;
+  }>;
+  perKondisi: Record<KondisiAset, number>;
+  /** Jumlah aset kondisi rusak berat. */
+  jumlahRusakBerat: number;
+  /** Jumlah aset yang idle/tidak termanfaatkan (indikasi pemborosan). */
+  jumlahIdle: number;
+  /** Tahun perhitungan (dipakai UI untuk menandai "per tahun X"). */
+  tahunPerhitungan: number;
+}
+
+/* ================= PERJANJIAN KINERJA ================= */
+
+/**
+ * Status siklus hidup Perjanjian Kinerja:
+ * `draf` = masih disusun, belum ditandatangani;
+ * `aktif` = sudah disepakati & berjalan (target menjadi komitmen);
+ * `ditutup` = periode selesai / dievaluasi.
+ */
+export type StatusPerjanjianKinerja = 'draf' | 'aktif' | 'ditutup';
+
+/**
+ * Arah capaian indikator:
+ * `maksimal` = semakin tinggi semakin baik (mis. produksi air, pendapatan);
+ * `minimal` = semakin rendah semakin baik (mis. kebocoran, keluhan pelanggan).
+ * Dipakai agar persentase capaian benar untuk kedua jenis indikator.
+ */
+export type ArahIndikator = 'maksimal' | 'minimal';
+
+/**
+ * Satu indikator kinerja dalam Perjanjian Kinerja: sasaran → indikator →
+ * target, beserta realisasi (capaian) yang dicatat terpisah.
+ */
+export interface IndikatorKinerja {
+  id: string;
+  /** Sasaran strategis yang diukur. */
+  sasaran: string;
+  /** Rumusan indikator kinerja. */
+  indikator: string;
+  /** Satuan target (mis. "%", "Rp juta", "unit"). */
+  satuan: string;
+  /** Target yang dijanjikan. */
+  target: number;
+  /** Arah capaian (menentukan cara menghitung persentase). */
+  arah: ArahIndikator;
+  /** Realisasi/capaian aktual — diisi saat pelaporan (opsional). */
+  realisasi?: number;
+  /** Catatan penjelasan capaian. */
+  catatanRealisasi?: string;
+}
+
+/**
+ * Perjanjian Kinerja — dokumen komitmen target kinerja antara pejabat penilai
+ * (pihak pertama) dan pejabat yang dinilai (pihak kedua).
+ *
+ * Prinsip: `target` adalah komitmen; `realisasi` dicatat belakangan. Persentase
+ * capaian DIHITUNG (bukan disimpan) agar tidak bisa dipalsukan.
+ */
+export interface PerjanjianKinerja {
+  id: string;
+  tenantId: string;
+  /** Nomor dokumen, mis. "PK-01/DIR/2026". */
+  nomor: string;
+  /** Periode/tahun anggaran, mis. "2026". */
+  periode: string;
+  /** Pihak pertama (pejabat penilai), mis. Direktur Utama. */
+  pihakPertama: string;
+  jabatanPertama: string;
+  /** Pihak kedua (yang berjanji kinerja). */
+  pihakKedua: string;
+  jabatanKedua: string;
+  /** Tanggal penetapan (ISO). */
+  tanggal: string;
+  status: StatusPerjanjianKinerja;
+  indikator: IndikatorKinerja[];
+  catatan?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan Perjanjian Kinerja — DIHITUNG server dari dokumen nyata.
+ * `capaianRataRata` = rata-rata persentase capaian indikator yang sudah
+ * direalisasikan (null bila belum ada realisasi sama sekali).
+ */
+export interface RingkasanPerjanjianKinerja {
+  total: number;
+  perStatus: Record<StatusPerjanjianKinerja, number>;
+  jumlahIndikator: number;
+  /** Jumlah indikator yang sudah punya realisasi. */
+  indikatorTerealisasi: number;
+  /** Jumlah indikator capaian >= 100%. */
+  indikatorTercapai: number;
+  /** Rata-rata capaian (%) dari indikator yang sudah direalisasikan, atau null. */
+  capaianRataRata: number | null;
+  /** Periode (tahun) terbaru yang tercatat. */
+  periodeTerbaru: string | null;
+}
+
+/* ================= LKjIP (LAPORAN KINERJA INSTANSI PEMERINTAH) ================= */
+
+/**
+ * Status penyusunan LKjIP:
+ * `draf` = masih disusun; `final` = sudah ditandatangani & siap disampaikan.
+ */
+export type StatusLKjIP = 'draf' | 'final';
+
+/** Satu bab/bagian bebas dalam LKjIP (analisis, kendala, tindak lanjut, dst.). */
+export interface BagianLKjIP {
+  id: string;
+  /** Judul bab, mis. "Analisis Capaian Kinerja". */
+  judul: string;
+  /** Isi naratif bab. */
+  isi: string;
+}
+
+/**
+ * LKjIP — laporan kinerja tahunan instansi, disusun dari Perjanjian Kinerja
+ * periode tersebut.
+ *
+ * Prinsip: LKjIP **menautkan** Perjanjian Kinerja (`perjanjianKinerjaIds`);
+ * ringkasan capaiannya DIHITUNG dari indikator PK yang ditautkan, bukan
+ * diketik ulang — supaya laporan tidak bisa berbeda dari komitmennya.
+ * Tenggat penyampaian: 2 bulan setelah tahun anggaran berakhir.
+ */
+export interface LKjIP {
+  id: string;
+  tenantId: string;
+  /** Periode/tahun anggaran yang dilaporkan, mis. "2026". */
+  periode: string;
+  nomor: string;
+  judul: string;
+  status: StatusLKjIP;
+  /** Tanggal penyusunan/penetapan (ISO). */
+  tanggal: string;
+  ringkasanEksekutif: string;
+  bagian: BagianLKjIP[];
+  /** Id Perjanjian Kinerja yang menjadi dasar laporan ini. */
+  perjanjianKinerjaIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ringkasan LKjIP — DIHITUNG server. `rataCapaian` ditarik dari indikator
+ * Perjanjian Kinerja yang ditautkan (null bila belum ada realisasi).
+ */
+export interface RingkasanLKjIP {
+  total: number;
+  perStatus: Record<StatusLKjIP, number>;
+  /** Jumlah indikator (dari PK tertaut) yang sudah direalisasikan. */
+  indikatorTerealisasi: number;
+  /** Jumlah indikator (dari PK tertaut) capaian >= 100%. */
+  indikatorTercapai: number;
+  /** Rata-rata capaian (%) dari indikator PK tertaut, atau null. */
+  rataCapaian: number | null;
+  /** Jumlah LKjIP yang lewat tenggat dan belum final. */
+  lewatTenggat: number;
+  /** Periode terbaru yang tercatat. */
+  periodeTerbaru: string | null;
+}

@@ -23,7 +23,7 @@ export interface AdminTab {
 export const ADMIN_TABS: AdminTab[] = [
   { id: 'overview', label: 'Ringkasan', judul: 'Ringkasan Sistem', icon: Activity },
   { id: 'users', label: 'Pengguna & RBAC', judul: 'Pengguna & RBAC', icon: Users },
-  { id: 'tenants', label: 'BUMD & Tenant', judul: 'BUMD & Tenant', icon: Building2 },
+  { id: 'tenants', label: 'Instansi & KB', judul: 'Instansi & Knowledge Base', icon: Building2 },
   { id: 'rag', label: 'Konfigurasi RAG', judul: 'Konfigurasi RAG', icon: Database },
   { id: 'alerts', label: 'Ambang Batas', judul: 'Ambang Batas & Alert', icon: Bell },
   { id: 'audit', label: 'Jejak Audit', judul: 'Jejak Audit & Kepatuhan', icon: ShieldCheck },

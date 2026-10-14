@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import {
   Activity,
   BarChart3,
+  ClipboardCheck,
+  Gauge,
+  ClipboardList,
   History,
   Layers,
   LayoutGrid,
@@ -10,6 +13,10 @@ import {
   Plus,
   Search,
   Shield,
+  ShieldAlert,
+  Boxes,
+  FileSignature,
+  BookOpen,
   Building2,
   ChevronDown,
 } from 'lucide-react';
@@ -49,7 +56,7 @@ export interface SidebarProps {
   onOpenAudit: () => void;
   onOpenAlerts: () => void;
   unreadAlertsCount: number;
-  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'admin';
+  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'admin';
   onOpenAdmin: () => void;
   /** Tab Panel Admin yang sedang aktif (dipakai saat currentView === 'admin'). */
   adminTab?: AdminTabId;
@@ -59,6 +66,19 @@ export interface SidebarProps {
   onOpenChartGallery?: () => void;
   /** Buka galeri Template Dashboard (dashboard siap pakai per sektor BUMD). */
   onOpenDashboardTemplates?: () => void;
+  /** Buka halaman Pelaporan Periodik & Kepatuhan (kewajiban lapor instansi). */
+  onOpenPelaporan?: () => void;
+  /** Buka halaman Tindak Lanjut Audit (temuan BPK/Inspektorat/BPKP). */
+  onOpenTindakLanjutAudit?: () => void;
+  onOpenKesehatanKeuangan?: () => void;
+  /** Buka halaman Manajemen Risiko (register risiko + heat map 5×5). */
+  onOpenManajemenRisiko?: () => void;
+  /** Buka halaman Manajemen Aset (daftar aset + nilai buku & penyusutan). */
+  onOpenManajemenAset?: () => void;
+  /** Buka halaman Perjanjian Kinerja (komitmen target + capaian). */
+  onOpenPerjanjianKinerja?: () => void;
+  /** Buka halaman LKjIP (laporan kinerja tahunan). */
+  onOpenLKjIP?: () => void;
   currentUser: User | null;
   onLogout: () => void;
 }
@@ -83,6 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectAdminTab,
   onOpenChartGallery,
   onOpenDashboardTemplates,
+  onOpenPelaporan,
+  onOpenTindakLanjutAudit,
+  onOpenKesehatanKeuangan,
+  onOpenManajemenRisiko,
+  onOpenManajemenAset,
+  onOpenPerjanjianKinerja,
+  onOpenLKjIP,
   currentUser,
   onLogout,
 }) => {
@@ -138,25 +165,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> Klien / Instansi</span>
               <span className="text-[9px] font-normal lowercase tracking-normal">{currentTenant?.city || 'BUMD'}</span>
             </div>
-            <div className="relative">
-              <select
-                value={currentTenant?.id || ''}
-                onChange={(e) => {
-                  const found = tenants.find((t) => t.id === e.target.value);
-                  if (found) onSelectTenant(found);
-                }}
-                className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand transition-all appearance-none truncate"
-                title="Pilih instansi aktif (klien / instansi lain)"
-                aria-label="Pilih instansi aktif"
+            {/* Kunci ketat 1 akun = 1 BUMD: hanya admin yang boleh berpindah
+                instansi. Non-admin melihat instansinya sebagai label statis,
+                bukan dropdown — supaya tidak ada jalan pindah konteks. */}
+            {currentUser?.role === 'admin' ? (
+              <div className="relative">
+                <select
+                  value={currentTenant?.id || ''}
+                  onChange={(e) => {
+                    const found = tenants.find((t) => t.id === e.target.value);
+                    if (found) onSelectTenant(found);
+                  }}
+                  className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand transition-all appearance-none truncate"
+                  title="Pilih instansi aktif (klien / instansi lain)"
+                  aria-label="Pilih instansi aktif"
+                >
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id} className="bg-shell-2 text-shell-ink">
+                      {t.name}{t.documentCount ? ` · ${t.documentCount} dok RAG` : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-shell-ink-2 pointer-events-none" />
+              </div>
+            ) : (
+              <div
+                className="w-full text-xs font-semibold text-shell-ink bg-shell border border-shell-line rounded-control px-2.5 py-1.5 truncate"
+                title={currentTenant?.name || 'Instansi Anda'}
               >
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id} className="bg-shell-2 text-shell-ink">
-                    {t.name}{t.documentCount ? ` · ${t.documentCount} dok RAG` : ''}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-shell-ink-2 pointer-events-none" />
-            </div>
+                {currentTenant?.name || 'Instansi Anda'}
+              </div>
+            )}
             <div className="flex items-center justify-between text-[10px] px-0.5">
               <span className="capitalize font-medium text-shell-ink-2 truncate max-w-[140px]">{currentTenant?.sector || 'Sektor Publik'}</span>
               <span className="text-[9px] text-pos bg-pos/15 px-1 rounded-chip font-medium" title="Basis dokumen RAG instansi ini">
@@ -248,6 +287,99 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {currentView === 'charts' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
                   <BarChart3 className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'charts' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
                   {!isCollapsed && <span className="flex-1 truncate">Template Chart</span>}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* GRUP 2.5: Kinerja & Kepatuhan (operasional BUMD) */}
+        {(onOpenPelaporan || onOpenTindakLanjutAudit || onOpenKesehatanKeuangan || onOpenManajemenRisiko || onOpenManajemenAset || onOpenPerjanjianKinerja || onOpenLKjIP) && (
+          <div>
+            {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Kinerja & Kepatuhan</div>}
+            <div className="space-y-0.5">
+              {onOpenPelaporan && (
+                <button
+                  onClick={onOpenPelaporan}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'pelaporan' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Pelaporan Periodik & Kepatuhan — pantau kewajiban lapor instansi per periode"
+                  data-testid="buka-pelaporan"
+                >
+                  {currentView === 'pelaporan' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <ClipboardList className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'pelaporan' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Pelaporan Periodik</span>}
+                </button>
+              )}
+              {onOpenTindakLanjutAudit && (
+                <button
+                  onClick={onOpenTindakLanjutAudit}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'auditTl' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Tindak Lanjut Audit — pantau temuan BPK/Inspektorat/BPKP dan rekomendasinya"
+                  data-testid="buka-tindak-lanjut-audit"
+                >
+                  {currentView === 'auditTl' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <ClipboardCheck className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'auditTl' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Tindak Lanjut Audit</span>}
+                </button>
+              )}
+              {onOpenKesehatanKeuangan && (
+                <button
+                  onClick={onOpenKesehatanKeuangan}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'keuangan' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Kesehatan Keuangan — rasio ROA/ROE/DER/likuiditas dari neraca & laba rugi"
+                  data-testid="buka-kesehatan-keuangan"
+                >
+                  {currentView === 'keuangan' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <Gauge className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'keuangan' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Kesehatan Keuangan</span>}
+                </button>
+              )}
+              {onOpenManajemenRisiko && (
+                <button
+                  onClick={onOpenManajemenRisiko}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'risiko' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Manajemen Risiko — register risiko & heat map 5×5 (PP 60/2008 SPIP)"
+                  data-testid="buka-manajemen-risiko"
+                >
+                  {currentView === 'risiko' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <ShieldAlert className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'risiko' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Manajemen Risiko</span>}
+                </button>
+              )}
+              {onOpenManajemenAset && (
+                <button
+                  onClick={onOpenManajemenAset}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'aset' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Manajemen Aset — daftar aset, nilai buku & penyusutan (Permendagri 19/2016)"
+                  data-testid="buka-manajemen-aset"
+                >
+                  {currentView === 'aset' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <Boxes className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'aset' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Manajemen Aset</span>}
+                </button>
+              )}
+              {onOpenPerjanjianKinerja && (
+                <button
+                  onClick={onOpenPerjanjianKinerja}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'pk' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Perjanjian Kinerja — komitmen target kinerja & capaian (PermenPANRB 53/2014)"
+                  data-testid="buka-perjanjian-kinerja"
+                >
+                  {currentView === 'pk' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <FileSignature className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'pk' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Perjanjian Kinerja</span>}
+                </button>
+              )}
+              {onOpenLKjIP && (
+                <button
+                  onClick={onOpenLKjIP}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'lkjip' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="LKjIP — Laporan Kinerja Instansi Pemerintah (Perpres 29/2014 SAKIP)"
+                  data-testid="buka-lkjip"
+                >
+                  {currentView === 'lkjip' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <BookOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'lkjip' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">LKjIP</span>}
                 </button>
               )}
             </div>

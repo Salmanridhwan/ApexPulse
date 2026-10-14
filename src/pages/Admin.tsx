@@ -7,6 +7,7 @@ import {
   Key,
   LogOut,
   Menu,
+  Pencil,
   Plus,
   Radio,
   RefreshCw,
@@ -36,7 +37,7 @@ const LABEL_SEKTOR: Record<BumdSector, string> = {
 
 /**
  * Baris hasil yang terisi otomatis dari KB — BUKAN kolom isian.
- * Dipakai form "BUMD & Tenant" supaya admin hanya perlu mengisi KB ID.
+ * Dipakai form "Instansi & KB" supaya admin hanya perlu mengisi KB ID.
  */
 const BarisOtomatis: React.FC<{ label: string; nilai?: string }> = ({ label, nilai }) => (
   <div>
@@ -120,6 +121,12 @@ export const Admin: React.FC<AdminProps> = ({
 
   // Tenant Modal State
   const [isAddTenantOpen, setIsAddTenantOpen] = useState(false);
+  /**
+   * ID instansi yang sedang DIEDIT lewat modal. Kosong = mode "tambah baru".
+   * Dipakai agar admin bisa mengubah Knowledge Base instansi yang sudah ada
+   * (mis. saat instansi berganti sumber dokumen) tanpa harus menghapus-buat ulang.
+   */
+  const [editTenantId, setEditTenantId] = useState<string>('');
   const [tenantName, setTenantName] = useState('');
   const [tenantShortName, setTenantShortName] = useState('');
   const [tenantSector, setTenantSector] = useState<BumdSector>('pdam');
@@ -236,43 +243,47 @@ export const Admin: React.FC<AdminProps> = ({
     if (!tenantName || !tenantCity) return;
 
     setTenantSaving(true);
+    const modeEdit = !!editTenantId;
     try {
-      const res = await fetch('/api/admin/tenants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: tenantName,
-          shortName: tenantShortName || tenantName.slice(0, 12),
-          sector: tenantSector,
-          city: tenantCity,
-          code: tenantCode || `BUMD-${Date.now().toString().slice(-3)}`,
-          logo: '🏛️',
-          // Jumlah dokumen TIDAK dikirim dari sini — server membacanya dari KB
-          // nyata saat sinkron, jadi tidak ada angka karangan.
-          knowledgeBaseId: tenantKbId.trim() || undefined,
-        }),
-      });
+      const res = await fetch(
+        modeEdit ? `/api/admin/tenants/${encodeURIComponent(editTenantId)}` : '/api/admin/tenants',
+        {
+          method: modeEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: tenantName,
+            shortName: tenantShortName || tenantName.slice(0, 12),
+            sector: tenantSector,
+            city: tenantCity,
+            code: tenantCode || `BUMD-${Date.now().toString().slice(-3)}`,
+            logo: '🏛️',
+            // Jumlah dokumen TIDAK dikirim dari sini — server membacanya dari KB
+            // nyata saat sinkron, jadi tidak ada angka karangan.
+            knowledgeBaseId: tenantKbId.trim() || undefined,
+          }),
+        }
+      );
       const newT = await res.json();
-      // Server kini IKUT menyinkronkan KB saat instansi dibuat (menunggu RAG),
-      // jadi instansi yang muncul sudah membawa jumlah dokumen terbaru.
-      setTenants((prev) => [...prev, newT]);
-      setIsAddTenantOpen(false);
-      setTenantName('');
-      setTenantCity('');
-      setTenantKbId('');
-      setTenantKbInfo(null);
+      // Server IKUT menyinkronkan KB saat KB berubah (menunggu RAG), jadi
+      // instansi yang muncul sudah membawa jumlah dokumen terbaru.
+      if (modeEdit) {
+        setTenants((prev) => prev.map((t) => (t.id === newT.id ? newT : t)));
+      } else {
+        setTenants((prev) => [...prev, newT]);
+      }
+      tutupModalTenant();
 
       if (newT?.sinkron) {
         setSinkronHasil(
           newT.sinkron.ok
             ? {
-                judul: `${newT.name}: KB langsung tersinkron (${newT.sinkron.jumlahDokumen ?? 0} dokumen)`,
+                judul: `${newT.name}: KB ${modeEdit ? 'diperbarui' : 'langsung tersinkron'} (${newT.sinkron.jumlahDokumen ?? 0} dokumen)`,
                 dokumenBaru: [],
                 dokumenHilang: [],
                 catatan: 'Jumlah dokumen dibaca langsung dari Knowledge Base, bukan angka contoh.',
               }
             : {
-                judul: `${newT.name}: instansi dibuat, tetapi KB belum tersinkron`,
+                judul: `${newT.name}: ${modeEdit ? 'perubahan disimpan' : 'instansi dibuat'}, tetapi KB belum tersinkron`,
                 dokumenBaru: [],
                 dokumenHilang: [],
                 catatan: newT.sinkron.error,
@@ -282,10 +293,42 @@ export const Admin: React.FC<AdminProps> = ({
       }
       loadData();
     } catch (err) {
-      console.error('Create tenant failed:', err);
+      console.error('Simpan tenant failed:', err);
     } finally {
       setTenantSaving(false);
     }
+  };
+
+  /** Kosongkan state modal instansi (dipakai saat batal, sukses, maupun tutup). */
+  const tutupModalTenant = () => {
+    setIsAddTenantOpen(false);
+    setEditTenantId('');
+    setTenantName('');
+    setTenantCity('');
+    setTenantShortName('');
+    setTenantCode('');
+    setTenantSector('pdam');
+    setTenantKbId('');
+    setTenantKbInfo(null);
+  };
+
+  /** Buka modal dalam mode EDIT: isi field dari instansi yang dipilih. */
+  const bukaEditTenant = (t: Tenant) => {
+    setEditTenantId(t.id);
+    setTenantName(t.name || '');
+    setTenantCity(t.city || '');
+    setTenantShortName(t.shortName || '');
+    setTenantCode(t.code || '');
+    setTenantSector(t.sector || 'pdam');
+    setTenantKbId(t.knowledgeBaseId || '');
+    setTenantKbInfo(null);
+    setIsAddTenantOpen(true);
+  };
+
+  /** Buka modal dalam mode TAMBAH: kosongkan dulu supaya tidak ada sisa nilai. */
+  const bukaTambahTenant = () => {
+    tutupModalTenant();
+    setIsAddTenantOpen(true);
   };
 
   const handleSaveConfig = async (e: React.FormEvent) => {
@@ -687,14 +730,14 @@ export const Admin: React.FC<AdminProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-ink">
-                      Instansi BUMD Terhubung (Multi-Tenant Isolation)
+                      Instansi Terhubung
                     </h3>
                     <p className="text-xs text-ink-2">
-                      Setiap instansi memiliki isolasi data dan pangkalan retrieval dokumen mandiri
+                      Setiap instansi memiliki isolasi data dan pangkalan retrieval dokumen (KB) mandiri
                     </p>
                   </div>
                   <button
-                    onClick={() => setIsAddTenantOpen(true)}
+                    onClick={bukaTambahTenant}
                     className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -795,7 +838,7 @@ export const Admin: React.FC<AdminProps> = ({
                       <th className="p-3">Nama Pengguna</th>
                       <th className="p-3">Email Instansi</th>
                       <th className="p-3">Peran (Role)</th>
-                      <th className="p-3">Penugasan BUMD</th>
+                      <th className="p-3">Instansi</th>
                       <th className="p-3 text-right">Aksi</th>
                     </tr>
                   </thead>
@@ -832,7 +875,7 @@ export const Admin: React.FC<AdminProps> = ({
                                 <span>{assignedTenant.shortName}</span>
                               </span>
                             ) : (
-                              <span className="text-ink-3">Lintas Instansi</span>
+                              <span className="text-ink-3">Tanpa instansi</span>
                             )}
                           </td>
                           <td className="p-3 text-right">
@@ -861,10 +904,10 @@ export const Admin: React.FC<AdminProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-ink">
-                    Daftar BUMD & Konfigurasi Multi-Tenant
+                    Instansi & Knowledge Base
                   </h3>
                   <p className="text-xs text-ink-2">
-                    Kelola identitas resmi, kode BUMD, dan pangkalan dokumen retrieval
+                    Kelola identitas instansi, kode, dan pangkalan dokumen retrieval (KB) yang dipakai
                   </p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -880,7 +923,7 @@ export const Admin: React.FC<AdminProps> = ({
                     <span>Perbarui Semua</span>
                   </button>
                   <button
-                    onClick={() => setIsAddTenantOpen(true)}
+                    onClick={bukaTambahTenant}
                     className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -979,6 +1022,16 @@ export const Admin: React.FC<AdminProps> = ({
                       >
                         <RefreshCw className={`w-3 h-3 ${sinkronLoading === t.id ? 'animate-spin' : ''}`} />
                         <span>{sinkronLoading === t.id ? 'Memperbarui…' : 'Perbarui RAG'}</span>
+                      </button>
+                      {/* Ubah identitas & KB instansi ini — inti alur "1 akun = 1 BUMD":
+                          admin menentukan instansi ini membaca dokumen dari KB mana. */}
+                      <button
+                        onClick={() => bukaEditTenant(t)}
+                        className="px-3 py-1.5 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-[11px] font-medium transition-colors flex items-center gap-1.5"
+                        title="Ubah nama, kode, atau Knowledge Base instansi ini"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Ubah</span>
                       </button>
                       <button
                         onClick={() => handleDeleteTenant(t)}
@@ -1585,14 +1638,16 @@ export const Admin: React.FC<AdminProps> = ({
           </div>
         )}
 
-        {/* ================= MODAL TAMBAH TENANT BUMD ================= */}
+        {/* ================= MODAL TAMBAH/UBAH INSTANSI ================= */}
         {isAddTenantOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddTenantOpen(false)} />
+            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={tutupModalTenant} />
             <div role="dialog" aria-modal="true" aria-labelledby="add-tenant-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h3 id="add-tenant-title" className="font-bold text-sm text-ink">Daftarkan Instansi BUMD Baru</h3>
-                <button onClick={() => setIsAddTenantOpen(false)} className="text-ink-3 hover:text-ink-2">
+                <h3 id="add-tenant-title" className="font-bold text-sm text-ink">
+                  {editTenantId ? 'Ubah Instansi & Knowledge Base' : 'Daftarkan Instansi BUMD Baru'}
+                </h3>
+                <button onClick={tutupModalTenant} className="text-ink-3 hover:text-ink-2">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -1658,7 +1713,7 @@ export const Admin: React.FC<AdminProps> = ({
                 <div className="pt-2 flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsAddTenantOpen(false)}
+                    onClick={tutupModalTenant}
                     className="px-4 py-2 border border-line rounded-control text-ink-2 hover:bg-surface-2"
                   >
                     Batal

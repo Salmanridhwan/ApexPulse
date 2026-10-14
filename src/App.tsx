@@ -8,6 +8,7 @@ import {
   Clock,
   EllipsisVertical,
   FileCheck,
+  FileSpreadsheet,
   FileText,
   Filter,
   History,
@@ -32,6 +33,7 @@ import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
 import { DashboardCanvas } from './components/DashboardCanvas';
 import { ExportModal } from './components/ExportModal';
+import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
@@ -58,6 +60,25 @@ const AuditLogPage = React.lazy(() =>
 const AlertsPage = React.lazy(() =>
   import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage }))
 );
+const PelaporanPage = React.lazy(() =>
+  import('./pages/PelaporanPage').then((m) => ({ default: m.PelaporanPage }))
+);
+const TindakLanjutAuditPage = React.lazy(() =>
+  import('./pages/TindakLanjutAuditPage').then((m) => ({ default: m.TindakLanjutAuditPage }))
+);
+const KesehatanKeuanganPage = React.lazy(() =>
+  import('./pages/KesehatanKeuanganPage').then((m) => ({ default: m.KesehatanKeuanganPage }))
+);
+const ManajemenRisikoPage = React.lazy(() =>
+  import('./pages/ManajemenRisikoPage').then((m) => ({ default: m.ManajemenRisikoPage }))
+);
+const ManajemenAsetPage = React.lazy(() =>
+  import('./pages/ManajemenAsetPage').then((m) => ({ default: m.ManajemenAsetPage }))
+);
+const PerjanjianKinerjaPage = React.lazy(() =>
+  import('./pages/PerjanjianKinerjaPage').then((m) => ({ default: m.PerjanjianKinerjaPage }))
+);
+const LKjIPPage = React.lazy(() => import('./pages/LKjIPPage').then((m) => ({ default: m.LKjIPPage })));
 const ChartGalleryPage = React.lazy(() =>
   import('./pages/ChartGalleryPage').then((m) => ({ default: m.ChartGalleryPage }))
 );
@@ -122,7 +143,7 @@ export default function App() {
 
   // App Core State
   // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'admin'>(() => {
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'admin'>(() => {
     const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
     if (saved) {
       try {
@@ -160,6 +181,7 @@ export default function App() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Active Selection for Drawer & Editor
   
@@ -172,9 +194,11 @@ export default function App() {
 
   // Initial Fetch
   useEffect(() => {
-    // Fetch Tenants
+    // Daftar instansi kini WAJIB login (dulu terbuka untuk umum). Jadi jangan
+    // memanggilnya saat belum ada sesi — kalau dipanggil, server membalas 401.
+    if (!currentUser || !authToken) return;
     fetch('/api/tenants')
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data: Tenant[]) => {
         setTenants(data);
         if (data.length > 0 && !currentTenant) {
@@ -183,7 +207,7 @@ export default function App() {
       })
       .catch((err) => console.error('Fetch tenants error:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser, authToken]);
 
   // Pre-warm chunk echarts paralel dengan fetch data dashboard, agar chart
   // pertama di workspace tidak menunggu unduhan ~1 MB (lihat ChartEcharts).
@@ -717,6 +741,34 @@ export default function App() {
                 setViewMode('templates');
                 setIsMobileNavOpen(false);
               }}
+              onOpenPelaporan={() => {
+                setViewMode('pelaporan');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenTindakLanjutAudit={() => {
+                setViewMode('auditTl');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenKesehatanKeuangan={() => {
+                setViewMode('keuangan');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenManajemenRisiko={() => {
+                setViewMode('risiko');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenManajemenAset={() => {
+                setViewMode('aset');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenPerjanjianKinerja={() => {
+                setViewMode('pk');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenLKjIP={() => {
+                setViewMode('lkjip');
+                setIsMobileNavOpen(false);
+              }}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
@@ -780,6 +832,8 @@ export default function App() {
                       : viewMode === 'alerts' ? 'Alert'
                       : viewMode === 'charts' ? 'Chart'
                       : viewMode === 'templates' ? 'Template Dashboard'
+                      : viewMode === 'pelaporan' ? 'Kinerja & Kepatuhan'
+                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' ? 'Kinerja & Kepatuhan'
                       : 'Workspace'}
                   </span>
                 </div>
@@ -796,7 +850,21 @@ export default function App() {
                           ? 'Ambang Batas & Alert'
                           : viewMode === 'templates'
                             ? 'Template Dashboard'
-                            : 'Template Chart'}
+                            : viewMode === 'pelaporan'
+                              ? 'Pelaporan Periodik & Kepatuhan'
+                              : viewMode === 'auditTl'
+                                ? 'Tindak Lanjut Audit'
+                                : viewMode === 'keuangan'
+                                    ? 'Kesehatan Keuangan'
+                                    : viewMode === 'risiko'
+                                      ? 'Manajemen Risiko'
+                                      : viewMode === 'aset'
+                                        ? 'Manajemen Aset'
+                                        : viewMode === 'pk'
+                                          ? 'Perjanjian Kinerja'
+                                          : viewMode === 'lkjip'
+                                            ? 'LKjIP'
+                                            : 'Template Chart'}
                   </h1>
                 )}
               </div>
@@ -902,7 +970,7 @@ export default function App() {
 
         {/* ================= MAIN CONTENT VIEWPORT ================= */}
         <div className={`flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto transition-[padding] duration-200 ${isChatOpen ? 'lg:pr-[440px]' : ''}`}>
-          {viewMode === 'admin' ? (
+          {viewMode === 'admin' && currentUser?.role === 'admin' ? (
             <React.Suspense fallback={pageFallback}>
               <Admin
                 currentUser={currentUser}
@@ -977,6 +1045,62 @@ export default function App() {
                   <DashboardTemplatesPage
                     currentTenant={currentTenant}
                     onUseTemplate={handleUseTemplate}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'pelaporan' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <PelaporanPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'auditTl' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <TindakLanjutAuditPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'keuangan' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <KesehatanKeuanganPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'risiko' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <ManajemenRisikoPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'aset' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <ManajemenAsetPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'pk' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <PerjanjianKinerjaPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'lkjip' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <LKjIPPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
                   />
                 </React.Suspense>
               ) : (
@@ -1082,6 +1206,14 @@ export default function App() {
 
                         {/* Kanan: tombol aksi */}
                         <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setIsImportOpen(true)}
+                            title="Ubah berkas Excel/CSV menjadi widget dashboard"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                          >
+                            <FileSpreadsheet className="w-3 h-3 text-ink-3" />
+                            Impor Data
+                          </button>
                           <button
                             onClick={() => setIsCatalogOpen(true)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
@@ -1236,6 +1368,13 @@ export default function App() {
         onClose={() => setIsExportOpen(false)}
         dashboard={activeDashboard}
         tenant={currentTenant}
+      />
+
+      {/* 9. Import Excel/CSV → Widget Modal */}
+      <ImportDataModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onAddWidget={handleAddWidgetFromCatalog}
       />
 
     </div>

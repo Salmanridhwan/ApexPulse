@@ -71,18 +71,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           }
           throw new Error(`Gagal memuat dashboard (Status: ${res.status})`);
         }
-        const dashData: Dashboard & { accessMode?: 'readonly' | 'editable' } = await res.json();
+        const dashData: Dashboard & { accessMode?: 'readonly' | 'editable'; tenant?: Tenant | null } = await res.json();
         setDashboard(dashData);
         setAccessMode(dashData.accessMode === 'editable' ? 'editable' : 'readonly');
-
-        if (dashData.tenantId) {
-          const tenantRes = await fetch('/api/tenants');
-          if (tenantRes.ok) {
-            const tenants: Tenant[] = await tenantRes.json();
-            const foundTenant = tenants.find((t) => t.id === dashData.tenantId);
-            if (foundTenant) setTenant(foundTenant);
-          }
-        }
+        // Instansi pemilik dashboard datang langsung bersama respons share —
+        // tidak lagi memanggil /api/tenants (kini wajib login).
+        if (dashData.tenant) setTenant(dashData.tenant);
       } catch (err: any) {
         setError(err.message || 'Terjadi kesalahan saat memuat dashboard.');
       } finally {

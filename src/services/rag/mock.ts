@@ -88,6 +88,21 @@ export class MockRagClient implements RagClient {
     };
   }
 
+  /**
+   * Mode mock: TIDAK mengembalikan angka keuangan apa pun.
+   * Angka contoh di sini akan langsung berubah jadi rasio "kesehatan" palsu —
+   * lebih jujur mengembalikan null supaya halaman menampilkan ajakan mengisi
+   * manual / mengaktifkan RAG HTTP.
+   */
+  async ekstrakKomponenKeuangan(): Promise<{
+    komponen: Record<string, number>;
+    sitasi: Record<string, { docName: string; page: number; chunkSnippet: string }>;
+    periodeLabel?: string;
+    catatan?: string;
+  } | null> {
+    return null;
+  }
+
   async probe(): Promise<{
     latencyMs: number;
     canOutputJson: boolean;

@@ -156,6 +156,44 @@ export const SKEMA_FOKUS: Record<string, any> = {
   narasi: SKEMA_NARASI_OBJ,
 };
 
+/**
+ * Skema ekstraksi komponen keuangan (neraca + laba rugi) untuk fitur Kesehatan
+ * Keuangan. Setiap field WAJIB membawa sitasi (`docName`, `page`,
+ * `chunkSnippet`) supaya angkanya bisa dilacak ke dokumen resmi. Field yang
+ * tidak ada di dokumen harus dikosongkan — BUKAN diisi 0.
+ */
+const SKEMA_KOMPONEN_SITASI = {
+  type: 'object',
+  properties: {
+    nilai: { type: 'string' },
+    docName: { type: 'string' },
+    page: { type: 'integer' },
+    chunkSnippet: { type: 'string' },
+  },
+  required: ['docName', 'chunkSnippet'],
+};
+
+export const SKEMA_KEUANGAN = {
+  type: 'object',
+  properties: {
+    periodeLabel: { type: 'string' },
+    totalAset: SKEMA_KOMPONEN_SITASI,
+    asetLancar: SKEMA_KOMPONEN_SITASI,
+    kas: SKEMA_KOMPONEN_SITASI,
+    liabilitas: SKEMA_KOMPONEN_SITASI,
+    liabilitasLancar: SKEMA_KOMPONEN_SITASI,
+    ekuitas: SKEMA_KOMPONEN_SITASI,
+    pendapatan: SKEMA_KOMPONEN_SITASI,
+    labaBersih: SKEMA_KOMPONEN_SITASI,
+    kreditBermasalah: SKEMA_KOMPONEN_SITASI,
+    totalKredit: SKEMA_KOMPONEN_SITASI,
+    bebanOperasional: SKEMA_KOMPONEN_SITASI,
+    pendapatanOperasional: SKEMA_KOMPONEN_SITASI,
+    nrw: SKEMA_KOMPONEN_SITASI,
+  },
+  required: [],
+};
+
 
 /** Ubah satu item hasil /extract menjadi Widget Spec AionesBoard (sesuai skema Zod). */
 /** Batas panjang teks supaya kartu tidak penuh dan tidak terpotong CSS. */
@@ -169,6 +207,88 @@ export function potong(teks: unknown, maks: number): string {
   const spasi = mentah.lastIndexOf(' ');
   const rapi = spasi > maks * 0.55 ? mentah.slice(0, spasi) : mentah;
   return rapi.replace(/[\s,;:\-\u2013\u2014]+$/, '') + '\u2026';
+}
+
+/**
+ * Baca angka keuangan dari keluaran model. Menangani format Indonesia
+ * (`1.234,56`), internasional (`1,234.56`), "Rp 1.500.000", tanda kurung
+ * akuntansi `(2.500)`, dan satuan juta/miliar/triliun. Mengembalikan `null`
+ * bila tidak bisa dibaca dengan pasti — JANGAN menebak (prinsip sama dengan
+ * `keAngka` di fitur impor).
+ */
+export function angkaKeuangan(teks: unknown): number | null {
+  if (typeof teks === 'number') return Number.isFinite(teks) ? teks : null;
+  if (teks === null || teks === undefined) return null;
+  let s = String(teks).trim().toLowerCase();
+  if (!s) return null;
+
+  // Tanda kurung akuntansi = negatif.
+  let negatif = false;
+  if (/^\(.*\)$/.test(s)) {
+    negatif = true;
+    s = s.slice(1, -1);
+  }
+
+  // Skala kata: "juta", "miliar"/"milyar", "triliun"/"trilyun", "miliar".
+  let skala = 1;
+  if (/\btriliun\b|\btrilyun\b|\btrn\b/.test(s)) skala = 1e12;
+  else if (/\bmiliar\b|\bmilyar\b|\b(m|bn)\b/.test(s)) skala = 1e9;
+  else if (/\bjuta\b|\bjt\b/.test(s)) skala = 1e6;
+  else if (/\bribu\b|\brb\b/.test(s)) skala = 1e3;
+
+  // Buang semua kecuali digit, pemisah, dan tanda minus.
+  s = s.replace(/[^\d.,\-]/g, '');
+  if (!s || s === '-') return null;
+  if (s.startsWith('-')) {
+    negatif = true;
+    s = s.slice(1);
+  }
+  if (!s) return null;
+
+  const adaTitik = s.includes('.');
+  const adaKoma = s.includes(',');
+
+  // Tentukan pemisah desimal. Aturan (sama seperti fitur impor):
+  // - Ada titik DAN koma → yang paling kanan = desimal, yang lain ribuan.
+  // - Hanya satu jenis pemisah:
+  //   · banyak pemisah, dan SEMUA grup setelah pemisah pertama = 3 digit → semua ribuan
+  //     (mis. "1.234.567" = 1234567, bukan 1234.567).
+  //   · satu pemisah diikuti tepat 3 digit dan bagian depan ≤3 digit → ribuan ("1.200").
+  //   · selain itu → desimal ("1,5" / "1234,56").
+  let desimal = -1;
+  if (adaTitik && adaKoma) {
+    desimal = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+  } else if (adaTitik || adaKoma) {
+    const ch = adaTitik ? '.' : ',';
+    const bagian = s.split(ch);
+    const jumlah = bagian.length - 1;
+    if (jumlah > 1) {
+      const semuaTiga = bagian.slice(1).every((g) => g.length === 3);
+      desimal = semuaTiga ? -1 : s.lastIndexOf(ch);
+    } else {
+      const idx = s.lastIndexOf(ch);
+      const sesudah = s.length - idx - 1;
+      if (sesudah === 3 && bagian[0].length <= 3 && bagian[0].length > 0) desimal = -1;
+      else desimal = idx;
+    }
+  }
+
+  let bersih = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '.') {
+      if (i === desimal) bersih += '.';
+    } else if (c === ',') {
+      if (i === desimal) bersih += '.';
+    } else if (c >= '0' && c <= '9') {
+      bersih += c;
+    }
+  }
+  if (!bersih) return null;
+  const n = Number(bersih);
+  if (!Number.isFinite(n)) return null;
+  const hasil = n * skala;
+  return negatif ? -hasil : hasil;
 }
 
 /** Nilai KPI: angka bersih, satuan dipisah supaya tidak tampil dobel di kartu. */
@@ -1169,6 +1289,78 @@ export class ConfigurableRagClient implements RagClient {
         catatan: `Gagal membaca profil instansi: ${err instanceof Error ? err.message : 'kesalahan jaringan'}`,
       };
     }
+  }
+
+  /**
+   * Tarik komponen keuangan (neraca + laba rugi) dari dokumen untuk satu periode.
+   *
+   * Memakai /extract dengan skema khusus: tiap field WAJIB membawa sitasi
+   * (docName/page/chunkSnippet). Field yang tidak ada di dokumen dikosongkan —
+   * TIDAK diisi 0. Angka yang tidak bisa dibaca dengan pasti dibuang, bukan
+   * ditebak, supaya rasio turunannya tidak pernah lahir dari nilai palsu.
+   */
+  async ekstrakKomponenKeuangan(
+    periode: string,
+    instansi: string | undefined,
+    sektor: BumdSector,
+    kbId?: string
+  ): Promise<{
+    komponen: Record<string, number>;
+    sitasi: Record<string, { docName: string; page: number; chunkSnippet: string }>;
+    periodeLabel?: string;
+    catatan?: string;
+  } | null> {
+    const cfg = this.getRagConfig();
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
+    const { dipakai } = await this.resolveBase(cfg);
+
+    const namaInstansi = (instansi || '').trim();
+    const periodeTeks = periode && periode.trim() ? periode.trim() : 'periode terbaru yang tersedia';
+    const instruksi =
+      `Dari dokumen resmi${namaInstansi ? ` milik "${namaInstansi}"` : ''}, ambil komponen LAPORAN KEUANGAN ` +
+      `untuk periode ${periodeTeks} (neraca + laba rugi). ` +
+      `Isi HANYA field yang benar-benar ada di dokumen; kalau tidak ada, KOSONGKAN field itu (jangan isi 0). ` +
+      `Setiap field diisi objek { nilai, docName, page, chunkSnippet } — "nilai" angka mentah dalam rupiah ` +
+      `(tanpa "Rp", tanpa titik pemisah ribuan; pakai titik desimal), docName = nama dokumen, page = nomor halaman, ` +
+      `chunkSnippet = potongan kalimat asli yang memuat angka itu. ` +
+      `Field yang diminta: totalAset, asetLancar, kas, liabilitas, liabilitasLancar, ekuitas, pendapatan, ` +
+      `labaBersih${sektor === 'bank' ? ', kreditBermasalah, totalKredit, bebanOperasional, pendapatanOperasional' : ''}` +
+      `${sektor === 'pdam' ? ', nrw' : ''}. ` +
+      `Angka WAJIB berasal dari dokumen.`;
+
+    const item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_KEUANGAN, kbId);
+    if (!item || typeof item !== 'object') return null;
+
+    const komponen: Record<string, number> = {};
+    const sitasi: Record<string, { docName: string; page: number; chunkSnippet: string }> = {};
+    for (const [kunci, isi] of Object.entries(item)) {
+      if (kunci === 'periodeLabel') continue;
+      if (!isi || typeof isi !== 'object') continue;
+      const v = (isi as any).nilai;
+      const n = angkaKeuangan(v);
+      const docName = String((isi as any).docName || '').trim();
+      const chunk = String((isi as any).chunkSnippet || '').trim();
+      // Tanpa angka ATAU tanpa dokumen = tidak bisa dilacak → jangan dipakai.
+      if (n === null || !docName || !chunk) continue;
+      komponen[kunci] = n;
+      sitasi[kunci] = {
+        docName,
+        page: Number.isFinite(Number((isi as any).page)) ? Number((isi as any).page) : 0,
+        chunkSnippet: chunk.slice(0, 600),
+      };
+    }
+    if (Object.keys(komponen).length === 0) {
+      return {
+        komponen: {},
+        sitasi: {},
+        catatan: 'Dokumen tidak memuat angka neraca/laba rugi yang bisa dilacak ke sumbernya.',
+      };
+    }
+    return {
+      komponen,
+      sitasi,
+      periodeLabel: item.periodeLabel ? String(item.periodeLabel) : undefined,
+    };
   }
 
   /**

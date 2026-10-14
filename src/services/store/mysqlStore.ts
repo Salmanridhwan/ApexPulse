@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AuditLog, Chat, Dashboard, KetersediaanPreset, NotificationItem, Tenant } from '../../types';
+import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 export interface MysqlConfig {
@@ -35,6 +35,15 @@ export interface DbSnapshot {
   ketersediaanPreset: KetersediaanPreset[];
   /** id instansi yang sudah dihapus admin — agar user seed-nya tidak dibuat ulang. */
   deletedTenantIds: string[];
+  kewajibanLapor: KewajibanLapor[];
+  laporanPeriodik: LaporanPeriodik[];
+  alurVerifikasi: AlurVerifikasi[];
+  temuanAudit: TemuanAudit[];
+  snapshotKeuangan: SnapshotKeuangan[];
+  risiko: Risiko[];
+  aset: Aset[];
+  perjanjianKinerja: PerjanjianKinerja[];
+  lkjip: LKjIP[];
 }
 
 export interface LoadedState {
@@ -51,6 +60,15 @@ export interface LoadedState {
   tenants?: Tenant[];
   ketersediaanPreset?: KetersediaanPreset[];
   deletedTenantIds?: string[];
+  kewajibanLapor?: KewajibanLapor[];
+  laporanPeriodik?: LaporanPeriodik[];
+  alurVerifikasi?: AlurVerifikasi[];
+  temuanAudit?: TemuanAudit[];
+  snapshotKeuangan?: SnapshotKeuangan[];
+  risiko?: Risiko[];
+  aset?: Aset[];
+  perjanjianKinerja?: PerjanjianKinerja[];
+  lkjip?: LKjIP[];
 }
 
 export class MysqlStore {
@@ -185,6 +203,350 @@ export class MysqlStore {
         INDEX idx_chat_dash (dashboard_id)
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel KEWAJIBAN LAPOR khusus, per-baris. Sama alasannya dengan `tenants`:
+     * `saveAll` menulis snapshot penuh, jadi kewajiban lapor yang dibuat di satu
+     * instance backend akan hilang/balik lagi bila ikut snapshot.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS kewajiban_lapor (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_kewajiban_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel LAPORAN PERIODIK khusus, per-baris. Laporan yang dikirim/diverifikasi
+     * di satu instance tidak boleh hilang karena ditimpa snapshot instance lain.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS laporan_periodik (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        kewajiban_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_laporan_tenant (tenant_id),
+        INDEX idx_laporan_kewajiban (kewajiban_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel ALUR VERIFIKASI khusus, per-baris. Definisi alur persetujuan
+     * milik instansi tidak boleh hilang karena ditimpa snapshot instance lain.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS alur_verifikasi (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_alur_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel TEMUAN AUDIT khusus, per-baris. Temuan + tindak lanjutnya tidak
+     * boleh hilang karena ditimpa snapshot instance backend lain.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS temuan_audit (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_temuan_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel SNAPSHOT KESEHATAN KEUANGAN, per-baris. Angka neraca/laba-rugi dan
+     * rasio turunannya tidak boleh hilang karena ditimpa snapshot instance lain.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS snapshot_keuangan (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        periode VARCHAR(32) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_keu_tenant (tenant_id),
+        INDEX idx_keu_periode (tenant_id, periode)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel REGISTER RISIKO, per-baris. Risiko + jejak mitigasinya tidak boleh
+     * hilang karena ditimpa snapshot instance backend lain.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS risiko (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_risiko_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel DAFTAR ASET, per-baris. Nilai buku/penyusutan dihitung di aplikasi
+     * dari field mentah; tabel ini hanya menyimpan entri aset apa adanya.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS aset (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_aset_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel PERJANJIAN KINERJA, per-baris. Dokumen + indikatornya disimpan
+     * sebagai JSON di kolom `data`.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS perjanjian_kinerja (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_pk_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel LKjIP, per-baris. Dokumen laporan + bagiannya disimpan sebagai JSON.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS lkjip (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_lkjip_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+  }
+
+  /** Tambah/perbarui SATU kewajiban lapor (upsert per-baris). */
+  async upsertKewajiban(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO kewajiban_lapor (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadKewajiban(): Promise<KewajibanLapor[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM kewajiban_lapor');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteKewajibanRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM kewajiban_lapor WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU laporan periodik (upsert per-baris). */
+  async upsertLaporan(id: string, tenantId: string, kewajibanId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO laporan_periodik (id, tenant_id, kewajiban_id, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), kewajiban_id = VALUES(kewajiban_id), data = VALUES(data)`,
+      [id, tenantId, kewajibanId, JSON.stringify(data)]
+    );
+  }
+
+  async loadLaporan(): Promise<LaporanPeriodik[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM laporan_periodik');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteLaporanRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM laporan_periodik WHERE id = ?', [id]);
+  }
+
+  /** Hapus semua laporan milik satu kewajiban (dipakai saat kewajiban dihapus). */
+  async deleteLaporanByKewajiban(kewajibanId: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM laporan_periodik WHERE kewajiban_id = ?', [kewajibanId]);
+  }
+
+  /** Tambah/perbarui SATU alur verifikasi (upsert per-baris). */
+  async upsertAlurVerifikasi(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO alur_verifikasi (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadAlurVerifikasi(): Promise<AlurVerifikasi[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM alur_verifikasi');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteAlurVerifikasiRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM alur_verifikasi WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU temuan audit (upsert per-baris). */
+  async upsertTemuanAudit(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO temuan_audit (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadTemuanAudit(): Promise<TemuanAudit[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM temuan_audit');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteTemuanAuditRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM temuan_audit WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU risiko (upsert per-baris). */
+  async upsertRisiko(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO risiko (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadRisiko(): Promise<Risiko[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM risiko');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteRisikoRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM risiko WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU aset (upsert per-baris). */
+  async upsertAset(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO aset (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadAset(): Promise<Aset[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM aset');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteAsetRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM aset WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU Perjanjian Kinerja (upsert per-baris). */
+  async upsertPerjanjianKinerja(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO perjanjian_kinerja (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadPerjanjianKinerja(): Promise<PerjanjianKinerja[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM perjanjian_kinerja');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deletePerjanjianKinerjaRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM perjanjian_kinerja WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU LKjIP (upsert per-baris). */
+  async upsertLKjIP(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO lkjip (id, tenant_id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), data = VALUES(data)`,
+      [id, tenantId, JSON.stringify(data)]
+    );
+  }
+
+  async loadLKjIP(): Promise<LKjIP[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM lkjip');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteLKjIPRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM lkjip WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU snapshot kesehatan keuangan (upsert per-baris). */
+  async upsertSnapshotKeuangan(id: string, tenantId: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    const periode = String((data as any)?.periode || '');
+    await this.pool.query(
+      `INSERT INTO snapshot_keuangan (id, tenant_id, periode, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), periode = VALUES(periode), data = VALUES(data)`,
+      [id, tenantId, periode, JSON.stringify(data)]
+    );
+  }
+
+  async loadSnapshotKeuangan(): Promise<SnapshotKeuangan[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM snapshot_keuangan');
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  async deleteSnapshotKeuanganRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM snapshot_keuangan WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU dashboard (upsert per-baris, aman multi-instance). */
@@ -331,6 +693,42 @@ export class MysqlStore {
     const chatKhusus = await this.loadChats();
     if (chatKhusus.length > 0) hasil.chats = chatKhusus;
     else if (arrays.chats) hasil.chats = arrays.chats as Chat[];
+
+    // Pelaporan periodik juga dari tabel khusus (alasan sama: tahan multi-instance).
+    const kewajibanKhusus = await this.loadKewajiban();
+    if (kewajibanKhusus.length > 0) hasil.kewajibanLapor = kewajibanKhusus;
+    else if (arrays.kewajibanLapor) hasil.kewajibanLapor = arrays.kewajibanLapor as KewajibanLapor[];
+
+    const laporanKhusus = await this.loadLaporan();
+    if (laporanKhusus.length > 0) hasil.laporanPeriodik = laporanKhusus;
+    else if (arrays.laporanPeriodik) hasil.laporanPeriodik = arrays.laporanPeriodik as LaporanPeriodik[];
+    const alurKhusus = await this.loadAlurVerifikasi();
+    if (alurKhusus.length > 0) hasil.alurVerifikasi = alurKhusus;
+    else if (arrays.alurVerifikasi) hasil.alurVerifikasi = arrays.alurVerifikasi as AlurVerifikasi[];
+
+    const temuanKhusus = await this.loadTemuanAudit();
+    if (temuanKhusus.length > 0) hasil.temuanAudit = temuanKhusus;
+    else if (arrays.temuanAudit) hasil.temuanAudit = arrays.temuanAudit as TemuanAudit[];
+
+    const keuKhusus = await this.loadSnapshotKeuangan();
+    if (keuKhusus.length > 0) hasil.snapshotKeuangan = keuKhusus;
+    else if (arrays.snapshotKeuangan) hasil.snapshotKeuangan = arrays.snapshotKeuangan as SnapshotKeuangan[];
+
+    const risikoKhusus = await this.loadRisiko();
+    if (risikoKhusus.length > 0) hasil.risiko = risikoKhusus;
+    else if (arrays.risiko) hasil.risiko = arrays.risiko as Risiko[];
+
+    const asetKhusus = await this.loadAset();
+    if (asetKhusus.length > 0) hasil.aset = asetKhusus;
+    else if (arrays.aset) hasil.aset = arrays.aset as Aset[];
+
+    const pkKhusus = await this.loadPerjanjianKinerja();
+    if (pkKhusus.length > 0) hasil.perjanjianKinerja = pkKhusus;
+    else if (arrays.perjanjianKinerja) hasil.perjanjianKinerja = arrays.perjanjianKinerja as PerjanjianKinerja[];
+
+    const lkKhusus = await this.loadLKjIP();
+    if (lkKhusus.length > 0) hasil.lkjip = lkKhusus;
+    else if (arrays.lkjip) hasil.lkjip = arrays.lkjip as LKjIP[];
 
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
     for (const row of kvRows as Array<{ k: string; data: any }>) {

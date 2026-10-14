@@ -79,7 +79,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regPassword2, setRegPassword2] = useState('');
-  const [regTenant, setRegTenant] = useState<string>(() => tenants[0]?.id || 'tenant-pdam');
+  // Daftar instansi untuk form pendaftaran. Diambil dari /api/auth/tenants
+  // (endpoint ringkas yang hanya hidup saat pendaftaran terbuka) — prop
+  // `tenants` dari App kini kosong sebelum login karena /api/tenants wajib sesi.
+  const [daftarTenant, setDaftarTenant] = useState<{ id: string; name: string }[]>([]);
+  const [regTenant, setRegTenant] = useState<string>('tenant-pdam');
 
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -98,13 +102,22 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
     onLoginSuccess(user, 'cookie-session');
   };
 
-  // Ambil konfigurasi auth (Client ID Google) sekali saat halaman dibuka.
+  // Ambil konfigurasi auth (Client ID Google) + daftar instansi untuk form daftar.
   useEffect(() => {
     let batal = false;
     fetch('/api/auth/config')
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
         if (!batal && cfg?.googleClientId) setGoogleClientId(cfg.googleClientId);
+      })
+      .catch(() => {});
+    // Daftar instansi ringkas (hanya id + nama) untuk dropdown pendaftaran.
+    fetch('/api/auth/tenants')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: string; name: string }[]) => {
+        if (batal || !Array.isArray(list)) return;
+        setDaftarTenant(list);
+        if (list.length > 0) setRegTenant(list[0].id);
       })
       .catch(() => {});
     return () => {
@@ -463,7 +476,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                       onChange={(e) => setRegTenant(e.target.value)}
                       className="w-full text-xs pl-9 pr-3 py-2 bg-surface border border-line-strong rounded-control text-ink focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all font-medium"
                     >
-                      {tenants.map((t) => (
+                      {daftarTenant.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.name}
                         </option>

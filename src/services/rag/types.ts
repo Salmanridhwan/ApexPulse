@@ -125,4 +125,22 @@ export interface RagClient {
     ringkasan?: string;
     catatan?: string;
   }>;
+
+  /**
+   * Tarik komponen keuangan (neraca + laba rugi) dari dokumen untuk satu
+   * periode. Mengembalikan angka + sitasi per field. Field yang tidak ada di
+   * dokumen TIDAK diisi (undefined), bukan 0. `null` = layanan tidak tersedia
+   * atau tidak ada dokumen yang memuat neraca.
+   */
+  ekstrakKomponenKeuangan(
+    periode: string,
+    instansi: string | undefined,
+    sektor: BumdSector,
+    kbId?: string
+  ): Promise<{
+    komponen: Record<string, number>;
+    sitasi: Record<string, { docName: string; page: number; chunkSnippet: string }>;
+    periodeLabel?: string;
+    catatan?: string;
+  } | null>;
 }

@@ -23,7 +23,7 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, Tenant, WidgetSpec } from './src/types';
+import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, StatusLaporan, Tenant, WidgetGrid, WidgetSpec } from './src/types';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -31,6 +31,79 @@ import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import { GoogleAuthError, verifikasiIdTokenGoogle } from './src/services/auth/google';
+import {
+  hitungDeadline,
+  hitungKepatuhan,
+  periodeTersedia,
+} from './src/services/laporan/periode';
+import {
+  buatAksi,
+  hitungPosisi,
+  bolehMenyetujui,
+  validasiAlur,
+  normalisasiPeran,
+  LABEL_PERAN,
+} from './src/services/laporan/alur';
+import {
+  bacaTabel,
+  bangunWidgetImpor,
+  ringkasPratinjau,
+  KonfigImpor,
+} from './src/services/impor/tabel';
+import {
+  buatAksiTindakLanjut,
+  hitungRingkasan as hitungRingkasanAudit,
+  normalisasiStatus as normalisasiStatusAudit,
+  normalisasiSumber as normalisasiSumberAudit,
+  validasiAksi as validasiAksiAudit,
+  validasiTemuan,
+} from './src/services/audit/tindakLanjut';
+import {
+  hitungRasio,
+  hitungSkorKesehatan,
+  labelPeriodeKeuangan,
+  lengkapiSnapshot,
+  normalisasiKomponen,
+  normalisasiSitasi,
+  ringkasKeuangan,
+  urutPeriodeTerbaru,
+  validasiSnapshot,
+} from './src/services/keuangan/rasio';
+import {
+  buatAksiMitigasi,
+  hitungRingkasanRisiko,
+  hitungSkor as hitungSkorRisiko,
+  levelDariSkor,
+  normalisasiKategori as normalisasiKategoriRisiko,
+  normalisasiLevel,
+  normalisasiStatusRisiko,
+  validasiAksiMitigasi,
+  validasiRisiko,
+} from './src/services/risiko/register';
+import {
+  akumulasiPenyusutan,
+  hitungRingkasanAset,
+  nilaiBuku,
+  normalisasiKategoriAset,
+  normalisasiKondisi,
+  normalisasiPemanfaatan,
+  validasiAset,
+} from './src/services/aset/daftarAset';
+import {
+  buatIndikator,
+  hitungRingkasanPK,
+  normalisasiStatusPK,
+  validasiIndikator,
+  validasiPerjanjianKinerja,
+} from './src/services/kinerja/perjanjianKinerja';
+import {
+  buatBagian,
+  hitungRingkasanLKjIP,
+  normalisasiStatusLKjIP,
+  ringkasIndikatorTertaut,
+  validasiBagian,
+  validasiLKjIP,
+} from './src/services/kinerja/lkjip';
 
 /**
  * Persona chatbot Aiones Boards. Disisipkan ke setiap query percakapan supaya
@@ -79,12 +152,20 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
 }
 
 /**
- * Tenant efektif untuk request. Pengguna yang sudah login boleh berpindah
- * konteks instansi lewat ?tenantId= / body.tenantId (fitur "Ganti Instansi"
- * di sidebar, agar bisa menelusuri dokumen RAG & dashboard instansi lain).
- * Tanpa permintaan eksplisit, dipakai tenant milik user.
+ * Tenant efektif untuk request.
+ *
+ * KUNCI KETAT (model jual 1 akun = 1 BUMD): pengguna NON-admin SELALU memakai
+ * instansi miliknya sendiri. Parameter `?tenantId=` / `body.tenantId` yang
+ * dikirim non-admin DIABAIKAN sepenuhnya — dulu parameter itu dipercaya apa
+ * adanya, sehingga siapa pun yang menambahkannya di URL bisa membaca dashboard
+ * instansi BUMD lain. Hanya `admin` yang boleh berpindah konteks instansi,
+ * karena dialah pengelola seluruh instansi pada instalasi ini.
  */
 function effectiveTenantId(req: Request, session: SessionPayload): string {
+  if (session.role !== 'admin') {
+    // Non-admin: kunci ke instansinya sendiri, titik. Abaikan permintaan pindah.
+    return session.tenantId;
+  }
   const requested = (req.query.tenantId as string) || (req.body?.tenantId as string | undefined);
   if (requested) return requested;
   return session.tenantId;
@@ -139,7 +220,9 @@ async function startServer() {
     }
   }
 
-  app.use(express.json());
+  // Batas payload dinaikkan: impor Excel/CSV mengirim berkas (base64) dan
+  // dashboard berisi banyak widget. Tanpa ini berkas sedang pun akan ditolak 413.
+  app.use(express.json({ limit: '25mb' }));
 
   /**
    * Sinkronisasi multi-instance: produksi berjalan di >1 instance backend yang
@@ -174,10 +257,18 @@ async function startServer() {
   });
 
   // ================= TENANT & AUTH ROUTES =================
-  app.get('/api/tenants', async (_req: Request, res: Response) => {
+  app.get('/api/tenants', async (req: Request, res: Response) => {
+    // WAJIB login: daftar instansi bukan informasi publik. Dulu endpoint ini
+    // terbuka tanpa autentikasi sehingga siapa pun bisa membaca daftar instansi.
+    const session = requireAuth(req, res);
+    if (!session) return;
     // Segarkan dari tabel khusus dulu supaya instance mana pun melihat daftar
     // instansi yang sama (produksi punya >1 instance backend).
     await db.segarkanTenantDariMysql();
+    // Non-admin hanya boleh melihat instansinya sendiri (kunci ketat 1 akun = 1 BUMD).
+    if (session.role !== 'admin') {
+      return res.json(db.tenants.filter((t) => t.id === session.tenantId));
+    }
     res.json(db.tenants);
   });
 
@@ -235,6 +326,23 @@ async function startServer() {
       googleClientId: process.env.GOOGLE_CLIENT_ID || '',
       googleAktif: !!process.env.GOOGLE_CLIENT_ID,
     });
+  });
+
+  /**
+   * Daftar instansi untuk FORM PENDAFTARAN saja.
+   *
+   * Berbeda dari /api/tenants (yang kini wajib login dan mengembalikan data
+   * lengkap), endpoint ini sengaja:
+   *  - hanya mengembalikan id + nama (tanpa jumlah dokumen, KB ID, dll.),
+   *  - hanya hidup saat pendaftaran mandiri terbuka (ALLOW_REGISTRATION).
+   * Kalau pendaftaran ditutup, endpoint mengembalikan daftar kosong — tidak ada
+   * alasan membocorkan daftar instansi ke publik.
+   */
+  app.get('/api/auth/tenants', (_req: Request, res: Response) => {
+    if (process.env.ALLOW_REGISTRATION === 'false') {
+      return res.json([]);
+    }
+    res.json(db.tenants.map((t) => ({ id: t.id, name: t.name })));
   });
 
   /** Terbitkan sesi + audit log untuk user yang sudah lolos verifikasi. */
@@ -1302,6 +1410,11 @@ async function startServer() {
   app.post('/api/rag-probe', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
+    // Probe menyentuh layanan RAG (Base URL/API key) — hanya admin yang boleh.
+    // Non-admin (analis/direksi) dilarang menyentuh konfigurasi RAG sama sekali.
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh menguji koneksi RAG.' });
+    }
     const cfg = db.systemConfig;
     try {
       const probeRes = await ragClient.probe();
@@ -1479,6 +1592,1412 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // ================= PELAPORAN PERIODIK & KEPATUHAN =================
+
+  /**
+   * Daftar kewajiban lapor instansi + periode yang tersedia.
+   * Semua data berasal dari instansi efektif (non-admin terkunci ke instansinya).
+   */
+  app.get('/api/pelaporan/kewajiban', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kewajiban = db.getKewajiban(tenantId);
+    res.json({
+      kewajiban,
+      periode: periodeTersedia(kewajiban),
+    });
+  });
+
+  app.post('/api/pelaporan/kewajiban', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const nama = String(req.body?.nama || '').trim();
+    if (!nama) return res.status(400).json({ error: 'Nama kewajiban lapor wajib diisi.' });
+    const jenis = ['bulanan', 'triwulanan', 'semesteran', 'tahunan'].includes(req.body?.jenis)
+      ? req.body.jenis
+      : 'triwulanan';
+    const tenggatHari = Number.isFinite(Number(req.body?.tenggatHari))
+      ? Math.max(0, Math.min(180, Number(req.body.tenggatHari)))
+      : 10;
+    const baru = db.createKewajiban({
+      tenantId,
+      nama,
+      jenis,
+      dasar: req.body?.dasar ? String(req.body.dasar).trim() : undefined,
+      penerima: req.body?.penerima ? String(req.body.penerima).trim() : undefined,
+      tenggatHari,
+      isActive: req.body?.isActive !== false,
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Kewajiban Lapor',
+      target: baru.nama,
+      details: `Jenis: ${baru.jenis}, tenggat ${baru.tenggatHari} hari setelah periode berakhir`,
+    });
+    res.status(201).json(baru);
+  });
+
+  app.patch('/api/pelaporan/kewajiban/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const partial: Record<string, unknown> = {};
+    if (typeof req.body?.nama === 'string') partial.nama = req.body.nama.trim();
+    if (['bulanan', 'triwulanan', 'semesteran', 'tahunan'].includes(req.body?.jenis)) {
+      partial.jenis = req.body.jenis;
+    }
+    if (typeof req.body?.dasar === 'string') partial.dasar = req.body.dasar.trim();
+    if (typeof req.body?.penerima === 'string') partial.penerima = req.body.penerima.trim();
+    if (Number.isFinite(Number(req.body?.tenggatHari))) {
+      partial.tenggatHari = Math.max(0, Math.min(180, Number(req.body.tenggatHari)));
+    }
+    if (typeof req.body?.isActive === 'boolean') partial.isActive = req.body.isActive;
+    const updated = db.updateKewajiban(req.params.id, tenantId, partial);
+    if (!updated) return res.status(404).json({ error: 'Kewajiban lapor tidak ditemukan.' });
+    res.json(updated);
+  });
+
+  app.delete('/api/pelaporan/kewajiban/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteKewajiban(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Kewajiban lapor tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Kewajiban Lapor',
+      target: req.params.id,
+      details: 'Kewajiban beserta seluruh laporan terkait dihapus',
+    });
+    res.json({ success: true });
+  });
+
+  /**
+   * Daftar laporan + ringkasan kepatuhan untuk satu periode.
+   * Ringkasan DIHITUNG dari kewajiban aktif vs laporan nyata.
+   *
+   * Tiap laporan dilengkapi `posisiVerifikasi` (tahap mana yang sedang menunggu)
+   * supaya UI tidak perlu menghitung ulang rantai persetujuan.
+   */
+  app.get('/api/pelaporan/laporan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kewajiban = db.getKewajiban(tenantId);
+    const periode = String(req.query.periode || '') || periodeTersedia(kewajiban)[0] || '';
+    const daftarAlur = db.getAlurVerifikasi(tenantId);
+    const laporan = db.getLaporan(tenantId, periode || undefined).map((l) => ({
+      ...l,
+      posisiVerifikasi: hitungPosisi(l, daftarAlur),
+    }));
+    const ringkasan = periode
+      ? hitungKepatuhan(kewajiban, laporan, periode)
+      : null;
+    res.json({
+      periode,
+      laporan,
+      ringkasan,
+      alur: daftarAlur,
+      periodeTersedia: periodeTersedia(kewajiban),
+    });
+  });
+
+  /**
+   * Catat/perbarui laporan untuk (kewajiban, periode).
+   * Tenggat dihitung server dari kewajiban — tidak dipercaya dari klien.
+   */
+  app.post('/api/pelaporan/laporan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kewajibanId = String(req.body?.kewajibanId || '').trim();
+    const periode = String(req.body?.periode || '').trim();
+    if (!kewajibanId || !periode) {
+      return res.status(400).json({ error: 'Kewajiban dan periode wajib diisi.' });
+    }
+    const kew = db.getKewajiban(tenantId).find((k) => k.id === kewajibanId);
+    if (!kew) {
+      return res.status(404).json({ error: 'Kewajiban lapor tidak ditemukan untuk instansi ini.' });
+    }
+    const status = ['belum', 'draf', 'terkirim', 'terverifikasi', 'revisi'].includes(req.body?.status)
+      ? req.body.status
+      : 'draf';
+    const lampiran = Array.isArray(req.body?.lampiran)
+      ? req.body.lampiran
+          .filter((l: any) => l && typeof l.nama === 'string' && l.nama.trim())
+          .map((l: any) => ({
+            nama: String(l.nama).trim(),
+            ukuran: Number.isFinite(Number(l.ukuran)) ? Number(l.ukuran) : undefined,
+            catatan: l.catatan ? String(l.catatan).trim() : undefined,
+          }))
+      : [];
+    // Alur verifikasi: pakai yang diminta bila memang milik instansi ini,
+    // kalau tidak jatuh ke alur default instansi (boleh kosong = alur bawaan).
+    const alurDiminta = req.body?.alurId ? String(req.body.alurId).trim() : '';
+    const daftarAlur = db.getAlurVerifikasi(tenantId);
+    const alurId = alurDiminta && daftarAlur.some((a) => a.id === alurDiminta)
+      ? alurDiminta
+      : db.getAlurDefault(tenantId)?.id;
+    const tersimpan = db.catatLaporan({
+      tenantId,
+      kewajibanId,
+      nama: kew.nama,
+      jenis: kew.jenis,
+      periode,
+      status,
+      // Tenggat DIHITUNG server dari kewajiban; klien tidak boleh menentukan.
+      deadline: hitungDeadline(periode, kew.tenggatHari) || undefined,
+      tanggalKirim:
+        status === 'terkirim' || status === 'terverifikasi'
+          ? req.body?.tanggalKirim || new Date().toISOString()
+          : undefined,
+      disusunOleh: req.body?.disusunOleh ? String(req.body.disusunOleh).trim() : session.name,
+      catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
+      lampiran,
+      alurId,
+    });
+    // Catat pengiriman ke riwayat verifikasi (titik awal rantai persetujuan).
+    // Hanya sekali per percobaan: kalau status tetap 'terkirim' dan riwayat
+    // sudah punya kiriman terakhir, jangan menambah entri kembar.
+    let hasil = tersimpan;
+    if (status === 'terkirim') {
+      const riwayat = Array.isArray(tersimpan.riwayatVerifikasi) ? tersimpan.riwayatVerifikasi : [];
+      const kirimTerakhir = [...riwayat].reverse().find((a) => a.aksi === 'kirim');
+      const adaSetelah = kirimTerakhir
+        ? riwayat.some((a) => new Date(a.pada).getTime() > new Date(kirimTerakhir.pada).getTime())
+        : false;
+      const perluCatat = !kirimTerakhir || adaSetelah;
+      if (perluCatat) {
+        hasil =
+          db.tambahAksiVerifikasi(
+            tersimpan.id,
+            tenantId,
+            buatAksi('kirim', 0, {
+              userId: session.userId,
+              name: session.name,
+              role: normalisasiPeran(session.role),
+            })
+          ) || tersimpan;
+      }
+    }
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Catat Laporan Periodik',
+      target: `${kew.nama} — ${periode}`,
+      details: `Status: ${status}`,
+    });
+    res.status(201).json(hasil);
+  });
+
+  /**
+   * Setujui / minta revisi laporan pada tahap verifikasi yang sedang aktif.
+   *
+   * Aturan yang ditegakkan server:
+   * - Hanya tahap AKTIF yang bisa diselesaikan (tidak boleh melompat).
+   * - Peran pengguna harus cocok dengan tahap (admin selalu boleh).
+   * - Tahap terakhir yang disetujui menaikkan status menjadi `terverifikasi`.
+   * - Revisi mengembalikan status ke `revisi` dan menghapus tahap yang belum
+   *   disetujui dari percobaan ini (riwayat tetap tersimpan sebagai jejak).
+   */
+  app.post('/api/pelaporan/laporan/:id/verifikasi', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const laporan = db.getLaporan(tenantId).find((l) => l.id === req.params.id);
+    if (!laporan) return res.status(404).json({ error: 'Laporan tidak ditemukan.' });
+
+    const aksi = req.body?.aksi === 'revisi' ? 'revisi' : 'setujui';
+    const catatan = req.body?.catatan ? String(req.body.catatan).trim() : undefined;
+    // Minta revisi WAJIB disertai alasan — tanpa itu penyusun tak tahu apa yang
+    // harus diperbaiki. Divalidasi sebelum cek status agar pesannya jelas.
+    if (aksi === 'revisi' && !catatan) {
+      return res.status(400).json({ error: 'Alasan revisi wajib diisi.' });
+    }
+    const daftarAlur = db.getAlurVerifikasi(tenantId);
+    const posisi = hitungPosisi(laporan, daftarAlur);
+
+    if (posisi.tuntas) {
+      return res.status(409).json({ error: 'Laporan ini sudah tuntas diverifikasi.' });
+    }
+    const tahap = posisi.tahapAktif;
+    if (!tahap) {
+      return res
+        .status(409)
+        .json({ error: 'Laporan belum dikirim, atau sedang menunggu pengiriman ulang setelah revisi.' });
+    }
+    if (!bolehMenyetujui(normalisasiPeran(session.role), tahap)) {
+      return res.status(403).json({
+        error: `Tahap "${tahap.nama}" hanya bisa diselesaikan oleh peran ${LABEL_PERAN[tahap.peran]} (atau admin).`,
+      });
+    }
+
+    let diperbarui = db.tambahAksiVerifikasi(
+      laporan.id,
+      tenantId,
+      buatAksi(
+        aksi,
+        tahap.urutan,
+        { userId: session.userId, name: session.name, role: normalisasiPeran(session.role) },
+        catatan
+      )
+    );
+    if (!diperbarui) return res.status(404).json({ error: 'Laporan tidak ditemukan.' });
+
+    // Perbarui status laporan mengikuti hasil aksi.
+    const posisiBaru = hitungPosisi(diperbarui, daftarAlur);
+    const statusBaru: StatusLaporan =
+      aksi === 'revisi' ? 'revisi' : posisiBaru.tuntas ? 'terverifikasi' : 'terkirim';
+    diperbarui = db.updateLaporanStatus(diperbarui.id, tenantId, statusBaru) || diperbarui;
+
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: aksi === 'revisi' ? 'Minta Revisi Laporan' : 'Setujui Tahap Verifikasi',
+      target: `${laporan.nama} — ${laporan.periode}`,
+      details: `Tahap ${tahap.urutan} "${tahap.nama}" (${LABEL_PERAN[tahap.peran]})${
+        catatan ? ` — ${catatan}` : ''
+      }. Status: ${statusBaru}`,
+    });
+
+    res.json({ ...diperbarui, posisiVerifikasi: hitungPosisi(diperbarui, daftarAlur) });
+  });
+
+  /** Daftar alur verifikasi instansi (semua peran boleh membaca). */
+  app.get('/api/pelaporan/alur', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    res.json({ alur: db.getAlurVerifikasi(tenantId) });
+  });
+
+  /** Simpan alur verifikasi (admin-only — ini konfigurasi tata kelola instansi). */
+  app.post('/api/pelaporan/alur', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengatur alur verifikasi.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const nama = String(req.body?.nama || '').trim();
+    if (!nama) return res.status(400).json({ error: 'Nama alur verifikasi wajib diisi.' });
+    const galatTahap = validasiAlur(req.body?.tahap);
+    if (galatTahap) return res.status(400).json({ error: galatTahap });
+    const tahap = (req.body.tahap as any[]).map((t, i) => ({
+      urutan: Number(t.urutan) || i + 1,
+      nama: String(t.nama).trim(),
+      peran: t.peran,
+    }));
+    const id = req.body?.id ? String(req.body.id) : undefined;
+    if (id && !db.getAlurVerifikasi(tenantId).some((a) => a.id === id)) {
+      return res.status(404).json({ error: 'Alur verifikasi tidak ditemukan.' });
+    }
+    const tersimpan = db.simpanAlurVerifikasi({
+      id,
+      tenantId,
+      nama,
+      tahap,
+      isDefault: req.body?.isDefault === true,
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: id ? 'Ubah Alur Verifikasi' : 'Tambah Alur Verifikasi',
+      target: tersimpan.nama,
+      details: `${tahap.length} tahap${tersimpan.isDefault ? ' (default)' : ''}`,
+    });
+    res.status(id ? 200 : 201).json(tersimpan);
+  });
+
+  app.delete('/api/pelaporan/alur/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus alur verifikasi.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteAlurVerifikasi(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Alur verifikasi tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Alur Verifikasi',
+      target: req.params.id,
+      details: 'Laporan yang memakainya kembali ke alur bawaan',
+    });
+    res.json({ success: true });
+  });
+
+  app.delete('/api/pelaporan/laporan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteLaporan(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Laporan tidak ditemukan.' });
+    res.json({ success: true });
+  });
+
+  // ================= TINDAK LANJUT AUDIT (BPK / Inspektorat / BPKP) ROUTES =================
+
+  /**
+   * Daftar temuan audit + ringkasan tindak lanjut untuk instansi aktif.
+   * Ringkasan DIHITUNG server dari temuan nyata (persentase tindak lanjut = IKU).
+   * Filter opsional: `?sumber=` dan `?status=`.
+   */
+  app.get('/api/audit/temuan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const sumber = typeof req.query.sumber === 'string' ? req.query.sumber : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const temuan = db.getTemuanAudit(tenantId, { sumber, status });
+    res.json({ temuan, ringkasan: hitungRingkasanAudit(db.getTemuanAudit(tenantId)) });
+  });
+
+  /** Ringkasan saja (dipakai kartu atas tanpa memuat seluruh daftar). */
+  app.get('/api/audit/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    res.json(hitungRingkasanAudit(db.getTemuanAudit(tenantId)));
+  });
+
+  /** Tambah temuan audit — hanya admin. */
+  app.post('/api/audit/temuan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menambah temuan audit.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiTemuan(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+    const statusAwal = normalisasiStatusAudit(req.body?.status);
+    const baru = db.createTemuanAudit({
+      tenantId,
+      sumber: normalisasiSumberAudit(req.body?.sumber),
+      nomorLHP: String(req.body.nomorLHP).trim(),
+      tanggalLHP: req.body?.tanggalLHP ? new Date(req.body.tanggalLHP).toISOString() : new Date().toISOString(),
+      periodePemeriksaan: req.body?.periodePemeriksaan ? String(req.body.periodePemeriksaan).trim() : undefined,
+      judul: String(req.body.judul).trim(),
+      uraian: req.body?.uraian ? String(req.body.uraian).trim() : undefined,
+      nilaiTemuan:
+        req.body?.nilaiTemuan !== undefined && req.body?.nilaiTemuan !== null && req.body?.nilaiTemuan !== ''
+          ? Number(req.body.nilaiTemuan)
+          : undefined,
+      rekomendasi: String(req.body.rekomendasi).trim(),
+      status: statusAwal,
+      batasWaktu: req.body?.batasWaktu ? new Date(req.body.batasWaktu).toISOString() : undefined,
+      penanggungJawab: req.body?.penanggungJawab ? String(req.body.penanggungJawab).trim() : undefined,
+      alasanTidakLanjut:
+        statusAwal === 'tidak_ditindaklanjuti' && req.body?.alasan
+          ? String(req.body.alasan).trim()
+          : undefined,
+      aksiTindakLanjut: [],
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Temuan Audit',
+      target: `${baru.nomorLHP} — ${baru.judul}`,
+      details: `Sumber: ${baru.sumber}`,
+    });
+    res.status(201).json(baru);
+  });
+
+  /** Ubah temuan audit — hanya admin. Riwayat tindak lanjut tidak ikut berubah. */
+  app.patch('/api/audit/temuan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah temuan audit.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    if (!db.getTemuanAuditById(req.params.id, tenantId)) {
+      return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+    }
+    const partial: Record<string, unknown> = {};
+    if (typeof req.body?.sumber === 'string') partial.sumber = normalisasiSumberAudit(req.body.sumber);
+    if (typeof req.body?.nomorLHP === 'string') partial.nomorLHP = req.body.nomorLHP.trim();
+    if (typeof req.body?.tanggalLHP === 'string') partial.tanggalLHP = new Date(req.body.tanggalLHP).toISOString();
+    if (typeof req.body?.periodePemeriksaan === 'string') partial.periodePemeriksaan = req.body.periodePemeriksaan.trim();
+    if (typeof req.body?.judul === 'string') partial.judul = req.body.judul.trim();
+    if (typeof req.body?.uraian === 'string') partial.uraian = req.body.uraian.trim();
+    if (typeof req.body?.rekomendasi === 'string') partial.rekomendasi = req.body.rekomendasi.trim();
+    if (typeof req.body?.penanggungJawab === 'string') partial.penanggungJawab = req.body.penanggungJawab.trim();
+    if (typeof req.body?.batasWaktu === 'string') {
+      partial.batasWaktu = req.body.batasWaktu ? new Date(req.body.batasWaktu).toISOString() : undefined;
+    }
+    if (req.body?.nilaiTemuan !== undefined) {
+      partial.nilaiTemuan =
+        req.body.nilaiTemuan === null || req.body.nilaiTemuan === '' ? undefined : Number(req.body.nilaiTemuan);
+    }
+    const updated = db.updateTemuanAudit(req.params.id, tenantId, partial);
+    if (!updated) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Temuan Audit',
+      target: `${updated.nomorLHP} — ${updated.judul}`,
+      details: `Field: ${Object.keys(partial).join(', ') || '(tidak ada)'}`,
+    });
+    res.json(updated);
+  });
+
+  /** Hapus temuan audit (beserta riwayat tindak lanjutnya) — hanya admin. */
+  app.delete('/api/audit/temuan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus temuan audit.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ada = db.getTemuanAuditById(req.params.id, tenantId);
+    if (!ada) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+    const ok = db.deleteTemuanAudit(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Temuan Audit',
+      target: `${ada.nomorLHP} — ${ada.judul}`,
+      details: `Riwayat tindak lanjut (${ada.aksiTindakLanjut.length} aksi) ikut dihapus`,
+    });
+    res.json({ success: true });
+  });
+
+  /**
+   * Catat satu aksi tindak lanjut pada temuan.
+   *
+   * Boleh `analis` (bukan hanya admin) — ini pekerjaan operasional. Aturan yang
+   * ditegakkan: uraian wajib; status `selesai`/`tidak_ditindaklanjuti` hanya sah
+   * bila ada aksi; `tidak_ditindaklanjuti` wajib alasan.
+   */
+  app.post('/api/audit/temuan/:id/tindak-lanjut', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const temuan = db.getTemuanAuditById(req.params.id, tenantId);
+    if (!temuan) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+
+    const galat = validasiAksiAudit(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+    const statusSesudah = normalisasiStatusAudit(req.body?.statusSesudah);
+    const alasan = req.body?.alasan ? String(req.body.alasan).trim() : undefined;
+    if (statusSesudah === 'tidak_ditindaklanjuti' && !alasan) {
+      return res.status(400).json({ error: 'Alasan wajib diisi bila temuan dinyatakan tidak dapat ditindaklanjuti.' });
+    }
+
+    const aksi = buatAksiTindakLanjut(
+      { uraian: String(req.body.uraian), tanggal: req.body?.tanggal, bukti: req.body?.bukti },
+      { userId: session.userId, name: session.name },
+      statusSesudah
+    );
+    const diperbarui = db.tambahAksiTindakLanjut(req.params.id, tenantId, aksi, {
+      alasanTidakLanjut: statusSesudah === 'tidak_ditindaklanjuti' ? alasan : undefined,
+    });
+    if (!diperbarui) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
+
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Catat Tindak Lanjut Audit',
+      target: `${temuan.nomorLHP} — ${temuan.judul}`,
+      details: `Status → ${statusSesudah}`,
+    });
+    res.status(201).json(diperbarui);
+  });
+
+  // ================= MANAJEMEN RISIKO ROUTES =================
+  /**
+   * Daftar risiko instansi aktif + ringkasan (termasuk heat map 5×5).
+   * Skor & level DIHITUNG server dari kemungkinan × dampak — nilai dari klien
+   * tidak pernah dipercaya (prinsip sama dengan rasio kesehatan keuangan).
+   */
+  app.get('/api/risiko', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kategori = typeof req.query.kategori === 'string' ? req.query.kategori : undefined;
+    const level = typeof req.query.level === 'string' ? req.query.level : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const daftar = db.getRisiko(tenantId, { kategori, level, status });
+    res.json({ risiko: daftar, ringkasan: hitungRingkasanRisiko(db.getRisiko(tenantId)) });
+  });
+
+  /** Ringkasan risiko saja (kartu atas tanpa memuat seluruh register). */
+  app.get('/api/risiko/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    res.json(hitungRingkasanRisiko(db.getRisiko(tenantId)));
+  });
+
+  /** Tambah risiko — hanya admin (penetapan kebijakan risiko). */
+  app.post('/api/risiko', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menambah risiko.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiRisiko(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+
+    // Skor & level DIHITUNG server; nilai kiriman klien (skor/level) diabaikan.
+    const kemungkinan = Math.max(1, Math.min(5, Math.round(Number(req.body.kemungkinan))));
+    const dampak = Math.max(1, Math.min(5, Math.round(Number(req.body.dampak))));
+    const skor = hitungSkorRisiko(kemungkinan, dampak);
+    const statusAwal = normalisasiStatusRisiko(req.body?.status);
+
+    const baru = db.createRisiko({
+      tenantId,
+      kode: String(req.body.kode).trim(),
+      kategori: normalisasiKategoriRisiko(req.body?.kategori),
+      pernyataan: String(req.body.pernyataan).trim(),
+      penyebab: req.body?.penyebab ? String(req.body.penyebab).trim() : undefined,
+      dampakUraian: req.body?.dampakUraian ? String(req.body.dampakUraian).trim() : undefined,
+      sasaran: req.body?.sasaran ? String(req.body.sasaran).trim() : undefined,
+      kemungkinan,
+      dampak,
+      skor,
+      level: levelDariSkor(skor),
+      status: statusAwal,
+      pemilikRisiko: req.body?.pemilikRisiko ? String(req.body.pemilikRisiko).trim() : undefined,
+      rencanaMitigasi: req.body?.rencanaMitigasi ? String(req.body.rencanaMitigasi).trim() : undefined,
+      batasWaktu: req.body?.batasWaktu ? new Date(req.body.batasWaktu).toISOString() : undefined,
+      levelResidual: normalisasiLevel(req.body?.levelResidual),
+      aksiMitigasi: [],
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Risiko',
+      target: `${baru.kode} — ${baru.pernyataan.slice(0, 80)}`,
+      details: `Kategori: ${baru.kategori}, skor ${baru.skor} (${baru.level})`,
+    });
+    res.status(201).json(baru);
+  });
+
+  /** Ubah risiko — hanya admin. Riwayat mitigasi tidak ikut berubah. */
+  app.patch('/api/risiko/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah risiko.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const lama = db.getRisikoById(req.params.id, tenantId);
+    if (!lama) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
+
+    const patch: Record<string, unknown> = {};
+    if (req.body?.kode !== undefined) patch.kode = String(req.body.kode).trim();
+    if (req.body?.pernyataan !== undefined) patch.pernyataan = String(req.body.pernyataan).trim();
+    if (req.body?.kategori !== undefined) patch.kategori = normalisasiKategoriRisiko(req.body.kategori);
+    if (req.body?.penyebab !== undefined) patch.penyebab = req.body.penyebab ? String(req.body.penyebab).trim() : undefined;
+    if (req.body?.dampakUraian !== undefined) patch.dampakUraian = req.body.dampakUraian ? String(req.body.dampakUraian).trim() : undefined;
+    if (req.body?.sasaran !== undefined) patch.sasaran = req.body.sasaran ? String(req.body.sasaran).trim() : undefined;
+    if (req.body?.pemilikRisiko !== undefined) patch.pemilikRisiko = req.body.pemilikRisiko ? String(req.body.pemilikRisiko).trim() : undefined;
+    if (req.body?.rencanaMitigasi !== undefined) patch.rencanaMitigasi = req.body.rencanaMitigasi ? String(req.body.rencanaMitigasi).trim() : undefined;
+    if (req.body?.batasWaktu !== undefined) patch.batasWaktu = req.body.batasWaktu ? new Date(req.body.batasWaktu).toISOString() : undefined;
+    if (req.body?.status !== undefined) patch.status = normalisasiStatusRisiko(req.body.status);
+    if (req.body?.levelResidual !== undefined) patch.levelResidual = normalisasiLevel(req.body.levelResidual);
+
+    // Skor & level dihitung ulang bila skala berubah (walau hanya salah satu).
+    if (req.body?.kemungkinan !== undefined || req.body?.dampak !== undefined) {
+      const kemungkinan = Math.max(1, Math.min(5, Math.round(Number(req.body?.kemungkinan ?? lama.kemungkinan))));
+      const dampak = Math.max(1, Math.min(5, Math.round(Number(req.body?.dampak ?? lama.dampak))));
+      const skor = hitungSkorRisiko(kemungkinan, dampak);
+      patch.kemungkinan = kemungkinan;
+      patch.dampak = dampak;
+      patch.skor = skor;
+      patch.level = levelDariSkor(skor);
+    }
+
+    const diperbarui = db.updateRisiko(req.params.id, tenantId, patch);
+    if (!diperbarui) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Risiko',
+      target: `${diperbarui.kode}`,
+      details: `Perubahan: ${Object.keys(patch).join(', ')}`,
+    });
+    res.json(diperbarui);
+  });
+
+  /** Hapus risiko — hanya admin. */
+  app.delete('/api/risiko/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus risiko.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteRisiko(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Risiko',
+      target: req.params.id,
+      details: 'Risiko dihapus dari register',
+    });
+    res.json({ success: true });
+  });
+
+  /**
+   * Catat satu aksi mitigasi pada risiko.
+   * Boleh `analis` (pekerjaan operasional), sama seperti tindak lanjut audit.
+   * Aturan: uraian wajib; `ditutup` wajib alasan.
+   */
+  app.post('/api/risiko/:id/mitigasi', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const risiko = db.getRisikoById(req.params.id, tenantId);
+    if (!risiko) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
+
+    const galat = validasiAksiMitigasi(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+    const statusSesudah = normalisasiStatusRisiko(req.body?.statusSesudah);
+    const alasan = req.body?.alasan ? String(req.body.alasan).trim() : undefined;
+    if (statusSesudah === 'ditutup' && !alasan) {
+      return res.status(400).json({ error: 'Alasan wajib diisi bila risiko ditutup.' });
+    }
+
+    const aksi = buatAksiMitigasi(
+      { uraian: String(req.body.uraian), tanggal: req.body?.tanggal, bukti: req.body?.bukti },
+      { userId: session.userId, name: session.name },
+      statusSesudah,
+      normalisasiLevel(req.body?.levelResidual)
+    );
+    const diperbarui = db.tambahAksiMitigasi(req.params.id, tenantId, aksi, {
+      rencanaMitigasi: req.body?.rencanaMitigasi !== undefined
+        ? (req.body.rencanaMitigasi ? String(req.body.rencanaMitigasi).trim() : undefined)
+        : undefined,
+    });
+    if (!diperbarui) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Catat Mitigasi Risiko',
+      target: `${risiko.kode} — ${risiko.pernyataan.slice(0, 60)}`,
+      details: `Status → ${statusSesudah}`,
+    });
+    res.status(201).json(diperbarui);
+  });
+
+  // ================= MANAJEMEN ASET ROUTES =================
+  /**
+   * Daftar aset instansi aktif + ringkasan (nilai buku, penyusutan, kondisi).
+   * Nilai buku & akumulasi penyusutan DIHITUNG server (metode garis lurus);
+   * angka dari klien tidak pernah dipercaya.
+   */
+  app.get('/api/aset', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kategori = typeof req.query.kategori === 'string' ? req.query.kategori : undefined;
+    const kondisi = typeof req.query.kondisi === 'string' ? req.query.kondisi : undefined;
+    const pemanfaatan = typeof req.query.pemanfaatan === 'string' ? req.query.pemanfaatan : undefined;
+    const tahun = Number(req.query.tahun) || new Date().getFullYear();
+    const daftar = db.getAset(tenantId, { kategori, kondisi, pemanfaatan });
+    // Lampirkan nilai buku & akumulasi penyusutan yang dihitung server.
+    const diperkaya = daftar.map((a) => ({
+      ...a,
+      nilaiBuku: nilaiBuku(a, tahun),
+      akumulasiPenyusutan: akumulasiPenyusutan(a, tahun),
+    }));
+    res.json({
+      aset: diperkaya,
+      ringkasan: hitungRingkasanAset(db.getAset(tenantId), tahun),
+    });
+  });
+
+  /** Ringkasan aset saja (kartu atas tanpa memuat seluruh daftar). */
+  app.get('/api/aset/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tahun = Number(req.query.tahun) || new Date().getFullYear();
+    res.json(hitungRingkasanAset(db.getAset(tenantId), tahun));
+  });
+
+  /** Tambah aset — hanya admin (kebijakan pencatatan aset). */
+  app.post('/api/aset', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menambah aset.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiAset(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+
+    const baru = db.createAset({
+      tenantId,
+      kode: String(req.body.kode).trim(),
+      nama: String(req.body.nama).trim(),
+      kategori: normalisasiKategoriAset(req.body?.kategori),
+      lokasi: req.body?.lokasi ? String(req.body.lokasi).trim() : undefined,
+      tahunPerolehan: Math.round(Number(req.body.tahunPerolehan)),
+      nilaiPerolehan: Number(req.body.nilaiPerolehan),
+      umurEkonomis: Math.round(Number(req.body.umurEkonomis)),
+      nilaiResidu: Number(req.body.nilaiResidu ?? 0),
+      kondisi: normalisasiKondisi(req.body?.kondisi),
+      pemanfaatan: normalisasiPemanfaatan(req.body?.pemanfaatan),
+      catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Aset',
+      target: `${baru.kode} — ${baru.nama}`,
+      details: `Kategori: ${baru.kategori}, perolehan Rp${baru.nilaiPerolehan.toLocaleString('id-ID')}`,
+    });
+    res.status(201).json({ ...baru, nilaiBuku: nilaiBuku(baru), akumulasiPenyusutan: akumulasiPenyusutan(baru) });
+  });
+
+  /** Ubah aset — hanya admin. Nilai buku dihitung ulang dari field mentah. */
+  app.patch('/api/aset/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah aset.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const lama = db.getAsetById(req.params.id, tenantId);
+    if (!lama) return res.status(404).json({ error: 'Aset tidak ditemukan.' });
+
+    const patch: Record<string, unknown> = {};
+    if (req.body?.kode !== undefined) patch.kode = String(req.body.kode).trim();
+    if (req.body?.nama !== undefined) patch.nama = String(req.body.nama).trim();
+    if (req.body?.kategori !== undefined) patch.kategori = normalisasiKategoriAset(req.body.kategori);
+    if (req.body?.lokasi !== undefined) patch.lokasi = req.body.lokasi ? String(req.body.lokasi).trim() : undefined;
+    if (req.body?.tahunPerolehan !== undefined) patch.tahunPerolehan = Math.round(Number(req.body.tahunPerolehan));
+    if (req.body?.nilaiPerolehan !== undefined) patch.nilaiPerolehan = Number(req.body.nilaiPerolehan);
+    if (req.body?.umurEkonomis !== undefined) patch.umurEkonomis = Math.round(Number(req.body.umurEkonomis));
+    if (req.body?.nilaiResidu !== undefined) patch.nilaiResidu = Number(req.body.nilaiResidu);
+    if (req.body?.kondisi !== undefined) patch.kondisi = normalisasiKondisi(req.body.kondisi);
+    if (req.body?.pemanfaatan !== undefined) patch.pemanfaatan = normalisasiPemanfaatan(req.body.pemanfaatan);
+    if (req.body?.catatan !== undefined) patch.catatan = req.body.catatan ? String(req.body.catatan).trim() : undefined;
+
+    // Validasi gabungan supaya residu tidak melebihi perolehan setelah patch.
+    const gabungan = { ...lama, ...patch };
+    const galat = validasiAset(gabungan);
+    if (galat) return res.status(400).json({ error: galat });
+
+    const diperbarui = db.updateAset(req.params.id, tenantId, patch);
+    if (!diperbarui) return res.status(404).json({ error: 'Aset tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Aset',
+      target: `${diperbarui.kode}`,
+      details: `Perubahan: ${Object.keys(patch).join(', ') || '(tidak ada)'}`,
+    });
+    res.json({ ...diperbarui, nilaiBuku: nilaiBuku(diperbarui), akumulasiPenyusutan: akumulasiPenyusutan(diperbarui) });
+  });
+
+  /** Hapus aset — hanya admin. */
+  app.delete('/api/aset/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus aset.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteAset(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Aset tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Aset',
+      target: req.params.id,
+      details: 'Aset dihapus dari daftar',
+    });
+    res.json({ success: true });
+  });
+
+  // ================= PERJANJIAN KINERJA ROUTES =================
+  /**
+   * Daftar Perjanjian Kinerja instansi aktif + ringkasan.
+   * Persentase capaian DIHITUNG server dari target & realisasi — nilai capaian
+   * dari klien tidak pernah dipercaya.
+   */
+  app.get('/api/perjanjian-kinerja', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const periode = typeof req.query.periode === 'string' ? req.query.periode : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const daftar = db.getPerjanjianKinerja(tenantId, { periode, status });
+    res.json({ perjanjianKinerja: daftar, ringkasan: hitungRingkasanPK(db.getPerjanjianKinerja(tenantId)) });
+  });
+
+  /** Ringkasan PK saja (kartu atas tanpa memuat seluruh dokumen). */
+  app.get('/api/perjanjian-kinerja/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    res.json(hitungRingkasanPK(db.getPerjanjianKinerja(tenantId)));
+  });
+
+  /** Tambah Perjanjian Kinerja — hanya admin (dokumen komitmen pejabat). */
+  app.post('/api/perjanjian-kinerja', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh membuat Perjanjian Kinerja.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiPerjanjianKinerja(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+
+    // Validasi + bangun indikator (kalau ada).
+    const indikatorInput = Array.isArray(req.body.indikator) ? req.body.indikator : [];
+    for (const ind of indikatorInput) {
+      const g = validasiIndikator(ind);
+      if (g) return res.status(400).json({ error: g });
+    }
+
+    const baru = db.createPerjanjianKinerja({
+      tenantId,
+      nomor: String(req.body.nomor).trim(),
+      periode: String(req.body.periode).trim(),
+      pihakPertama: req.body?.pihakPertama ? String(req.body.pihakPertama).trim() : '',
+      jabatanPertama: req.body?.jabatanPertama ? String(req.body.jabatanPertama).trim() : '',
+      pihakKedua: String(req.body.pihakKedua).trim(),
+      jabatanKedua: req.body?.jabatanKedua ? String(req.body.jabatanKedua).trim() : '',
+      tanggal: req.body?.tanggal ? new Date(req.body.tanggal).toISOString() : new Date().toISOString(),
+      status: normalisasiStatusPK(req.body?.status),
+      indikator: indikatorInput.map((i: any) => buatIndikator(i)),
+      catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Perjanjian Kinerja',
+      target: `${baru.nomor} — ${baru.pihakKedua}`,
+      details: `Periode ${baru.periode}, ${baru.indikator.length} indikator`,
+    });
+    res.status(201).json(baru);
+  });
+
+  /** Ubah Perjanjian Kinerja — hanya admin. */
+  app.patch('/api/perjanjian-kinerja/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah Perjanjian Kinerja.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const lama = db.getPerjanjianKinerjaById(req.params.id, tenantId);
+    if (!lama) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
+
+    const patch: Record<string, unknown> = {};
+    if (req.body?.nomor !== undefined) patch.nomor = String(req.body.nomor).trim();
+    if (req.body?.periode !== undefined) patch.periode = String(req.body.periode).trim();
+    if (req.body?.pihakPertama !== undefined) patch.pihakPertama = req.body.pihakPertama ? String(req.body.pihakPertama).trim() : '';
+    if (req.body?.jabatanPertama !== undefined) patch.jabatanPertama = req.body.jabatanPertama ? String(req.body.jabatanPertama).trim() : '';
+    if (req.body?.pihakKedua !== undefined) patch.pihakKedua = String(req.body.pihakKedua).trim();
+    if (req.body?.jabatanKedua !== undefined) patch.jabatanKedua = req.body.jabatanKedua ? String(req.body.jabatanKedua).trim() : '';
+    if (req.body?.tanggal !== undefined) patch.tanggal = req.body.tanggal ? new Date(req.body.tanggal).toISOString() : lama.tanggal;
+    if (req.body?.status !== undefined) {
+      if (normalisasiStatusPK(req.body.status) !== req.body.status) {
+        return res.status(400).json({ error: `Status "${req.body.status}" tidak dikenal.` });
+      }
+      patch.status = req.body.status;
+    }
+    if (req.body?.catatan !== undefined) patch.catatan = req.body.catatan ? String(req.body.catatan).trim() : undefined;
+    if (Array.isArray(req.body?.indikator)) {
+      for (const ind of req.body.indikator) {
+        const g = validasiIndikator(ind);
+        if (g) return res.status(400).json({ error: g });
+      }
+      patch.indikator = req.body.indikator.map((i: any) => buatIndikator(i));
+    }
+
+    const diperbarui = db.updatePerjanjianKinerja(req.params.id, tenantId, patch);
+    if (!diperbarui) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Perjanjian Kinerja',
+      target: `${diperbarui.nomor}`,
+      details: `Perubahan: ${Object.keys(patch).join(', ') || '(tidak ada)'}`,
+    });
+    res.json(diperbarui);
+  });
+
+  /** Hapus Perjanjian Kinerja — hanya admin. */
+  app.delete('/api/perjanjian-kinerja/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus Perjanjian Kinerja.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deletePerjanjianKinerja(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Perjanjian Kinerja',
+      target: req.params.id,
+      details: 'Dokumen dihapus',
+    });
+    res.json({ success: true });
+  });
+
+  /**
+   * Catat realisasi/capaian satu indikator dalam Perjanjian Kinerja.
+   * Boleh `analis` (pekerjaan operasional — pengumpulan data capaian),
+   * sama seperti pencatatan laporan & tindak lanjut.
+   */
+  app.post('/api/perjanjian-kinerja/:id/realisasi', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const pk = db.getPerjanjianKinerjaById(req.params.id, tenantId);
+    if (!pk) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
+
+    const indikatorId = String(req.body?.indikatorId || '').trim();
+    const idx = pk.indikator.findIndex((i) => i.id === indikatorId);
+    if (idx === -1) return res.status(404).json({ error: 'Indikator tidak ditemukan dalam dokumen ini.' });
+
+    const realisasi = Number(req.body?.realisasi);
+    if (!Number.isFinite(realisasi) || realisasi < 0) {
+      return res.status(400).json({ error: 'Realisasi harus angka tidak negatif.' });
+    }
+
+    const indikatorBaru = pk.indikator.map((i, k) =>
+      k === idx
+        ? {
+            ...i,
+            realisasi,
+            catatanRealisasi: req.body?.catatanRealisasi
+              ? String(req.body.catatanRealisasi).trim()
+              : i.catatanRealisasi,
+          }
+        : i
+    );
+    const diperbarui = db.updatePerjanjianKinerja(req.params.id, tenantId, { indikator: indikatorBaru });
+    if (!diperbarui) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Catat Realisasi Kinerja',
+      target: `${pk.nomor} — ${pk.indikator[idx].indikator}`,
+      details: `Realisasi: ${realisasi} ${pk.indikator[idx].satuan}`,
+    });
+    res.status(201).json(diperbarui);
+  });
+
+  // ================= LKjIP ROUTES =================
+  /**
+   * Daftar LKjIP instansi aktif + ringkasan. Capaian DIHITUNG dari indikator
+   * Perjanjian Kinerja yang ditautkan — bukan diketik ulang di laporan.
+   */
+  app.get('/api/lkjip', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const periode = typeof req.query.periode === 'string' ? req.query.periode : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const daftar = db.getLKjIP(tenantId, { periode, status });
+    const semuaPK = db.getPerjanjianKinerja(tenantId);
+    // Lampirkan ringkasan capaian tertaut + info PK tertaut agar UI bisa tampil.
+    const diperkaya = daftar.map((l) => ({
+      ...l,
+      capaianTertaut: ringkasIndikatorTertaut(l, semuaPK),
+      pkTertaut: semuaPK
+        .filter((p) => l.perjanjianKinerjaIds.includes(p.id))
+        .map((p) => ({ id: p.id, nomor: p.nomor, periode: p.periode, status: p.status, jumlahIndikator: p.indikator.length })),
+    }));
+    res.json({ lkjip: diperkaya, ringkasan: hitungRingkasanLKjIP(daftar, semuaPK) });
+  });
+
+  /** Ringkasan LKjIP saja (kartu atas). */
+  app.get('/api/lkjip/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    res.json(hitungRingkasanLKjIP(db.getLKjIP(tenantId), db.getPerjanjianKinerja(tenantId)));
+  });
+
+  /** Tambah LKjIP — hanya admin (dokumen pelaporan pejabat). */
+  app.post('/api/lkjip', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh membuat LKjIP.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiLKjIP(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+
+    const bagianInput = Array.isArray(req.body.bagian) ? req.body.bagian : [];
+    for (const b of bagianInput) {
+      const g = validasiBagian(b);
+      if (g) return res.status(400).json({ error: g });
+    }
+
+    // Hanya tautkan PK yang memang milik instansi ini.
+    const pkIds = Array.isArray(req.body.perjanjianKinerjaIds) ? req.body.perjanjianKinerjaIds.map((x: any) => String(x)) : [];
+    const pkValid = pkIds.filter((id: string) => !!db.getPerjanjianKinerjaById(id, tenantId));
+
+    const baru = db.createLKjIP({
+      tenantId,
+      periode: String(req.body.periode).trim(),
+      nomor: String(req.body.nomor).trim(),
+      judul: String(req.body.judul).trim(),
+      status: normalisasiStatusLKjIP(req.body?.status),
+      tanggal: req.body?.tanggal ? new Date(req.body.tanggal).toISOString() : new Date().toISOString(),
+      ringkasanEksekutif: req.body?.ringkasanEksekutif ? String(req.body.ringkasanEksekutif).trim() : '',
+      bagian: bagianInput.map((b: any) => buatBagian(b)),
+      perjanjianKinerjaIds: pkValid,
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah LKjIP',
+      target: `${baru.nomor} — ${baru.judul}`,
+      details: `Periode ${baru.periode}, ${baru.bagian.length} bagian, ${pkValid.length} PK tertaut`,
+    });
+    res.status(201).json(baru);
+  });
+
+  /** Ubah LKjIP — hanya admin. */
+  app.patch('/api/lkjip/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah LKjIP.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const lama = db.getLKjIPById(req.params.id, tenantId);
+    if (!lama) return res.status(404).json({ error: 'LKjIP tidak ditemukan.' });
+
+    const patch: Record<string, unknown> = {};
+    if (req.body?.periode !== undefined) patch.periode = String(req.body.periode).trim();
+    if (req.body?.nomor !== undefined) patch.nomor = String(req.body.nomor).trim();
+    if (req.body?.judul !== undefined) patch.judul = String(req.body.judul).trim();
+    if (req.body?.status !== undefined) {
+      if (normalisasiStatusLKjIP(req.body.status) !== req.body.status) {
+        return res.status(400).json({ error: `Status "${req.body.status}" tidak dikenal.` });
+      }
+      patch.status = req.body.status;
+    }
+    if (req.body?.tanggal !== undefined) patch.tanggal = req.body.tanggal ? new Date(req.body.tanggal).toISOString() : lama.tanggal;
+    if (req.body?.ringkasanEksekutif !== undefined) patch.ringkasanEksekutif = String(req.body.ringkasanEksekutif || '').trim();
+    if (Array.isArray(req.body?.bagian)) {
+      for (const b of req.body.bagian) {
+        const g = validasiBagian(b);
+        if (g) return res.status(400).json({ error: g });
+      }
+      patch.bagian = req.body.bagian.map((b: any) => buatBagian(b));
+    }
+    if (Array.isArray(req.body?.perjanjianKinerjaIds)) {
+      const pkIds = req.body.perjanjianKinerjaIds.map((x: any) => String(x));
+      patch.perjanjianKinerjaIds = pkIds.filter((id: string) => !!db.getPerjanjianKinerjaById(id, tenantId));
+    }
+
+    const diperbarui = db.updateLKjIP(req.params.id, tenantId, patch);
+    if (!diperbarui) return res.status(404).json({ error: 'LKjIP tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah LKjIP',
+      target: `${diperbarui.nomor}`,
+      details: `Perubahan: ${Object.keys(patch).join(', ') || '(tidak ada)'}`,
+    });
+    res.json(diperbarui);
+  });
+
+  /** Hapus LKjIP — hanya admin. */
+  app.delete('/api/lkjip/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus LKjIP.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteLKjIP(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'LKjIP tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus LKjIP',
+      target: req.params.id,
+      details: 'Dokumen LKjIP dihapus',
+    });
+    res.json({ success: true });
+  });
+
+  // ================= KESEHATAN KEUANGAN & RASIO ROUTES =================
+  /**
+   * Ambil data kesehatan keuangan instansi aktif: snapshot terbaru + sebelumnya,
+   * delta tiap rasio, dan daftar periode. Rasio DIHITUNG server dari komponen
+   * yang tersimpan — nilai rasio dari klien tidak pernah dipercaya.
+   */
+  app.get('/api/keuangan/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const semua = db.getSnapshotKeuangan(tenantId);
+    res.json(ringkasKeuangan(semua));
+  });
+
+  /** Daftar snapshot (opsional satu periode) + rasio terhitung per snapshot. */
+  app.get('/api/keuangan/snapshot', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const periode = typeof req.query.periode === 'string' ? req.query.periode : undefined;
+    const daftar = db.getSnapshotKeuangan(tenantId, periode);
+    res.json({ snapshot: daftar, periodeTersedia: urutPeriodeTerbaru(daftar.map((s) => s.periode)) });
+  });
+
+  /**
+   * Tarik komponen keuangan (neraca + laba rugi) dari dokumen lewat RAG.
+   *
+   * TIDAK menyimpan apa pun — mengembalikan usulan angka + sitasi supaya admin
+   * bisa memeriksa/mengoreksi sebelum menyimpan. Angka yang tidak ada di dokumen
+   * dibiarkan kosong (bukan 0). Hanya admin (pemegang konfigurasi RAG).
+   */
+  app.post('/api/keuangan/ekstrak', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menarik data keuangan dari dokumen.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const periode = req.body?.periode ? String(req.body.periode).trim() : '';
+    if (!periode) return res.status(400).json({ error: 'Periode wajib diisi (contoh: 2026-Q1).' });
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || undefined;
+    try {
+      const hasil = await ragClient.ekstrakKomponenKeuangan(
+        periode,
+        tenant?.name,
+        (tenant?.sector || 'aneka_usaha') as BumdSector,
+        kbId
+      );
+      if (!hasil) {
+        return res.status(503).json({
+          error: 'Layanan RAG tidak aktif atau tidak bisa dihubungi. Aktifkan provider HTTP di panel admin.',
+        });
+      }
+      // Hitung rasio sebagai PRATINJAU (belum disimpan) supaya admin melihat dampaknya.
+      const komponen = normalisasiKomponen(hasil.komponen);
+      const rasio = hitungRasio(komponen, tenant?.sector);
+      res.json({
+        periode,
+        periodeLabel: hasil.periodeLabel || labelPeriodeKeuangan(periode),
+        komponen,
+        sitasi: hasil.sitasi,
+        rasio,
+        skorKesehatan: hitungSkorKesehatan(rasio),
+        catatan: hasil.catatan,
+      });
+    } catch (err) {
+      res.status(502).json({
+        error: `Gagal menarik data keuangan: ${err instanceof Error ? err.message : 'kesalahan tidak dikenal'}`,
+      });
+    }
+  });
+
+  /**
+   * Simpan snapshot kesehatan keuangan satu periode (idempoten per periode).
+   * Rasio DIHITUNG ULANG server dari komponen — angka rasio dari klien diabaikan.
+   * Boleh analis & admin (input data), sesuai pola modul pelaporan.
+   */
+  app.post('/api/keuangan/snapshot', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const galat = validasiSnapshot(req.body);
+    if (galat) return res.status(400).json({ error: galat });
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const periode = String(req.body.periode).trim();
+    const komponen = normalisasiKomponen(req.body.komponen);
+    const sitasi = normalisasiSitasi(req.body.sitasi);
+    const snapshot = lengkapiSnapshot(
+      {
+        tenantId,
+        periode,
+        periodeLabel: req.body?.periodeLabel
+          ? String(req.body.periodeLabel).trim()
+          : labelPeriodeKeuangan(periode),
+        komponen,
+        sitasi,
+        catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
+        disusunOleh: session.name,
+      },
+      tenant?.sector
+    );
+    const disimpan = db.catatSnapshotKeuangan(snapshot);
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Simpan Kesehatan Keuangan',
+      target: `Periode ${disimpan.periode}`,
+      details: `Skor ${disimpan.skorKesehatan ?? '—'} · ${disimpan.rasio.filter((r) => r.nilai !== null).length} rasio terhitung`,
+    });
+    res.status(201).json(disimpan);
+  });
+
+  /** Hapus snapshot satu periode — hanya admin. */
+  app.delete('/api/keuangan/snapshot/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus snapshot keuangan.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    const ok = db.deleteSnapshotKeuangan(req.params.id, tenantId);
+    if (!ok) return res.status(404).json({ error: 'Snapshot keuangan tidak ditemukan.' });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Kesehatan Keuangan',
+      target: req.params.id,
+      details: 'Snapshot kesehatan keuangan dihapus',
+    });
+    res.json({ ok: true });
+  });
+
+  // ================= IMPORT EXCEL/CSV ROUTES =================
+  /**
+   * Unggah & pratinjau berkas Excel/CSV.
+   *
+   * Menerima base64 (JSON) supaya tidak butuh middleware multipart. Berkas
+   * diurai di server, dikembalikan sebagai tabel ringkas untuk dipetakan UI.
+   * Angka yang tidak bisa dibaca dengan pasti TIDAK ditebak (lihat `keAngka`).
+   */
+  app.post('/api/impor/pratinjau', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const isiB64 = typeof req.body?.isi === 'string' ? req.body.isi : '';
+    if (!isiB64) return res.status(400).json({ error: 'Berkas belum dikirim.' });
+    // Buang prefiks data-URL bila ada (mis. "data:...;base64,").
+    const bersih = isiB64.includes(',') && /^data:/.test(isiB64) ? isiB64.split(',').pop()! : isiB64;
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(bersih, 'base64');
+    } catch {
+      return res.status(400).json({ error: 'Isi berkas tidak valid (base64 rusak).' });
+    }
+    if (buffer.length === 0) return res.status(400).json({ error: 'Berkas kosong.' });
+    if (buffer.length > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Berkas terlalu besar (maksimum 25 MB).' });
+    }
+    try {
+      const tabel = bacaTabel(buffer, typeof req.body?.sheet === 'string' ? req.body.sheet : undefined);
+      return res.json(ringkasPratinjau(tabel));
+    } catch (err) {
+      return res.status(400).json({ error: jelaskanError(err) });
+    }
+  });
+
+  /**
+   * Bangun widget dari berkas + konfigurasi pemetaan (TANPA menyimpan).
+   *
+   * Memakai alur yang sama dengan kanvas: klien mengirim konfigurasi, server
+   * mengembalikan `WidgetSpec` yang SUDAH divalidasi skema. Penyimpanan ke
+   * dashboard dilakukan lewat PATCH dashboard yang sudah ada, sehingga impor
+   * tidak menambah jalur tulis baru.
+   */
+  app.post('/api/impor/widget', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const isiB64 = typeof req.body?.isi === 'string' ? req.body.isi : '';
+    if (!isiB64) return res.status(400).json({ error: 'Berkas belum dikirim.' });
+    const bersih = isiB64.includes(',') && /^data:/.test(isiB64) ? isiB64.split(',').pop()! : isiB64;
+
+    const konfig = req.body?.konfig as KonfigImpor | undefined;
+    if (!konfig || typeof konfig !== 'object') {
+      return res.status(400).json({ error: 'Konfigurasi pemetaan wajib diisi.' });
+    }
+    if (!konfig.tipe) return res.status(400).json({ error: 'Tipe visualisasi wajib dipilih.' });
+    if (!Array.isArray(konfig.kolomNilai) || konfig.kolomNilai.length === 0) {
+      return res.status(400).json({ error: 'Pilih minimal satu kolom nilai.' });
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(bersih, 'base64');
+    } catch {
+      return res.status(400).json({ error: 'Isi berkas tidak valid (base64 rusak).' });
+    }
+    if (buffer.length === 0) return res.status(400).json({ error: 'Berkas kosong.' });
+    if (buffer.length > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Berkas terlalu besar (maksimum 25 MB).' });
+    }
+
+    try {
+      const tabel = bacaTabel(
+        buffer,
+        typeof req.body?.sheet === 'string' ? req.body.sheet : undefined
+      );
+      const idWidget = `w-impor-${randomBytes(6).toString('hex')}`;
+      const grid: WidgetGrid = { x: 0, y: 0, w: 6, h: 4 };
+      const { widget, peringatan } = bangunWidgetImpor(tabel, konfig, idWidget, grid);
+      // Validasi bentuk widget dengan skema yang sama seperti kanvas — supaya
+      // impor tak bisa menyimpan data rusak yang nanti gagal dirender.
+      const sah = WidgetSpecSchema.safeParse(widget);
+      if (!sah.success) {
+        return res.status(400).json({
+          error: 'Hasil pemetaan tidak lolos validasi widget.',
+          detail: sah.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
+        });
+      }
+      db.addAuditLog({
+        tenantId: effectiveTenantId(req, session),
+        userId: session.userId,
+        userName: session.name,
+        action: 'Impor Data Excel/CSV',
+        target: widget.title,
+        details: `Berkas "${tabel.namaSheet}" → ${widget.type}, ${tabel.baris.length} baris.`,
+      });
+      return res.json({ widget: sah.data, peringatan, baris: tabel.baris.length, namaSheet: tabel.namaSheet });
+    } catch (err) {
+      return res.status(400).json({ error: jelaskanError(err) });
+    }
+  });
+
   // ================= SHARE ROUTES =================
   app.post('/api/dashboards/:id/share', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -1506,7 +3025,11 @@ async function startServer() {
     if (!dash) {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
-    res.json({ ...dash, accessMode: mode });
+    // Sertakan data instansi pemilik dashboard LANGSUNG di respons share.
+    // Halaman tautan publik tidak boleh membaca /api/tenants (daftar instansi
+    // kini wajib login), jadi cukup instansi yang relevan saja — bukan daftarnya.
+    const tenant = db.tenants.find((t) => t.id === dash.tenantId) || null;
+    res.json({ ...dash, accessMode: mode, tenant });
   });
 
   /**

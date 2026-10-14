@@ -18,7 +18,7 @@ keluarannya tidak terstruktur. React + Vite hanya merender Widget Spec JSON.
 react-grid-layout, Zustand, TanStack Query | Node + Express + TypeScript,
 Prisma, PostgreSQL, zod, SSE, JWT + bcrypt, Nodemailer (SMTP).
 
-**Repo:** `C:\Salman\PROJEK\ApexPulse`
+**Repo:** `C:\Salman\PROJEK\aiones-boards`
 **PRD:** `C:\Salman\AI Agent\.hermes\plans\2026-09-29_PRD-dashboard-otomatis-rag-bumd.md`
 
 **Deploy:** panel Kroombox, akun **allstartup** (`allstartup@kroombox.com`)
@@ -120,7 +120,7 @@ skrip probe. **Belum ada UI dashboard.**
 ### Task 0.1 — Inisialisasi repo
 
 ```bash
-mkdir -p "C:/Salman/PROJEK/ApexPulse" && cd "C:/Salman/PROJEK/ApexPulse"
+mkdir -p "C:/Salman/PROJEK/aiones-boards" && cd "C:/Salman/PROJEK/aiones-boards"
 git init
 npm create vite@latest web -- --template react-ts
 mkdir -p server && cd server && npm init -y
@@ -132,7 +132,7 @@ commit pertama.
 ### Task 0.2 — Dependency backend
 
 ```bash
-cd "C:/Salman/PROJEK/ApexPulse/server"
+cd "C:/Salman/PROJEK/aiones-boards/server"
 npm i express cors helmet morgan jsonwebtoken bcryptjs zod @prisma/client dotenv nodemailer
 npm i -D typescript tsx @types/node @types/express @types/jsonwebtoken @types/bcryptjs @types/nodemailer prisma
 npx tsc --init

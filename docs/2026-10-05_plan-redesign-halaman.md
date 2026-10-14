@@ -2,7 +2,7 @@
 
 **Tanggal:** 5 Oktober 2026
 **Status:** usulan — belum dikerjakan
-**Basis:** audit kode nyata `C:\Salman\PROJEK\ApexPulse` (bukan asumsi)
+**Basis:** audit kode nyata `C:\Salman\PROJEK\aiones-boards` (bukan asumsi)
 
 ---
 
