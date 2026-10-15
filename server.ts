@@ -38,6 +38,8 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
+import { generateInsightPresentasi } from './src/services/presentasi/generateInsight';
+import { susunSlide, VERSI_PRESENTASI } from './src/services/presentasi/slide';
 import { GoogleAuthError, verifikasiIdTokenGoogle } from './src/services/auth/google';
 import {
   hitungDeadline,
@@ -629,6 +631,95 @@ async function startServer() {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
     res.json(updated);
+  });
+
+  /**
+   * SIAPKAN MODE PRESENTASI — generate narasi insight tiap widget lewat RAG, lalu
+   * susun rencana slide, dan SIMPAN ke dashboard (`dashboard.presentasi`).
+   *
+   * Dipanggil sekali (bukan tiap membuka presentasi) supaya:
+   *  - tidak memanggil layanan RAG berulang (mahal & lambat),
+   *  - narasi bisa disunting manual dan tetap tersimpan.
+   *
+   * Body: { tenantId?, dashboardId?, segarkan? }
+   *  - segarkan=false (default): pakai insight yang sudah ada; hanya generate
+   *    widget yang BELUM punya insight.
+   *  - segarkan=true: generate ulang semua (kecuali yang diedit manual).
+   *
+   * SSE: mengirim progres per widget agar UI menampilkan kemajuan.
+   */
+  app.post('/api/dashboards/:id/presentasi', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+
+    const dash = db.getDashboardById(req.params.id, tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
+    if (!dash.widgets?.length) {
+      return res.status(400).json({ error: 'Dashboard ini belum punya widget untuk dipresentasikan.' });
+    }
+
+    const segarkan = req.body?.segarkan === true;
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const sector = (req.body?.sector || dash.sector || tenant?.sector || 'pdam') as BumdSector;
+
+    // SSE: progres per widget (jumlah widget bisa belasan → generate bisa lama).
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    const sendEvent = (event: string, data: any) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      // Tanpa segarkan, widget yang sudah punya insight dipertahankan (tidak
+      // dipanggil ulang) — menghemat panggilan RAG. Dengan segarkan, insight
+      // dikosongkan supaya ditulis ulang dari RAG (editan manual tetap dijaga).
+      const perlu = dash.widgets.map((w) =>
+        segarkan && w.insightAsal !== 'manual'
+          ? { ...w, insight: undefined, insightAsal: undefined }
+          : !segarkan && w.insight
+            ? { ...w, insightAsal: w.insightAsal || ('rag' as const) }
+            : w
+      );
+
+      sendEvent('mulai', { total: perlu.length });
+
+      const hasil = await generateInsightPresentasi(perlu, {
+        sector,
+        instansi: tenant?.name,
+        kbId,
+        rag: ragClient,
+        konkurensi: 3,
+        onProgres: (p) => sendEvent('progres', p),
+      });
+
+      const presentasi = { slides: hasil.slides, disusunAt: new Date().toISOString(), versi: VERSI_PRESENTASI };
+      const updated = db.updateDashboard(dash.id, { widgets: hasil.widgets, presentasi }, tenantId);
+
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Siapkan Presentasi',
+        target: dash.title,
+        details: `Menyusun ${hasil.slides.length} slide (insight RAG: ${hasil.dariRag}, dari data: ${hasil.dariData}).`,
+      });
+
+      sendEvent('selesai', {
+        dashboard: updated,
+        jumlahSlide: hasil.slides.length,
+        dariRag: hasil.dariRag,
+        dariData: hasil.dariData,
+        catatan: hasil.catatan,
+      });
+      res.end();
+    } catch (err) {
+      sendEvent('galat', { pesan: err instanceof Error ? err.message : 'Gagal menyiapkan presentasi.' });
+      res.end();
+    }
   });
 
   /**

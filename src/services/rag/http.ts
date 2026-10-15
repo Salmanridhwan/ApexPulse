@@ -955,6 +955,58 @@ export class ConfigurableRagClient implements RagClient {
     return { data: selaras.widget, judul: item.dashboardTitle, deskripsi: item.description };
   }
 
+  /**
+   * NARASI INSIGHT mode presentasi: minta layanan RAG menafsirkan data widget —
+   * pola, penyebab, dan implikasi — BUKAN mengulang angkanya. Hasilnya dipakai
+   * sekali lalu DISIMPAN ke dashboard (lihat endpoint `/api/dashboards/:id/presentasi`).
+   *
+   * Memakai endpoint /extract dengan skema satu field (`insight`) supaya keluaran
+   * terstruktur & mudah dibersihkan. Mengembalikan `null` bila layanan tidak
+   * tersedia — pemanggil memakai narasi cadangan dari data, bukan mengarang.
+   */
+  async insightWidget(
+    konteks: string,
+    sector: BumdSector,
+    instansi?: string,
+    kbId?: string
+  ): Promise<{ insight: string | null; catatan?: string } | null> {
+    const cfg = this.getRagConfig();
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
+    const { dipakai } = await this.resolveBase(cfg);
+
+    const sebutanInstansi = kbId?.trim()
+      ? 'Semua dokumen di knowledge base ini milik SATU instansi. '
+      : instansi?.trim()
+        ? `Instansi: "${instansi.trim()}". `
+        : '';
+
+    const instruksi =
+      `Anda menyusun NARASI INSIGHT untuk mode presentasi dashboard BUMD (${sector.toUpperCase()}). ` +
+      sebutanInstansi +
+      `Data widget yang harus ditafsirkan:\n${konteks}\n\n` +
+      `Tulis SATU paragraf 2-3 kalimat (maksimal 60 kata) dalam bahasa Indonesia yang menjelaskan ` +
+      `APA ARTINYA data ini untuk pengambil keputusan: pola/arah yang terlihat, penyebab yang mungkin, ` +
+      `dan implikasi atau perhatiannya. ` +
+      `JANGAN mengulang daftar angka yang sudah ada di chart; jangan mengarang angka baru. ` +
+      `Kalau data tidak cukup untuk menyimpulkan, katakan apa adanya secara singkat. ` +
+      `Balas HANYA JSON: { "insight": "..." } tanpa markdown.`;
+
+    const skemaInsight = {
+      type: 'object',
+      properties: { insight: { type: 'string' } },
+      required: ['insight'],
+    };
+
+    try {
+      const item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, skemaInsight, kbId);
+      const teks = potong(item?.insight, 320);
+      if (!teks) return { insight: null, catatan: 'Layanan tidak mengembalikan narasi.' };
+      return { insight: teks };
+    } catch (err) {
+      return { insight: null, catatan: jelaskanError(err) };
+    }
+  }
+
   async query(options: RagQueryOptions): Promise<RagResult> {
     const cfg = this.getRagConfig();
     // TIDAK ADA fallback ke data contoh (mock) di sini. Kalau layanan RAG belum

@@ -17,9 +17,9 @@ import {
   LogOut,
   Maximize2,
   Menu,
-  Minimize2,
   Palette,
   Plus,
+  Presentation,
   Printer,
   Search,
   Share2,
@@ -38,6 +38,7 @@ import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
 import { GlobalFiltersBar } from './components/GlobalFiltersBar';
+import { PresentationMode } from './components/PresentationMode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
 
@@ -249,33 +250,9 @@ export default function App() {
     }
   }, [currentUser, authToken, activeDashboard]);
 
-  // Auto Fullscreen saat Mode Presentasi diaktifkan / dinonaktifkan
-  useEffect(() => {
-    if (isPresentationMode) {
-      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch((err) => {
-          console.warn('Auto fullscreen error:', err);
-        });
-      }
-    } else {
-      if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
-    }
-  }, [isPresentationMode]);
-
-  // Sync state ketika pengguna menekan tombol ESC browser
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && isPresentationMode) {
-        setIsPresentationMode(false);
-      }
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, [isPresentationMode]);
+  // Catatan: fullscreen & tombol ESC mode presentasi kini ditangani DI DALAM
+  // komponen `PresentationMode` (yang juga mengunci scroll body), jadi efek
+  // fullscreen lama di sini dihapus agar tidak saling bertabrakan.
 
   const handleLoginSuccess = (user: User, token: string) => {
     setCurrentUser(user);
@@ -949,6 +926,15 @@ export default function App() {
                         <div className="px-2.5 py-1.5 text-[10px] font-semibold text-ink-3 uppercase tracking-wider">
                           Ekspor & Bagikan
                         </div>
+                        {activeDashboard && (activeDashboard.widgets?.length || 0) > 0 && (
+                          <button
+                            onClick={() => { setIsMoreMenuOpen(false); setIsPresentationMode(true); }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
+                          >
+                            <Presentation className="w-3.5 h-3.5 shrink-0 text-ink-3" />
+                            <span>Mode Presentasi</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => { setIsMoreMenuOpen(false); setIsExportOpen(true); }}
                           className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
@@ -1153,41 +1139,6 @@ export default function App() {
                 </React.Suspense>
               ) : (
                 <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-                  {/* Executive Presentation Top Header with Title when Active */}
-                  {isPresentationMode && activeDashboard && (
-                    <div className="mb-6 bg-surface text-ink rounded-card p-5 border border-line flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="w-2.5 h-2.5 rounded-full bg-pos animate-pulse" />
-                          <span className="text-xs uppercase font-bold tracking-wider text-brand">
-                            {currentTenant?.name || 'Laporan Eksekutif'} • Mode Presentasi
-                          </span>
-                        </div>
-                        <h1 className="text-xl sm:text-2xl font-extrabold text-ink tracking-tight">
-                          {activeDashboard.title}
-                        </h1>
-                        {activeDashboard.description && (
-                          <p className="text-xs sm:text-sm text-ink-2 mt-1 max-w-3xl leading-relaxed font-medium">
-                            {activeDashboard.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                        <span className="text-xs text-ink-2 font-semibold px-2.5 py-1 bg-surface-2 rounded-control border border-line hidden sm:inline-block">
-                          {activeDashboard.widgets.length} Widget
-                        </span>
-                        <button
-                          onClick={() => setIsPresentationMode(false)}
-                          className="px-3.5 py-1.5 rounded-control bg-surface-2 hover:bg-line/50 text-ink-2 hover:text-ink border border-line transition-all flex items-center gap-1.5 text-xs font-bold active:scale-[0.98]"
-                        >
-                          <Minimize2 className="w-4 h-4 text-ink-2" />
-                          <span>Keluar Presentasi</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Visual Header & Toolbar Card */}
                   {activeDashboard && !isPresentationMode && (
                     <div className="mb-5 card">
@@ -1353,6 +1304,19 @@ export default function App() {
           ]);
         }}
       />
+
+      {/* ================= MODE PRESENTASI (overlay penuh, tanpa scroll) ================= */}
+      {isPresentationMode && activeDashboard && (
+        <PresentationMode
+          dashboard={activeDashboard}
+          tenantName={currentTenant?.name}
+          onExit={() => setIsPresentationMode(false)}
+          onUpdate={(d) => {
+            setActiveDashboard(d);
+            setDashboards((prev) => [d, ...prev.filter((x) => x.id !== d.id)]);
+          }}
+        />
+      )}
 
       {/* Floating Action Button RAG Copilot di Ujung Kanan Bawah (hanya tampil saat panel chat tertutup) */}
       {!isPresentationMode && !isChatOpen && (

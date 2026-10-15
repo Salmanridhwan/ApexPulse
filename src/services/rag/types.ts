@@ -161,4 +161,23 @@ export interface RagClient {
     kbId?: string,
     opsi?: { lemparSaatGagal?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null>;
+
+  /**
+   * Susun NARASI INSIGHT untuk satu/beberapa widget dashboard (mode presentasi):
+   * penjelasan APA ARTINYA data ini — pola, penyebab, dan implikasinya, BUKAN
+   * mengulang angkanya. Dipakai sekali saat menyiapkan presentasi, lalu hasilnya
+   * DISIMPAN ke dashboard.
+   *
+   * `konteks` berisi ringkasan widget (judul, tipe, angka pokok, satuan) supaya
+   * model memahami data tanpa perlu mengambil ulang dari dokumen.
+   *
+   * Mengembalikan `null` bila layanan tidak tersedia — pemanggil memakai narasi
+   * cadangan dari data (`narasiInsight`), bukan mengarang.
+   */
+  insightWidget?(
+    konteks: string,
+    sector: BumdSector,
+    instansi?: string,
+    kbId?: string
+  ): Promise<{ insight: string | null; catatan?: string } | null>;
 }

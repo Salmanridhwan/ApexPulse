@@ -196,6 +196,19 @@ export interface WidgetSpec {
   dataKosong?: boolean;
   /** Alasan singkat kenapa kartu dikosongkan (ditampilkan di kanvas). */
   catatanData?: string;
+  /**
+   * NARASI INSIGHT untuk mode presentasi: 1-3 kalimat yang menjelaskan APA
+   * ARTINYA chart ini (bukan mengulang angka). Digenerate lewat RAG dari data
+   * dokumen, lalu DISIMPAN ke dashboard supaya tidak perlu digenerate ulang tiap
+   * presentasi. Bisa diedit manual seperti field widget lain.
+   *
+   * PENTING: teks ini TIDAK boleh memuat angka baru — angkanya sudah ada di
+   * chart; insight hanya menafsirkan. Kalau kosong, slide memakai `narasi`/
+   * ringkasan otomatis dari data (lihat `narasiInsight`).
+   */
+  insight?: string;
+  /** Asal insight: 'rag' (dari layanan) | 'otomatis' (dihitung dari data) | 'manual' (diedit user). */
+  insightAsal?: 'rag' | 'otomatis' | 'manual';
   kpi?: {
     value: number | string;
     unit?: string;
@@ -316,6 +329,38 @@ export interface Dashboard {
   updatedAt: string;
   isShared?: boolean;
   shareToken?: string;
+  /**
+   * Rencana slide mode presentasi yang DISIMPAN (urutan & pengelompokan widget
+   * per slide). Kalau kosong, slide disusun otomatis dari widget saat masuk mode
+   * presentasi (lihat `susunSlide`). Menyimpannya membuat urutan presentasi
+   * awet dan bisa disunting.
+   */
+  presentasi?: {
+    slides: SlidePresentasi[];
+    /** Kapan terakhir disusun/digenerate. */
+    disusunAt?: string;
+    /** Versi skema slide saat disusun (lihat VERSI_PRESENTASI). */
+    versi?: number;
+  };
+}
+
+/**
+ * Satu slide mode presentasi: sekelompok widget yang ditampilkan bersamaan
+ * (tanpa scroll) beserta narasi insight-nya.
+ */
+export interface SlidePresentasi {
+  id: string;
+  /** Judul slide (mis. "Kinerja Utama" atau judul widget pertama). */
+  judul: string;
+  /** Id widget yang tampil di slide ini (urut). */
+  widgetIds: string[];
+  /**
+   * Narasi insight slide (mengantar kelompok widget ini). Narasi per-widget ada
+   * di `WidgetSpec.insight`.
+   */
+  narasi?: string;
+  /** Asal narasi slide: dari RAG, disusun otomatis, atau diedit manual. */
+  narasiAsal?: 'rag' | 'otomatis' | 'manual';
 }
 
 export type PresetSector = BumdSector | 'universal';
