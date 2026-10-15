@@ -973,81 +973,134 @@ async function startServer() {
 
       // Check if this is a conversational EDIT instruction
 
-      // Case 0: Chart / widget recommendations & pertanyaan penambahan chart
-      const isRekomendasi =
-        lower.includes('rekomendasi') ||
-        lower.includes('rekomendasikan') ||
-        lower.includes('chart apa') ||
-        lower.includes('grafik apa') ||
-        lower.includes('widget apa') ||
-        lower.includes('tambah chart') ||
-        lower.includes('tambahkan chart') ||
-        lower.includes('tambah grafik') ||
-        lower.includes('tambahkan grafik') ||
-        lower.includes('tambah widget') ||
-        lower.includes('tambahkan widget') ||
-        lower.includes('saran chart') ||
-        lower.includes('saran grafik') ||
-        lower.includes('apa yang bisa') ||
-        lower.includes('chart yang bisa') ||
-        lower.includes('chart yang dapat') ||
-        lower.includes('suggest') ||
-        lower.includes('bisa menambahkan') ||
-        lower.includes('bisa tambah') ||
-        lower.includes('apakah bisa') ||
-        lower.includes('chart lagi') ||
-        lower.includes('widget lagi') ||
-        lower.includes('grafik lagi');
+      // Case 0 (LAMA) DIHAPUS: dulu "rekomendasi chart"/"tambah widget" dijawab
+      // SENDIRI oleh aplikasi dari WIDGET_CATALOG kita — tanpa menanyakan RAG
+      // sama sekali. Sesuai permintaan user, chat TIDAK lagi menjawab sendiri:
+      // permintaan itu kini diteruskan ke RAG (lihat routing di bawah).
 
-      if (isRekomendasi) {
-        sendEvent('step', { id: 's0', title: 'Menganalisis katalog widget & dokumen...', status: 'in_progress' });
-        await new Promise((r) => setTimeout(r, 300));
+      // Case 0b: "tambahkan widget <indikator>" → WIDGETNYA DIBUAT RAG.
+      // Aplikasi TIDAK memakai katalog preseten sendiri di sini; ia hanya
+      // meneruskan indikatornya ke layanan RAG (`/extract`) dan memasang kartu
+      // dari data yang RAG kembalikan. Kalau RAG tidak memuat indikator itu,
+      // pesan jujur — bukan angka contoh.
+      const mintaTambahWidget = /\b(?:tambah(?:kan)?|bikin(?:kan)?|masukkan|sematkan)\s+(?:widget|chart|grafik|kartu|panel)\b/i.test(
+        prompt
+      );
+      if (mintaTambahWidget) {
+        // Instansi tanpa KB sendiri tidak boleh menembak RAG tanpa scope KB —
+        // hasilnya bisa bercampur dengan dokumen instansi lain.
+        if (db.systemConfig.ragProvider === 'http' && !kbChat) {
+          const pesan =
+            `Instansi "${tenantChat?.name || tenantId}" belum punya Knowledge Base RAG sendiri, ` +
+            `jadi saya tidak bisa mengambil data untuk widget baru. Hubungi admin untuk menautkan KB ` +
+            `instansi ini (Admin → Instansi → Knowledge Base ID), lalu coba lagi.`;
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'no_kb' } as any);
+          sendEvent('result', { actionTaken: 'no_kb', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
+        }
+        if (!activeDash) {
+          const pesan = 'Buka dulu salah satu dashboard, baru saya bisa menambahkan widget ke kanvasnya.';
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+          sendEvent('result', { actionTaken: 'none', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
+        }
+        // Indikator = sisa kalimat setelah kata kunci, tanpa embel-embel tujuan.
+        const indikator = prompt
+          .replace(
+            /^.*?\b(?:tambah(?:kan)?|bikin(?:kan)?|masukkan|sematkan)\s+(?:widget|chart|grafik|kartu|panel)\b/i,
+            ''
+          )
+          .replace(/\b(?:ke|kedalam|ke dalam|pada|dalam)\s+(?:dashboard|kanvas|canvas)\b.*$/i, '')
+          .replace(/["'“”]/g, '')
+          .trim();
+        if (indikator.length < 2) {
+          const pesan =
+            'Indikatornya apa yang mau ditambahkan? Sebutkan, misalnya *"tambahkan widget jumlah pelanggan"*. ' +
+            'Saya akan meminta datanya ke dokumen instansi Anda.';
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+          sendEvent('result', { actionTaken: 'none', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
+        }
+        const tipeDiminta = /\b(grafik|chart|diagram|batang|garis|line|area|donut|donat|pie|bar)\b/i.test(lower)
+          ? 'bar'
+          : /\btabel\b/i.test(lower)
+            ? 'table'
+            : /\bnarasi\b/i.test(lower)
+              ? 'narasi'
+              : 'kpi';
 
-        const tenant = db.tenants.find((t) => t.id === tenantId);
-        const sectorFilter = sector || tenant?.sector || 'universal';
-
-        // Pick relevant widgets from catalog (matching sector, max 6)
-        const matched = WIDGET_CATALOG.filter(
-          (w) => w.sektor.includes(sectorFilter as any) || w.sektor.includes('universal')
-        ).slice(0, 6);
-
-        // Exclude already-added widget ids if dashboard exists
-        const existingNames = activeDash?.widgets.map((w) => w.title.toLowerCase()) || [];
-        const suggestions = matched
-          .filter((w) => !existingNames.includes(w.nama.toLowerCase()))
-          .slice(0, 6);
-
-        const recommendations = (suggestions.length > 0 ? suggestions : matched.slice(0, 6)).map((w) => ({
-          id: w.id,
-          name: w.nama,
-          category: w.kategori,
-          chartTypes: w.tipeChart,
-          description: w.deskripsi,
-          prompt: `Tambahkan widget "${w.nama}" ke dashboard`,
-        }));
-
-        sendEvent('step', { id: 's0', title: `Ditemukan ${recommendations.length} rekomendasi chart`, status: 'completed' });
-
-        const isPertanyaanBisa = lower.includes('bisa') || lower.includes('apakah') || lower.includes('cara');
-        const pembuka = isPertanyaanBisa
-          ? `Tentu saja bisa! Anda dapat menambahkan widget chart baru ke dashboard ini kapan saja.\n\n`
-          : '';
-
-        const replyText = `${pembuka}Berikut beberapa rekomendasi chart dari katalog dokumen resmi ${sector.toUpperCase()} yang relevan. Anda bisa langsung mengklik salah satu tombol di bawah untuk menyematkannya ke kanvas:`;
-        catatAsisten({
-          sender: 'system',
-          text: replyText,
-          actionTaken: 'recommend',
-          recommendations,
-        } as any);
-
-        sendEvent('result', {
-          actionTaken: 'recommend',
-          message: replyText,
-          recommendations,
-        });
-        sendEvent('done', { ok: true });
-        return res.end();
+        sendEvent('step', { id: 's0', title: `Meminta data "${indikator}" ke layanan RAG...`, status: 'in_progress' });
+        try {
+          const hasil = await ragClient.ambilDataWidget(
+            indikator,
+            sector,
+            tipeDiminta,
+            tenantChat?.name,
+            kbChat
+          );
+          if (!hasil || !hasil.data) {
+            const pesan =
+              `Dokumen instansi ini tidak memuat data untuk **"${indikator}"**, jadi widget tidak ditambahkan. ` +
+              `${hasil?.alasan ? `Alasan: ${hasil.alasan} ` : ''}` +
+              `Saya tidak menambahkan angka contoh. Coba sebutkan indikator lain yang ada di dokumen Anda.`;
+            sendEvent('step', { id: 's0', title: 'Dokumen tidak memuat indikator tersebut', status: 'failed' });
+            catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+            sendEvent('result', { actionTaken: 'none', message: pesan });
+            sendEvent('done', { ok: false });
+            return res.end();
+          }
+          const d = hasil.data as any;
+          const widgetBaru: WidgetSpec = {
+            id: `w-rag-${Date.now()}`,
+            type: d.type || (tipeDiminta === 'bar' ? 'bar' : tipeDiminta),
+            title: d.title || hasil.judul || indikator,
+            subtitle: d.subtitle,
+            category: d.category || 'Operasional',
+            confidence: 'sumber',
+            grid: d.grid || { x: 0, y: 0, w: 6, h: 4 },
+            kpi: d.kpi,
+            chart: d.chart,
+            table: d.table,
+            narasi: d.narasi,
+            citations: d.citations || [],
+            unitKerja: d.unitKerja,
+            periode: d.periode,
+            lastUpdated: new Date().toISOString(),
+          } as WidgetSpec;
+          const updatedWidgets = [widgetBaru, ...activeDash.widgets];
+          db.updateDashboard(activeDash.id, { widgets: updatedWidgets }, tenantId);
+          db.addAuditLog({
+            tenantId,
+            userId: session.userId,
+            userName: session.name,
+            action: 'Tambah Widget via Chat (RAG)',
+            target: widgetBaru.title,
+            details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
+          });
+          const pesan = `Widget **"${widgetBaru.title}"** ditambahkan ke kanvas dari data dokumen instansi (${widgetBaru.citations.length} sitasi).`;
+          sendEvent('step', { id: 's0', title: 'Widget ditambahkan dari dokumen', status: 'completed' });
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'add_widget' } as any);
+          sendEvent('result', {
+            actionTaken: 'add_widget',
+            message: pesan,
+            dashboard: { ...activeDash, widgets: updatedWidgets },
+          });
+          sendEvent('done', { ok: true });
+          return res.end();
+        } catch (err: any) {
+          const detail =
+            err instanceof RagServiceError ? err.detail || err.message : err?.message || 'kesalahan jaringan';
+          const pesan =
+            `⚠️ Belum bisa menambahkan widget karena **layanan RAG tidak dapat dihubungi**.\n\nPenyebab: ${detail}`;
+          sendEvent('step', { id: 's0', title: 'Layanan RAG tidak dapat dihubungi', status: 'failed' });
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'rag_error' } as any);
+          sendEvent('result', { actionTaken: 'rag_error', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
+        }
       }
 
       // Case 1: Hapus widget
@@ -1421,9 +1474,7 @@ async function startServer() {
       replyText +=
         genResult.modeUsed === 'Jalur A (LLM JSON)'
           ? `Seluruh angka bersitasi dokumen resmi instansi ini (**${genResult.citationsCount} sitasi**).\n`
-          : genResult.modeUsed === 'Jalur B (Agregasi Metadata)'
-            ? `Angka disusun dari ringkasan metadata dokumen instansi ini (**${genResult.citationsCount} sitasi**), jadi bisa lebih sedikit daripada dashboard penuh.\n`
-            : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
+          : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
 
       // JUJUR soal jumlah widget: kalau pengguna meminta jumlah tertentu
       // ("dashboard dengan 15-20 widget"), katakan berapa yang benar-benar

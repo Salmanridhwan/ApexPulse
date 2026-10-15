@@ -398,26 +398,16 @@ export interface ProgressStep {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
-export interface ChatRecommendation {
-  id: string;       // WIDGET_CATALOG id, e.g. 'W-01'
-  name: string;
-  category: string;
-  chartTypes: string[];
-  description: string;
-  prompt: string;   // suggested follow-up prompt to send
-}
-
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'recommend' | 'qa_answer' | 'no_kb' | 'rag_error';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_kb' | 'rag_error';
   affectedWidgetId?: string;
-  modeUsed?: 'Jalur A (LLM JSON)' | 'Jalur B (Agregasi Metadata)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
+  modeUsed?: 'Jalur A (LLM JSON)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;
   progressSteps?: ProgressStep[];
-  recommendations?: ChatRecommendation[];
 }
 
 /**

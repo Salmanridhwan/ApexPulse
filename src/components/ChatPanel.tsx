@@ -2,26 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
-  BarChart2,
   Bot,
   Building2,
   CheckCircle2,
-  ChevronRight,
   Clock,
-  CornerDownLeft,
-  Layers,
   Loader2,
-  PieChart,
-  Plus,
   Send,
   Sparkles,
-  TrendingUp,
   Trash2,
   X,
 } from 'lucide-react';
-import { BumdSector, ChatMessage, ChatRecommendation, Dashboard, ProgressStep, WidgetSpec, WidgetType } from '../types';
-import { WIDGET_CATALOG } from '../services/builder/catalog';
-import { ambilWidgetPreset } from '../services/builder/dariPreset';
+import { BumdSector, ChatMessage, Dashboard, ProgressStep } from '../types';
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -39,122 +30,7 @@ interface ChatPanelProps {
   /** Dashboard pemilik percakapan ini — sumber riwayatnya. */
   dashboardId?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
-  /** Sematkan widget hasil pilihan pengguna LANGSUNG ke kanvas (tanpa memanggil LLM lagi). */
-  onAddWidget?: (widget: WidgetSpec) => void | Promise<void>;
 }
-
-// Chart type icon helper
-const ChartIcon: React.FC<{ type: string; className?: string }> = ({ type, className = 'w-3 h-3' }) => {
-  if (type === 'bar') return <BarChart2 className={className} />;
-  if (type === 'line' || type === 'area') return <TrendingUp className={className} />;
-  if (type === 'donut' || type === 'pie') return <PieChart className={className} />;
-  return <Layers className={className} />;
-};
-
-// Category color map
-const categoryColor: Record<string, string> = {
-  Keuangan: 'bg-pos/15 text-pos border-pos/30',
-  Operasional: 'bg-brand/15 text-brand-ink border-brand/30',
-  'Kepatuhan & Risiko': 'bg-warn/15 text-warn border-warn/30',
-  SDM: 'bg-violet/15 text-violet border-violet/30',
-  Pelanggan: 'bg-neg/15 text-neg border-neg/30',
-};
-const getCategoryClass = (cat: string) =>
-  categoryColor[cat] || 'bg-surface-2 text-ink-2 border-line';
-
-/** Status penyematan per kartu rekomendasi. */
-interface StatusSemat {
-  memuat?: boolean;
-  pesan?: string;
-  galat?: boolean;
-}
-
-// Recommendation cards component — KLIK = SEMATKAN LANGSUNG ke kanvas (tanpa memanggil LLM lagi).
-const RecommendationCards: React.FC<{
-  items: ChatRecommendation[];
-  onPick: (rec: ChatRecommendation, tipe: string) => void;
-  status: Record<string, StatusSemat>;
-  isStreaming: boolean;
-  bolehSemat: boolean;
-}> = ({ items, onPick, status, isStreaming, bolehSemat }) => (
-  <div className="mt-3 grid gap-2">
-    {items.map((rec, i) => {
-      const st = status[rec.id] || {};
-      const sibuk = !!st.memuat;
-      const tipeUtama = rec.chartTypes[0] || 'kpi';
-      const nonaktif = !bolehSemat || sibuk || isStreaming;
-      return (
-        <div
-          key={rec.id}
-          className="group relative bg-surface border border-line hover:border-line-strong hover:shadow-md rounded-card p-3 pl-4 transition-all duration-200 overflow-hidden"
-          style={{ animationDelay: `${i * 60}ms` }}
-          data-testid={`kartu-saran-${rec.id}`}
-        >
-          <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" aria-hidden="true" />
-          <div className="flex items-start gap-2.5">
-            {/* index badge */}
-            <span className="item-tile !w-6 !h-6 shrink-0 text-[10px] font-bold mt-0.5">
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                <span className="text-xs font-semibold text-ink leading-tight">{rec.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getCategoryClass(rec.category)}`}>
-                  {rec.category}
-                </span>
-              </div>
-              <p className="text-[11px] text-ink-2 leading-snug line-clamp-2 mb-2">{rec.description}</p>
-              {/* chip tipe = tombol; klik = sematkan dengan tipe itu */}
-              <div className="flex items-center gap-1 flex-wrap">
-                {rec.chartTypes.slice(0, 3).map((ct) => (
-                  <button
-                    key={ct}
-                    type="button"
-                    disabled={nonaktif}
-                    onClick={() => onPick(rec, ct)}
-                    title={`Sematkan sebagai ${ct}`}
-                    data-testid={`semat-${rec.id}-${ct}`}
-                    className="inline-flex items-center gap-0.5 text-[10px] bg-surface-2 text-ink-2 hover:bg-brand/15 hover:text-brand-ink px-1.5 py-0.5 rounded font-mono border border-transparent hover:border-brand/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChartIcon type={ct} className="w-2.5 h-2.5" />
-                    {ct}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* tombol sematkan: tipe pertama */}
-            <button
-              type="button"
-              disabled={nonaktif}
-              onClick={() => onPick(rec, tipeUtama)}
-              title={bolehSemat ? `Sematkan sebagai ${tipeUtama}` : 'Buka dashboard dulu untuk menyematkan'}
-              data-testid={`semat-${rec.id}`}
-              className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-control border border-brand/40 text-brand-ink bg-brand/10 hover:bg-brand hover:text-on-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {sibuk ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : st.pesan && !st.galat ? (
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              ) : (
-                <Plus className="w-3.5 h-3.5" />
-              )}
-              {sibuk ? 'Menyematkan' : st.pesan && !st.galat ? 'Tersemat' : 'Sematkan'}
-            </button>
-          </div>
-          {st.pesan && (
-            <p
-              className={`mt-2 text-[10.5px] leading-snug flex items-start gap-1 ${st.galat ? 'text-neg' : 'text-pos'}`}
-              data-testid={`status-${rec.id}`}
-            >
-              {st.galat ? <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />}
-              <span>{st.pesan}</span>
-            </p>
-          )}
-        </div>
-      );
-    })}
-  </div>
-);
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   isOpen,
@@ -165,7 +41,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   tenantKbId,
   dashboardId,
   onDashboardUpdated,
-  onAddWidget,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
@@ -194,47 +69,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    * ini dua baris (atau lebih) tampil "AKTIF" sekaligus.
    */
   const idxLangkahAktif = currentSteps.reduce((acc, s, i) => (s.status === 'in_progress' ? i : acc), -1);
-  const [sematkan, setSematkan] = useState<Record<string, StatusSemat>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Sematkan rekomendasi ke kanvas LANGSUNG — tanpa memanggil LLM lagi.
-   * Angka tetap dari dokumen resmi lewat jalur yang sama dengan katalog
-   * (`ambilWidgetPreset`); kalau dokumen tidak memuat indikatornya, muncul
-   * alasan jujur dan kanvas tidak ditambah apa pun.
-   */
-  const handleSematkan = async (rec: ChatRecommendation, tipe: string) => {
-    if (!onAddWidget) return;
-    const preset = WIDGET_CATALOG.find((p) => p.id === rec.id);
-    if (!preset) {
-      setSematkan((prev) => ({
-        ...prev,
-        [rec.id]: { galat: true, pesan: `Preset ${rec.id} tidak ditemukan di katalog.` },
-      }));
-      return;
-    }
-    setSematkan((prev) => ({ ...prev, [rec.id]: { memuat: true } }));
-    const { widget, error } = await ambilWidgetPreset(preset, tipe as WidgetType, sector, tenantId);
-    if (!widget) {
-      setSematkan((prev) => ({
-        ...prev,
-        [rec.id]: { galat: true, pesan: error || 'Gagal mengambil data dari dokumen.' },
-      }));
-      return;
-    }
-    try {
-      await onAddWidget(widget);
-      setSematkan((prev) => ({
-        ...prev,
-        [rec.id]: { pesan: `Tersemat ke kanvas (${widget.type}) — ${widget.title}` },
-      }));
-    } catch {
-      setSematkan((prev) => ({
-        ...prev,
-        [rec.id]: { galat: true, pesan: 'Gagal menyimpan ke dashboard.' },
-      }));
-    }
-  };
 
   /** Timestamp pesan dari server berbentuk ISO; tampilkan sebagai jam lokal. */
   const jam = (ts: string) => {
@@ -308,8 +143,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     `Berapa total aset ${sector.toUpperCase()} tahun 2025?`,
     `Apa saja indikator kinerja utama ${sector.toUpperCase()}?`,
     `Buat dashboard kinerja keuangan ${sector.toUpperCase()} 2026`,
-    `Rekomendasi chart untuk dashboard ini`,
     `Bagaimana pertumbuhan laba bersih tahun ini?`,
+    `Apa program kerja utama ${sector.toUpperCase()} tahun ini?`,
   ];
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -406,7 +241,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   actionTaken: data.actionTaken,
                   modeUsed: data.modeUsed,
                   citationsCount: data.citationsCount,
-                  recommendations: data.recommendations,
                 };
               } else if (eventName === 'error') {
                 pendingBotMsg = {
@@ -628,16 +462,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 })}
               </div>
 
-              {/* ✦ Interactive Recommendation Cards */}
-              {msg.recommendations && msg.recommendations.length > 0 && (
-                <RecommendationCards
-                  items={msg.recommendations}
-                  onPick={handleSematkan}
-                  status={sematkan}
-                  isStreaming={isStreaming}
-                  bolehSemat={!!onAddWidget && !!dashboardId}
-                />
-              )}
+              {/* Kartu rekomendasi DIHAPUS: rekomendasi chart kini datang dari
+                  jawaban RAG (chatbot), bukan dari katalog aplikasi. */}
 
               {/* Peringatan status dashboard. Label teknis internal ("Jalur A
                   (LLM JSON)", jumlah sitasi) sengaja TIDAK ditampilkan — itu
@@ -815,7 +641,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </button>
         </form>
         <p className="text-[10px] text-ink-3 text-center mt-1.5">
-          Didukung Orkestrator Node.js + Validasi Zod + Dual Jalur RAG BUMD
+          Jawaban & angka bersumber dari dokumen instansi lewat layanan RAG
         </p>
       </div>
     </div>

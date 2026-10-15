@@ -4,7 +4,6 @@ import { RagServiceError } from '../rag/http';
 import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
-import { buildWidgetsFromMetadata } from './fromMetadata';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
@@ -39,7 +38,6 @@ export interface GenerateOptions {
 /** Cara sebuah dashboard diperoleh — dipakai untuk pesan jujur ke pengguna. */
 export type GenerateMode =
   | 'Jalur A (LLM JSON)'
-  | 'Jalur B (Agregasi Metadata)'
   | 'Fallback (Template Snapshot)'
   | 'Gagal (Layanan RAG)'
   | 'Gagal (Dokumen Tidak Memadai)';
@@ -190,24 +188,18 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       modeUsed = 'Jalur A (LLM JSON)';
       logSummary.push(`[Jalur A Sukses] Berhasil memvalidasi ${synthesizedWidgets.length} widget dengan sitasi.`);
     } else {
-      logSummary.push(`[Jalur A Gagal] Ditolak: ${jsonRes.errors?.join('; ')}. Beralih ke Jalur B...`);
+      logSummary.push(`[Jalur A Gagal] Ditolak: ${jsonRes.errors?.join('; ')}.`);
     }
   }
 
-  // JALUR B FALLBACK: If Jalur A was not used or failed, use metadata aggregation
-  if (synthesizedWidgets.length === 0 && ragRes.chunks && ragRes.chunks.length > 0) {
-    logSummary.push('[Jalur B] Menjalankan agregasi metadata deterministik...');
-    const metaRes = buildWidgetsFromMetadata(ragRes.chunks, sector, userPrompt);
-    if (metaRes.success && metaRes.widgets.length > 0) {
-      synthesizedWidgets = metaRes.widgets;
-      dashboardTitle = metaRes.dashboardTitle;
-      dashboardDesc = metaRes.description;
-      modeUsed = 'Jalur B (Agregasi Metadata)';
-      logSummary.push(`[Jalur B Sukses] Tersusun ${synthesizedWidgets.length} widget murni dari metadata dokumen.`);
-    }
-  }
+  // JALUR B DIHAPUS (permintaan user 2026-10-15): aplikasi TIDAK menyusun dashboard
+  // sendiri dari metadata/chunk (modul `fromMetadata` sudah dihapus). Modul itu
+  // mengisi tren & sparkline dengan angka yang di-HARDCODE di kode kita, sehingga
+  // kanvas bisa menampilkan grafik yang tidak berasal dari RAG sama sekali. Sekarang
+  // angka hanya boleh datang dari RAG lewat Jalur A (/extract JSON terstruktur);
+  // kalau tidak ada, dashboard TIDAK dibuat.
 
-  // FALLBACK 3: tidak ada data sah sama sekali.
+  // FALLBACK: tidak ada data sah sama sekali.
   // Snapshot contoh hanya boleh dipakai di mode demo tanpa RAG nyata. Dengan RAG
   // nyata (provider `http`) snapshot itu menampilkan angka + sitasi karangan yang
   // tampak resmi, jadi permintaan digagalkan dan dashboard TIDAK disimpan.
@@ -215,7 +207,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   let alasanGagal: string | undefined;
   if (synthesizedWidgets.length === 0) {
     if (izinkanSnapshotDemo) {
-      logSummary.push('[Fallback 3] Menggunakan template dashboard tersimpan (mode demo).');
+      logSummary.push('[Fallback] Menggunakan template dashboard tersimpan (mode demo).');
       const fb = getFallbackDemoDashboard(sector, tenantId);
       synthesizedWidgets = fb.widgets;
       dashboardTitle = fb.title;
@@ -225,8 +217,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       modeUsed = 'Gagal (Dokumen Tidak Memadai)';
       ok = false;
       alasanGagal =
-        'RAG tidak mengembalikan angka yang bisa divalidasi dari dokumen instansi ini, ' +
-        'jadi dashboard tidak dibuat supaya kanvas tidak menampilkan angka contoh.';
+        'Layanan RAG tidak mengembalikan data terstruktur yang bisa divalidasi dari dokumen instansi ini, ' +
+        'jadi dashboard tidak dibuat supaya kanvas tidak menampilkan angka yang bukan dari dokumen.';
       logSummary.push(`[Gagal] ${alasanGagal}`);
     }
   }

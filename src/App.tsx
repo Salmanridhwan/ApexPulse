@@ -1345,7 +1345,6 @@ export default function App() {
         tenantName={currentTenant?.name}
         tenantKbId={currentTenant?.knowledgeBaseId}
         dashboardId={activeDashboard?.id}
-        onAddWidget={handleAddWidgetFromCatalog}
         onDashboardUpdated={(newDash) => {
           setActiveDashboard(newDash);
           setDashboards((prev) => [

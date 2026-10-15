@@ -439,6 +439,39 @@ Menu di grup **Kinerja & Kepatuhan**.
     (tidak dipaksa); minta "2 widget" yang sudah terpenuhi → tidak menambah.
   - Verifikasi: `tsc --noEmit` 0 error (src+server), `npm run build` hijau, konsol browser
     0 error, regresi unit lulus (lkjip 52, pk 65, risiko 70, aset 57, katalog-kb 61).
+- **Chatbot HANYA meneruskan ke RAG + Jalur B dihapus — DIUBAH 2026-10-14.** Permintaan user:
+  "chatbot hanya akan mengirimkan pertanyaan ke RAG, jangan menjawabnya dari project saya" dan
+  "untuk katalog widget juga, widgetnya dibuat oleh RAG langsung".
+  - **Balasan lokal DIHAPUS dari `/api/chat`.** Dulu "rekomendasi chart"/"widget apa"/"tambah
+    widget" dijawab aplikasi sendiri dari `WIDGET_CATALOG` (tanpa menyentuh RAG). Case itu
+    dibuang; permintaan semacam itu kini diteruskan ke RAG lewat `/query` (persona + riwayat)
+    dan dijawab `qa_answer`/`Chatbot RAG`. Terbukti e2e: `rekomendasi chart apa yang bagus?`
+    → `actionTaken: qa_answer` (dulu `recommend`).
+  - **"tambahkan widget <indikator>" kini WIDGETNYA DIBUAT RAG.** Case baru di `/api/chat`
+    (`mintaTambahWidget`) memanggil `ragClient.ambilDataWidget(indikator, …)` — panggilan yang
+    sama dengan tombol Tambah — lalu memasang kartu dari data yang RAG kembalikan. Kalau dokumen
+    tidak memuat indikatornya → pesan jujur, TANPA angka contoh. Katalog `WIDGET_CATALOG` tidak
+    lagi dipakai untuk menjawab chat.
+  - **Jalur B DIHAPUS TOTAL.** `src/services/builder/fromMetadata.ts` dihapus dari repo. Dulu
+    jalur itu menyusun widget dari metadata chunk dengan **angka tren & sparkline yang
+    di-HARDCODE di kode kita** (`data: [20.2, 21.0, …]`, `sparkline` sintetis, `delta: 5.0`),
+    sehingga kanvas bisa menampilkan grafik yang tidak berasal dari RAG. Sekarang angka hanya
+    dari RAG lewat Jalur A (`/extract` JSON terstruktur); kalau tidak ada → `Gagal (Dokumen
+    Tidak Memadai)` + pesan jujur, dashboard TIDAK dibuat.
+  - Tipe `GenerateMode` & `ChatMessage.modeUsed` dibersihkan dari varian `'Jalur B (Agregasi
+    Metadata)'`; kartu rekomendasi lokal di `ChatPanel.tsx` (beserta state `sematkan`,
+    `handleSematkan`, `RecommendationCards`, helper `ChartIcon`/`getCategoryClass`, prop
+    `onAddWidget`) dihapus karena tak ada lagi yang mengirimnya.
+  - Bukti e2e terhadap layanan RAG nyata (admin@gmail.com): (1) pertanyaan data → `qa_answer`
+    / `Chatbot RAG`, jawaban bersumber dokumen; (2) `rekomendasi chart…` → `qa_answer` (bukan
+    `recommend`); (3) `buatkan dashboard kinerja` → `create_dashboard` via `Jalur A (LLM JSON)`,
+    8 widget, TIDAK ada satupun widget "Tren Agregasi … (12 Bulan)" atau "Kompilasi Temuan
+    Dokumen Resmi (Jalur B - Tanpa AI)".
+  - Uji: `scripts/tmp-verif-rag-saja.ts` (**9 pemeriksaan**, klien RAG tiruan — membuktikan
+    tanpa `structuredJson` dashboard TIDAK dibuat walau `chunks` ada) dan
+    `scripts/tmp-uji-chat-rag-saja.ts` / `tmp-uji-dash-rag-saja.ts` (e2e ke layanan nyata).
+  - Verifikasi: `tsc --noEmit` 0 error (src+server), `npm run build` hijau, regresi unit lulus
+    (permintaan-widget 47, lkjip 52, pk 65, risiko 70, aset 57).
 - Skrip uji `scripts/tmp-uji-*.sh` / `*.ts` sudah tercakup `.gitignore` (`tmp-*`).
 
 ## 10. Yang TIDAK diubah
