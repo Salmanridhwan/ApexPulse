@@ -32,6 +32,21 @@ export interface Tenant {
   dokumenTerakhir?: string[];
   /** Waktu sinkronisasi KB terakhir (ISO). Ditampilkan di kartu instansi. */
   kbTersinkronPada?: string;
+  /**
+   * ID project/organisasi instansi ini di layanan KMS (`ragkms.aiones.app`).
+   *
+   * KMS memisahkan berkas per project, dan SATU API key dapat mengakses banyak
+   * project. Karena itu unggah berkas WAJIB menyertakan `organizationId` yang
+   * benar — kalau kosong, berkas tidak bisa diunggah (jangan menebak project).
+   * Dipetakan manual admin di panel admin (satu API key, banyak KB).
+   */
+  kmsOrganizationId?: string;
+  /**
+   * Knowledge base KMS yang terhubung ke project di atas (mis.
+   * `kb_aoc_budi_motor_8nx3`). Hanya untuk tampilan/diagnostik — penentuan
+   * tujuan unggah memakai `kmsOrganizationId`.
+   */
+  kmsKnowledgeBase?: string;
 }
 
 export interface User {
@@ -1127,4 +1142,69 @@ export interface RingkasanLKjIP {
   lewatTenggat: number;
   /** Periode terbaru yang tercatat. */
   periodeTerbaru: string | null;
+}
+
+/* ================= MANAJEMEN BERKAS (KMS) ================= */
+
+/**
+ * Satu berkas di repositori KMS (`ragkms.aiones.app`).
+ *
+ * Bentuknya mengikuti balasan `GET /api/documents` layanan KMS; field yang
+ * tidak dikirim layanan dibiarkan `undefined` (jangan diisi tebakan).
+ */
+export interface BerkasKMS {
+  id: string;
+  organizationId: string;
+  organizationName?: string;
+  title: string;
+  category?: string;
+  /** 'document' | 'photo' */
+  repositoryType?: string;
+  /** PDF, DOCX, XLSX, TXT, JPG, … (huruf besar dari layanan). */
+  fileType?: string;
+  fileSizeKb?: number;
+  fileUrl?: string;
+  year?: number | null;
+  department?: string | null;
+  notes?: string | null;
+  summary?: string | null;
+  tags?: string[];
+  uploadedBy?: string;
+  uploadedAt?: string;
+  chunksCount?: number;
+  /** 'indexed' | 'pending' | 'failed' | … (status indeks ke RAG). */
+  ragStatus?: string;
+  cdnFileId?: string | null;
+}
+
+/** Project/organisasi di layanan KMS (satu project = satu knowledge base). */
+export interface OrganisasiKMS {
+  id: string;
+  name: string;
+  code?: string;
+  /** KB yang otomatis dibuat KMS untuk project ini (mis. `kb_aoc_budi_motor_8nx3`). */
+  knowledgeBase?: string;
+  type?: string;
+  status?: string;
+  documentsCount?: number;
+  chunksCount?: number;
+  storageUsedMb?: number;
+  createdAt?: string;
+}
+
+/** Ringkasan repositori berkas instansi — DIHITUNG server dari data KMS. */
+export interface RingkasanBerkas {
+  total: number;
+  /** Total ukuran berkas (KB) dari field `fileSizeKb`. */
+  totalKb: number;
+  /** Jumlah berkas yang sudah terindeks ke RAG. */
+  terindeks: number;
+  /** Jumlah berkas yang belum/gagal terindeks. */
+  belumTerindeks: number;
+  /** Jumlah per jenis berkas (PDF, DOCX, …), urut menurun. */
+  perTipe: Array<{ tipe: string; jumlah: number }>;
+  /** Ukuran berkas terbesar (KB), 0 bila kosong. */
+  terbesarKb: number;
+  /** Waktu unggah terbaru (ISO), null bila kosong. */
+  terbaruPada: string | null;
 }

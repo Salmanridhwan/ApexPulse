@@ -1170,6 +1170,93 @@ export class ConfigurableRagClient implements RagClient {
   }
 
   /**
+   * Daftar SELURUH knowledge base di layanan RAG beserta statistiknya.
+   *
+   * Dipakai tombol "Perbarui RAG" di tab Instansi & KB: admin bisa melihat KB
+   * BARU yang muncul di sumber RAG tanpa harus menebak ID-nya, lalu memasangnya
+   * ke sebuah instansi.
+   *
+   * Memakai endpoint `GET {base}/knowledge-bases`. Kalau endpoint tidak ada,
+   * mengembalikan daftar kosong DENGAN `catatan` — jangan sampai UI mengaku
+   * "tidak ada KB" padahal layanannya yang tidak punya endpoint itu.
+   */
+  async daftarKnowledgeBase(): Promise<{
+    kbs: Array<{
+      knowledgeBaseId: string;
+      documents: number;
+      chunks: number;
+      tokens: number;
+      completed: number;
+      processing: number;
+      failed: number;
+      updatedAt?: string;
+    }>;
+    catatan?: string;
+  }> {
+    const cfg = this.getRagConfig();
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) {
+      return {
+        kbs: [],
+        catatan:
+          'Provider RAG bukan "HTTP" (mode mock) — daftar knowledge base hanya tersedia untuk layanan RAG nyata.',
+      };
+    }
+    const { dipakai } = await this.resolveBase(cfg);
+    const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 30000);
+    let res: Response;
+    try {
+      res = await fetch(`${dipakai}/knowledge-bases`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${cfg.apiKey}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      return {
+        kbs: [],
+        catatan: `Tidak bisa menghubungi layanan RAG: ${err instanceof Error ? err.message : 'kesalahan jaringan'}`,
+      };
+    }
+    if (res.status === 404 || res.status === 405) {
+      return {
+        kbs: [],
+        catatan:
+          'Layanan RAG ini tidak menyediakan endpoint /knowledge-bases, jadi daftar KB tidak bisa dibaca.',
+      };
+    }
+    if (!res.ok) {
+      return {
+        kbs: [],
+        catatan: `Layanan RAG menjawab HTTP ${res.status} — ini galat layanan, bukan berarti tidak ada KB.`,
+      };
+    }
+    const mentah: any = await res.json().catch(() => null);
+    const daftarMentah: any[] =
+      (Array.isArray(mentah?.data?.knowledge_bases) && mentah.data.knowledge_bases) ||
+      (Array.isArray(mentah?.knowledge_bases) && mentah.knowledge_bases) ||
+      (Array.isArray(mentah?.data) && mentah.data) ||
+      [];
+
+    const angka = (v: any): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    const kbs = daftarMentah
+      .map((k: any) => ({
+        knowledgeBaseId: String(k?.knowledge_base_id ?? k?.knowledgeBaseId ?? k?.id ?? '').trim(),
+        documents: angka(k?.documents),
+        chunks: angka(k?.chunks),
+        tokens: angka(k?.tokens),
+        completed: angka(k?.completed),
+        processing: angka(k?.processing),
+        failed: angka(k?.failed),
+        updatedAt: k?.updated_at ? String(k.updated_at) : undefined,
+      }))
+      .filter((k) => k.knowledgeBaseId);
+
+    return {
+      kbs,
+      catatan: kbs.length === 0 ? 'Layanan RAG tidak melaporkan knowledge base apa pun.' : undefined,
+    };
+  }
+
+  /**
    * Profil instansi dari dokumen KB: nama, kota, sektor, ringkasan.
    *
    * Nama instansi dipakai apa adanya saat menyusun dashboard (nama yang tidak cocok

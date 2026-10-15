@@ -350,6 +350,66 @@ Menu di grup **Kinerja & Kepatuhan**.
   - Bug nyata yang ditemukan & diperbaiki saat pengujian: tenggat LKjIP salah bulan
     (`Date.UTC(y+1, 1, 1)` = 31 Jan, seharusnya akhir Feb → `Date.UTC(y+1, 2, 1) - 1`); PATCH
     menerima status tak dikenal (PK & LKjIP) yang seharusnya 400.
+- **Manajemen Berkas (KMS) — SELESAI 2026-10-14.** Menu baru di grup **Kinerja & Kepatuhan**
+  untuk mengunggah & mengelola berkas instansi di **KMS BUMD** (`https://ragkms.aiones.app`,
+  layanan *berbeda* dari RAG query `rag.aiones.app` — tetapi **berbagi vector store yang sama**,
+  jadi berkas yang diunggah lewat KMS langsung terbaca chat & dashboard).
+  - **Model izin**: SATU API key KMS dapat mengakses **banyak** project, jadi tujuan unggah
+    ditentukan `Tenant.kmsOrganizationId` yang **dipetakan manual admin** (panel admin → tab
+    Konfigurasi, bagian *KMS — Repositori Berkas*, dan tab Instansi & KB). Instansi yang belum
+    dipetakan menjawab `terpetakan: false` + cara perbaikannya — **bukan** "0 berkas" palsu.
+  - **Berkas**: logika murni `src/services/berkas/kms.ts` (validasi ekstensi/ukuran, ringkasan,
+    filter, format ukuran), klien HTTP `src/services/berkas/kmsClient.ts`
+    (`GET /api/organizations`, `GET /api/documents`, `POST /api/documents/upload`,
+    `DELETE /api/documents/{id}`, `GET /api/documents/{id}/{view,download}`).
+  - **Endpoint**: `GET /api/berkas` (+`?cakupan=all` untuk admin), `GET /api/berkas/ringkasan`,
+    `POST /api/berkas/unggah` (base64 JSON — server yang menyusun multipart ke KMS),
+    `DELETE /api/berkas/:id` (**admin saja**), `GET /api/berkas/:id/lihat|unduh`
+    (**diteruskan server** supaya API key tidak pernah sampai ke browser),
+    `GET /api/admin/kms-organisasi`, `POST /api/admin/kms-uji`.
+  - **Semua jenis berkas** diterima (PDF, Word, Excel, PowerPoint, teks, gambar), maks **50 MB**;
+    batas `express.json` dinaikkan 25 → **70 MB** agar base64 50 MB tetap lolos.
+  - **Keamanan kredensial**: `kmsApiKey` selalu keluar **tertopeng** (`kms_*********6b2f`) dari
+    `GET/POST /api/admin/config` dan `POST /api/admin/config-simpan-uji`; helper `lindungiKunci()`
+    mencegah nilai bertopeng tersimpan sebagai kredensial asli. Uji e2e **54/54**.
+  - **Bug nyata yang ditemukan & diperbaiki saat pengujian**: `POST /api/admin/config` semula
+    mengembalikan `kmsApiKey` **apa adanya** (bocor ke klien) — masking hanya dipasang di `GET`.
+  - Diverifikasi: `tsc --noEmit` **0 error**, `npm run build` sukses (chunk
+    `ManajemenBerkasPage-YL0AWt2B.js` 18,85 kB), unggah/daftar/unduh/hapus **sungguhan ke KMS**,
+    penjagaan peran (analis 403), dan konfigurasi tersimpan di **db.json + MySQL `kv`**.
+    Data uji dibersihkan: **0 sisa berkas uji di KMS** (hanya 2 dokumen Telkom University yang asli),
+    4 entri audit artefak uji dihapus, tabel fitur lain tetap 0 baris.
+- **Tombol "Perbarui RAG" — SELESAI 2026-10-14.** Di sebelah "Perbarui Semua" (tab Instansi & KB).
+  Membaca ulang **katalog knowledge base** langsung dari layanan RAG (`GET {base}/knowledge-bases`)
+  sehingga KB baru yang ditambahkan di sumbernya langsung terlihat tanpa menebak ID-nya.
+  Panel menampilkan 47 KB dalam tiga kelompok: **Siap dipakai** (rapi & belum terpasang),
+  **Sudah dipakai instansi** (menyebut instansi pemakainya), dan **Perlu dicek dulu**
+  (pola sisa demo `dm-*`, `kb-vibecontent-*`, `kb_prj_*`, ID huruf besar semua, atau
+  **penulisan ganda** yang terdeteksi dari bentuk-normal ID — mis. `kb_pamjaya` vs `kb_pam_jaya`
+  dan `kb_tirtamoedal` vs `kb_tirta_moedal`). Dari panel itu admin bisa langsung **"Pakai"**:
+  memasang sebuah KB ke instansi terpilih, yang memakai `PATCH /api/admin/tenants/:id` yang
+  sudah ada sehingga isi KB langsung tersinkron. Logika murni di `src/services/rag/kbKatalog.ts`;
+  endpoint `GET /api/admin/kb-tersedia` (khusus admin, read-only terhadap layanan RAG).
+  Uji: unit `scripts/tmp-uji-katalog-kb.ts` (**61 pemeriksaan**).
+- **RAG Copilot mengikuti instansi aktif — DIPERBAIKI 2026-10-14.** Keluhan: saat login sebagai
+  admin, copilot "ngacak" mengambil KB, bukan KB instansi yang sedang dibuka. Dua bug nyata:
+  (1) `App.tsx` mengisi instansi aktif dengan **`data[0]`** — instansi pertama pada daftar,
+  bukan instansi milik pengguna yang login. Saat admin login, `handleLoginSuccess` gagal
+  menemukan instansinya karena `tenants` masih kosong, lalu efek pemuatan instansi menimpanya
+  dengan instansi lain (urutannya arbitrer) → copilot menjawab dari KB instansi yang tidak
+  sedang dibuka. Sekarang instansi aktif dicari lewat `currentUser.tenantId`, `handleLogout`
+  mengosongkan instansi aktif, dan objek instansi aktif disinkronkan ulang tiap daftar instansi
+  dimuat (lewat `onTenantsRefreshed` dari panel admin).
+  (2) `ChatPanel` memuat riwayat ke **`/api/chat/umum` tanpa `tenantId`**, sehingga server
+  menjawab dengan instansi milik akun admin sendiri sementara jawaban copilot datang dari
+  instansi aktif — riwayat dan jawaban berasal dari dua instansi berbeda. Sekarang `tenantId`
+  ikut dikirim di setiap permintaan riwayat, `tenantId` masuk daftar dependensi efek, dan
+  pesan dikosongkan saat instansi berganti. Ditambah label **"Menjawab untuk <instansi> · <KB>"**
+  di header copilot agar sumber jawaban selalu terlihat. Default kolom instansi pada form
+  pengguna di panel admin juga tidak lagi `tenantsRes[0]`.
+  Bukti: `/api/chat/umum` tanpa `tenantId` → `tenant-1791501310547` (PAM JAYA, 5 pesan);
+  dengan `?tenantId=tenant-1791429954407` → chat Tirta Moedal (3 pesan), terpisah.
+  Suite isolasi tetap lulus (isolasi-kuat 6/6, isolasi-tenant 13/13).
 - Skrip uji `scripts/tmp-uji-*.sh` / `*.ts` sudah tercakup `.gitignore` (`tmp-*`).
 
 ## 10. Yang TIDAK diubah

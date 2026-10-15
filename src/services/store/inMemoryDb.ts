@@ -314,6 +314,17 @@ export class InMemoryDb {
     smtpUser: 'alert@bumd-pemda.go.id',
     smtpFrom: 'AionesBoard Alert System <alert@aionesboard.id>',
     auditRetentionDays: 90,
+    /**
+     * KMS (Knowledge Management System) — repositori berkas & media.
+     *
+     * Layanan TERPISAH dari RAG query (`ragApiUrl`): KMS yang menyimpan berkas,
+     * mengindeksnya, lalu RAG query membacanya. Satu `kmsApiKey` bisa mengakses
+     * BANYAK project, jadi tujuan unggah ditentukan `Tenant.kmsOrganizationId`
+     * (dipetakan admin per instansi) — bukan dari key.
+     */
+    kmsApiUrl: 'https://ragkms.aiones.app',
+    kmsApiKey: '',
+    kmsTimeoutSeconds: 120,
   };
 
   public shareTokens: Record<string, string> = {}; // token -> dashboardId

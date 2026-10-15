@@ -4,6 +4,7 @@ import {
   Check,
   CheckCircle2,
   Database,
+  FolderOpen,
   Key,
   LogOut,
   Menu,
@@ -48,6 +49,37 @@ const BarisOtomatis: React.FC<{ label: string; nilai?: string }> = ({ label, nil
   </div>
 );
 
+/**
+ * Angka gaya Indonesia untuk daftar katalog KB (mis. 1.234).
+ * Dipakai di panel "Perbarui RAG" agar jumlah token mudah dibaca.
+ */
+const angkaId = (n: unknown): string => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
+
+/**
+ * Tanggal ringkas dari layanan RAG (ISO → "14 Okt 2026").
+ * Mengembalikan null bila tanggalnya tidak bisa dibaca, supaya UI tidak
+ * menampilkan "Invalid Date".
+ */
+const tanggalRingkas = (iso?: string): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+/**
+ * Saring satu baris katalog kapan tombol "Perbarui RAG" sedang terbuka.
+ *
+ * Pengelompokan (terpakai/tersedia/perlu dicek) sudah dihitung server; ini hanya
+ * penyaring tampilan supaya pencarian terasa langsung tanpa memanggil ulang.
+ */
+const cocokBarisKb = (k: any, cari: string, hanyaBelumDipakai: boolean): boolean => {
+  if (hanyaBelumDipakai && k?.terpakai) return false;
+  const q = String(cari || '').trim().toLowerCase();
+  if (q && !String(k?.knowledgeBaseId || '').toLowerCase().includes(q)) return false;
+  return true;
+};
+
 interface AdminProps {
   currentUser: User | null;
   onLogout: () => void;
@@ -56,6 +88,14 @@ interface AdminProps {
   onSelectTab: (tab: AdminTabId) => void;
   /** Buka/tutup sidebar utama aplikasi dari header halaman admin. */
   onToggleSidebar: () => void;
+  /**
+   * Dipanggil setelah panel admin memuat ulang daftar instansi.
+   *
+   * App memegang satu-satunya objek "instansi aktif" (dipakai RAG Copilot untuk
+   * menentukan KB). Tanpa pemberitahuan ini, mengubah KB sebuah instansi di panel
+   * tidak akan terlihat oleh copilot sampai halaman dimuat ulang.
+   */
+  onTenantsRefreshed?: () => void;
 }
 
 export const Admin: React.FC<AdminProps> = ({
@@ -64,6 +104,7 @@ export const Admin: React.FC<AdminProps> = ({
   activeTab,
   onSelectTab,
   onToggleSidebar,
+  onTenantsRefreshed,
 }) => {
 
   // Admin Data State
@@ -95,6 +136,28 @@ export const Admin: React.FC<AdminProps> = ({
   // Panel Knowledge Base: daftar dokumen sebuah KB (dipisah dari form umum).
   const [kbInput, setKbInput] = useState('');
   const [kbLoading, setKbLoading] = useState(false);
+
+  // Uji koneksi KMS (repositori berkas) — memakai konfigurasi yang TERSIMPAN.
+  const [kmsLoading, setKmsLoading] = useState(false);
+  const [kmsHasil, setKmsHasil] = useState<{ ok: boolean; jumlahProject: number; pesan: string } | null>(null);
+  const [kmsOrganisasi, setKmsOrganisasi] = useState<Array<{ id: string; name: string; knowledgeBase?: string }>>([]);
+
+  // Katalog KB dari layanan RAG (tombol "Perbarui RAG").
+  const [katalogTerbuka, setKatalogTerbuka] = useState(false);
+  const [katalogLoading, setKatalogLoading] = useState(false);
+  const [katalogCari, setKatalogCari] = useState('');
+  const [katalogHanyaBelum, setKatalogHanyaBelum] = useState(false);
+  const [katalogGalat, setKatalogGalat] = useState<string | null>(null);
+  const [katalog, setKatalog] = useState<{
+    kbs: any[];
+    kelompok: { terpakai: any[]; tersedia: any[]; perluDicek: any[] };
+    ringkasan: any;
+    catatan?: string;
+    baseUrl?: string;
+  } | null>(null);
+  /** Pilihan instansi untuk tiap KB yang belum dipakai: kbId -> tenantId */
+  const [kbPilihInstansi, setKbPilihInstansi] = useState<Record<string, string>>({});
+  const [kbSedangPasang, setKbSedangPasang] = useState<string | null>(null);
   const [kbHasil, setKbHasil] = useState<{
     kbId: string;
     jumlah: number;
@@ -133,6 +196,8 @@ export const Admin: React.FC<AdminProps> = ({
   const [tenantCity, setTenantCity] = useState('');
   const [tenantCode, setTenantCode] = useState('');
   const [tenantKbId, setTenantKbId] = useState('');
+  /** Project KMS instansi ini (tujuan unggah menu Manajemen Berkas). */
+  const [tenantKmsOrgId, setTenantKmsOrgId] = useState('');
   /** Hasil pembacaan profil instansi dari KB (nama/kota/sektor/jumlah dokumen). */
   const [tenantKbInfo, setTenantKbInfo] = useState<{
     kbId: string;
@@ -182,8 +247,13 @@ export const Admin: React.FC<AdminProps> = ({
       if (Array.isArray(logsRes)) setAuditLogs(logsRes);
       if (Array.isArray(alertsRes)) setAlertRules(alertsRes);
       if (Array.isArray(tenantsRes) && tenantsRes.length > 0 && !userTenantId) {
-        setUserTenantId(tenantsRes[0].id);
+        // Default kolom instansi pada form pengguna = instansi admin sendiri,
+        // bukan instansi pertama pada daftar (urutannya arbitrer).
+        const milikAdmin = tenantsRes.find((t: any) => t.id === currentUser?.tenantId);
+        setUserTenantId(milikAdmin?.id || tenantsRes[0].id);
       }
+      // Beri tahu App supaya objek instansi aktif (dipakai header copilot) ikut segar.
+      onTenantsRefreshed?.();
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -260,6 +330,9 @@ export const Admin: React.FC<AdminProps> = ({
             // Jumlah dokumen TIDAK dikirim dari sini — server membacanya dari KB
             // nyata saat sinkron, jadi tidak ada angka karangan.
             knowledgeBaseId: tenantKbId.trim() || undefined,
+            // Project KMS (repositori berkas). Dikirim eksplisit supaya admin bisa
+            // MENGOSONGKAN pemetaan (string kosong -> undefined), bukan hanya mengisi.
+            kmsOrganizationId: tenantKmsOrgId.trim() || undefined,
           }),
         }
       );
@@ -307,8 +380,9 @@ export const Admin: React.FC<AdminProps> = ({
     setTenantCity('');
     setTenantShortName('');
     setTenantCode('');
-    setTenantSector('pdam');
     setTenantKbId('');
+    setTenantKmsOrgId('');
+    setTenantSector('pdam');
     setTenantKbInfo(null);
   };
 
@@ -321,10 +395,10 @@ export const Admin: React.FC<AdminProps> = ({
     setTenantCode(t.code || '');
     setTenantSector(t.sector || 'pdam');
     setTenantKbId(t.knowledgeBaseId || '');
+    setTenantKmsOrgId(t.kmsOrganizationId || '');
     setTenantKbInfo(null);
     setIsAddTenantOpen(true);
   };
-
   /** Buka modal dalam mode TAMBAH: kosongkan dulu supaya tidak ada sisa nilai. */
   const bukaTambahTenant = () => {
     tutupModalTenant();
@@ -385,6 +459,123 @@ export const Admin: React.FC<AdminProps> = ({
       });
     } finally {
       setKeyTestLoading(false);
+    }
+  };
+
+  /**
+   * Simpan konfigurasi KMS lalu uji koneksinya.
+   *
+   * Sama seperti uji API Key RAG: simpan dulu, baru uji — supaya yang diuji
+   * benar-benar key baru, bukan key lama yang masih tersimpan.
+   */
+  const handleSimpanUjiKms = async () => {
+    setKmsLoading(true);
+    setKmsHasil(null);
+    try {
+      const simpan = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(systemConfig),
+      });
+      const dataSimpan = await simpan.json().catch(() => ({}));
+      if (dataSimpan?.kmsApiKey !== undefined) setSystemConfig(dataSimpan);
+
+      const res = await fetch('/api/admin/kms-uji', { method: 'POST' });
+      const hasil = await res.json().catch(() => ({}));
+      setKmsHasil(hasil);
+      if (hasil?.ok) await muatKmsOrganisasi();
+    } catch (err: any) {
+      setKmsHasil({ ok: false, jumlahProject: 0, pesan: `Gagal menghubungi server: ${err?.message || 'kesalahan jaringan'}` });
+    } finally {
+      setKmsLoading(false);
+    }
+  };
+
+  /** Muat daftar project KMS untuk pilihan pemetaan instansi. */
+  const muatKmsOrganisasi = async () => {
+    try {
+      const res = await fetch('/api/admin/kms-organisasi');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data?.organisasi)) setKmsOrganisasi(data.organisasi);
+    } catch {
+      // Diamkan: daftar project hanya pelengkap form; galatnya tampil di uji koneksi.
+    }
+  };
+
+  /**
+   * Muat katalog KB dari layanan RAG (tombol "Perbarui RAG").
+   *
+   * Selalu dibaca ulang dari layanan — tidak ada salinan lokal yang bisa basi,
+   * supaya KB yang baru ditambahkan di sumber RAG langsung terlihat di sini.
+   */
+  const muatKatalogKb = async () => {
+    setKatalogLoading(true);
+    setKatalogGalat(null);
+    try {
+      const res = await fetch('/api/admin/kb-tersedia');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Gagal membaca katalog KB (HTTP ${res.status}).`);
+      setKatalog(data);
+      if (!Array.isArray(data?.kbs) || data.kbs.length === 0) {
+        setKatalogGalat(data?.catatan || 'Layanan RAG tidak melaporkan knowledge base apa pun.');
+      }
+    } catch (err: any) {
+      setKatalog(null);
+      setKatalogGalat(err?.message || 'Gagal membaca katalog KB.');
+    } finally {
+      setKatalogLoading(false);
+    }
+  };
+
+  const bukaKatalogKb = () => {
+    setKatalogTerbuka(true);
+    setKbPilihInstansi({});
+    void muatKatalogKb();
+  };
+
+  /**
+   * Pasang sebuah KB ke instansi terpilih, lalu sinkronkan.
+   *
+   * Memakai PATCH instansi yang sudah ada: server otomatis membaca ulang isi KB
+   * dan memperbarui jumlah dokumen, jadi tidak ada jalur tulis kedua yang perlu
+   * dijaga terpisah.
+   */
+  const pasangKbKeInstansi = async (kbId: string) => {
+    const tenantId = kbPilihInstansi[kbId];
+    if (!tenantId) return;
+    setKbSedangPasang(kbId);
+    try {
+      const res = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ knowledgeBaseId: kbId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Gagal memasang KB ke instansi.');
+      const ten = tenants.find((t) => t.id === tenantId);
+      const ok = data?.sinkron?.ok === true;
+      setSinkronHasil({
+        judul: `${ten?.name || tenantId} ⇐ KB ${kbId}`,
+        dokumenBaru: [],
+        dokumenHilang: [],
+        catatan: ok
+          ? `KB dipasang & tersinkron — ${data.sinkron.jumlahDokumen ?? 0} dokumen terbaca dari KB ${kbId}.`
+          : data?.sinkron?.error || 'KB dipasang, tetapi KB belum tersinkron (baca ulang nanti).',
+        gagal: !ok,
+      });
+      await loadData();
+      await muatKatalogKb();
+      setKbPilihInstansi({});
+    } catch (err: any) {
+      setSinkronHasil({
+        judul: 'Gagal memasang KB',
+        dokumenBaru: [],
+        dokumenHilang: [],
+        catatan: err?.message || 'Kesalahan jaringan',
+        gagal: true,
+      });
+    } finally {
+      setKbSedangPasang(null);
     }
   };
 
@@ -922,6 +1113,20 @@ export const Admin: React.FC<AdminProps> = ({
                     <RefreshCw className={`w-3.5 h-3.5 ${sinkronLoading === 'semua' ? 'animate-spin' : ''}`} />
                     <span>Perbarui Semua</span>
                   </button>
+                  {/* Baca ulang KATALOG KB dari layanan RAG — supaya KB yang baru
+                      ditambahkan di sumbernya langsung terlihat & bisa dipasang.
+                      Namanya sengaja BUKAN "Perbarui RAG": tombol per-kartu instansi
+                      di bawah juga bernama itu, tapi fungsinya lain (menyegarkan satu
+                      instansi), jadi dua tombol berbeda nama itu wajib dipisah. */}
+                  <button
+                    onClick={bukaKatalogKb}
+                    className="px-3.5 py-2 border border-line hover:bg-surface-2 text-ink-2 rounded-control text-xs font-medium transition-colors flex items-center gap-1.5"
+                    title="Baca ulang daftar knowledge base dari layanan RAG (lihat KB yang baru muncul di sumbernya)"
+                    data-testid="katalog-kb"
+                  >
+                    <Database className={`w-3.5 h-3.5 ${katalogLoading && katalogTerbuka ? 'animate-pulse' : ''}`} />
+                    <span>Katalog KB</span>
+                  </button>
                   <button
                     onClick={bukaTambahTenant}
                     className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
@@ -1217,6 +1422,86 @@ export const Admin: React.FC<AdminProps> = ({
                     sumbernya, jadi tidak lagi mengandalkan deret contoh. Kalau layanan RAG tidak
                     punya /extract, aplikasi otomatis memakai jalur retrieval biasa.
                   </label>
+                </div>
+
+                {/* ===== KMS: repositori berkas (menu Manajemen Berkas) ===== */}
+                <div className="pt-4 border-t border-line space-y-3" data-testid="konfigurasi-kms">
+                  <div>
+                    <h4 className="font-bold text-ink flex items-center gap-1.5">
+                      <FolderOpen className="w-4 h-4 text-brand" />
+                      <span>KMS — Repositori Berkas</span>
+                    </h4>
+                    <p className="text-[11px] text-ink-2 mt-0.5">
+                      Layanan penyimpanan berkas instansi (menu <strong>Manajemen Berkas</strong>). Satu API
+                      key KMS dapat mengakses <strong>banyak</strong> project, jadi tiap instansi dipetakan ke
+                      satu project di tab <strong>Instansi &amp; KB</strong>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-ink-2 font-semibold mb-1">Base URL KMS</label>
+                    <input
+                      type="text"
+                      placeholder="https://ragkms.aiones.app"
+                      value={systemConfig.kmsApiUrl || ''}
+                      onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiUrl: e.target.value })}
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      data-testid="input-kms-url"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-ink-2 font-semibold mb-1">API Key KMS</label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="password"
+                          placeholder="tempel API key KMS di sini"
+                          value={systemConfig.kmsApiKey || ''}
+                          onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiKey: e.target.value })}
+                          className="w-full px-3 py-2 pr-9 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                          data-testid="input-kms-key"
+                        />
+                        <Key className="w-4 h-4 text-ink-3 absolute right-3 top-2.5" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSimpanUjiKms}
+                        disabled={kmsLoading}
+                        className="shrink-0 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        data-testid="uji-kms"
+                      >
+                        {kmsLoading ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menguji…
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-3.5 h-3.5" /> Simpan &amp; Uji KMS
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    {kmsHasil && (
+                      <div
+                        className={`mt-2 p-3 rounded-card border text-[11px] flex items-start gap-2 ${
+                          kmsHasil.ok ? 'bg-pos/15 border-pos/30 text-pos' : 'bg-neg/15 border-neg/30 text-neg'
+                        }`}
+                        data-testid="hasil-uji-kms"
+                      >
+                        {kmsHasil.ok ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        )}
+                        <span>{kmsHasil.pesan}</span>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-ink-3 mt-1">
+                      Tombol ini menyimpan konfigurasi lalu benar-benar membaca daftar project dari KMS —
+                      bukan sekadar menyimpan.
+                    </p>
+                  </div>
                 </div>
               </form>
 
@@ -1696,6 +1981,51 @@ export const Admin: React.FC<AdminProps> = ({
                   </p>
                 </div>
 
+                {/* Project KMS: tujuan unggah berkas menu "Manajemen Berkas". */}
+                <div className="p-3 bg-surface-2 border border-line rounded-card space-y-2" data-testid="pemetaan-kms">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-ink-2 font-medium">
+                      Project KMS <span className="font-normal text-ink-3">(tujuan unggah berkas)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void muatKmsOrganisasi()}
+                      className="text-[11px] text-brand-ink hover:underline inline-flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Muat daftar project
+                    </button>
+                  </div>
+                  {kmsOrganisasi.length > 0 ? (
+                    <select
+                      value={tenantKmsOrgId}
+                      onChange={(e) => setTenantKmsOrgId(e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                      data-testid="pilih-kms-org"
+                    >
+                      <option value="">(belum dipetakan — berkas tidak bisa diunggah)</option>
+                      {kmsOrganisasi.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} — {o.id}
+                          {o.knowledgeBase ? ` (${o.knowledgeBase})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="mis. org-1791512468154 (tekan “Muat daftar project” untuk memilih)"
+                      value={tenantKmsOrgId}
+                      onChange={(e) => setTenantKmsOrgId(e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                      data-testid="input-kms-org"
+                    />
+                  )}
+                  <p className="text-[10px] text-ink-3">
+                    Satu API key KMS melayani banyak project. Berkas yang diunggah ke project ini otomatis
+                    terindeks ke RAG sehingga bisa dipakai chat &amp; dashboard instansi.
+                  </p>
+                </div>
+
                 {/* Field lain BUKAN isian: hanya menampilkan hasil yang dibaca dari
                     dokumen KB. Admin cukup mengisi KB ID di atas. */}
                 <div className="space-y-2">
@@ -1734,6 +2064,270 @@ export const Admin: React.FC<AdminProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================= PANEL KATALOG KB (PERBARUI RAG) ================= */}
+        {katalogTerbuka && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-scrim/50 backdrop-blur-xs"
+              onClick={() => setKatalogTerbuka(false)}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="katalog-kb-title"
+              className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-surface rounded-card shadow-2xl border border-line z-10 text-xs"
+              data-testid="panel-katalog-kb"
+            >
+              {/* Kepala */}
+              <div className="flex items-start justify-between gap-3 border-b border-line p-5 pb-3">
+                <div className="min-w-0">
+                  <h3 id="katalog-kb-title" className="font-bold text-sm text-ink">
+                    Katalog Knowledge Base — Sumber RAG
+                  </h3>
+                  <p className="text-[10px] text-ink-3 mt-0.5 truncate">
+                    Dibaca langsung dari {katalog?.baseUrl || 'layanan RAG'} · {katalogLoading ? 'memuat…' : 'data terkini'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => void muatKatalogKb()}
+                    disabled={katalogLoading}
+                    className="px-3 py-1.5 border border-line hover:bg-surface-2 text-ink-2 rounded-control font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    data-testid="katalog-muat-ulang"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${katalogLoading ? 'animate-spin' : ''}`} />
+                    Muat ulang
+                  </button>
+                  <button
+                    onClick={() => setKatalogTerbuka(false)}
+                    className="text-ink-3 hover:text-ink-2 p-1"
+                    aria-label="Tutup"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Penyaring */}
+              <div className="px-5 py-3 border-b border-line flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
+                  <input
+                    type="text"
+                    value={katalogCari}
+                    onChange={(e) => setKatalogCari(e.target.value)}
+                    placeholder="Cari ID knowledge base…"
+                    className="w-full pl-8 pr-3 py-1.5 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                    data-testid="katalog-cari"
+                  />
+                </div>
+                <label className="flex items-center gap-1.5 text-ink-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={katalogHanyaBelum}
+                    onChange={(e) => setKatalogHanyaBelum(e.target.checked)}
+                    className="rounded border-line"
+                  />
+                  Hanya yang belum dipakai
+                </label>
+              </div>
+
+              {/* Isi */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {katalogLoading && !katalog && (
+                  <div className="py-12 text-center text-ink-3 flex flex-col items-center gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Membaca daftar KB dari layanan RAG…
+                  </div>
+                )}
+
+                {katalogGalat && (
+                  <div
+                    className="rounded-card border border-warn/40 bg-warn/10 p-3 text-warn"
+                    data-testid="katalog-galat"
+                  >
+                    <p className="font-semibold">Daftar KB tidak bisa dibaca</p>
+                    <p className="mt-1 text-[11px] leading-relaxed">{katalogGalat}</p>
+                  </div>
+                )}
+
+                {katalog && (
+                  <>
+                    {/* Ringkasan */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                      {[
+                        { label: 'Total KB', nilai: katalog.ringkasan?.totalKb ?? 0, tegas: false },
+                        { label: 'Dokumen', nilai: katalog.ringkasan?.totalDokumen ?? 0, tegas: false },
+                        { label: 'Dipakai', nilai: katalog.ringkasan?.terpakai ?? 0, tegas: false },
+                        { label: 'Siap dipakai', nilai: katalog.ringkasan?.tersedia ?? 0, tegas: false },
+                        { label: 'KB baru', nilai: katalog.ringkasan?.baru ?? 0, tegas: true },
+                        { label: 'Perlu dicek', nilai: katalog.ringkasan?.perluDicek ?? 0, tegas: false },
+                      ].map((s) => (
+                        <div key={s.label} className="border border-line rounded-control px-3 py-2 bg-surface-2">
+                          <div className={`font-bold text-sm ${s.tegas ? 'text-brand' : 'text-ink'}`}>
+                            {angkaId(s.nilai)}
+                          </div>
+                          <div className="text-[10px] text-ink-3">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {(() => {
+                      const grup: Array<{ judul: string; ket: string; isi: any[]; warn: boolean }> = [
+                        {
+                          judul: 'Siap dipakai',
+                          ket: 'KB di layanan RAG yang belum terpasang ke instansi mana pun.',
+                          isi: katalog.kelompok?.tersedia || [],
+                          warn: false,
+                        },
+                        {
+                          judul: 'Sudah dipakai instansi',
+                          ket: 'KB yang sedang jadi sumber data instansi.',
+                          isi: katalog.kelompok?.terpakai || [],
+                          warn: false,
+                        },
+                        {
+                          judul: 'Perlu dicek dulu',
+                          ket: 'Tampak seperti sisa demo/uji atau penulisan ganda dari KB yang sudah ada.',
+                          isi: katalog.kelompok?.perluDicek || [],
+                          warn: true,
+                        },
+                      ];
+                      return grup.map((g) => {
+                        const isi = g.isi.filter((k) => cocokBarisKb(k, katalogCari, katalogHanyaBelum));
+                        if (isi.length === 0) return null;
+                        return (
+                          <div key={g.judul}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className={`font-bold ${g.warn ? 'text-warn' : 'text-ink'}`}>{g.judul}</h4>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-chip bg-surface-2 border border-line text-ink-3">
+                                {isi.length}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-ink-3 mb-2">{g.ket}</p>
+                            <div className="space-y-2">
+                              {isi.map((k) => {
+                                const tgl = tanggalRingkas(k.updatedAt);
+                                const terpilih = kbPilihInstansi[k.knowledgeBaseId] || '';
+                                const sedang = kbSedangPasang === k.knowledgeBaseId;
+                                return (
+                                  <div
+                                    key={k.knowledgeBaseId}
+                                    className={`border rounded-control p-3 ${g.warn ? 'border-warn/40 bg-warn/5' : 'border-line bg-surface'}`}
+                                    data-testid={`kb-${k.knowledgeBaseId}`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-mono text-[11px] font-semibold text-ink break-all">
+                                            {k.knowledgeBaseId}
+                                          </span>
+                                          {k.baru && (
+                                            <span className="px-1.5 py-0.5 rounded-chip bg-brand-soft text-brand font-semibold text-[10px]">
+                                              Baru
+                                            </span>
+                                          )}
+                                          {Number(k.failed) > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded-chip bg-warn/10 text-warn font-semibold text-[10px]">
+                                              {angkaId(k.failed)} gagal
+                                            </span>
+                                          )}
+                                          {Number(k.processing) > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded-chip bg-surface-2 border border-line text-ink-3 text-[10px]">
+                                              {angkaId(k.processing)} diproses
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-ink-3 mt-1">
+                                          {angkaId(k.documents)} dokumen · {angkaId(k.chunks)} potongan ·{' '}
+                                          {angkaId(k.tokens)} token
+                                          {tgl ? ` · diperbarui ${tgl}` : ''}
+                                        </div>
+                                      </div>
+
+                                      {k.terpakai ? (
+                                        <div className="text-[10px] text-ink-2 shrink-0 text-right">
+                                          <span className="text-ink-3">Dipakai oleh</span>
+                                          <div className="font-medium">
+                                            {k.dipakaiOleh.map((p: any) => p.nama).join(', ')}
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    {k.alasanPerluDicek?.length > 0 && (
+                                      <div className="mt-2 text-[10px] text-warn">
+                                        {k.alasanPerluDicek.join(' · ')}
+                                      </div>
+                                    )}
+
+                                    {!k.terpakai && (
+                                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                        <select
+                                          value={terpilih}
+                                          onChange={(e) =>
+                                            setKbPilihInstansi((s) => ({
+                                              ...s,
+                                              [k.knowledgeBaseId]: e.target.value,
+                                            }))
+                                          }
+                                          className="flex-1 min-w-[180px] px-2.5 py-1.5 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
+                                          data-testid={`pilih-instansi-${k.knowledgeBaseId}`}
+                                        >
+                                          <option value="">Pasang ke instansi…</option>
+                                          {tenants.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                              {t.name}
+                                              {t.knowledgeBaseId ? ` (kini: ${t.knowledgeBaseId})` : ''}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          onClick={() => void pasangKbKeInstansi(k.knowledgeBaseId)}
+                                          disabled={!terpilih || sedang}
+                                          className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                                          data-testid={`pakai-${k.knowledgeBaseId}`}
+                                        >
+                                          {sedang ? (
+                                            <>
+                                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                              Memasang…
+                                            </>
+                                          ) : (
+                                            'Pakai'
+                                          )}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+
+                    {(() => {
+                      const adaIsi = [
+                        ...(katalog.kelompok?.tersedia || []),
+                        ...(katalog.kelompok?.terpakai || []),
+                        ...(katalog.kelompok?.perluDicek || []),
+                      ].some((k) => cocokBarisKb(k, katalogCari, katalogHanyaBelum));
+                      if (adaIsi) return null;
+                      return (
+                        <div className="py-8 text-center text-ink-3">
+                          Tidak ada KB yang cocok dengan penyaring ini.
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

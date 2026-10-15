@@ -11,6 +11,12 @@ import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { ConfigurableRagClient, RagServiceError, jelaskanError, maskKey } from './src/services/rag/http';
+import {
+  hitungRingkasanKatalog,
+  kelompokkanKatalog,
+  saringKatalog,
+  tandaiKatalog,
+} from './src/services/rag/kbKatalog';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
@@ -104,6 +110,14 @@ import {
   validasiBagian,
   validasiLKjIP,
 } from './src/services/kinerja/lkjip';
+import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
+import {
+  BATAS_UKURAN_BYTE,
+  hitungRingkasanBerkas,
+  saringBerkas,
+  validasiBerkas,
+  validasiMetadata,
+} from './src/services/berkas/kms';
 
 /**
  * Persona chatbot Aiones Boards. Disisipkan ke setiap query percakapan supaya
@@ -200,6 +214,35 @@ async function startServer() {
   if (process.env.RAG_API_KEY) db.systemConfig.ragApiKey = process.env.RAG_API_KEY;
   if (process.env.RAG_KB_ID) (db.systemConfig as any).ragKnowledgeBaseId = process.env.RAG_KB_ID;
 
+  // Klien KMS (repositori berkas) — dibuat per-permintaan dari systemConfig
+  // supaya perubahan Base URL/API key di panel admin langsung berlaku.
+  if (process.env.KMS_API_URL) (db.systemConfig as any).kmsApiUrl = process.env.KMS_API_URL;
+  if (process.env.KMS_API_KEY) (db.systemConfig as any).kmsApiKey = process.env.KMS_API_KEY;
+  const klienKms = () =>
+    new KmsClient({
+      baseUrl: (db.systemConfig as any).kmsApiUrl || 'https://ragkms.aiones.app',
+      apiKey: (db.systemConfig as any).kmsApiKey || '',
+      timeoutMs: (db.systemConfig as any).kmsTimeoutSeconds || 120,
+    });
+
+  /**
+   * Jangan pernah menyimpan nilai BERSETOPENG sebagai kredensial asli.
+   *
+   * GET /api/admin/config mengirim key ter-mask ke browser, jadi kolom isian
+   * berisi topeng seperti "kms_*********b2f". Kalau topeng itu ikut tersimpan,
+   * kredensial asli HANCUR. Dua kasus: (a) nilai sama dengan topeng saat ini →
+   * pertahankan key lama; (b) nilai SUDAH BERBENTUK TOPENG (topeng basi) → juga
+   * pertahankan key lama. Nilai yang benar-benar baru dipakai apa adanya.
+   */
+  function lindungiKunci(nilaiDikirim: unknown, kunciSekarang: string): string {
+    if (typeof nilaiDikirim !== 'string') return kunciSekarang;
+    const berbentukMask = /[*•·]{4,}/.test(nilaiDikirim);
+    if (berbentukMask || nilaiDikirim === maskKey(kunciSekarang) || nilaiDikirim === '*********') {
+      return kunciSekarang;
+    }
+    return nilaiDikirim;
+  }
+
   // Pemeriksa ketersediaan preset katalog (lihat services/widgets/ketersediaan.ts).
   const pemeriksaKetersediaan = buatPemeriksaKetersediaan({
     ragClient,
@@ -222,7 +265,9 @@ async function startServer() {
 
   // Batas payload dinaikkan: impor Excel/CSV mengirim berkas (base64) dan
   // dashboard berisi banyak widget. Tanpa ini berkas sedang pun akan ditolak 413.
-  app.use(express.json({ limit: '25mb' }));
+  // Dinaikkan ke 70 MB agar unggah Manajemen Berkas sampai batas KMS (50 MB per
+  // berkas) tetap lolos — base64 membengkak ~33%, jadi 50 MB jadi ~67 MB.
+  app.use(express.json({ limit: '70mb' }));
 
   /**
    * Sinkronisasi multi-instance: produksi berjalan di >1 instance backend yang
@@ -2764,6 +2809,250 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // ================= MANAJEMEN BERKAS (KMS) ROUTES =================
+  /**
+   * Manajemen Berkas — repositori berkas instansi di layanan KMS.
+   *
+   * Berkas TIDAK disimpan di aplikasi ini: penyimpanannya di KMS
+   * (`ragkms.aiones.app`), lalu KMS mengindeksnya ke vector store yang sama
+   * dengan yang dibaca chat/dashboard. Karena itu daftar berkas selalu dibaca
+   * LANGSUNG dari KMS — aplikasi tidak menyimpan salinan yang bisa jadi basi.
+   *
+   * Satu API key KMS dapat mengakses BANYAK project, jadi tujuan berkas
+   * ditentukan `Tenant.kmsOrganizationId` (dipetakan admin per instansi).
+   * Instansi yang belum dipetakan TIDAK diberi berkas kosong palsu — balasannya
+   * menyebut `terpetakan: false` beserta cara memperbaikinya.
+   */
+  const berkasKosong = () => ({
+    total: 0,
+    totalKb: 0,
+    terindeks: 0,
+    belumTerindeks: 0,
+    perTipe: [],
+    terbesarKb: 0,
+    terbaruPada: null,
+  });
+
+  /** Ambil instansi efektif + project KMS-nya. */
+  function konteksBerkas(req: Request, session: SessionPayload) {
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    return { tenantId, tenant, organizationId: String(tenant?.kmsOrganizationId || '').trim() };
+  }
+
+  /** Terjemahkan kegagalan KMS jadi balasan HTTP yang jujur. */
+  function balasGalatKms(res: Response, err: any) {
+    const status = err instanceof KmsServiceError && err.status ? err.status : 502;
+    const kode = status >= 400 && status < 500 && status !== 404 ? status : 502;
+    return res.status(kode).json({
+      error: err?.message || 'Gagal menghubungi KMS.',
+      detail: err instanceof KmsServiceError ? err.detail : undefined,
+    });
+  }
+
+  /**
+   * Daftar berkas instansi aktif + ringkasan.
+   * Admin boleh `?cakupan=all` untuk melihat seluruh project sekaligus.
+   */
+  app.get('/api/berkas', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const { tenant, organizationId } = konteksBerkas(req, session);
+    const cakupanAll = session.role === 'admin' && String(req.query.cakupan || '') === 'all';
+    const org = cakupanAll ? 'all' : organizationId;
+
+    if (!org) {
+      // Jujur: belum dipetakan. Jangan mengaku "0 berkas" seolah repo memang kosong.
+      return res.json({
+        berkas: [],
+        ringkasan: berkasKosong(),
+        terpetakan: false,
+        organizationId: null,
+        instansi: tenant?.name || null,
+        catatan:
+          'Instansi ini belum dipetakan ke project KMS. Atur "Project KMS" pada instansi di panel admin, lalu berkas bisa diunggah & dibaca dari sini.',
+      });
+    }
+
+    try {
+      const berkas = await klienKms().daftarBerkas(org);
+      const cari = typeof req.query.cari === 'string' ? req.query.cari : '';
+      const tipe = typeof req.query.tipe === 'string' ? req.query.tipe : '';
+      const tersaring = cari || tipe ? saringBerkas(berkas, { cari, tipe }) : berkas;
+      res.json({
+        berkas: tersaring,
+        ringkasan: hitungRingkasanBerkas(berkas),
+        terpetakan: true,
+        cakupan: org,
+        organizationId: organizationId || null,
+        instansi: tenant?.name || null,
+      });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
+
+  /** Ringkasan berkas saja (kartu atas tanpa memuat seluruh daftar). */
+  app.get('/api/berkas/ringkasan', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const { organizationId } = konteksBerkas(req, session);
+    if (!organizationId) return res.json({ ...berkasKosong(), terpetakan: false });
+    try {
+      res.json({ ...hitungRingkasanBerkas(await klienKms().daftarBerkas(organizationId)), terpetakan: true });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
+
+  /**
+   * Unggah satu berkas ke project KMS instansi aktif.
+   *
+   * Berkas dikirim sebagai base64 di JSON (bukan multipart) supaya melewati
+   * parser yang sudah ada; server yang menyusun multipart ke KMS. Jenis berkas
+   * yang diterima dan batas ukuran divalidasi di sini SEBELUM dikirim.
+   */
+  app.post('/api/berkas/unggah', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const { tenant, organizationId } = konteksBerkas(req, session);
+
+    const nama = String(req.body?.nama || '').trim();
+    const galatBerkas = validasiBerkas({ nama, ukuran: req.body?.ukuran, tipe: req.body?.tipe });
+    if (galatBerkas) return res.status(400).json({ error: galatBerkas });
+
+    const galatMeta = validasiMetadata({
+      judul: req.body?.judul || nama,
+      kategori: req.body?.kategori,
+      organizationId,
+    });
+    if (galatMeta) return res.status(400).json({ error: galatMeta });
+
+    // Terima data URL ("data:application/pdf;base64,....") maupun base64 polos.
+    const mentah = String(req.body?.isiBase64 || '');
+    const base64 = mentah.includes(',') && mentah.trim().startsWith('data:') ? mentah.slice(mentah.indexOf(',') + 1) : mentah;
+    if (!base64) return res.status(400).json({ error: 'Isi berkas kosong atau tidak terbaca.' });
+    let isi: Buffer;
+    try {
+      isi = Buffer.from(base64, 'base64');
+    } catch {
+      return res.status(400).json({ error: 'Isi berkas bukan base64 yang sah.' });
+    }
+    if (isi.length === 0) return res.status(400).json({ error: 'Isi berkas kosong.' });
+    if (isi.length > BATAS_UKURAN_BYTE) {
+      return res.status(400).json({ error: `Berkas ${(isi.length / 1024 / 1024).toFixed(1)} MB melebihi batas 50 MB.` });
+    }
+
+    try {
+      const berkas = await klienKms().unggahBerkas({
+        isi,
+        namaBerkas: nama,
+        judul: String(req.body?.judul || nama).trim(),
+        kategori: String(req.body?.kategori).trim(),
+        organizationId,
+        tipeRepositori: req.body?.tipeRepositori === 'photo' ? 'photo' : 'document',
+        tahun: req.body?.tahun !== undefined && req.body?.tahun !== '' ? Number(req.body.tahun) : undefined,
+        departemen: req.body?.departemen ? String(req.body.departemen).trim() : undefined,
+        catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
+        mimeType: req.body?.tipe ? String(req.body.tipe) : undefined,
+      });
+      db.addAuditLog({
+        tenantId: tenant?.id || session.tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Unggah Berkas',
+        target: String(req.body?.judul || nama),
+        details: `Berkas ${nama} (${(isi.length / 1024).toFixed(0)} KB) diunggah ke project KMS ${organizationId}${berkas?.ragStatus ? ` · status RAG: ${berkas.ragStatus}` : ''}`,
+      });
+      res.status(201).json({ success: true, berkas });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
+
+  /** Hapus berkas dari KMS (sekaligus CDN & RAG) — hanya admin. */
+  app.delete('/api/berkas/:id', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus berkas dari repositori.' });
+    }
+    const { tenant, organizationId } = konteksBerkas(req, session);
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
+    }
+    try {
+      await klienKms().hapusBerkas(req.params.id);
+      db.addAuditLog({
+        tenantId: tenant?.id || session.tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Hapus Berkas',
+        target: req.params.id,
+        details: `Berkas ${req.params.id} dihapus dari repositori KMS ${organizationId} (beserta CDN & RAG)`,
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
+
+  /**
+   * Teruskan isi berkas dari KMS ke browser (pratinjau inline / unduhan).
+   *
+   * Diteruskan lewat server supaya API key KMS tidak pernah sampai ke browser.
+   * Kedua rute ini WAJIB ada sebelum catch-all SPA di bawah.
+   */
+  async function teruskanBerkas(req: Request, res: Response, mode: 'view' | 'download') {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const { organizationId } = konteksBerkas(req, session);
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
+    }
+    try {
+      const { isi, contentType, namaBerkas } = await klienKms().ambilIsiBerkas(req.params.id, mode);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader(
+        'Content-Disposition',
+        `${mode === 'download' ? 'attachment' : 'inline'}; filename="${namaBerkas || req.params.id}"`
+      );
+      res.setHeader('Content-Length', String(isi.length));
+      res.send(isi);
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  }
+
+  app.get('/api/berkas/:id/lihat', (req: Request, res: Response) => void teruskanBerkas(req, res, 'view'));
+  app.get('/api/berkas/:id/unduh', (req: Request, res: Response) => void teruskanBerkas(req, res, 'download'));
+
+  /** Daftar project KMS — untuk pemetaan instansi di panel admin (khusus admin). */
+  app.get('/api/admin/kms-organisasi', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh melihat daftar project KMS.' });
+    }
+    try {
+      const organisasi = await klienKms().daftarOrganisasi();
+      res.json({ organisasi, baseUrl: (db.systemConfig as any).kmsApiUrl || '' });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
+
+  /** Uji koneksi KMS dengan konfigurasi yang TERSIMPAN (khusus admin). */
+  app.post('/api/admin/kms-uji', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh menguji koneksi KMS.' });
+    }
+    const hasil = await klienKms().uji();
+    res.status(hasil.ok ? 200 : 502).json(hasil);
+  });
+
   // ================= KESEHATAN KEUANGAN & RASIO ROUTES =================
   /**
    * Ambil data kesehatan keuangan instansi aktif: snapshot terbaru + sebelumnya,
@@ -3440,7 +3729,11 @@ async function startServer() {
       return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
     }
     // API key dikirim ter-mask — nilai asli hanya hidup di server.
-    res.json({ ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) });
+    res.json({
+      ...db.systemConfig,
+      ragApiKey: maskKey(db.systemConfig.ragApiKey),
+      kmsApiKey: maskKey((db.systemConfig as any).kmsApiKey || ''),
+    });
   });
 
   /**
@@ -3494,6 +3787,55 @@ async function startServer() {
   });
 
   /**
+   * Katalog knowledge base: SELURUH KB di layanan RAG + siapa pemakainya.
+   *
+   * Dipakai tombol "Perbarui RAG" di tab Instansi & KB. Admin bisa melihat KB
+   * yang BARU muncul di sumber RAG (tanpa menebak ID), tahu mana yang sudah
+   * dipakai instansi mana, dan mana yang perlu dicek dulu (sisa demo / penulisan
+   * ganda). Read-only terhadap layanan RAG — tidak ada yang diubah.
+   *
+   * Query: `cari` (saring ID), `hanyaBelumDipakai=1`.
+   */
+  app.get('/api/admin/kb-tersedia', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh melihat katalog knowledge base.' });
+    }
+
+    let hasil: { kbs: any[]; catatan?: string };
+    try {
+      hasil = await ragClient.daftarKnowledgeBase();
+    } catch (err: any) {
+      return res.status(502).json({
+        error: `Gagal membaca daftar KB dari layanan RAG: ${err?.message || 'kesalahan tidak diketahui'}`,
+      });
+    }
+
+    // Peta pemakai: knowledgeBaseId → instansi yang memakainya.
+    const petaPakai: Record<string, Array<{ id: string; nama: string }>> = {};
+    for (const t of db.tenants) {
+      const kb = String(t.knowledgeBaseId || '').trim();
+      if (!kb) continue;
+      (petaPakai[kb] = petaPakai[kb] || []).push({ id: t.id, nama: t.name });
+    }
+
+    const semua = tandaiKatalog(hasil.kbs as any, petaPakai);
+    const cari = typeof req.query.cari === 'string' ? req.query.cari : '';
+    const hanyaBelumDipakai = String(req.query.hanyaBelumDipakai || '') === '1';
+    const tersaring = cari || hanyaBelumDipakai ? saringKatalog(semua, { cari, hanyaBelumDipakai }) : semua;
+
+    res.json({
+      kbs: tersaring,
+      kelompok: kelompokkanKatalog(tersaring),
+      ringkasan: hitungRingkasanKatalog(semua),
+      catatan: hasil.catatan,
+      provider: db.systemConfig.ragProvider,
+      baseUrl: db.systemConfig.ragApiUrl,
+    });
+  });
+
+  /**
    * Simpan konfigurasi SEKALIGUS uji API Key-nya dalam satu panggilan.
    *
    * Urutannya penting: simpan dulu, baru uji. Kalau diuji dulu, key yang diuji adalah
@@ -3518,15 +3860,8 @@ async function startServer() {
       // (b) nilai SUDAH BERBENTUK TOPENG (topeng basi, mis. panel dibuka sebelum key
       // diubah pihak lain) -> JANGAN simpan topeng sebagai key.
       const body = { ...(req.body || {}) };
-      const berbentukMask =
-        typeof body.ragApiKey === 'string' && /[*•·]{4,}/.test(body.ragApiKey);
-      if (
-        berbentukMask ||
-        body.ragApiKey === maskKey(db.systemConfig.ragApiKey) ||
-        body.ragApiKey === '*********'
-      ) {
-        body.ragApiKey = db.systemConfig.ragApiKey;
-      }
+      body.ragApiKey = lindungiKunci(body.ragApiKey, db.systemConfig.ragApiKey);
+      body.kmsApiKey = lindungiKunci(body.kmsApiKey, (db.systemConfig as any).kmsApiKey || '');
       db.updateSystemConfig(body);
     } catch (err: any) {
       return res.status(500).json({
@@ -3550,7 +3885,11 @@ async function startServer() {
     res.json({
       tersimpan: true,
       // Selalu bertopeng ke browser — nilai asli hanya hidup di server.
-      konfigurasi: { ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) },
+      konfigurasi: {
+        ...db.systemConfig,
+        ragApiKey: maskKey(db.systemConfig.ragApiKey),
+        kmsApiKey: maskKey((db.systemConfig as any).kmsApiKey || ''),
+      },
       // Jejak audit: key hanya ditampilkan sebagai sidik jari, bukan nilai penuh.
       jejak: {
         baseUrlSebelum: sebelum.ragApiUrl,
@@ -3575,11 +3914,8 @@ async function startServer() {
     //     diubah pihak lain, sehingga mask-nya basi) -> JANGAN simpan mask itu
     //     sebagai key, karena akan merusak kredensial yang asli.
     const body = { ...req.body };
-    const berbentukMask =
-      typeof body.ragApiKey === 'string' && /[*•·]{4,}/.test(body.ragApiKey);
-    if (berbentukMask || body.ragApiKey === maskKey(db.systemConfig.ragApiKey) || body.ragApiKey === '*********') {
-      body.ragApiKey = db.systemConfig.ragApiKey;
-    }
+    body.ragApiKey = lindungiKunci(body.ragApiKey, db.systemConfig.ragApiKey);
+    body.kmsApiKey = lindungiKunci(body.kmsApiKey, (db.systemConfig as any).kmsApiKey || '');
     // Lewat updateSystemConfig() supaya langsung dicerminkan ke MySQL/data/db.json,
     // bukan hanya tersimpan di memori.
     db.updateSystemConfig(body);
@@ -3591,7 +3927,11 @@ async function startServer() {
       target: 'System Settings',
       details: `Memperbarui parameter sistem & RAG provider (provider: ${db.systemConfig.ragProvider}, url: ${db.systemConfig.ragApiUrl})`,
     });
-    res.json({ ...db.systemConfig, ragApiKey: maskKey(db.systemConfig.ragApiKey) });
+    res.json({
+      ...db.systemConfig,
+      ragApiKey: maskKey(db.systemConfig.ragApiKey),
+      kmsApiKey: maskKey((db.systemConfig as any).kmsApiKey || ''),
+    });
   });
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================

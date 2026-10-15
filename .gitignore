@@ -12,4 +12,5 @@ data/
 skills-lock.json
 *.png
 tmp-*
+.tmp-*
 apex-analitik-render.html

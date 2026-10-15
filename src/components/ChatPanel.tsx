@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BarChart2,
   Bot,
+  Building2,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -28,6 +29,14 @@ interface ChatPanelProps {
   onClose: () => void;
   sector: BumdSector;
   tenantId: string;
+  /**
+   * Nama instansi yang sedang dibuka. Dipakai HANYA untuk ditampilkan di header,
+   * supaya jelas copilot ini menjawab dokumen instansi yang mana — tanpa ini,
+   * jawaban dari KB instansi lain terlihat seolah "ngacak".
+   */
+  tenantName?: string;
+  /** Knowledge Base instansi aktif (kalau diatur admin) — ikut ditampilkan di header. */
+  tenantKbId?: string;
   /** Dashboard pemilik percakapan ini — sumber riwayatnya. */
   dashboardId?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
@@ -153,6 +162,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onClose,
   sector,
   tenantId,
+  tenantName,
+  tenantKbId,
   dashboardId,
   onDashboardUpdated,
   onAddWidget,
@@ -238,18 +249,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentSteps]);
 
-  // Riwayat dimuat dari server tiap dashboard aktif berubah (server yang membuatnya).
+  // Riwayat dimuat dari server tiap dashboard aktif ATAU instansi aktif berubah.
+  //
+  // `tenantId` wajib ada di daftar dependensi DAN di setiap permintaan: tanpa itu,
+  // saat admin berpindah instansi panel tetap menampilkan riwayat instansi
+  // sebelumnya, dan permintaan tanpa `tenantId` dijawab server dengan instansi milik
+  // akun admin sendiri — riwayat dan jawaban jadi berasal dari dua instansi berbeda.
   useEffect(() => {
     if (!isOpen) return;
     if (isStreaming) return; // Jangan bersihkan atau muat ulang riwayat saat sedang streaming respon!
 
+    // Kosongkan dulu supaya riwayat instansi lama tidak menyangkut di instansi baru.
+    setMessages([]);
+    setChatId(undefined);
+
     if (!dashboardId) {
-      // Belum ada dashboard terbuka: muat riwayat "percakapan umum" user ini,
+      // Belum ada dashboard terbuka: muat riwayat "percakapan umum" instansi aktif,
       // supaya pertanyaan bebas yang tadi diajukan tidak hilang saat panel dibuka lagi.
       let batalUmum = false;
       (async () => {
         try {
-          const res = await fetch('/api/chat/umum');
+          const res = await fetch(`/api/chat/umum?tenantId=${encodeURIComponent(tenantId)}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           if (batalUmum) return;
@@ -268,7 +288,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     let batal = false;
     (async () => {
       try {
-        const res = await fetch(`/api/dashboards/${dashboardId}/chat`);
+        const res = await fetch(`/api/dashboards/${dashboardId}/chat?tenantId=${encodeURIComponent(tenantId)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (batal) return;
@@ -283,7 +303,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return () => {
       batal = true;
     };
-  }, [isOpen, dashboardId, isStreaming]);
+  }, [isOpen, dashboardId, isStreaming, tenantId]);
 
   const quickPrompts = [
     `Berapa total aset ${sector.toUpperCase()} tahun 2025?`,
@@ -459,6 +479,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <p className="text-xs text-ink-2">
               {chatId && dashboardId ? `Riwayat tersimpan · ${messages.length} pesan` : 'Tanya dokumen resmi atau buat dashboard BUMD'}
             </p>
+            {/* Instansi sumber jawaban. Penting saat login sebagai admin: instansi aktif
+                bisa berbeda dari instansi akun, jadi harus terlihat agar tidak terkesan
+                copilot mengambil KB secara acak. */}
+            {tenantName && (
+              <p className="text-[10px] text-ink-3 mt-0.5 flex items-center gap-1 flex-wrap">
+                <Building2 className="w-3 h-3 shrink-0" />
+                <span>
+                  Menjawab untuk <strong className="text-ink-2">{tenantName}</strong>
+                </span>
+                {tenantKbId ? (
+                  <span className="font-mono px-1 py-0.5 rounded-chip bg-surface-2 border border-line">
+                    {tenantKbId}
+                  </span>
+                ) : (
+                  <span className="text-warn">tanpa KB sendiri</span>
+                )}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -470,7 +508,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   const del = await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
                   if (!del.ok) throw new Error(`HTTP ${del.status}`);
                   // Server membuat ulang chat kosong untuk dashboard ini.
-                  const ulang = await fetch(`/api/dashboards/${dashboardId}/chat`);
+                  const ulang = await fetch(`/api/dashboards/${dashboardId}/chat?tenantId=${encodeURIComponent(tenantId)}`);
                   const data = await ulang.json();
                   setChatId(data.chat?.id);
                   setMessages(data.chat?.messages || []);

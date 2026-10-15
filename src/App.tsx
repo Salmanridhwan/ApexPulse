@@ -79,6 +79,9 @@ const PerjanjianKinerjaPage = React.lazy(() =>
   import('./pages/PerjanjianKinerjaPage').then((m) => ({ default: m.PerjanjianKinerjaPage }))
 );
 const LKjIPPage = React.lazy(() => import('./pages/LKjIPPage').then((m) => ({ default: m.LKjIPPage })));
+const ManajemenBerkasPage = React.lazy(() =>
+  import('./pages/ManajemenBerkasPage').then((m) => ({ default: m.ManajemenBerkasPage }))
+);
 const ChartGalleryPage = React.lazy(() =>
   import('./pages/ChartGalleryPage').then((m) => ({ default: m.ChartGalleryPage }))
 );
@@ -143,7 +146,7 @@ export default function App() {
 
   // App Core State
   // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'admin'>(() => {
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'berkas' | 'admin'>(() => {
     const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
     if (saved) {
       try {
@@ -202,12 +205,41 @@ export default function App() {
       .then((data: Tenant[]) => {
         setTenants(data);
         if (data.length > 0 && !currentTenant) {
-          setCurrentTenant(data[0]);
+          // Instansi aktif HARUS instansi milik pengguna yang login, bukan instansi
+          // pertama pada daftar. Dulu di sini `data[0]`: saat admin login, instansi
+          // aktif jadi instansi lain (urutannya arbitrer), sehingga RAG Copilot
+          // menjawab dari KB instansi yang tidak sedang dibuka admin.
+          const milikSendiri = data.find((t) => t.id === currentUser?.tenantId);
+          setCurrentTenant(milikSendiri || data[0]);
         }
       })
       .catch((err) => console.error('Fetch tenants error:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, authToken]);
+
+  /**
+   * Jaga objek instansi aktif tetap sinkron dengan daftar instansi terbaru.
+   *
+   * Panel admin bisa mengubah KB sebuah instansi; kalau objek lama dibiarkan,
+   * header copilot menampilkan KB lama walau server sudah memakai yang baru.
+   */
+  useEffect(() => {
+    if (!currentTenant) return;
+    const terbaru = tenants.find((t) => t.id === currentTenant.id);
+    if (terbaru && terbaru !== currentTenant) setCurrentTenant(terbaru);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenants]);
+
+  /** Muat ulang daftar instansi (dipakai panel admin setelah mengubah instansi/KB). */
+  const segarkanTenants = () => {
+    if (!currentUser || !authToken) return;
+    fetch('/api/tenants')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Tenant[]) => {
+        if (Array.isArray(data) && data.length > 0) setTenants(data);
+      })
+      .catch((err) => console.error('Segarkan tenants error:', err));
+  };
 
   // Pre-warm chunk echarts paralel dengan fetch data dashboard, agar chart
   // pertama di workspace tidak menunggu unduhan ~1 MB (lihat ChartEcharts).
@@ -274,6 +306,9 @@ export default function App() {
     sessionStorage.removeItem('aionesboard_user');
     setAuthToken(null);
     setCurrentUser(null);
+    // Buang juga instansi aktif: kalau tidak, pengguna berikutnya mewarisi konteks
+    // instansi milik pengguna sebelumnya (dan copilot ikut menjawab dari KB itu).
+    setCurrentTenant(null);
     setViewMode('workspace');
   };
 
@@ -769,6 +804,10 @@ export default function App() {
                 setViewMode('lkjip');
                 setIsMobileNavOpen(false);
               }}
+              onOpenManajemenBerkas={() => {
+                setViewMode('berkas');
+                setIsMobileNavOpen(false);
+              }}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
@@ -833,7 +872,7 @@ export default function App() {
                       : viewMode === 'charts' ? 'Chart'
                       : viewMode === 'templates' ? 'Template Dashboard'
                       : viewMode === 'pelaporan' ? 'Kinerja & Kepatuhan'
-                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' ? 'Kinerja & Kepatuhan'
+                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' || viewMode === 'berkas' ? 'Kinerja & Kepatuhan'
                       : 'Workspace'}
                   </span>
                 </div>
@@ -984,6 +1023,7 @@ export default function App() {
                     setIsSidebarCollapsed(!isSidebarCollapsed);
                   }
                 }}
+                onTenantsRefreshed={segarkanTenants}
               />
             </React.Suspense>
           ) : (
@@ -1098,6 +1138,14 @@ export default function App() {
               ) : viewMode === 'lkjip' ? (
                 <React.Suspense fallback={pageFallback}>
                   <LKjIPPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'berkas' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <ManajemenBerkasPage
                     tenantId={currentTenant?.id || 'tenant-pdam'}
                     peran={currentUser?.role}
                     onBackToWorkspace={() => setViewMode('workspace')}
@@ -1294,6 +1342,8 @@ export default function App() {
         }}
         sector={currentTenant?.sector || 'pdam'}
         tenantId={currentTenant?.id || 'tenant-pdam'}
+        tenantName={currentTenant?.name}
+        tenantKbId={currentTenant?.knowledgeBaseId}
         dashboardId={activeDashboard?.id}
         onAddWidget={handleAddWidgetFromCatalog}
         onDashboardUpdated={(newDash) => {

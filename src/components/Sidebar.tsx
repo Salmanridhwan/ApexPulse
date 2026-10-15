@@ -17,6 +17,7 @@ import {
   Boxes,
   FileSignature,
   BookOpen,
+  FolderOpen,
   Building2,
   ChevronDown,
 } from 'lucide-react';
@@ -56,7 +57,7 @@ export interface SidebarProps {
   onOpenAudit: () => void;
   onOpenAlerts: () => void;
   unreadAlertsCount: number;
-  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'admin';
+  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'berkas' | 'admin';
   onOpenAdmin: () => void;
   /** Tab Panel Admin yang sedang aktif (dipakai saat currentView === 'admin'). */
   adminTab?: AdminTabId;
@@ -79,6 +80,8 @@ export interface SidebarProps {
   onOpenPerjanjianKinerja?: () => void;
   /** Buka halaman LKjIP (laporan kinerja tahunan). */
   onOpenLKjIP?: () => void;
+  /** Buka halaman Manajemen Berkas (unggah & daftar berkas di knowledge base). */
+  onOpenManajemenBerkas?: () => void;
   currentUser: User | null;
   onLogout: () => void;
 }
@@ -110,6 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenManajemenAset,
   onOpenPerjanjianKinerja,
   onOpenLKjIP,
+  onOpenManajemenBerkas,
   currentUser,
   onLogout,
 }) => {
@@ -294,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* GRUP 2.5: Kinerja & Kepatuhan (operasional BUMD) */}
-        {(onOpenPelaporan || onOpenTindakLanjutAudit || onOpenKesehatanKeuangan || onOpenManajemenRisiko || onOpenManajemenAset || onOpenPerjanjianKinerja || onOpenLKjIP) && (
+        {(onOpenPelaporan || onOpenTindakLanjutAudit || onOpenKesehatanKeuangan || onOpenManajemenRisiko || onOpenManajemenAset || onOpenPerjanjianKinerja || onOpenLKjIP || onOpenManajemenBerkas) && (
           <div>
             {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Kinerja & Kepatuhan</div>}
             <div className="space-y-0.5">
@@ -380,6 +384,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {currentView === 'lkjip' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
                   <BookOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'lkjip' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
                   {!isCollapsed && <span className="flex-1 truncate">LKjIP</span>}
+                </button>
+              )}
+              {onOpenManajemenBerkas && (
+                <button
+                  onClick={onOpenManajemenBerkas}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'berkas' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Manajemen Berkas — unggah & kelola dokumen knowledge base instansi"
+                  data-testid="buka-manajemen-berkas"
+                >
+                  {currentView === 'berkas' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <FolderOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'berkas' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Manajemen Berkas</span>}
                 </button>
               )}
             </div>
