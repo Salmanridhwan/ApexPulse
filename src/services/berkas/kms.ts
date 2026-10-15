@@ -11,6 +11,37 @@
  */
 import type { BerkasKMS, OrganisasiKMS, RingkasanBerkas } from '../../types';
 
+/** Bentuk-normal id: buang spasi/titik/garis bawah/garis hubung, huruf kecil. */
+function bentukNormal(id: unknown): string {
+  return String(id || '')
+    .toLowerCase()
+    .replace(/[\s._-]+/g, '');
+}
+
+/**
+ * Cari project KMS yang `knowledgeBase`-nya SAMA dengan KB instansi.
+ *
+ * Dipakai sebagai pemetaan OTOMATIS saat admin belum mengisi `Project KMS`.
+ * Dicocokkan bentuk-normal (bukan kemiripan teks) supaya `kb_pam_jaya` ==
+ * `kb_pamjaya`.
+ *
+ * PENTING: pemanggil TIDAK boleh memakai `knowledgeBaseId` mentah sebagai
+ * `organizationId`. KMS diam-diam mengalihkan organizationId yang tidak
+ * dikenal ke project DEFAULT (berkas bisa mendarat di instansi lain). Karena
+ * itu fungsi ini HANYA mengembalikan `id` project yang benar-benar ada di
+ * daftar KMS.
+ */
+export function cariProjectKmsDariKb(
+  daftarProject: OrganisasiKMS[],
+  knowledgeBaseId: unknown
+): OrganisasiKMS | null {
+  const kb = bentukNormal(knowledgeBaseId);
+  if (!kb) return null;
+  return (Array.isArray(daftarProject) ? daftarProject : []).find(
+    (o) => bentukNormal(o?.knowledgeBase) === kb
+  ) || null;
+}
+
 /** Jenis berkas yang diterima KMS (maks 50 MB per berkas). */
 export const EKSTENSI_DIIZINKAN = [
   'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',

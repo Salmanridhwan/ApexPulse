@@ -78,11 +78,23 @@ export const SKEMA_KPI_ITEM = {
   required: ['label', 'nilai', 'docName', 'chunkSnippet'],
 };
 
+/**
+ * Tipe grafik yang boleh diminta ke /extract. Daftar ini SENGAJA lebar: repo
+ * mendukung puluhan tipe (donut, radar, gauge, waterfall, funnel, …) dan dulu
+ * skema hanya mengizinkan `line|bar|area`, sehingga setiap dashboard selalu
+ * berisi diagram batang saja — "chartnya itu-itu aja". Tipe yang datanya tidak
+ * mendukung tetap diturunkan otomatis oleh `selaraskanDaftarWidget`.
+ */
+const TIPE_GRAFIK_DIIZINKAN = [
+  'line', 'area', 'bar', 'hbar', 'combo', 'donut', 'pie', 'funnel', 'treemap',
+  'radar', 'scatter', 'bubble', 'waterfall', 'histogram', 'boxplot', 'heatmap',
+];
+
 const SKEMA_GRAFIK_OBJ = {
   type: 'object',
   properties: {
     judul: { type: 'string' },
-    tipe: { type: 'string', enum: ['line', 'bar', 'area'] },
+    tipe: { type: 'string', enum: TIPE_GRAFIK_DIIZINKAN },
     satuan: { type: 'string' },
     kategori: { type: 'array', items: { type: 'string' } },
     seri: {
@@ -130,7 +142,12 @@ const SKEMA_NARASI_OBJ = {
 
 /**
  * Skema yang diminta ke /extract: SATU dashboard utuh berupa data
- * (kpi[], grafik, tabel, narasi), bukan daftar widget bebas.
+ * (kpi[], grafik[], tabel, narasi), bukan daftar widget bebas.
+ *
+ * `grafik` berupa ARRAY supaya model boleh mengembalikan BEBERAPA grafik dengan
+ * tipe berbeda (tren + komposisi + peringkat + proporsi) — inilah yang membuat
+ * dashboard bervariasi, bukan hanya satu diagram batang. Bentuk objek tunggal
+ * lama tetap diterima saat pemetaan demi kompatibilitas.
  */
 export const SKEMA_EKSTRAKSI = {
   type: 'object',
@@ -138,7 +155,7 @@ export const SKEMA_EKSTRAKSI = {
     dashboardTitle: { type: 'string' },
     description: { type: 'string' },
     kpi: { type: 'array', items: SKEMA_KPI_ITEM },
-    grafik: SKEMA_GRAFIK_OBJ,
+    grafik: { type: 'array', items: SKEMA_GRAFIK_OBJ },
     tabel: SKEMA_TABEL_OBJ,
     narasi: SKEMA_NARASI_OBJ,
   },
@@ -450,14 +467,17 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
     });
   });
 
-  // --- Grafik: hanya kalau kategori dan seluruh seri panjangnya sama
-  const g = payload?.grafik;
-  const kategori = (Array.isArray(g?.kategori) ? g.kategori : []).map((x: any) => potong(x, 24));
+  // --- Grafik: boleh BEBERAPA (array) supaya dashboard bervariasi. Bentuk objek
+  // tunggal lama tetap didukung (dibungkus jadi array satu elemen).
+  const grafikMentah: any[] = Array.isArray(payload?.grafik)
+    ? payload.grafik
+    : payload?.grafik
+      ? [payload.grafik]
+      : [];
 
   // ── Normalisasi satuan grafik ──────────────────────────────────────────────
   // RAG kadang mengembalikan data lintas satuan dalam satu grafik, mis. beberapa
-  // item kategori dalam "triliun" dan sisanya dalam "miliar". Normalisasi ke
-  // satuan terkecil (miliar) agar bar proporsional.
+  // item kategori dalam "triliun" dan sisanya dalam "miliar".
   function deteksiMultiplierSatuan(teks: string): number {
     const u = (teks || '').toLowerCase();
     if (/triliun/.test(u)) return 1_000;   // 1 triliun = 1000 miliar
@@ -467,55 +487,61 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
     return 1;
   }
 
-  // Periksa apakah label xAxis/kategori mengandung satuan (mis. "Sustainable Bond (triliun)")
-  // dan nilai yang dikembalikan RAG masih dalam angka aslinya.
-  // Juga cek satuan header grafik (g.satuan).
-  const satuanGrafik = String(g?.satuan || '');
-  const multiplierGrafik = deteksiMultiplierSatuan(satuanGrafik);
+  /** Ubah SATU objek grafik mentah jadi WidgetSpec, atau null bila tidak layak. */
+  function grafikKeWidget(g: any, indeks: number): any | null {
+    const kategori = (Array.isArray(g?.kategori) ? g.kategori : []).map((x: any) => potong(x, 24));
+    const satuanGrafik = String(g?.satuan || '');
+    const seriRaw = (Array.isArray(g?.seri) ? g.seri : []);
+    const multiplierPerSeri = seriRaw.map((s: any) => deteksiMultiplierSatuan(String(s?.satuan || satuanGrafik)));
+    const adaSatuanCampur = multiplierPerSeri.some((m: number) => m !== multiplierPerSeri[0]);
+    const multiplierDasar = adaSatuanCampur ? Math.min(...multiplierPerSeri) : 1;
 
-  // Periksa per-seri: apakah ada metadata satuan per-seri dari RAG.
-  const seriRaw = (Array.isArray(g?.seri) ? g.seri : []);
-  const multiplierPerSeri = seriRaw.map((s: any) => deteksiMultiplierSatuan(String(s?.satuan || satuanGrafik)));
-  const adaSatuanCampur = multiplierPerSeri.some((m: number) => m !== multiplierPerSeri[0]);
-  const multiplierDasar = adaSatuanCampur ? Math.min(...multiplierPerSeri) : 1;
+    const seri = seriRaw
+      .map((s: any, i: number) => {
+        const mult = adaSatuanCampur ? multiplierPerSeri[i] / multiplierDasar : 1;
+        return {
+          name: potong(s?.nama || `Seri ${i + 1}`, 28),
+          data: (Array.isArray(s?.data) ? s.data : [])
+            .map((n: any) => {
+              const angka = Number(n);
+              return Number.isFinite(angka) ? angka * mult : NaN;
+            })
+            .filter((n: number) => Number.isFinite(n)),
+          color: WARNA_SERI[i % WARNA_SERI.length],
+        };
+      })
+      .filter((s: any) => s.data.length >= 3);
 
-  const seri = seriRaw
-    .map((s: any, i: number) => {
-      const mult = adaSatuanCampur ? multiplierPerSeri[i] / multiplierDasar : 1;
-      return {
-        name: potong(s?.nama || `Seri ${i + 1}`, 28),
-        data: (Array.isArray(s?.data) ? s.data : [])
-          .map((n: any) => {
-            const angka = Number(n);
-            return Number.isFinite(angka) ? angka * mult : NaN;
-          })
-          .filter((n: number) => Number.isFinite(n)),
-        color: WARNA_SERI[i % WARNA_SERI.length],
-      };
-    })
-    .filter((s: any) => s.data.length >= 3);
-  // ──────────────────────────────────────────────────────────────────────────
+    const grafikValid = kategori.length >= 3 && kategori.length <= 12 && seri.length > 0 && seri.every((s: any) => s.data.length === kategori.length);
+    if (!g || !grafikValid) return null;
 
-  const grafikValid = kategori.length >= 3 && kategori.length <= 6 && seri.length > 0 && seri.every((s: any) => s.data.length === kategori.length);
-  if (g && grafikValid) {
-    // Satuan display: kalau ada satuan campur, pakai satuan terkecil yang jadi basis.
     let unitDisplay = satuanSeragam(g?.satuan);
     if (adaSatuanCampur) {
       const satuanMin = seriRaw[multiplierPerSeri.indexOf(Math.min(...multiplierPerSeri))]?.satuan;
       unitDisplay = satuanSeragam(satuanMin) || unitDisplay;
     }
-    widgets.push({
+    // Tipe diambil apa adanya dari model (skemanya sudah dibatasi ke tipe yang
+    // didukung). Tipe tak dikenal diturunkan ke batang; penyelaras tipe akan
+    // menurunkannya lagi bila bentuk datanya tidak cocok.
+    const tipeDiminta = String(g?.tipe || 'bar');
+    return {
       ...dasar,
-      id: 'w-grafik-1',
-      type: ['line', 'bar', 'area'].includes(g?.tipe) ? g.tipe : 'bar',
+      id: `w-grafik-${indeks + 1}`,
+      type: tipeDiminta,
       title: judulGrafik(g?.judul, seri, kategori),
       subtitle: unitDisplay,
       grid: penata.kotak(12, 4),
       chart: { xAxis: kategori, series: seri, unit: unitDisplay, showLegend: seri.length > 1 },
-      citations: [kutipanExtract('grafik-1', g?.docName, g?.page, g?.chunkSnippet)],
+      citations: [kutipanExtract(`grafik-${indeks + 1}`, g?.docName, g?.page, g?.chunkSnippet)],
       periode: potong(g?.periode, 12) || '',
-    });
+    };
   }
+
+  // Batasi jumlah grafik supaya dashboard tidak kebanjiran satu jenis tampilan.
+  grafikMentah.slice(0, 8).forEach((g: any, i: number) => {
+    const w = grafikKeWidget(g, i);
+    if (w) widgets.push(w);
+  });
 
   // --- Tabel: maksimal 4 kolom dan 5 baris
   const t = payload?.tabel;
@@ -731,7 +757,14 @@ export class ConfigurableRagClient implements RagClient {
       `"nilai" HANYA angka (contoh "221,35"), satuan ditulis terpisah di "satuan" dan wajib pakai salah satu bentuk ini: ` +
       `"Rp triliun", "Rp miliar", "Rp juta", "%", "unit", atau "orang". ` +
       `(4) deltaLabel hanya kalau dokumen benar-benar membandingkan dua periode (contoh "+0,63% vs 2024"). Kalau tidak ada, kosongkan. ` +
-      `(5) grafik: isi hanya kalau dokumen memuat angka beberapa periode atau kategori sekaligus. kategori 3 sampai 6 label, setiap seri panjangnya sama dengan kategori, semua angka dari dokumen. ` +
+      `(5) grafik: berupa ARRAY berisi 3 sampai 6 grafik dengan TIPE BERBEDA-BEDA (jangan semuanya "bar"). ` +
+      `Pilih tipe sesuai bentuk datanya: ` +
+      `"line"/"area" untuk tren deret waktu; "bar" untuk membandingkan kategori; "hbar" untuk peringkat dengan nama panjang; ` +
+      `"donut"/"pie" untuk komposisi satu total; "waterfall" untuk pembeda selisih bertahap; "funnel" untuk tahapan yang menyusut; ` +
+      `"radar" untuk profil beberapa indikator; "scatter"/"bubble" untuk hubungan dua besaran; "heatmap" untuk pola dua dimensi; ` +
+      `"combo" untuk dua metrik berbeda satuan. ` +
+      `Setiap grafik: kategori 3 sampai 12 label, setiap seri panjangnya sama dengan kategori, semua angka dari dokumen. ` +
+      `Pakai tipe yang benar-benar didukung data; kalau ragu, pakai "bar" atau "line". ` +
       `(6) tabel: maksimal 4 kolom, maksimal 5 baris, isinya angka atau nama entitas pendek. ` +
       `(7) narasi: maksimal 45 kata berisi ringkasan kinerja dari dokumen. Jangan menyalin visi misi, syarat sandi, atau kebijakan internal. ` +
       `Angka wajib berasal dari dokumen yang benar-benar ada. Untuk setiap angka sertakan docName, page, dan chunkSnippet aslinya.`;

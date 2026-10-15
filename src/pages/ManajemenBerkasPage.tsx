@@ -33,6 +33,8 @@ type BalasanBerkas = {
   terpetakan: boolean;
   organizationId?: string | null;
   cakupan?: string;
+  pemetaanOtomatis?: boolean;
+  projectKms?: string | null;
   instansi?: string | null;
   catatan?: string;
 };
@@ -97,6 +99,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
     setIsLoading(true);
     try {
       const qs = new URLSearchParams();
+      // Instansi aktif dari sidebar. WAJIB dikirim: untuk admin, server memakai
+      // tenantId ini; tanpa itu admin selalu melihat instansi miliknya sendiri.
+      if (tenantId) qs.set('tenantId', tenantId);
       if (cakupanAll) qs.set('cakupan', 'all');
       const res = await fetch(`/api/berkas${qs.toString() ? `?${qs}` : ''}`);
       const isi = await res.json().catch(() => ({}));
@@ -172,6 +177,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          tenantId,
           nama: berkasPilih.name,
           ukuran: berkasPilih.size,
           tipe: berkasPilih.type,
@@ -204,7 +210,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   const hapus = async (b: BerkasKMS) => {
     if (!window.confirm(`Hapus "${b.title}" dari repositori? Berkas juga dihapus dari CDN & RAG.`)) return;
     try {
-      const res = await fetch(`/api/berkas/${encodeURIComponent(b.id)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/berkas/${encodeURIComponent(b.id)}?tenantId=${encodeURIComponent(tenantId)}`, { method: 'DELETE' });
       const balasan = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(balasan?.error || 'Berkas gagal dihapus.');
       setPesan({ tipe: 'ok', teks: `Berkas "${b.title}" dihapus.` });
@@ -316,6 +322,27 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
           </div>
         ) : (
           <>
+            {/* Pemetaan otomatis dari KB instansi — tunjukkan supaya admin tahu
+                ke project KMS mana berkas ini akan pergi (bukan tersembunyi). */}
+            {data?.pemetaanOtomatis && (
+              <div
+                className="mb-4 p-3 rounded-card border border-brand/30 bg-brand/5 text-xs text-ink-2 flex items-start gap-2"
+                data-testid="info-pemetaan-otomatis"
+              >
+                <ShieldCheck className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
+                <span>
+                  Project KMS dipetakan <strong>otomatis</strong> dari Knowledge Base instansi
+                  {data.projectKms ? (
+                    <>
+                      {' '}
+                      → <strong>{data.projectKms}</strong>
+                    </>
+                  ) : null}
+                  . Admin bisa menimpanya lewat panel admin (Instansi &amp; KB → Project KMS).
+                </span>
+              </div>
+            )}
+
             {/* Kartu ringkas */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {kartuRingkas.map((k) => (
@@ -567,7 +594,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <a
-                          href={`/api/berkas/${encodeURIComponent(b.id)}/lihat`}
+                          href={`/api/berkas/${encodeURIComponent(b.id)}/lihat?tenantId=${encodeURIComponent(tenantId)}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 text-ink-3 hover:text-brand-ink rounded-control hover:bg-brand/10 transition-colors"
@@ -577,7 +604,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           <Eye className="w-3.5 h-3.5" />
                         </a>
                         <a
-                          href={`/api/berkas/${encodeURIComponent(b.id)}/unduh`}
+                          href={`/api/berkas/${encodeURIComponent(b.id)}/unduh?tenantId=${encodeURIComponent(tenantId)}`}
                           className="p-1.5 text-ink-3 hover:text-brand-ink rounded-control hover:bg-brand/10 transition-colors"
                           aria-label="Unduh berkas"
                           title="Unduh"

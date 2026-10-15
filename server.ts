@@ -19,6 +19,7 @@ import {
   tandaiKatalog,
 } from './src/services/rag/kbKatalog';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
+import { niatBuatDashboard } from './src/services/chat/niat';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -30,7 +31,7 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, ChatMessage, Dashboard, NotificationItem, ProgressStep, StatusLaporan, Tenant, WidgetGrid, WidgetSpec } from './src/types';
+import { BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, WidgetGrid, WidgetSpec } from './src/types';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -114,6 +115,7 @@ import {
 import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
 import {
   BATAS_UKURAN_BYTE,
+  cariProjectKmsDariKb,
   hitungRingkasanBerkas,
   saringBerkas,
   validasiBerkas,
@@ -1220,17 +1222,11 @@ async function startServer() {
       // masuk jalur orkestrator; SEMUA pesan lain dijawab sebagai chatbot LLM
       // (sapaan, tanya data, obrolan) lewat /query RAG dengan persona + riwayat.
       //
-      // PENTING: jangan mensyaratkan kata-kata BERDAMPINGAN. "buatkan saya dashboard
-      // dengan 10-15 widget" tidak memuat frasa "buatkan dashboard" sehingga dulu
-      // salah dijawab sebagai tanya-jawab, bukan membuat dashboard.
-      const KATA_PERINTAH_DASH =
-        /\b(buat|buatkan|bikin|bikinkan|generate|hasilkan|susun|rancang|ciptakan|sediakan|desain|tampilkan|perbarui|perbaharui|update|refresh)\b/;
-      const OBJEK_DASH = /\b(dashboard|kanvas|canvas|kpi|laporan)\b/;
-      // Pertanyaan ("bagaimana cara buat dashboard?") tetap dijawab sebagai obrolan.
-      const KATA_TANYA =
-        /\b(apa|apakah|bagaimana|gimana|cara|kenapa|mengapa|berapa|siapa|kapan|dimana|mana)\b/;
-      const isGenerateDash =
-        KATA_PERINTAH_DASH.test(lower) && OBJEK_DASH.test(lower) && !KATA_TANYA.test(lower);
+      // Deteksi niat dipindah ke `niatBuatDashboard` (murni, teruji) karena
+      // regex `\b` DULU gagal pada imbuhan bahasa Indonesia: `\bdashboard\b`
+      // tidak cocok "dashboardnya", `\bbuatkan\b` tidak cocok "membuatkan" —
+      // sehingga "oke buatkan saya dashboardnya" salah dijawab sebagai obrolan.
+      const isGenerateDash = niatBuatDashboard(prompt);
 
       // Deteksi obrolan ringan (sapaan/terima kasih) → persona boleh membalas
       // natural tanpa strict grounding. Pertanyaan data tetap grounded.
@@ -2901,11 +2897,55 @@ async function startServer() {
     terbaruPada: null,
   });
 
+  /**
+   * Cache singkat daftar project KMS. Halaman Manajemen Berkas memanggil
+   * beberapa endpoint sekaligus (daftar + ringkasan + unggah); tanpa cache,
+   * tiap panggilan menembak KMS lagi. Daftar project jarang berubah.
+   */
+  let cacheOrgKms: { pada: number; data: OrganisasiKMS[] } | null = null;
+  async function daftarProjectKms(): Promise<OrganisasiKMS[]> {
+    const sekarang = Date.now();
+    if (cacheOrgKms && sekarang - cacheOrgKms.pada < 60_000) return cacheOrgKms.data;
+    const data = await klienKms().daftarOrganisasi();
+    cacheOrgKms = { pada: sekarang, data };
+    return data;
+  }
+
+  /**
+   * Project KMS efektif untuk sebuah instansi.
+   *
+   * Pemetaan eksplisit (`Tenant.kmsOrganizationId`) menang. Bila belum diisi,
+   * cari project KMS yang `knowledgeBase`-nya SAMA dengan KB instansi
+   * (`Tenant.knowledgeBaseId`) — dicocokkan bentuk-normal, bukan kemiripan teks.
+   *
+   * PENTING: JANGAN pernah mengirim `knowledgeBaseId` mentah sebagai
+   * `organizationId`. KMS diam-diam mengalihkan organizationId yang tidak
+   * dikenal ke project DEFAULT — berkas bisa mendarat di repositori instansi
+   * lain (terbukti saat uji: kirim `kb_pam_jaya` → tersimpan di project
+   * "VibeContent Shared Knowledge"). Karena itu pemetaan otomatis HANYA
+   * mengembalikan id project yang benar-benar ada di daftar KMS.
+   */
+  async function projectKmsEfektif(
+    tenant: Tenant | undefined
+  ): Promise<{ organizationId: string; otomatis: boolean; projectKms?: string }> {
+    const eksplisit = String(tenant?.kmsOrganizationId || '').trim();
+    if (eksplisit) return { organizationId: eksplisit, otomatis: false };
+    try {
+      const orgs = await daftarProjectKms();
+      const cocok = cariProjectKmsDariKb(orgs, tenant?.knowledgeBaseId);
+      if (cocok) return { organizationId: cocok.id, otomatis: true, projectKms: cocok.name };
+    } catch {
+      // KMS tak bisa dihubungi — jangan menebak. Pemanggil yang menampilkan galat.
+    }
+    return { organizationId: '', otomatis: false };
+  }
+
   /** Ambil instansi efektif + project KMS-nya. */
-  function konteksBerkas(req: Request, session: SessionPayload) {
+  async function konteksBerkas(req: Request, session: SessionPayload) {
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
-    return { tenantId, tenant, organizationId: String(tenant?.kmsOrganizationId || '').trim() };
+    const { organizationId, otomatis, projectKms } = await projectKmsEfektif(tenant);
+    return { tenantId, tenant, organizationId, otomatis, projectKms };
   }
 
   /** Terjemahkan kegagalan KMS jadi balasan HTTP yang jujur. */
@@ -2925,7 +2965,7 @@ async function startServer() {
   app.get('/api/berkas', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { tenant, organizationId } = konteksBerkas(req, session);
+    const { tenant, organizationId, otomatis, projectKms } = await konteksBerkas(req, session);
     const cakupanAll = session.role === 'admin' && String(req.query.cakupan || '') === 'all';
     const org = cakupanAll ? 'all' : organizationId;
 
@@ -2938,7 +2978,7 @@ async function startServer() {
         organizationId: null,
         instansi: tenant?.name || null,
         catatan:
-          'Instansi ini belum dipetakan ke project KMS. Atur "Project KMS" pada instansi di panel admin, lalu berkas bisa diunggah & dibaca dari sini.',
+          'Instansi ini belum dipetakan ke project KMS. Saya sudah mencoba mencocokkan otomatis lewat Knowledge Base instansi, tetapi tidak ada project KMS yang KB-nya sama. Atur "Project KMS" pada instansi di panel admin, lalu berkas bisa diunggah & dibaca dari sini.',
       });
     }
 
@@ -2953,6 +2993,8 @@ async function startServer() {
         terpetakan: true,
         cakupan: org,
         organizationId: organizationId || null,
+        pemetaanOtomatis: otomatis,
+        projectKms: projectKms || null,
         instansi: tenant?.name || null,
       });
     } catch (err: any) {
@@ -2964,7 +3006,7 @@ async function startServer() {
   app.get('/api/berkas/ringkasan', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { organizationId } = konteksBerkas(req, session);
+    const { organizationId } = await konteksBerkas(req, session);
     if (!organizationId) return res.json({ ...berkasKosong(), terpetakan: false });
     try {
       res.json({ ...hitungRingkasanBerkas(await klienKms().daftarBerkas(organizationId)), terpetakan: true });
@@ -2983,7 +3025,7 @@ async function startServer() {
   app.post('/api/berkas/unggah', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { tenant, organizationId } = konteksBerkas(req, session);
+    const { tenant, organizationId } = await konteksBerkas(req, session);
 
     const nama = String(req.body?.nama || '').trim();
     const galatBerkas = validasiBerkas({ nama, ukuran: req.body?.ukuran, tipe: req.body?.tipe });
@@ -3045,7 +3087,7 @@ async function startServer() {
     if (session.role !== 'admin') {
       return res.status(403).json({ error: 'Hanya admin yang boleh menghapus berkas dari repositori.' });
     }
-    const { tenant, organizationId } = konteksBerkas(req, session);
+    const { tenant, organizationId } = await konteksBerkas(req, session);
     if (!organizationId) {
       return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
     }
@@ -3074,7 +3116,7 @@ async function startServer() {
   async function teruskanBerkas(req: Request, res: Response, mode: 'view' | 'download') {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { organizationId } = konteksBerkas(req, session);
+    const { organizationId } = await konteksBerkas(req, session);
     if (!organizationId) {
       return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
     }

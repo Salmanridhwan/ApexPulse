@@ -137,20 +137,35 @@ export interface HasilLengkapiWidget {
 }
 
 /**
- * Fokus dasar yang selalu bisa dipenuhi pembuat widget untuk sebuah preset.
- * Dipakai saat melengkapi dashboard supaya permintaannya berupa SATU fokus
- * (kpi/grafik/tabel/narasi), bukan tipe chart spesifik yang bisa ditolak.
+ * Fokus dasar untuk sebuah preset saat MELENGKAPI dashboard.
  *
- * Untuk preset grafik dipakai `bar` (bukan `grafik`) karena `ambilDataWidget`
- * mengenali tipe konkret; `grafik` justru jatuh ke cabang narasi. Nilai ini
- * mengikuti pemeriksa ketersediaan katalog supaya hasilnya konsisten.
+ * PENTING (perbaikan 2026-10-15): fungsi ini DULU selalu mengembalikan `bar`
+ * untuk semua keluarga grafik, sehingga dashboard hasil lengkapan katalog
+ * hampir selalu berisi deretan diagram batang — "chartnya itu-itu aja" padahal
+ * repo punya puluhan tipe (donut, radar, heatmap, gauge, waterfall, funnel, …).
+ * Sekarang tipe yang DIMINTAKAN preset dipertahankan apa adanya; kalau bentuk
+ * datanya tidak mendukung, `ambilDataWidget` menurunkan ke tipe cadangan yang
+ * aman (`tipeCadangan`) — jadi variasi didapat tanpa menampilkan bentuk palsu.
  */
 export function tipeDasarPreset(preset: { tipeChart?: string[] }): string {
   const t = String(preset.tipeChart?.[0] || 'kpi');
-  if (['kpi', 'bullet-target', 'gauge'].includes(t)) return 'kpi';
-  if (t === 'table') return 'table';
-  if (t === 'narasi') return 'narasi';
-  return 'bar';
+  // 'grafik' bukan tipe konkret; peta ke batang supaya tetap punya bentuk default.
+  if (t === 'grafik') return 'bar';
+  return t;
+}
+
+/**
+ * Tipe cadangan (berurutan) bila tipe utama tidak bisa dihormati data dokumen.
+ * Dipakai `ambilDataWidget` pada data yang SAMA (tanpa panggilan RAG tambahan),
+ * sehingga widget tetap muncul dengan bentuk paling setia yang bisa digambar.
+ */
+export function tipeCadanganPreset(preset: { tipeChart?: string[] }): string[] {
+  const utama = tipeDasarPreset(preset);
+  const daftar = (preset.tipeChart || []).filter((t) => t && t !== 'grafik' && t !== utama);
+  // Selalu sertakan batang & garis sebagai jaring terakhir: keduanya bisa digambar
+  // dari hampir semua bentuk data {xAxis, series}.
+  for (const aman of ['bar', 'line']) if (!daftar.includes(aman) && aman !== utama) daftar.push(aman);
+  return daftar;
 }
 
 /**

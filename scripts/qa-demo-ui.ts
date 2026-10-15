@@ -47,8 +47,9 @@ function log(msg: string) {
 
 async function bukaPanelChat(): Promise<boolean> {
   return page.evaluate(() => {
-    const btn = [...document.querySelectorAll('header button')].find(
-      (b) => /Buka \/ Tutup Chat RAG Copilot/i.test(b.getAttribute('title') || '')
+    // Panel chat dibuka lewat FAB ber-title "Buka RAG Copilot" (bisa juga sudah ada tombol tutup).
+    const btn = [...document.querySelectorAll('button')].find(
+      (b) => /Buka (RAG Copilot|. Tutup Chat RAG Copilot)/i.test(b.getAttribute('title') || '')
     ) as HTMLElement | undefined;
     if (!btn) return false;
     btn.click();
@@ -76,8 +77,9 @@ async function bukaMenuAksi(): Promise<void> {
     );
     (btn as HTMLElement)?.click();
   });
-  // Penanda menu harus salah satu ISINYA, bukan label filter bar yang sudah berubah.
-  await page.waitForFunction(() => /Mode Presentasi/i.test(document.body.innerText), {
+  // Penanda menu = item yang SELALU ada di menu ("Cetak / Ekspor").
+  // (Dulu memakai "Mode Presentasi", item yang sudah dihapus dari menu.)
+  await page.waitForFunction(() => /Cetak \/ Ekspor/.test(document.body.innerText), {
     timeout: 8000,
   });
 }
@@ -175,20 +177,20 @@ async function main() {
   await uji('1 — Login user instansi', async () => {
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // Auto-prefill demo credentials di form login
+    // Form login kini mulai KOSONG (prefill demo sudah dihapus) — pastikan field ada.
     const emailVal = await page.$eval('input[type="email"]', (el: any) => (el as HTMLInputElement).value);
-    assert.ok(emailVal.includes('@'), 'form login tidak menampilkan email prefill');
+    assert.ok(typeof emailVal === 'string', 'form login tidak menampilkan input email');
 
-    await page.click('input[type="email"]', { count: 3 } as any);
+    await page.click('input[type="email"]');
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
     await page.type('input[type="email"]', DEMO_EMAIL);
-    await page.click('input[type="password"]', { count: 3 } as any);
+    await page.click('input[type="password"]');
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
     await page.type('input[type="password"]', DEMO_PASS);
-    await page.evaluate(() => {
-      const btn = [...document.querySelectorAll('button')].find((b) =>
-        /masuk/i.test(b.textContent || '')
-      );
-      (btn as HTMLButtonElement)?.click();
-    });
+    // Tombol submit = satu-satunya button[type="submit"] (tombol tab "Masuk" bukan submit).
+    await page.click('button[type="submit"]');
 
     // Tunggu UI terpakai: aside sidebar hanya ada di halaman terautentikasi.
     const masuk = await page
@@ -303,7 +305,16 @@ async function main() {
     // Widget sebelum aksi
     const sebelum = await hitungWidgetKanvas();
 
-    // --- 4a: hapus widget pertama yang mengandung "Tren"/"Pendapatan" via chat
+    // --- 4a: hapus widget via chat memakai JUDUL WIDGET NYATA ---
+    // JANGAN hardcode judul (dulu "pendapatan" dari Jalur B yang sudah dihapus);
+    // ambil judul widget pertama yang benar-benar ada di kanvas.
+    const judulTarget = await page.evaluate(() => {
+      const grid = [...document.querySelectorAll('main div.grid')].find((g) => g.querySelector('h3, h4'));
+      const kartu = grid ? ([...grid.children].find((c) => c.querySelector('h3, h4')) as HTMLElement | undefined) : undefined;
+      return (kartu?.querySelector('h3, h4')?.textContent || '').trim();
+    });
+    assert.ok(judulTarget, 'tidak ada widget di kanvas untuk dihapus');
+
     // Chat input = input[type=text] di panel fixed (bukan textarea).
     if (!(await page.evaluate(() => !!document.querySelector('div.fixed input[type="text"]')))) {
       const buka = await bukaPanelChat();
@@ -313,10 +324,10 @@ async function main() {
     const CHAT = 'div.fixed input[type="text"]';
 
     await page.click(CHAT);
-    await page.type(CHAT, 'hapus widget pendapatan');
+    await page.type(CHAT, 'hapus widget ' + judulTarget.slice(0, 16).toLowerCase());
     await page.keyboard.press('Enter');
     const hapusOk = await tungguTeks('telah dihapus|berhasil dihapus', 20000);
-    assert.ok(hapusOk, 'perintah hapus widget tidak menghasilkan konfirmasi');
+    assert.ok(hapusOk, `perintah hapus widget "${judulTarget.slice(0, 16)}" tidak menghasilkan konfirmasi`);
 
     let sesudahHapus = sebelum;
     const start4 = Date.now();
@@ -329,7 +340,7 @@ async function main() {
 
     // --- 4b: ganti tipe chart jadi batang via chat
     await page.click(CHAT);
-    await page.type(CHAT, 'ganti tren pendapatan jadi diagram batang');
+    await page.type(CHAT, 'ganti chart jadi diagram batang');
     await page.keyboard.press('Enter');
     const gantiOk = await tungguTeks('diubah menjadi BAR|telah diubah|DIAGRAM BATANG|BAR', 20000);
     assert.ok(gantiOk, 'perintah ganti chart tidak menghasilkan konfirmasi');

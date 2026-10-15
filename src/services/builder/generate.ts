@@ -4,12 +4,14 @@ import { RagServiceError } from '../rag/http';
 import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
+import { rapikanTataLetak } from './tataLetak';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
   labelJumlahWidget,
   lengkapiWidgetDariKatalog,
   parsePermintaanJumlahWidget,
+  tipeCadanganPreset,
   tipeDasarPreset,
 } from './permintaanWidget';
 
@@ -264,14 +266,27 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       target: permintaanJumlah,
       onCatatan: (t) => logSummary.push(`[Lengkapi] ${t}`),
       ambil: async (preset) => {
-        const hasil = await ragClient.ambilDataWidget!(
-          preset.queryRagContoh,
-          sector,
-          tipeDasarPreset(preset),
-          instansi,
-          kbId
-        );
-        return hasil?.data ? (hasil.data as WidgetSpec) : null;
+        // Coba tipe yang DIMINTAKAN preset dulu (agar variasi chart terjaga:
+        // donut, radar, heatmap, gauge, …). Kalau bentuk datanya tidak mendukung,
+        // `ambilDataWidget` mengembalikan null — coba tipe cadangan berikutnya
+        // PADA DATA yang sudah diambil ulang, sehingga kartu tetap muncul dengan
+        // bentuk paling setia yang bisa digambar, bukan hilang.
+        const kandidat = [tipeDasarPreset(preset), ...tipeCadanganPreset(preset)];
+        for (const tipe of kandidat) {
+          try {
+            const hasil = await ragClient.ambilDataWidget!(
+              preset.queryRagContoh,
+              sector,
+              tipe,
+              instansi,
+              kbId
+            );
+            if (hasil?.data) return hasil.data as WidgetSpec;
+          } catch {
+            // Galat satu tipe tidak boleh menggagalkan preset ini; coba cadangan.
+          }
+        }
+        return null;
       },
     });
     synthesizedWidgets = lengkap.widgets;
@@ -293,6 +308,17 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
           : `Tersusun ${synthesizedWidgets.length} widget (permintaan ${labelJumlahWidget(permintaanJumlah)} belum terpenuhi penuh)`,
       status: 'completed',
     });
+  }
+
+  // Step 3c: RAPIKAN TATA LETAK.
+  // Kanvas mengabaikan x/y dan menyusun dari URUTAN + lebar (grid.w). Tanpa
+  // langkah ini urutan widget hasil gabungan (Jalur A + pelengkap katalog) acak
+  // dan lebarnya tidak mengemas 12 kolom, sehingga kanvas penuh celah —
+  // "penempatan widgetnya masih berantakan". `rapikanTataLetak` mengurutkan per
+  // zona (kartu → grafik → tabel → narasi) dan menetapkan lebar yang rapat.
+  if (synthesizedWidgets.length > 0) {
+    synthesizedWidgets = rapikanTataLetak(synthesizedWidgets);
+    logSummary.push(`[Tata Letak] ${synthesizedWidgets.length} widget disusun rapi (12 kolom tanpa celah).`);
   }
 
   onProgress?.({
