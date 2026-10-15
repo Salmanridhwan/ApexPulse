@@ -6,6 +6,13 @@ import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { buildWidgetsFromMetadata } from './fromMetadata';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
+import {
+  PermintaanJumlahWidget,
+  labelJumlahWidget,
+  lengkapiWidgetDariKatalog,
+  parsePermintaanJumlahWidget,
+  tipeDasarPreset,
+} from './permintaanWidget';
 
 export interface GenerateOptions {
   userPrompt: string;
@@ -47,12 +54,36 @@ export interface GenerateResult {
   latencyMs: number;
   citationsCount: number;
   logSummary: string[];
+  /**
+   * Permintaan jumlah widget yang terbaca dari kalimat pengguna, mis.
+   * "dashboard dengan 15-20 widget" → { min: 15, max: 20 }. `undefined` bila
+   * pengguna tidak menyebut jumlah (dashboard dibuat apa adanya).
+   */
+  permintaanJumlah?: PermintaanJumlahWidget;
+  /** Jumlah widget yang benar-benar berhasil dibuat. */
+  jumlahWidget: number;
+  /**
+   * true bila permintaan jumlah widget BELUM terpenuhi (dokumen tidak memuat
+   * cukup indikator). Pemanggil wajib menyampaikan ini apa adanya ke pengguna.
+   */
+  jumlahKurang: boolean;
 }
 
 export async function generateDashboard(options: GenerateOptions): Promise<GenerateResult> {
   const { userPrompt, sector, tenantId, instansi, kbId, izinkanSnapshotDemo, onProgress } = options;
   const start = Date.now();
   const logSummary: string[] = [];
+
+  // Permintaan JUMLAH widget ("dashboard dengan 15-20 widget"). Dibaca di awal
+  // supaya jalur mana pun tahu targetnya, dan supaya janji ke pengguna tidak
+  // pernah melebihi widget yang benar-benar dibuat.
+  const permintaanJumlahDibaca = parsePermintaanJumlahWidget(userPrompt);
+  const permintaanJumlah: PermintaanJumlahWidget | undefined = permintaanJumlahDibaca ?? undefined;
+  if (permintaanJumlah) {
+    logSummary.push(
+      `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`
+    );
+  }
 
   // Step 1: Menerjemahkan instruksi
   onProgress?.({
@@ -123,6 +154,9 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       latencyMs: Date.now() - start,
       citationsCount: 0,
       logSummary,
+      permintaanJumlah,
+      jumlahWidget: 0,
+      jumlahKurang: !!permintaanJumlah,
     };
   }
 
@@ -213,6 +247,62 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     }
   }
 
+  // Step 3b: LENGKAPI sampai jumlah widget yang diminta pengguna.
+  // Dashboard utama biasanya hanya menghasilkan 2-6 widget. Kalau pengguna
+  // meminta lebih ("15-20 widget"), tarik sisa widget dari KATALOG preset —
+  // angkanya tetap dari dokumen instansi (bukan karangan). Best-effort: yang
+  // tidak ada datanya dibuang, dan selisihnya dilaporkan jujur ke pengguna.
+  if (
+    ok &&
+    permintaanJumlah &&
+    synthesizedWidgets.length > 0 &&
+    synthesizedWidgets.length < permintaanJumlah.max &&
+    typeof options.ragClient?.ambilDataWidget === 'function'
+  ) {
+    onProgress?.({
+      id: 'step-3b',
+      title: `Melengkapi dashboard sampai ${labelJumlahWidget(permintaanJumlah)} widget dari dokumen...`,
+      status: 'in_progress',
+    });
+    const ragClient = options.ragClient;
+    const lengkap = await lengkapiWidgetDariKatalog({
+      widgets: synthesizedWidgets,
+      katalog: WIDGET_CATALOG,
+      sector,
+      target: permintaanJumlah,
+      onCatatan: (t) => logSummary.push(`[Lengkapi] ${t}`),
+      ambil: async (preset) => {
+        const hasil = await ragClient.ambilDataWidget!(
+          preset.queryRagContoh,
+          sector,
+          tipeDasarPreset(preset),
+          instansi,
+          kbId
+        );
+        return hasil?.data ? (hasil.data as WidgetSpec) : null;
+      },
+    });
+    synthesizedWidgets = lengkap.widgets;
+    logSummary.push(
+      `[Lengkapi] Ditambahkan ${lengkap.ditambahkan} dari ${lengkap.dicoba} preset katalog ` +
+        `(total ${synthesizedWidgets.length} widget).`
+    );
+    // Setelah melengkapi, tipe widget baru perlu diselaraskan juga supaya
+    // kartunya sama dengan pratinjau katalog (mis. bar tanpa seri valid).
+    if (lengkap.ditambahkan > 0) {
+      const selaras2 = selaraskanDaftarWidget(synthesizedWidgets);
+      synthesizedWidgets = selaras2.widgets;
+    }
+    onProgress?.({
+      id: 'step-3b',
+      title:
+        synthesizedWidgets.length >= permintaanJumlah.max
+          ? `Dashboard lengkap: ${synthesizedWidgets.length} widget dari dokumen instansi`
+          : `Tersusun ${synthesizedWidgets.length} widget (permintaan ${labelJumlahWidget(permintaanJumlah)} belum terpenuhi penuh)`,
+      status: 'completed',
+    });
+  }
+
   onProgress?.({
     id: 'step-3',
     title: ok ? `Sintesis selesai via ${modeUsed}` : 'Dokumen instansi tidak memadai — dashboard tidak dibuat',
@@ -259,5 +349,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     latencyMs,
     citationsCount: totalCitations,
     logSummary,
+    permintaanJumlah,
+    jumlahWidget: synthesizedWidgets.length,
+    jumlahKurang: !!permintaanJumlah && synthesizedWidgets.length < permintaanJumlah.max,
   };
 }

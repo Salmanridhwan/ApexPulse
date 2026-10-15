@@ -143,4 +143,22 @@ export interface RagClient {
     periodeLabel?: string;
     catatan?: string;
   } | null>;
+
+  /**
+   * Ambil data NYATA satu indikator untuk melengkapi dashboard sampai jumlah
+   * widget yang diminta pengguna (mis. "dashboard dengan 15-20 widget").
+   *
+   * Opsional: hanya klien HTTP yang bisa menjawab. Kalau tidak ada, permintaan
+   * jumlah widget dilaporkan apa adanya (tidak dipenuhi), bukan dikarang.
+   * Mengembalikan `null` bila dokumen tidak memuat indikator itu — JANGAN
+   * mengembalikan widget kosong.
+   */
+  ambilDataWidget?(
+    query: string,
+    sector: BumdSector,
+    tipe: string,
+    instansi?: string,
+    kbId?: string,
+    opsi?: { lemparSaatGagal?: boolean }
+  ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null>;
 }

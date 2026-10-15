@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
+import { labelJumlahWidget } from './src/services/builder/permintaanWidget';
 import { ConfigurableRagClient, RagServiceError, jelaskanError, maskKey } from './src/services/rag/http';
 import {
   hitungRingkasanKatalog,
@@ -1423,6 +1424,22 @@ async function startServer() {
           : genResult.modeUsed === 'Jalur B (Agregasi Metadata)'
             ? `Angka disusun dari ringkasan metadata dokumen instansi ini (**${genResult.citationsCount} sitasi**), jadi bisa lebih sedikit daripada dashboard penuh.\n`
             : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
+
+      // JUJUR soal jumlah widget: kalau pengguna meminta jumlah tertentu
+      // ("dashboard dengan 15-20 widget"), katakan berapa yang benar-benar
+      // tersusun — jangan menjanjikan angka yang tidak ada di kanvas.
+      if (genResult.permintaanJumlah) {
+        const diminta = labelJumlahWidget(genResult.permintaanJumlah);
+        if (genResult.jumlahKurang) {
+          replyText +=
+            `⚠️ Anda meminta **${diminta} widget**, tetapi dokumen instansi ini baru memuat data untuk **${genResult.jumlahWidget} widget**. ` +
+            `Sisanya tidak ditambahkan supaya tidak ada angka contoh. Tambahkan/rapikan dokumen di knowledge base lalu minta lagi.\n`;
+        } else {
+          replyText += `Dashboard berisi **${genResult.jumlahWidget} widget** sesuai permintaan Anda.\n`;
+        }
+      } else {
+        replyText += `Dashboard berisi **${genResult.jumlahWidget} widget** dari dokumen instansi ini.\n`;
+      }
       replyText += `Anda bisa meminta penyesuaian lebih lanjut (misalnya: *"rekomendasi chart"*, *"ubah grafik ke diagram garis"*, atau *"hapus widget [nama]"*).`;
 
       catatAsisten({

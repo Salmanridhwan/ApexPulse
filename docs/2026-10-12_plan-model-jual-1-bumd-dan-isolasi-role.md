@@ -410,6 +410,35 @@ Menu di grup **Kinerja & Kepatuhan**.
   Bukti: `/api/chat/umum` tanpa `tenantId` → `tenant-1791501310547` (PAM JAYA, 5 pesan);
   dengan `?tenantId=tenant-1791429954407` → chat Tirta Moedal (3 pesan), terpisah.
   Suite isolasi tetap lulus (isolasi-kuat 6/6, isolasi-tenant 13/13).
+- **Permintaan JUMLAH widget dihormati + balasan jujur — DIPERBAIKI 2026-10-14.** Keluhan:
+  "bisa buatkan saya dashboard dengan 15-20 widget" dijawab "Tentu!" tetapi kanvas hanya
+  berisi 2 widget. Dua bug nyata: (1) jumlah widget yang diminta **tidak pernah dibaca**
+  dari kalimat pengguna, dan (2) balasan chat mengklaim sukses tanpa menyebut berapa yang
+  benar-benar dibuat.
+  - **Logika murni baru** `src/services/builder/permintaanWidget.ts`:
+    `parsePermintaanJumlahWidget` (rentang "15-20", "20 sampai 25", "8 s/d 10", angka
+    tunggal "12 widget"/"6 kartu"/"10 grafik"; batas wajar 40; frasa kualitatif "beberapa
+    widget" sengaja TIDAK dipetakan ke angka), `labelJumlahWidget`, `pilihPresetPelengkap`,
+    `tipeDasarPreset`, dan `lengkapiWidgetDariKatalog` (best-effort: ambil widget nyata dari
+    katalog preset sampai target, buang yang datanya tidak ada di dokumen, batas waktu 75 detik,
+    concurrency 3, kandidat di-overshoot supaya kegagalan satu preset tertutup).
+  - `generate.ts` membaca permintaan di awal, menambah **Step 3b** pelengkapan dari katalog
+    (hanya bila pengguna menyebut jumlah DAN masih kurang DAN klien punya `ambilDataWidget`),
+    lalu mengembalikan `permintaanJumlah`, `jumlahWidget`, `jumlahKurang`.
+  - `server.ts` menyampaikan apa adanya: kalau kurang → "Anda meminta **15–20 widget**, tetapi
+    dokumen baru memuat data untuk **N widget**"; kalau cukup → "Dashboard berisi **N widget**
+    sesuai permintaan Anda". Tidak ada lagi klaim jumlah yang tidak ada di kanvas.
+  - `ChatPanel.tsx` **menghapus** label teknis internal "Jalur A (LLM JSON)" dan pill
+    "N Sitasi" (detail mesin, bukan informasi pengguna), **tetapi mempertahankan** peringatan
+    jujur: "DATA CONTOH — bukan dokumen instansi", "Layanan RAG tidak terhubung", dan
+    "Dashboard tidak dibuat". (Sisa kata "Sitasi" di bundle hanya di ExportModal & kartu
+    statistik Admin — memang bukan pill yang dihapus.)
+  - Uji: unit `scripts/tmp-uji-permintaan-widget.ts` (**47 pemeriksaan**, murni) dan
+    verifikasi alur `scripts/tmp-verif-jumlah-widget.ts` (**14 pemeriksaan**, klien RAG
+    tiruan): minta "15-20 widget" → tepat 20 widget; tanpa menyebut jumlah → tetap 3 widget
+    (tidak dipaksa); minta "2 widget" yang sudah terpenuhi → tidak menambah.
+  - Verifikasi: `tsc --noEmit` 0 error (src+server), `npm run build` hijau, konsol browser
+    0 error, regresi unit lulus (lkjip 52, pk 65, risiko 70, aset 57, katalog-kb 61).
 - Skrip uji `scripts/tmp-uji-*.sh` / `*.ts` sudah tercakup `.gitignore` (`tmp-*`).
 
 ## 10. Yang TIDAK diubah

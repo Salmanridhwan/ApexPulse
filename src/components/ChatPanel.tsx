@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Clock,
   CornerDownLeft,
-  FileCheck,
   Layers,
   Loader2,
   PieChart,
@@ -640,38 +639,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 />
               )}
 
-              {/* Mode & Citations Metadata Pill */}
-              {(msg.modeUsed || msg.citationsCount) && (
+              {/* Peringatan status dashboard. Label teknis internal ("Jalur A
+                  (LLM JSON)", jumlah sitasi) sengaja TIDAK ditampilkan — itu
+                  detail mesin, bukan informasi yang berguna bagi pengguna. Yang
+                  tetap tampil hanya peringatan yang memang penting: dashboard
+                  berisi data contoh, layanan RAG tidak terhubung, atau dashboard
+                  tidak dibuat. */}
+              {msg.modeUsed === 'Fallback (Template Snapshot)' && (
                 <div className="mt-2.5 pt-2 border-t border-line/60 flex items-center gap-2 text-[10px]">
-                  {msg.modeUsed && (
-                    msg.modeUsed === 'Fallback (Template Snapshot)' ? (
-                      <span className="inline-flex items-center gap-1 text-warn font-semibold bg-warn/15 px-2 py-0.5 rounded border border-warn/40">
-                        <AlertTriangle className="w-3 h-3 text-warn" />
-                        DATA CONTOH — bukan dokumen instansi
-                      </span>
-                    ) : msg.modeUsed === 'Gagal (Layanan RAG)' ? (
-                      <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
-                        <AlertCircle className="w-3 h-3 text-neg" />
-                        Layanan RAG tidak terhubung
-                      </span>
-                    ) : msg.modeUsed === 'Gagal (Dokumen Tidak Memadai)' ? (
-                      <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
-                        <AlertTriangle className="w-3 h-3 text-neg" />
-                        Dashboard tidak dibuat
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-ink-2 font-medium bg-surface px-2 py-0.5 rounded border border-line">
-                        <Layers className="w-3 h-3 text-brand" />
-                        {msg.modeUsed}
-                      </span>
-                    )
-                  )}
-                  {msg.citationsCount !== undefined && (
-                    <span className="inline-flex items-center gap-1 text-pos font-medium bg-pos/15 px-2 py-0.5 rounded border border-pos/30">
-                      <FileCheck className="w-3 h-3 text-pos" />
-                      {msg.citationsCount} Sitasi
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1 text-warn font-semibold bg-warn/15 px-2 py-0.5 rounded border border-warn/40">
+                    <AlertTriangle className="w-3 h-3 text-warn" />
+                    DATA CONTOH — bukan dokumen instansi
+                  </span>
+                </div>
+              )}
+              {msg.modeUsed === 'Gagal (Layanan RAG)' && (
+                <div className="mt-2.5 pt-2 border-t border-line/60 flex items-center gap-2 text-[10px]">
+                  <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
+                    <AlertCircle className="w-3 h-3 text-neg" />
+                    Layanan RAG tidak terhubung
+                  </span>
+                </div>
+              )}
+              {msg.modeUsed === 'Gagal (Dokumen Tidak Memadai)' && (
+                <div className="mt-2.5 pt-2 border-t border-line/60 flex items-center gap-2 text-[10px]">
+                  <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
+                    <AlertTriangle className="w-3 h-3 text-neg" />
+                    Dashboard tidak dibuat
+                  </span>
                 </div>
               )}
             </div>
