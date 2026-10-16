@@ -37,15 +37,32 @@ const LABEL_SEKTOR: Record<BumdSector, string> = {
 };
 
 /**
- * Baris hasil yang terisi otomatis dari KB — BUKAN kolom isian.
- * Dipakai form "Instansi & KB" supaya admin hanya perlu mengisi KB ID.
+ * Baris hasil yang terisi otomatis dari KB.
+ * Bila `onChange` diberikan, baris berubah jadi kolom ISIAN: nilainya datang dari
+ * dokumen, tetapi admin tetap boleh menimpanya secara manual — ini jalur keluar
+ * ketika layanan RAG lambat/tidak tersedia sehingga field tidak terisi sendiri.
  */
-const BarisOtomatis: React.FC<{ label: string; nilai?: string }> = ({ label, nilai }) => (
+const BarisOtomatis: React.FC<{
+  label: string;
+  nilai?: string;
+  onChange?: (v: string) => void;
+  placeholder?: string;
+}> = ({ label, nilai, onChange, placeholder }) => (
   <div>
     <label className="block text-ink-3 mb-0.5">{label}</label>
-    <div className="px-3 py-2 border border-line rounded-control bg-surface-2 text-ink min-h-[34px] break-words">
-      {nilai ? nilai : <span className="text-ink-3">— menunggu KB ID</span>}
-    </div>
+    {onChange ? (
+      <input
+        type="text"
+        value={nilai || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder || '— menunggu KB ID (bisa diisi manual)'}
+        className="w-full px-3 py-2 border border-line rounded-control bg-surface text-ink min-h-[34px] focus:outline-none focus:ring-1 focus:ring-brand"
+      />
+    ) : (
+      <div className="px-3 py-2 border border-line rounded-control bg-surface-2 text-ink min-h-[34px] break-words">
+        {nilai ? nilai : <span className="text-ink-3">— menunggu KB ID</span>}
+      </div>
+    )}
   </div>
 );
 
@@ -209,6 +226,12 @@ export const Admin: React.FC<AdminProps> = ({
     catatan?: string;
   } | null>(null);
   const [tenantKbLoading, setTenantKbLoading] = useState(false);
+  /** True bila KB punya dokumen tetapi profil (nama/kota) gagal terisi otomatis. */
+  const [tenantProfilGagal, setTenantProfilGagal] = useState(false);
+  /** True bila admin memilih mengisi profil manual (melewati pembacaan KB). */
+  const [tenantManual, setTenantManual] = useState(false);
+  /** Pesan galat saat menyimpan instansi (mis. validasi server menolak). */
+  const [tenantSaveError, setTenantSaveError] = useState('');
   /** Sedang menyimpan instansi + menyinkronkan KB-nya (menunggu layanan RAG). */
   const [tenantSaving, setTenantSaving] = useState(false);
 
@@ -310,7 +333,15 @@ export const Admin: React.FC<AdminProps> = ({
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantName || !tenantCity) return;
+    // Validasi TIDAK boleh gagal senyap: kalau tombol Simpan tak bereaksi,
+    // admin mengira aplikasinya rusak. Selalu jelaskan apa yang kurang.
+    setTenantSaveError('');
+    if (!tenantName.trim() || !tenantCity.trim()) {
+      setTenantSaveError(
+        'Nama Resmi BUMD dan Kota/Kabupaten wajib diisi. Lengkapi field tersebut (boleh manual) lalu simpan lagi.'
+      );
+      return;
+    }
 
     setTenantSaving(true);
     const modeEdit = !!editTenantId;
@@ -337,6 +368,12 @@ export const Admin: React.FC<AdminProps> = ({
         }
       );
       const newT = await res.json();
+      // Server menolak (mis. kode instansi duplikat / nama kosong): tampilkan
+      // alasannya di form, jangan tutup modal seolah berhasil.
+      if (!res.ok) {
+        setTenantSaveError(newT?.error || `Gagal menyimpan instansi (HTTP ${res.status}).`);
+        return;
+      }
       // Server IKUT menyinkronkan KB saat KB berubah (menunggu RAG), jadi
       // instansi yang muncul sudah membawa jumlah dokumen terbaru.
       if (modeEdit) {
@@ -367,6 +404,7 @@ export const Admin: React.FC<AdminProps> = ({
       loadData();
     } catch (err) {
       console.error('Simpan tenant failed:', err);
+      setTenantSaveError('Tidak bisa menghubungi server saat menyimpan instansi. Coba lagi.');
     } finally {
       setTenantSaving(false);
     }
@@ -384,6 +422,9 @@ export const Admin: React.FC<AdminProps> = ({
     setTenantKmsOrgId('');
     setTenantSector('pdam');
     setTenantKbInfo(null);
+    setTenantProfilGagal(false);
+    setTenantManual(false);
+    setTenantSaveError('');
   };
 
   /** Buka modal dalam mode EDIT: isi field dari instansi yang dipilih. */
@@ -397,6 +438,9 @@ export const Admin: React.FC<AdminProps> = ({
     setTenantKbId(t.knowledgeBaseId || '');
     setTenantKmsOrgId(t.kmsOrganizationId || '');
     setTenantKbInfo(null);
+    setTenantProfilGagal(false);
+    setTenantManual(false);
+    setTenantSaveError('');
     setIsAddTenantOpen(true);
   };
   /** Buka modal dalam mode TAMBAH: kosongkan dulu supaya tidak ada sisa nilai. */
@@ -781,14 +825,18 @@ export const Admin: React.FC<AdminProps> = ({
 
   /**
    * AUTO-ISI dari KB: satu-satunya isian di form ini adalah KB ID. Begitu diisi,
-   * semua field lain (Nama, Kota, Sektor, Nama Singkat, Kode) TERISI dari dokumen KB.
-   * Kalau KB kosong/ID salah, field dikosongkan lagi supaya tidak ada sisa nilai lama
-   * yang tertinggal dan tampak seolah-olah masih berlaku.
+   * field lain (Nama, Kota, Sektor, Nama Singkat, Kode) diisi dari dokumen KB.
+   *
+   * Kalau pembacaan GAGAL (layanan RAG lambat/timeout) field TIDAK dikosongkan —
+   * nilai yang sudah ada dibiarkan, dan admin diberi tahu lewat `tenantProfilGagal`
+   * supaya bisa mengisi manual. Mengosongkan di sini dulu membuat tombol Simpan
+   * mati tanpa penjelasan. Field hanya dikosongkan saat KB memang benar-benar kosong.
    */
   useEffect(() => {
     const kb = tenantKbId.trim();
     if (!kb) {
       setTenantKbInfo(null);
+      setTenantProfilGagal(false);
       setTenantName('');
       setTenantCity('');
       setTenantShortName('');
@@ -796,24 +844,39 @@ export const Admin: React.FC<AdminProps> = ({
       setTenantSector('pdam');
       return;
     }
+    // Mode isi manual: lewati pembacaan KB sama sekali — admin mengisi sendiri,
+    // dan fetch yang sedang berjalan dibatalkan lewat cleanup efek ini.
+    if (tenantManual) {
+      setTenantKbLoading(false);
+      return;
+    }
     let batal = false;
     setTenantKbLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/admin/kb-profil?kb=${encodeURIComponent(kb)}`);
+        const res = await fetch(`/api/admin/kb-profil?kb=${encodeURIComponent(kb)}`, {
+          signal: AbortSignal.timeout(180000),
+        });
         const data = await res.json();
         if (batal) return;
         setTenantKbInfo(data);
-        // Field ini bukan isian lagi, jadi diisi apa adanya dari dokumen.
-        setTenantName(data?.nama || '');
-        setTenantCity(data?.kota || '');
-        if (data?.sektor) setTenantSector(data.sektor);
-        // Nama singkat: ambil potongan nama instansi; kalau tidak ada, dari KB ID.
-        setTenantShortName(
-          data?.nama ? String(data.nama).replace(/^Perumda\s+/i, '').slice(0, 24) : ''
-        );
-        // Kode instansi diturunkan dari KB ID (mis. kb_pam_jaya → KB_PAM_JAYA).
+        const dariDokumen = !!data?.nama;
+        if (dariDokumen) {
+          setTenantName(data.nama);
+          setTenantCity(data.kota || '');
+          if (data.sektor) setTenantSector(data.sektor);
+          // Nama singkat: ambil potongan nama instansi.
+          setTenantShortName(String(data.nama).replace(/^Perumda\s+/i, '').slice(0, 24));
+        } else if (data?.jumlahDokumen === 0) {
+          // KB benar-benar kosong / ID salah — tidak ada yang bisa diisi.
+          setTenantName('');
+          setTenantCity('');
+        }
+        // Kode instansi selalu diturunkan dari KB ID (mis. kb_pam_jaya → KB_PAM_JAYA).
         setTenantCode(kb.toUpperCase());
+        // Gagal terisi padahal KB punya dokumen = layanan lambat / dokumen belum
+        // selesai diindeks. Tandai supaya UI menawarkan pengisian manual.
+        setTenantProfilGagal(!dariDokumen && Number(data?.jumlahDokumen || 0) > 0);
       } catch {
         if (!batal) {
           setTenantKbInfo({
@@ -821,8 +884,9 @@ export const Admin: React.FC<AdminProps> = ({
             jumlahDokumen: 0,
             catatan: 'Tidak bisa menghubungi server untuk membaca KB.',
           });
-          setTenantName('');
-          setTenantCity('');
+          // Jangan kosongkan field: admin masih bisa mengisi manual lalu menyimpan.
+          setTenantCode(kb.toUpperCase());
+          setTenantProfilGagal(true);
         }
       } finally {
         if (!batal) setTenantKbLoading(false);
@@ -832,7 +896,7 @@ export const Admin: React.FC<AdminProps> = ({
       batal = true;
       clearTimeout(timer);
     };
-  }, [tenantKbId]);
+  }, [tenantKbId, tenantManual]);
 
   return (
     <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-canvas text-ink font-sans">
@@ -1941,32 +2005,58 @@ export const Admin: React.FC<AdminProps> = ({
                 {/* KB ID paling atas: begitu ditempel, field di bawah terisi otomatis
                     dari dokumen KB (nama, kota, sektor, jumlah dokumen). */}
                 <div className="p-3 bg-surface-2 border border-line rounded-card space-y-2">
-                  <label className="block text-ink-2 font-medium mb-1">
-                    Knowledge Base ID <span className="font-normal text-ink-3">(isi ini dulu — sisanya terisi otomatis)</span>
-                  </label>
+                  <div className="flex items-start justify-between gap-2">
+                    <label className="block text-ink-2 font-medium">
+                      Knowledge Base ID <span className="font-normal text-ink-3">(isi ini dulu — sisanya terisi otomatis)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setTenantManual((v) => !v)}
+                      className="shrink-0 text-[11px] text-brand-ink hover:underline"
+                      title={
+                        tenantManual
+                          ? 'Coba baca nama/kota dari dokumen KB lagi'
+                          : 'Isi nama/kota manual tanpa menunggu layanan RAG'
+                      }
+                    >
+                      {tenantManual ? 'Baca otomatis dari KB' : 'Isi manual'}
+                    </button>
+                  </div>
                   <input
                     type="text"
                     placeholder="Contoh: kb_pam_jaya"
                     value={tenantKbId}
-                    onChange={(e) => setTenantKbId(e.target.value)}
+                    onChange={(e) => {
+                      setTenantKbId(e.target.value);
+                      // KB baru = coba baca otomatis lagi (keluar dari mode manual).
+                      setTenantManual(false);
+                    }}
                     className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
                   />
-                  {tenantKbLoading && (
+                  {tenantKbLoading && !tenantManual && (
                     <p className="text-[11px] text-ink-2 flex items-center gap-1.5">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Membaca dokumen KB…
+                    </p>
+                  )}
+                  {tenantManual && (
+                    <p className="text-[11px] text-ink-3">
+                      Mode isi manual aktif: field di bawah Anda isi sendiri. Klik “Baca otomatis dari KB”
+                      untuk mencoba membaca dari dokumen lagi.
                     </p>
                   )}
                   {!tenantKbLoading && tenantKbInfo && (
                     <div
                       className={`text-[11px] rounded-control p-2 border ${
-                        tenantKbInfo.jumlahDokumen > 0
+                        tenantKbInfo.jumlahDokumen > 0 && !tenantProfilGagal
                           ? 'bg-pos/15 border-pos/30 text-pos'
                           : 'bg-warn/15 border-warn/30 text-warn'
                       }`}
                     >
                       <span className="font-semibold">
                         {tenantKbInfo.jumlahDokumen > 0
-                          ? `${tenantKbInfo.jumlahDokumen} dokumen ditemukan — field di bawah sudah terisi otomatis.`
+                          ? tenantProfilGagal
+                            ? `${tenantKbInfo.jumlahDokumen} dokumen ditemukan, tetapi nama/kota belum bisa dibaca otomatis — isi manual di bawah.`
+                            : `${tenantKbInfo.jumlahDokumen} dokumen ditemukan — field di bawah sudah terisi otomatis.`
                           : 'KB ini tidak memuat dokumen.'}
                       </span>
                       {tenantKbInfo.catatan && <span className="block text-ink-2 mt-0.5">{tenantKbInfo.catatan}</span>}
@@ -2026,19 +2116,63 @@ export const Admin: React.FC<AdminProps> = ({
                   </p>
                 </div>
 
-                {/* Field lain BUKAN isian: hanya menampilkan hasil yang dibaca dari
-                    dokumen KB. Admin cukup mengisi KB ID di atas. */}
+                {/* Field lain terisi otomatis dari dokumen KB, TETAPI tetap bisa
+                    disunting manual — ini jalan keluar saat layanan RAG lambat
+                    atau dokumen belum selesai diindeks. */}
                 <div className="space-y-2">
-                  <BarisOtomatis label="Nama Resmi BUMD" nilai={tenantName} />
+                  <p className="text-[10px] text-ink-3">
+                    Nilai di bawah dibaca dari dokumen KB dan bisa Anda ubah manual bila perlu.
+                  </p>
+                  <BarisOtomatis
+                    label="Nama Resmi BUMD"
+                    nilai={tenantName}
+                    onChange={setTenantName}
+                    placeholder="mis. Perumda Air Minum Tirta Raharja"
+                  />
                   <div className="grid grid-cols-2 gap-2">
-                    <BarisOtomatis label="Nama Singkat" nilai={tenantShortName} />
-                    <BarisOtomatis label="Kode Instansi" nilai={tenantCode} />
+                    <BarisOtomatis
+                      label="Nama Singkat"
+                      nilai={tenantShortName}
+                      onChange={setTenantShortName}
+                      placeholder="mis. Tirta Raharja"
+                    />
+                    <BarisOtomatis
+                      label="Kode Instansi"
+                      nilai={tenantCode}
+                      onChange={setTenantCode}
+                      placeholder="mis. KB_PAM_JAYA"
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <BarisOtomatis label="Sektor" nilai={LABEL_SEKTOR[tenantSector]} />
-                    <BarisOtomatis label="Kota / Kabupaten" nilai={tenantCity} />
+                    <div>
+                      <label className="block text-ink-3 mb-0.5">Sektor</label>
+                      <select
+                        value={tenantSector}
+                        onChange={(e) => setTenantSector(e.target.value as BumdSector)}
+                        className="w-full px-3 py-2 border border-line rounded-control bg-surface text-ink min-h-[34px] focus:outline-none focus:ring-1 focus:ring-brand"
+                      >
+                        {(Object.keys(LABEL_SEKTOR) as BumdSector[]).map((s) => (
+                          <option key={s} value={s}>
+                            {LABEL_SEKTOR[s]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <BarisOtomatis
+                      label="Kota / Kabupaten"
+                      nilai={tenantCity}
+                      onChange={setTenantCity}
+                      placeholder="mis. Bandung"
+                    />
                   </div>
                 </div>
+
+                {tenantSaveError && (
+                  <div className="text-[11px] rounded-control p-2 border bg-neg/15 border-neg/30 text-neg flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{tenantSaveError}</span>
+                  </div>
+                )}
 
                 <div className="pt-2 flex justify-end gap-2">
                   <button
@@ -2050,7 +2184,7 @@ export const Admin: React.FC<AdminProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={tenantSaving || tenantKbLoading || !tenantName || !tenantCity}
+                    disabled={tenantSaving || (tenantKbLoading && !tenantManual)}
                     className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                   >
                     {tenantSaving ? (

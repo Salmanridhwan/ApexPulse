@@ -321,6 +321,30 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     logSummary.push(`[Tata Letak] ${synthesizedWidgets.length} widget disusun rapi (12 kolom tanpa celah).`);
   }
 
+  // Step 3d: PASTIKAN ID WIDGET UNIK.
+  // Sumber ID bersifat STATIS per bentuk (mis. `w-kpi-1`, `w-grafik-1` di
+  // `payloadKeWidgetSpec`). Saat banyak widget digabung (Jalur A + pelengkap
+  // katalog + penambahan via chat), ID yang sama terulang — React memakai `id`
+  // sebagai key, sehingga duplikat membuat kanvas merender kartu yang salah atau
+  // tidak muncul sama sekali ("chart tidak masuk dashboard"). Di sini ID
+  // dijadikan unik tanpa mengubah urutan/isi widget.
+  if (synthesizedWidgets.length > 0) {
+    const terpakai = new Set<string>();
+    let dinomori = 0;
+    synthesizedWidgets = synthesizedWidgets.map((w) => {
+      let id = String(w.id || '').trim();
+      if (!id || terpakai.has(id)) {
+        const dasar = id || `w-${w.type || 'widget'}`;
+        let kandidat = `${dasar}-${++dinomori}`;
+        while (terpakai.has(kandidat)) kandidat = `${dasar}-${++dinomori}`;
+        id = kandidat;
+      }
+      terpakai.add(id);
+      return { ...w, id };
+    });
+    logSummary.push('[ID Widget] Semua ID widget unik (tidak ada key duplikat di kanvas).');
+  }
+
   onProgress?.({
     id: 'step-3',
     title: ok ? `Sintesis selesai via ${modeUsed}` : 'Dokumen instansi tidak memadai — dashboard tidak dibuat',

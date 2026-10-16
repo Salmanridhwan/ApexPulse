@@ -39,3 +39,79 @@ export function niatBuatDashboard(prompt: unknown): boolean {
   if (TANYA.test(teks)) return false;
   return PERINTAH.test(teks) && OBJEK.test(teks);
 }
+
+/**
+ * Kata perintah MENAMBAH widget, termasuk bentuk berimbuhan.
+ *
+ * Sengaja mencakup `buat(?:kan)?` juga: pengguna sering menulis "buatkan
+ * widgetnya" — dulu kata ini tidak dikenali sehingga permintaan jatuh ke jalur
+ * chatbot dan dijawab prosa (bahkan kode HTML mentah), bukan menambah widget.
+ */
+const PERINTAH_WIDGET =
+  /(?:^|[^a-z])(?:tambah(?:kan)?|tambahin|buat(?:kan)?|bikin(?:kan)?|masukkan|sematkan|sisipkan|pasang)(?:kan|lah|in)?(?:[^a-z]|$)/i;
+
+/**
+ * Objek widget, termasuk klitik: "widgetnya", "chartnya", "grafiknya".
+ * `\b` TIDAK dipakai karena gagal pada imbuhan Indonesia (mis. `\bwidget\b`
+ * tidak cocok dengan "widgetnya") — itu akar bug "chart tidak masuk dashboard".
+ */
+const OBJEK_WIDGET =
+  /(?:^|[^a-z])(?:widget|chart|grafik|kartu|panel|diagram)(?:nya|ku|mu)?(?:[^a-z]|$)/i;
+
+/**
+ * Apakah pesan meminta widget/chart DITAMBAHKAN ke kanvas?
+ * Contoh yang HARUS true: "tambahkan widget jumlah pelanggan",
+ *   "buatkan widgetnya untuk kurun waktu 2021-2024 saja", "bikin chart laba".
+ * Contoh yang HARUS false: "buatkan dashboard", "apa itu widget?".
+ */
+export function niatTambahWidget(prompt: unknown): boolean {
+  const teks = String(prompt || '').toLowerCase();
+  if (!teks.trim()) return false;
+  return PERINTAH_WIDGET.test(teks) && OBJEK_WIDGET.test(teks);
+}
+
+/**
+ * Ambil indikator dari perintah "tambah widget <indikator>".
+ *
+ * Membuang kata perintah + objek widget di depan, embel-embel tujuan
+ * ("ke dashboard"), dan kata sambung pengantar ("untuk", "dengan", ...).
+ * Mengembalikan string kosong bila tidak ada sisa indikator.
+ */
+export function indikatorTambahWidget(prompt: unknown): string {
+  return String(prompt || '')
+    .replace(
+      /^.*?(?:tambah(?:kan)?|tambahin|buat(?:kan)?|bikin(?:kan)?|masukkan|sematkan|sisipkan|pasang)(?:kan|lah|in)?\s+(?:widget|chart|grafik|kartu|panel|diagram)(?:nya|ku|mu)?/i,
+      ''
+    )
+    .replace(/\b(?:ke|kedalam|ke dalam|pada|dalam)\s+(?:dashboard|kanvas|canvas)\b.*$/i, '')
+    .replace(/^\s*(?:untuk|buat|dengan|mengenai|tentang|soal|berisi|menampilkan|yang)\s+/i, '')
+    .replace(/["'“”]/g, '')
+    .trim();
+}
+
+/**
+ * Apakah teks hanya KETERANGAN PERIODE tanpa subjek?
+ *
+ * Contoh true: "kurun waktu 2021-2024 saja", "tahun 2023", "periode 2021-2024".
+ * Contoh false: "laba bersih 2021-2024", "jumlah pelanggan", "NPL".
+ *
+ * Dipakai untuk menyelamatkan perintah lanjutan seperti "buatkan widgetnya
+ * untuk kurun waktu 2021-2024 saja" — subjeknya ada di pesan sebelumnya, bukan
+ * di kalimat ini. Tanpa ini, RAG ditanya "kurun waktu 2021-2024 saja" dan
+ * tidak menemukan indikator apa pun, sehingga widget tak pernah muncul.
+ */
+export function hanyaKeteranganPeriode(teks: unknown): boolean {
+  const t = String(teks || '').toLowerCase();
+  if (!t.trim()) return true;
+  const sisa = t
+    .replace(
+      /\b(?:kurun|waktu|periode|rentang|tahun|thn|tahunan|bulan|bulanan|triwulan|kuartal|semester|saja|aja|dong|ya|sih|dari|sampai|hingga|sd|s\.d|s\/d)\b/g,
+      ' '
+    )
+    .replace(/\bq[1-4]\b/g, ' ')
+    .replace(/\b(?:19|20)\d{2}\b/g, ' ')
+    .replace(/[0-9\-/–—.,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sisa.length < 3;
+}

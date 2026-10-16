@@ -1388,7 +1388,10 @@ export class ConfigurableRagClient implements RagClient {
     }
 
     const { dipakai } = await this.resolveBase(cfg);
-    const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 60000);
+    // Pakai timeout dari konfigurasi admin apa adanya (jangan dipotong ke 60s):
+    // membaca profil dari dokumen besar bisa lebih lama dari itu, dan memotongnya
+    // membuat field terisi kosong padahal layanan hanya lambat, bukan gagal.
+    const timeoutMs = Math.max(5, cfg.timeoutMs || 60) * 1000;
     const prompt =
       'Dari dokumen resmi instansi ini, jawab SINGKAT dalam format persis seperti ini:\n' +
       'NAMA: <nama lengkap perusahaan/instansi>\n' +
@@ -1454,11 +1457,18 @@ export class ConfigurableRagClient implements RagClient {
             : undefined,
       };
     } catch (err) {
+      // Timeout bukan galat permanen: layanan hanya lambat (atau sedang sibuk
+      // mengindeks dokumen). Pesannya harus menjelaskan itu, bukan "gagal" polos,
+      // supaya admin tahu nama/kota/sektor tinggal diisi manual — bukan berarti
+      // KB salah atau kosong.
+      const lewatWaktu = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
       return {
         kbId: kb,
         jumlahDokumen: daftar.jumlah,
         ringkasan,
-        catatan: `Gagal membaca profil instansi: ${err instanceof Error ? err.message : 'kesalahan jaringan'}`,
+        catatan: lewatWaktu
+          ? `Layanan RAG tidak menjawab dalam ${Math.round(timeoutMs / 1000)}s — dokumen mungkin masih diproses atau layanan sedang lambat. Nama, kota, dan sektor dapat diisi manual.`
+          : `Gagal membaca profil instansi: ${err instanceof Error ? err.message : 'kesalahan jaringan'}. Nama, kota, dan sektor dapat diisi manual.`,
       };
     }
   }

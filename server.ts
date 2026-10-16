@@ -19,7 +19,12 @@ import {
   tandaiKatalog,
 } from './src/services/rag/kbKatalog';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
-import { niatBuatDashboard } from './src/services/chat/niat';
+import {
+  niatBuatDashboard,
+  niatTambahWidget,
+  indikatorTambahWidget,
+  hanyaKeteranganPeriode,
+} from './src/services/chat/niat';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -1076,9 +1081,12 @@ async function startServer() {
       // meneruskan indikatornya ke layanan RAG (`/extract`) dan memasang kartu
       // dari data yang RAG kembalikan. Kalau RAG tidak memuat indikator itu,
       // pesan jujur — bukan angka contoh.
-      const mintaTambahWidget = /\b(?:tambah(?:kan)?|bikin(?:kan)?|masukkan|sematkan)\s+(?:widget|chart|grafik|kartu|panel)\b/i.test(
-        prompt
-      );
+      //
+      // Deteksi memakai `niatTambahWidget` (murni, teruji): regex lama memakai
+      // `\bwidget\b` yang GAGAL pada imbuhan Indonesia — "buatkan widgetnya"
+      // tidak dikenali, sehingga pesan jatuh ke jalur chatbot dan dijawab prosa
+      // (bahkan kode HTML mentah) alih-alih menambah widget ke kanvas.
+      const mintaTambahWidget = niatTambahWidget(prompt);
       if (mintaTambahWidget) {
         // Instansi tanpa KB sendiri tidak boleh menembak RAG tanpa scope KB —
         // hasilnya bisa bercampur dengan dokumen instansi lain.
@@ -1100,14 +1108,23 @@ async function startServer() {
           return res.end();
         }
         // Indikator = sisa kalimat setelah kata kunci, tanpa embel-embel tujuan.
-        const indikator = prompt
-          .replace(
-            /^.*?\b(?:tambah(?:kan)?|bikin(?:kan)?|masukkan|sematkan)\s+(?:widget|chart|grafik|kartu|panel)\b/i,
-            ''
-          )
-          .replace(/\b(?:ke|kedalam|ke dalam|pada|dalam)\s+(?:dashboard|kanvas|canvas)\b.*$/i, '')
-          .replace(/["'“”]/g, '')
-          .trim();
+        let indikator = indikatorTambahWidget(prompt);
+        // Perintah lanjutan seperti "buatkan widgetnya untuk kurun waktu
+        // 2021-2024 saja" tidak menyebut indikatornya — subjeknya ada di pesan
+        // sebelumnya. Kalau sisa kalimat hanya keterangan periode, ambil subjek
+        // dari pesan USER terakhir yang benar-benar berisi indikator.
+        if (hanyaKeteranganPeriode(indikator) && chat) {
+          const pesanUserSebelumnya = [...chat.messages]
+            .reverse()
+            .filter((m) => m.sender === 'user' && m.text.trim() !== prompt.trim())
+            .map((m) => indikatorTambahWidget(m.text))
+            .find((k) => k.length >= 2 && !hanyaKeteranganPeriode(k));
+          if (pesanUserSebelumnya) {
+            // Gabungkan subjek lama + keterangan periode baru, mis.
+            // "laba tahun berjalan" + "kurun waktu 2021-2024 saja".
+            indikator = `${pesanUserSebelumnya} ${indikator}`.trim();
+          }
+        }
         if (indikator.length < 2) {
           const pesan =
             'Indikatornya apa yang mau ditambahkan? Sebutkan, misalnya *"tambahkan widget jumlah pelanggan"*. ' +
@@ -1164,6 +1181,25 @@ async function startServer() {
             lastUpdated: new Date().toISOString(),
           } as WidgetSpec;
           const updatedWidgets = [widgetBaru, ...activeDash.widgets];
+          // ID widget dari RAG bisa berulang (mis. `w-kpi-1` lagi). Kanvas memakai
+          // `id` sebagai React key, jadi duplikat membuat kartu tidak muncul atau
+          // tertukar. Beri ID unik tanpa mengubah isinya.
+          {
+            const terpakai = new Set<string>();
+            for (let i = 0; i < updatedWidgets.length; i++) {
+              const w = updatedWidgets[i];
+              let id = String(w.id || '').trim();
+              if (!id || terpakai.has(id)) {
+                const dasar = id || `w-${w.type || 'widget'}`;
+                let n = 1;
+                let kandidat = `${dasar}-${n}`;
+                while (terpakai.has(kandidat)) kandidat = `${dasar}-${++n}`;
+                id = kandidat;
+                updatedWidgets[i] = { ...w, id };
+              }
+              terpakai.add(id);
+            }
+          }
           db.updateDashboard(activeDash.id, { widgets: updatedWidgets }, tenantId);
           db.addAuditLog({
             tenantId,

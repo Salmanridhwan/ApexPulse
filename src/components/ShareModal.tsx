@@ -1,40 +1,73 @@
-import React, { useState } from 'react';
-import { Check, Code2, Copy, ExternalLink, Globe, Lock, Pencil, Share2, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, Check, Code2, Copy, ExternalLink, Globe, Lock, Pencil, Share2, X } from 'lucide-react';
 import { Dashboard } from '../types';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   dashboard: Dashboard | null;
+  /**
+   * Instansi pemilik dashboard. WAJIB untuk admin: dashboard bisa milik instansi
+   * yang tidak sama dengan instansi akun admin (mis. admin global + dashboard
+   * bank BJB). Tanpa ini server mencari dashboard di instansi admin sendiri dan
+   * membalas 404 "Dashboard tidak ditemukan."
+   */
+  tenantId?: string;
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
   dashboard,
+  tenantId,
 }) => {
   const [accessMode, setAccessMode] = useState<'readonly' | 'editable'>('readonly');
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedEmbed, setIsCopiedEmbed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  /** Pesan galat saat membuat tautan — ditampilkan di UI, bukan hanya di konsol. */
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Reset setiap kali modal dibuka untuk dashboard (lain): token & galat lama
+  // tidak boleh terbawa, supaya tidak tampak "tidak bereaksi" saat dibuka ulang.
+  useEffect(() => {
+    if (isOpen) {
+      setShareToken(null);
+      setErrorMsg('');
+      setIsCopied(false);
+      setIsCopiedEmbed(false);
+    }
+  }, [isOpen, dashboard?.id]);
 
   if (!isOpen || !dashboard) return null;
 
   const handleGenerateShareLink = async () => {
     setIsLoading(true);
+    setErrorMsg('');
     try {
       const res = await fetch(`/api/dashboards/${dashboard.id}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: accessMode }),
+        // tenantId menargetkan instansi PEMILIK dashboard. Tanpa ini admin yang
+        // membuka dashboard instansi lain mendapat 404.
+        body: JSON.stringify({ mode: accessMode, tenantId }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (!data?.token) throw new Error('Token tidak diterima dari server');
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // 401 = sesi habis (mis. server baru di-restart): beri tahu admin agar
+        // login ulang, jangan diam saja seperti sebelumnya.
+        if (res.status === 401) {
+          throw new Error('Sesi Anda sudah berakhir. Silakan login ulang lalu buat tautan lagi.');
+        }
+        throw new Error(data?.error || `Gagal membuat tautan (HTTP ${res.status}).`);
+      }
+      if (!data?.token) throw new Error('Server tidak mengirim token tautan.');
       setShareToken(data.token);
     } catch (err) {
+      const pesan = err instanceof Error ? err.message : 'Gagal membuat tautan berbagi.';
       console.error('Failed to create share link:', err);
+      setErrorMsg(pesan);
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +183,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
 
           {!shareToken ? (
-            <div className="text-center py-3">
+            <div className="text-center py-3 space-y-2">
+              {errorMsg && (
+                <div className="text-[11px] rounded-control p-2 border bg-neg/15 border-neg/30 text-neg flex items-start gap-1.5 text-left">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}

@@ -8,6 +8,8 @@ import { susunSlide, VERSI_PRESENTASI } from '../services/presentasi/slide';
 interface PresentationModeProps {
   dashboard: Dashboard;
   tenantName?: string;
+  /** Instansi pemilik dashboard — dipakai agar admin bisa membuka presentasi dashboard instansi lain. */
+  tenantId?: string;
   onExit: () => void;
   /** Dipanggil saat dashboard berubah (mis. setelah insight/slide digenerate). */
   onUpdate: (d: Dashboard) => void;
@@ -30,6 +32,7 @@ function kelasBaris(n: number): string {
 export const PresentationMode: React.FC<PresentationModeProps> = ({
   dashboard,
   tenantName,
+  tenantId,
   onExit,
   onUpdate,
 }) => {
@@ -88,7 +91,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
         const res = await fetch(`/api/dashboards/${dashboard.id}/presentasi`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ segarkan }),
+          // tenantId = instansi pemilik dashboard; tanpa ini admin yang membuka
+          // dashboard instansi lain akan ditolak 404.
+          body: JSON.stringify({ segarkan, tenantId }),
         });
         if (!res.ok || !res.body) {
           const j = await res.json().catch(() => null);

@@ -202,7 +202,22 @@ export default function App() {
     // memanggilnya saat belum ada sesi — kalau dipanggil, server membalas 401.
     if (!currentUser || !authToken) return;
     fetch('/api/tenants')
-      .then((res) => (res.ok ? res.json() : []))
+      .then((res) => {
+        // Sesi browser (localStorage) bisa tertinggal lebih lama daripada cookie
+        // HttpOnly di server (kedaluwarsa/ganti origin). Saat itu terjadi app
+        // TAMPAK login padahal setiap permintaan dibalas 401 — fitur seperti
+        // "Bagikan" lalu mati tanpa penjelasan. Di sini sesi basi dibersihkan
+        // supaya pengguna diminta login ulang, bukan menebak-nebak.
+        if (res.status === 401) {
+          localStorage.removeItem('aionesboard_user');
+          sessionStorage.removeItem('aionesboard_user');
+          setAuthToken(null);
+          setCurrentUser(null);
+          setCurrentTenant(null);
+          return [];
+        }
+        return res.ok ? res.json() : [];
+      })
       .then((data: Tenant[]) => {
         setTenants(data);
         if (data.length > 0 && !currentTenant) {
@@ -1310,6 +1325,7 @@ export default function App() {
         <PresentationMode
           dashboard={activeDashboard}
           tenantName={currentTenant?.name}
+          tenantId={currentTenant?.id}
           onExit={() => setIsPresentationMode(false)}
           onUpdate={(d) => {
             setActiveDashboard(d);
@@ -1373,6 +1389,7 @@ export default function App() {
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         dashboard={activeDashboard}
+        tenantId={currentTenant?.id}
       />
 
       {/* 8. Export Printable Executive Report Modal */}
