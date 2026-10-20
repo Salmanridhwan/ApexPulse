@@ -1159,10 +1159,10 @@ export function buildChartOption(
   // terlalu mirip saat bersebelahan jadi pasangan batang sulit dibedakan.
   // Urutan ini tetap diputar per widget supaya tiap kartu tidak selalu biru.
   const URUTAN_SERI = [0, 3, 5, 1, 2, 4, 6, 8, 7, 10, 9, 11];
-  const paletSeri = putarPalet(
-    URUTAN_SERI.map((i) => T.series[i % T.series.length]),
-    seed,
-  );
+  // Sengaja TIDAK diputar per widget: Target harus selalu warna yang sama di
+  // semua kartu, begitu pula Realisasi, supaya pembaca tidak perlu membaca ulang
+  // legenda tiap kartu.
+  const paletSeri = URUTAN_SERI.map((i) => T.series[i % T.series.length]);
   const seriGanda = seriesView.length >= 2;
 
   const echartsSeries = seriesView.map((s, sIdx) => {
