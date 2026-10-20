@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
-import { labelJumlahWidget } from './src/services/builder/permintaanWidget';
+import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
 import { ConfigurableRagClient, RagServiceError, jelaskanError, maskKey } from './src/services/rag/http';
 import {
   hitungRingkasanKatalog,
@@ -1180,6 +1180,33 @@ async function startServer() {
             periode: d.periode,
             lastUpdated: new Date().toISOString(),
           } as WidgetSpec;
+          // Tolak KEMBARAN: kalau kanvas sudah punya widget dengan isi yang sama
+          // (judul + subjudul + periode + tipe), jangan tambah duplikat. Menambah
+          // kartu kedua yang menanyakan hal sama membuat jumlah widget menipu.
+          const kunciBaru = kunciKembarWidget(widgetBaru);
+          const kembar = activeDash.widgets.find((w) => kunciKembarWidget(w) === kunciBaru);
+          if (kembar) {
+            const pesan =
+              `Widget **"${kembar.title}"** sudah ada di kanvas dengan isi yang sama, jadi tidak saya tambahkan lagi. ` +
+              `Kalau mau diubah, sebutkan perubahannya (mis. "ubah jadi grafik garis" atau "ganti ke periode lain").`;
+            sendEvent('step', {
+              id: 's0',
+              title: 'Widget dengan isi sama sudah ada — tidak ditambahkan',
+              status: 'failed',
+            });
+            db.addAuditLog({
+              tenantId,
+              userId: session.userId,
+              userName: session.name,
+              action: 'Tolak Widget Kembar via Chat',
+              target: kembar.title,
+              details: `Indikator: "${indikator}" · sudah ada di kanvas`,
+            });
+            catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+            sendEvent('result', { actionTaken: 'none', message: pesan });
+            sendEvent('done', { ok: false });
+            return res.end();
+          }
           const updatedWidgets = [widgetBaru, ...activeDash.widgets];
           // ID widget dari RAG bisa berulang (mis. `w-kpi-1` lagi). Kanvas memakai
           // `id` sebagai React key, jadi duplikat membuat kartu tidak muncul atau

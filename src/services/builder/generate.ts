@@ -8,6 +8,7 @@ import { rapikanTataLetak } from './tataLetak';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
+  buangWidgetKembar,
   labelJumlahWidget,
   lengkapiWidgetDariKatalog,
   parsePermintaanJumlahWidget,
@@ -343,6 +344,27 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       return { ...w, id };
     });
     logSummary.push('[ID Widget] Semua ID widget unik (tidak ada key duplikat di kanvas).');
+  }
+
+  // Step 3e: BUANG WIDGET YANG ISINYA KEMBAR.
+  // ID unik hanya menyelesaikan masalah render. Dua widget tetap bisa
+  // menanyakan hal yang sama (ID beda, judul/isi sama) karena widget Jalur A
+  // tidak pernah melewati dedup yang ada di `lengkapiWidgetDariKatalog` — hasil
+  // nyata: "Laba bersih 2022" muncul 3x dalam satu dashboard. Di sini daftar
+  // FINAL (Jalur A + pelengkap katalog + tambahan chat) disaring sekali lagi;
+  // urutan kanvas dipertahankan dan yang disisakan adalah widget paling lengkap.
+  if (synthesizedWidgets.length > 0) {
+    const sebelum = synthesizedWidgets.length;
+    const saring = buangWidgetKembar(synthesizedWidgets);
+    synthesizedWidgets = saring.widgets;
+    if (saring.dibuang.length > 0) {
+      logSummary.push(
+        `[Isi Kembar] ${saring.dibuang.length} widget kembar dibuang (${sebelum} → ${synthesizedWidgets.length}): ` +
+          saring.dibuang.map((d) => `"${d.judul}"`).join(', ')
+      );
+    } else {
+      logSummary.push('[Isi Kembar] Tidak ada widget kembar.');
+    }
   }
 
   onProgress?.({

@@ -246,3 +246,96 @@ export async function lengkapiWidgetDariKatalog(
     catatan,
   };
 }
+
+/**
+ * Sidik "kembar" sebuah widget.
+ *
+ * ID unik TIDAK cukup: dua widget bisa ber-ID berbeda tapi menanyakan hal yang
+ * sama. Yang menentukan kembar adalah ISI-nya — judul, subjudul, periode, dan
+ * tipe — semuanya dinormalisasi supaya beda huruf besar/kecil atau spasi
+ * berlebih tidak lolos ("NPL gross" == "NPL Gross").
+ *
+ * Periode ikut masuk kunci supaya "Laba bersih 2022" dan "Laba bersih 2023"
+ * tetap dianggap dua widget berbeda.
+ */
+export const kunciKembarWidget = (w: WidgetSpec): string =>
+  [normJudul(w.title), normJudul(w.subtitle || ''), normJudul(w.periode || ''), String(w.type || '')].join('|');
+
+/**
+ * Skor kelengkapan isi widget — dipakai memilih mana yang DIPERTAHANKAN saat ada
+ * kembaran. Widget yang punya data nyata + sitasi lebih berharga daripada kartu
+ * kosong dengan judul sama.
+ */
+function skorIsiWidget(w: WidgetSpec): number {
+  let skor = 0;
+  if (w.dataKosong) skor -= 10;
+  skor += (w.citations?.length || 0) * 4;
+  if (w.kpi && w.kpi.value !== undefined && w.kpi.value !== null && w.kpi.value !== '') skor += 6;
+  if (w.chart?.series?.some((s) => Array.isArray(s.data) && s.data.length > 0)) skor += 6;
+  if (w.table?.rows?.length) skor += 6;
+  if (w.narasi?.text || w.insight) skor += 2;
+  return skor;
+}
+
+export interface HasilBuangKembar {
+  /** Daftar final tanpa widget kembar, URUTAN aslinya dipertahankan. */
+  widgets: WidgetSpec[];
+  /** Widget yang dibuang beserta alasan ringkasnya (untuk log jujur ke pengguna). */
+  dibuang: Array<{ judul: string; dipertahankan: string; alasan: string }>;
+}
+
+/**
+ * Buang widget yang isinya kembar dari daftar FINAL (Jalur A + pelengkap katalog
+ * + tambahan via chat).
+ *
+ * Kenapa perlu: dedup yang lama hanya berjalan di `lengkapiWidgetDariKatalog`
+ * dan hanya untuk widget hasil katalog. Widget dari LLM (Jalur A) tidak pernah
+ * disaring, sehingga dashboard bisa berisi 3 kartu "Laba bersih 2022" dengan ID
+ * berbeda-beda — jumlah widget benar, isinya duplikat.
+ *
+ * Aturan: kembar = `kunciKembarWidget` sama. Yang dipertahankan adalah yang
+ * skornya lebih tinggi (punya data & sitasi); kalau seri, yang lebih dulu muncul
+ * dipertahankan supaya urutan kanvas tidak berubah.
+ */
+export function buangWidgetKembar(widgets: WidgetSpec[]): HasilBuangKembar {
+  if (!Array.isArray(widgets) || widgets.length < 2) return { widgets: widgets || [], dibuang: [] };
+
+  const hasil: WidgetSpec[] = [];
+  const posisiKunci = new Map<string, number>();
+  const skorKunci = new Map<string, number>();
+  const dibuang: HasilBuangKembar['dibuang'] = [];
+
+  for (const w of widgets) {
+    const kunci = kunciKembarWidget(w);
+    const posisi = posisiKunci.get(kunci);
+
+    if (posisi === undefined) {
+      posisiKunci.set(kunci, hasil.length);
+      skorKunci.set(kunci, skorIsiWidget(w));
+      hasil.push(w);
+      continue;
+    }
+
+    const skorLama = skorKunci.get(kunci) ?? 0;
+    const skorBaru = skorIsiWidget(w);
+
+    if (skorBaru > skorLama) {
+      // Ganti di posisi yang sama: kartu lebih lengkap menempati urutan aslinya.
+      dibuang.push({
+        judul: hasil[posisi].title,
+        dipertahankan: w.title,
+        alasan: 'kembar, tapi isinya lebih lengkap',
+      });
+      hasil[posisi] = w;
+      skorKunci.set(kunci, skorBaru);
+    } else {
+      dibuang.push({
+        judul: w.title,
+        dipertahankan: hasil[posisi].title,
+        alasan: 'kembar dengan widget yang sudah ada',
+      });
+    }
+  }
+
+  return { widgets: hasil, dibuang };
+}
