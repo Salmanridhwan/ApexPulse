@@ -1153,10 +1153,28 @@ export function buildChartOption(
   const perKategoriDasar =
     seriesView.length === 1 && (type === 'bar' || type === 'hbar') && !stacked;
 
+  // Seri berganda (Target vs Realisasi, Aktual/Target/Tahun lalu, combo):
+  // warna SERI diambil dari urutan yang sengaja berjauhan hue-nya (biru → amber
+  // → teal → violet → hijau → merah). Palet dasar berurutan (biru lalu violet)
+  // terlalu mirip saat bersebelahan jadi pasangan batang sulit dibedakan.
+  // Urutan ini tetap diputar per widget supaya tiap kartu tidak selalu biru.
+  const URUTAN_SERI = [0, 3, 5, 1, 2, 4, 6, 8, 7, 10, 9, 11];
+  const paletSeri = putarPalet(
+    URUTAN_SERI.map((i) => T.series[i % T.series.length]),
+    seed,
+  );
+  const seriGanda = seriesView.length >= 2;
+
   const echartsSeries = seriesView.map((s, sIdx) => {
     // Warna lama yang tersimpan (mis. #38c6e2 merek lama) digeser ke palet aktif
     // memakai seed widget, jadi tiap kartu mulai dari hue berbeda.
-    const baseColor = keWarnaTema(s.color, paletTema) || paletWidget[sIdx % paletWidget.length];
+    // Warna tersimpan yang BUKAN warna lama (mis. palet pilihan pengguna) tetap
+    // dihormati; warna lama/sky/teal dan seri tanpa warna ikut urutan kontras.
+    const warnaMentah = s.color?.toLowerCase();
+    const warnaTersimpanKustom = !!warnaMentah && !WARNA_LEGACY[warnaMentah];
+    const baseColor = seriGanda && !warnaTersimpanKustom
+      ? paletSeri[sIdx % paletSeri.length]
+      : keWarnaTema(s.color, paletTema) || paletWidget[sIdx % paletWidget.length];
     // 'hbar' bukan tipe seri ECharts — ia bar biasa dengan sumbu ditukar.
     const tipeSeri: any = isCombo
       ? (s.kind || (sIdx === 0 ? 'bar' : 'line'))
