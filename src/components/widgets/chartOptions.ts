@@ -1146,7 +1146,12 @@ export function buildChartOption(
   // Bar/hbar satu seri: warnai tiap kategori dari palet supaya batang tidak
   // monoton satu warna. Berlaku hanya bila tidak ditumpuk & tanpa makna naik/turun
   // (waterfall/skenario punya warnanya sendiri di cabang lain).
-  const perKategoriDasar = (type === 'bar' || type === 'hbar') && !stacked;
+  // Bar/hbar SATU seri boleh diwarnai per kategori (biar tidak monoton). Begitu
+  // ada 2+ seri (mis. Target vs Realisasi, atau bar+garis di combo), warna WAJIB
+  // mengikuti SERI: satu warna per metrik, supaya legenda benar dan pembaca bisa
+  // membedakan Target dan Realisasi. Jangan "warnai pelangi" chart berkelompok.
+  const perKategoriDasar =
+    seriesView.length === 1 && (type === 'bar' || type === 'hbar') && !stacked;
 
   const echartsSeries = seriesView.map((s, sIdx) => {
     // Warna lama yang tersimpan (mis. #38c6e2 merek lama) digeser ke palet aktif
@@ -1160,9 +1165,8 @@ export function buildChartOption(
         : isHbar
           ? 'bar'
           : type;
-    // Combo: batang juga diwarnai per kategori (garis tetap satu hue) supaya
-    // kartu tidak terlihat "satu warna" seperti sebelumnya.
-    const perKategori = perKategoriDasar || (isCombo && tipeSeri === 'bar' && !stacked);
+    // Chart berkelompok (2 seri Target/Realisasi) dan combo: warna mengikuti seri.
+    const perKategori = perKategoriDasar;
     return {
       name: s.name,
       type: tipeSeri,
