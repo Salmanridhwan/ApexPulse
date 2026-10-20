@@ -197,7 +197,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           )}
           <span
             data-testid="kpi-value"
-            className={`kpi-enter ${angkaKelas} leading-none font-normal tracking-tight tabular-nums ${
+            className={`kpi-enter ${angkaKelas} leading-none font-bold tracking-tight tabular-nums ${
               isCorrected ? 'text-warn' : 'text-ink'
             }`}
             style={isCorrected ? undefined : gayaAngka}
@@ -214,12 +214,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({
             <div className="flex items-center gap-1.5 min-w-0">
               {delta !== undefined && (
                 <span
-                  className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums shrink-0 ${
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums shrink-0 border ${
                     deltaGood
-                      ? 'bg-pos/15 text-pos'
+                      ? 'border-pos/40 text-pos bg-surface'
                       : deltaBad
-                        ? 'bg-neg/15 text-neg'
-                        : 'bg-surface-2 text-ink-2'
+                        ? 'border-neg/40 text-neg bg-surface'
+                        : 'border-line text-ink-2 bg-surface'
                   }`}
                   title={lowerIsBetter ? 'Metrik ini semakin kecil semakin baik' : undefined}
                 >

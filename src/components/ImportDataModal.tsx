@@ -281,7 +281,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-ink flex items-center justify-center text-surface">
+            <div className="w-8 h-8 rounded-control bg-solid flex items-center justify-center text-on-solid">
               <FileSpreadsheet className="w-4 h-4" />
             </div>
             <div>
@@ -561,7 +561,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
                         onClick={() => toggleNilai(k)}
                         className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-chip text-[11px] font-medium border transition-colors ${
                           aktif
-                            ? 'bg-brand text-white border-brand'
+                            ? 'bg-brand text-on-brand border-brand'
                             : numerik
                               ? 'bg-surface-2 text-ink-2 border-line hover:border-brand/50'
                               : 'bg-surface text-ink-3 border-line/60 hover:border-line'
@@ -648,7 +648,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
               <button
                 onClick={() => void bangun()}
                 disabled={menyimpan || kolomNilai.length === 0}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-semibold text-white bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {menyimpan ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

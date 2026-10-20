@@ -18,7 +18,7 @@
 
   --color-ink: #1a1d1f;
   --color-ink-2: #4b5563;
-  --color-ink-3: #646b78;   /* lulus WCAG AA di kanvas (4.95:1) & permukaan (5.36:1) */
+  --color-ink-3: #5b6472;   /* dinaikkan: teks mikro 9-11px butuh kontras lebih (5.9:1 di permukaan) */
 
   --color-brand: #1fa6cc;       /* cyan — aksen/isi */
   --color-brand-ink: #0f6b85;   /* digelapkan: teks & chip lulus WCAG AA (6.07:1) */
@@ -55,6 +55,11 @@
 
   /* Scrim (latar gelap di belakang modal/drawer) — gelap di KEDUA mode. */
   --color-scrim: #10141d;
+
+  /* Isian "solid" untuk tombol utama/tile ikon: gelap di mode terang, dan
+     TETAP terlihat sebagai aksi (bukan putih menyilaukan) di mode gelap. */
+  --color-solid: #1a1d1f;
+  --color-on-solid: #ffffff;
 }
 
 /* Mode gelap — "Clean Grid" gelap (near-black netral, bukan navy). */
@@ -69,7 +74,7 @@
 
   --color-ink: #f2f4f7;
   --color-ink-2: #b6bdc8;
-  --color-ink-3: #8b93a1;   /* lulus WCAG AA (5.64:1) */
+  --color-ink-3: #98a1af;   /* dinaikkan untuk teks mikro di mode gelap (6.4:1) */
 
   --color-brand: #38c6e2;
   --color-brand-ink: #7fdcf0;
@@ -90,9 +95,13 @@
   --color-shell-2: #1c2026;
   --color-shell-line: #262b33;
   --color-shell-ink: #f2f4f7;
-  --color-shell-ink-2: #8b93a1;
+  --color-shell-ink-2: #98a1af;   /* samakan dengan ink-3 gelap agar meta kecil di sidebar terbaca */
   --color-shell-hover: rgb(255 255 255 / 0.05);
   --color-shell-active: #1f2329;
+
+  /* Mode gelap: tombol utama memakai aksen brand, bukan putih. */
+  --color-solid: #38c6e2;
+  --color-on-solid: #0b1013;
 
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
   --shadow-pop-sm: 0 2px 8px rgb(0 0 0 / 0.4);
@@ -129,8 +138,8 @@
 }
 @utility btn-primary {
   border-radius: var(--radius-control);
-  background-color: var(--color-ink);
-  color: var(--color-surface);
+  background-color: var(--color-solid);
+  color: var(--color-on-solid);
   font-weight: 600;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   &:hover {
@@ -184,8 +193,8 @@
   }
 }
 @utility segmented-item-active {
-  background-color: var(--color-ink);
-  color: var(--color-surface);
+  background-color: var(--color-solid);
+  color: var(--color-on-solid);
 }
 /* Kartu stat beraksen (solid 1 warna, seperti referensi). Teks selalu putih
    agar lulus kontras; warna via accent-*. Ditaruh di @layer components (bukan
@@ -193,7 +202,9 @@
 @layer components {
   .card-accent {
     border-radius: var(--radius-card);
-    color: #fff;
+    /* Teks di atas warna aksen memakai tinta "on-brand" (gelap) supaya
+       terbaca di kedua mode; putih di atas cyan gagal kontras. */
+    color: var(--color-on-brand);
     border: 1px solid rgb(255 255 255 / 0.14);
     box-shadow: var(--elev-card);
     background-image: linear-gradient(135deg, var(--accent-a), var(--accent-b));
@@ -724,5 +735,101 @@
   /* Transisi halus pada kontrol form login. */
   .auth-transisi {
     transition-duration: 0.2s !important;
+  }
+}
+
+/* ============================================================================
+   TEMA "BERSIH & TEGAS" — KANVAS DASHBOARD + KARTU WIDGET
+   ----------------------------------------------------------------------------
+   Arah yang dipilih pemilik produk (2026-10-20, revisi kedua): BERSIH & TEGAS.
+   Bukan glow/gradien — ketegasan datang dari kontras, garis, dan tipografi:
+
+   - Satu warna aksen saja (biru sinyal). Warna lain HANYA untuk status data
+     (positif/negatif/peringatan). Tidak ada gradien dekoratif.
+   - Kartu: permukaan putih rata, garis 1px, sudut 10px, TANPA bayangan saat
+     diam. Saat disentuh kursor: garis jadi hitam + bayangan padat 3px 3px
+     (hard shadow, bukan blur) → terasa "ditekan", bukan melayang.
+   - `accent-tab` : blok aksen padat 48x3px di sudut kiri atas kartu.
+   - `canvas-tegas`: bidang kanvas rata + garis bingkai, tanpa pola.
+   - `label-tegas`: label mikro huruf kapital berspasi lebar (kontras tinggi).
+
+   Sengaja dipersempit ke kanvas + kartu widget; halaman admin/login tak berubah.
+   ============================================================================ */
+:root {
+  /* Satu aksen untuk seluruh kanvas. */
+  --tegas-accent: #0057ff;
+  --tegas-ink: #0b0c0e;
+  --tegas-canvas: #f2f4f6;
+  --tegas-line: #c4ccd6;
+  --tegas-card: #ffffff;
+}
+
+[data-theme='dark'] {
+  --tegas-accent: #3d8bff;
+  --tegas-ink: #f4f5f7;
+  --tegas-canvas: #08090a;
+  --tegas-line: #3a414b;
+  --tegas-card: #15181d;
+}
+
+/* Bidang kanvas: rata, bersih, hanya bingkai tipis sebagai pemisah. */
+@utility canvas-tegas {
+  position: relative;
+  border-radius: 10px;
+  background-color: var(--tegas-canvas);
+  border: 1px solid var(--tegas-line);
+}
+
+/* Kartu widget: tegas saat diam, "ditekan" saat disentuh. */
+@utility card-tegas {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid var(--tegas-line);
+  background-color: var(--tegas-card);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+
+  &:hover {
+    border-color: var(--tegas-ink);
+    box-shadow: 3px 3px 0 0 var(--tegas-ink);
+    transform: translate(-1px, -1px);
+  }
+}
+
+/* Penanda aksen: bilah padat 3px setinggi kartu di tepi kiri (aturan Swiss,
+   bukan strip dekoratif). Satu warna untuk semua kartu. */
+@utility accent-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background-color: var(--tegas-accent);
+}
+
+/* Label mikro: kapital, spasi lebar, kontras tinggi. */
+@utility label-tegas {
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-ink-3);
+}
+
+/* ============================================================
+   KOREKSI KETERBACAAN — teks beraksen brand
+   ------------------------------------------------------------
+   `--color-brand` adalah warna ISI (tombol, badge, grafik). Sebagai warna
+   TEKS ia gagal WCAG AA di mode terang (#1fa6cc di atas putih = 2,8:1).
+   Semua `text-brand` diarahkan ke `--color-brand-ink` (#0f6b85 terang /
+   #7fdcf0 gelap) sehingga teks tetap mengikuti tema dan terbaca.
+   `bg-brand`, `border-brand`, `ring-brand` TIDAK terpengaruh.
+   ============================================================ */
+@layer utilities {
+  .text-brand {
+    color: var(--color-brand-ink);
   }
 }

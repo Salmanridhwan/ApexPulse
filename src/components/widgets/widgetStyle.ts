@@ -28,13 +28,13 @@ export const FONT_BAWAAN: FontTersedia = 'Inter';
  */
 export const PALET: Record<NonNullable<WidgetStyle['palette']>, { label: string; warna: string[] }> = {
   default: { label: 'Bawaan', warna: [] }, // kosong = pakai palet tema
-  brand: { label: 'Biru (Brand)', warna: ['#1fa6cc', '#0f6b85', '#7f80d8', '#38c6e2', '#5b9bd5', '#0e7490'] },
-  hijau: { label: 'Hijau', warna: ['#0f7a53', '#3fd29a', '#12805c', '#6ee7b7', '#065f46', '#34d399'] },
-  ungu: { label: 'Ungu', warna: ['#7f80d8', '#9a9be8', '#6d28d9', '#c4b5fd', '#4c1d95', '#a78bfa'] },
-  oranye: { label: 'Oranye', warna: ['#8f5e08', '#f59e0b', '#ea580c', '#fbbf24', '#b45309', '#fb923c'] },
-  hangat: { label: 'Hangat', warna: ['#c62f22', '#ee4b32', '#8f5e08', '#f59e0b', '#9a3412', '#fca5a5'] },
-  sejuk: { label: 'Sejuk', warna: ['#0f6b85', '#1fa6cc', '#0e7490', '#38c6e2', '#155e75', '#7fdcf0'] },
-  monokrom: { label: 'Monokrom', warna: ['#1a1d1f', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#374151'] },
+  brand: { label: 'Biru (Brand)', warna: ['#0057ff', '#3d8bff', '#0284c7', '#1e40af', '#0d9488', '#7fa6ff'] },
+  hijau: { label: 'Hijau', warna: ['#00a878', '#34d399', '#0d9488', '#65a30d', '#047857', '#a3e635'] },
+  ungu: { label: 'Ungu', warna: ['#7c3aed', '#a78bfa', '#4338ca', '#a21caf', '#6d28d9', '#c4b5fd'] },
+  oranye: { label: 'Oranye', warna: ['#f59e0b', '#ea580c', '#fbbf24', '#d97706', '#fb923c', '#b45309'] },
+  hangat: { label: 'Hangat', warna: ['#e11d48', '#f43f5e', '#ea580c', '#f59e0b', '#a21caf', '#fb7185'] },
+  sejuk: { label: 'Sejuk', warna: ['#0284c7', '#0d9488', '#06b6d4', '#3d8bff', '#0891b2', '#38bdf8'] },
+  monokrom: { label: 'Monokrom', warna: ['#0b0c0e', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1'] },
 };
 
 /** Urutan palet untuk ditampilkan di editor. */

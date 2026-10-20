@@ -393,7 +393,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
         />
 
         {savingEdit && (
-          <div className="fixed bottom-4 right-4 z-50 bg-ink text-surface text-xs px-3 py-2 rounded-control shadow-pop flex items-center gap-2">
+          <div className="fixed bottom-4 right-4 z-50 bg-solid text-on-solid text-xs px-3 py-2 rounded-control shadow-pop flex items-center gap-2">
             <Activity className="w-3.5 h-3.5 animate-spin" />
             Menyimpan perubahan...
           </div>

@@ -153,6 +153,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   useEffect(() => {
     if (!googleClientId || !googleBtnRef.current) return;
     let batal = false;
+    let bersihkan: (() => void) | undefined;
     muatSkripGoogle()
       .then(() => {
         if (batal || !window.google?.accounts?.id || !googleBtnRef.current) return;
@@ -162,19 +163,32 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
             if (resp?.credential) void masukDenganGoogle(resp.credential);
           },
         });
-        window.google.accounts.id.renderButton(googleBtnRef.current, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'rectangular',
-          logo_alignment: 'left',
-          width: 320,
-        });
+        // Tombol Google punya tema sendiri: `outline` = putih (mode terang),
+        // `filled_black` = gelap (mode gelap). Tanpa ini tombol putih menyala
+        // di tengah halaman gelap.
+        const gambar = () => {
+          if (!window.google?.accounts?.id || !googleBtnRef.current) return;
+          const gelap = document.documentElement.dataset.theme === 'dark';
+          googleBtnRef.current.replaceChildren();
+          window.google.accounts.id.renderButton(googleBtnRef.current, {
+            type: 'standard',
+            theme: gelap ? 'filled_black' : 'outline',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 320,
+          });
+        };
+        gambar();
+        const pengamat = new MutationObserver(gambar);
+        pengamat.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        bersihkan = () => pengamat.disconnect();
       })
       .catch(() => setGoogleError('Tidak bisa memuat tombol Google. Periksa koneksi Anda.'));
     return () => {
       batal = true;
+      bersihkan?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleClientId, mode]);

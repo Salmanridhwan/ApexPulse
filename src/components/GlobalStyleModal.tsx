@@ -104,7 +104,7 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
               onApply(akanMengubah ? style : undefined);
               onClose();
             }}
-            className="px-5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" />
             <span>{akanMengubah ? 'Terapkan ke Semua Widget' : 'Kembalikan Semua ke Bawaan'}</span>

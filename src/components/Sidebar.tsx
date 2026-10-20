@@ -253,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!isCollapsed && (
                     <span className="flex-1 min-w-0">
                       <span className="block truncate text-[12px] leading-tight">{d.title}</span>
-                      <span className={`block text-[9px] leading-tight mt-0.5 truncate ${isActive ? 'text-shell-ink-2' : 'text-shell-ink-2/80'}`}>{d.widgets?.length || 0} widget{perluPembeda && <> · {waktuRelatif(d.updatedAt)}</>}</span>
+                      <span className={`block text-[9px] leading-tight mt-0.5 truncate ${isActive ? 'text-shell-ink-2' : 'text-shell-ink-2'}`}>{d.widgets?.length || 0} widget{perluPembeda && <> · {waktuRelatif(d.updatedAt)}</>}</span>
                     </span>
                   )}
                 </button>

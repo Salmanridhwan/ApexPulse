@@ -235,7 +235,7 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Susun LKjIP</span>
@@ -324,7 +324,7 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Susun LKjIP
@@ -613,7 +613,7 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
               <button
                 onClick={() => void simpan()}
                 disabled={sedangSimpan}
-                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60"
+                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
               >
                 {sedangSimpan ? 'Menyimpan…' : 'Simpan'}
               </button>

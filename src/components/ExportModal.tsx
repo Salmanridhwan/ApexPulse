@@ -55,7 +55,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-line flex items-center justify-between bg-surface-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-ink flex items-center justify-center text-surface">
+            <div className="w-8 h-8 rounded-control bg-solid flex items-center justify-center text-on-solid">
               <Printer className="w-4 h-4" />
             </div>
             <div>
@@ -206,7 +206,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </button>
             <button
               onClick={handlePrint}
-              className="px-5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Cetak / Simpan PDF</span>

@@ -311,7 +311,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-ink hover:bg-ink/90 text-surface text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-solid hover:bg-solid/90 text-on-solid text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

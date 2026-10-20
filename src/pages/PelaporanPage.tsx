@@ -534,7 +534,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
             {activeTab === 'alur' && bisaAturAlur ? (
               <button
                 onClick={bukaAlurBaru}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Tambah Alur</span>
@@ -542,7 +542,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
             ) : activeTab !== 'alur' ? (
               <button
                 onClick={() => setIsKewajibanOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Tambah Kewajiban</span>
@@ -860,7 +860,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 <button
                   type="submit"
                   disabled={sedangSimpan || !kewNama.trim()}
-                  className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sedangSimpan ? 'Menyimpan…' : 'Simpan'}
                 </button>
@@ -939,7 +939,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 <button
                   type="submit"
                   disabled={sedangSimpan}
-                  className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sedangSimpan ? 'Menyimpan…' : 'Simpan Laporan'}
                 </button>
@@ -1078,7 +1078,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                   type="submit"
                   disabled={sedangSimpan || (verifikasiAksi === 'revisi' && !verifikasiCatatan.trim())}
                   className={`px-4 py-2 rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed text-on-brand ${
-                    verifikasiAksi === 'revisi' ? 'bg-neg hover:bg-neg/90' : 'bg-brand hover:bg-brand-ink'
+                    verifikasiAksi === 'revisi' ? 'bg-neg hover:bg-neg/90' : 'bg-brand hover:brightness-95'
                   }`}
                 >
                   {sedangSimpan ? 'Menyimpan…' : verifikasiAksi === 'revisi' ? 'Kirim Revisi' : 'Setujui'}
@@ -1210,7 +1210,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 <button
                   type="submit"
                   disabled={sedangSimpan || !alurNama.trim() || alurTahap.some((t) => !t.nama.trim())}
-                  className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sedangSimpan ? 'Menyimpan…' : 'Simpan Alur'}
                 </button>

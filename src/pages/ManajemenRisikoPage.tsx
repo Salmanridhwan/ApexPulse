@@ -265,7 +265,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
       { label: 'Total Risiko', nilai: ringkasan?.total ?? 0, ikon: <ShieldAlert className="w-4 h-4" />, warna: 'bg-brand' },
       { label: 'Risiko Tinggi/Ekstrem', nilai: ringkasan?.risikoTinggi ?? 0, ikon: <AlertTriangle className="w-4 h-4" />, warna: 'bg-neg' },
       { label: 'Lewat Tenggat', nilai: ringkasan?.lewatTenggat ?? 0, ikon: <Clock className="w-4 h-4" />, warna: 'bg-warn' },
-      { label: 'Rata Skor', nilai: ringkasan?.rataSkor ?? 0, ikon: <Target className="w-4 h-4" />, warna: 'bg-ink' },
+      { label: 'Rata Skor', nilai: ringkasan?.rataSkor ?? 0, ikon: <Target className="w-4 h-4" />, warna: 'bg-solid' },
     ],
     [ringkasan]
   );
@@ -300,7 +300,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Tambah Risiko</span>
@@ -411,7 +411,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Tambah Risiko
@@ -755,7 +755,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               <button
                 onClick={() => void simpan()}
                 disabled={sedangSimpan}
-                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60"
+                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
               >
                 {sedangSimpan ? 'Menyimpan…' : 'Simpan'}
               </button>
@@ -856,7 +856,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               <button
                 onClick={() => void simpanMitigasi()}
                 disabled={sedangSimpan}
-                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60"
+                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
               >
                 {sedangSimpan ? 'Menyimpan…' : 'Catat Mitigasi'}
               </button>
@@ -913,7 +913,7 @@ const PetaRisiko: React.FC<{ matriks: number[][]; daftar: Risiko[]; perLevel?: R
                       style={{ background: WARNA_SEL[level] }}
                       title={`Skor ${skor} (${LABEL_LEVEL[level]})`}
                     >
-                      <span className={`text-lg font-extrabold tabular-nums ${jumlah > 0 ? 'text-ink' : 'text-ink-3/40'}`}>
+                      <span className={`text-lg font-extrabold tabular-nums ${jumlah > 0 ? 'text-ink' : 'text-ink-3'}`}>
                         {jumlah}
                       </span>
                       <span className="text-[9px] text-ink-3">skor {skor}</span>

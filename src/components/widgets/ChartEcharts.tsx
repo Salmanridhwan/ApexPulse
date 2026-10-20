@@ -112,6 +112,11 @@ export interface ChartEchartsProps {
   ganttData?: { tasks: Array<{ name: string; start: string; end: string; progress?: number; color?: string }> };
   /** Gaya tampilan pilihan pengguna (warna/font/ketebalan). */
   style?: WidgetStyle;
+  /**
+   * Geseran palet khusus widget ini (stabil). Diberikan oleh WidgetRenderer dari
+   * id/judul widget supaya tiap kartu mulai dari hue yang berbeda.
+   */
+  warnaSeed?: number;
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -135,6 +140,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   geoData,
   ganttData,
   style,
+  warnaSeed = 0,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -228,6 +234,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         geo: geoData,
         gantt: ganttData,
         heatmap: { rows: heatRows, columns: heatCols, data: heatMatriks, unit: displayUnit },
+        warnaSeed,
       };
 
       let option: EChartsOption;

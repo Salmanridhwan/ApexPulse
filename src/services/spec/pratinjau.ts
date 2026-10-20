@@ -17,6 +17,7 @@ const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'O
 /** Deret contoh: pola naik-turun wajar, jelas bukan angka laporan. */
 const DERET_A = [42, 48, 45, 52, 58, 55, 62, 68, 64, 72, 76, 80];
 const DERET_B = [30, 34, 33, 38, 41, 44, 43, 47, 50, 52, 55, 58];
+const DERET_C = [24, 27, 26, 31, 33, 36, 35, 39, 42, 45, 47, 50];
 
 const GRID = { x: 0, y: 0, w: 4, h: 3 };
 
@@ -39,6 +40,21 @@ const chartDuaSeri = (unit = 'Rp miliar') => ({
   series: [
     { name: 'Aktual', data: DERET_A },
     { name: 'Target', data: DERET_B, kind: 'line' as const, yAxisIndex: 1 as const },
+  ],
+  unit,
+  showLegend: true,
+});
+
+/**
+ * Tiga seri kartesius: pratinjau harus memperlihatkan bagaimana palet dipakai
+ * ketika ada beberapa deret (Aktual / Target / Tahun lalu), bukan satu garis saja.
+ */
+const chartTigaSeri = (unit = 'Rp miliar') => ({
+  xAxis: BULAN,
+  series: [
+    { name: 'Aktual', data: DERET_A },
+    { name: 'Target', data: DERET_B },
+    { name: 'Tahun lalu', data: DERET_C },
   ],
   unit,
   showLegend: true,
@@ -167,10 +183,13 @@ function bangun(type: WidgetType): WidgetSpec {
           },
         });
       }
-      return dasar(type, { title: 'Tren contoh', chart: chartSatuSeri() });
+      return dasar(type, {
+        title: 'Tren contoh',
+        chart: ['line', 'bar', 'hbar'].includes(type) ? chartTigaSeri() : chartSatuSeri(),
+      });
 
     case 'area':
-      return dasar(type, { title: 'Tren contoh', chart: { ...chartSatuSeri(), stacked: true } });
+      return dasar(type, { title: 'Tiga seri contoh', chart: { ...chartTigaSeri(), stacked: true } });
 
     case 'combo':
       return dasar(type, { title: 'Dua metrik contoh', chart: chartDuaSeri() });

@@ -7,6 +7,8 @@ import { NarasiCard } from './NarasiCard';
 
 interface WidgetRendererProps {
   widget: WidgetSpec;
+  /** Posisi kartu di kanvas (opsional) — menggeser hue awal grafik. */
+  urutan?: number;
 }
 
 /** Tipe yang dirender lewat ChartEcharts. */
@@ -18,7 +20,21 @@ const TIPE_CHART = [
   'trend-line', 'forecast', 'anomaly', 'cluster', 'dekomposisi', 'skenario', 'sensitivitas',
 ];
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
+/**
+ * Seed warna stabil dari id + judul widget. Dipakai agar tiap grafik di dashboard
+ * mulai dari hue berbeda (bukan semuanya biru), tanpa berubah antar-render.
+ */
+const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
+  // Bila posisi kartu diketahui, langkah 5 (koprima dengan 12 hue) menjamin
+  // kartu bersebelahan selalu beda hue: 0,5,10,3,8,1,6,11,4,9,2,7.
+  if (urutan !== undefined) return (urutan * 5) % 12;
+  const teks = `${widget.id || ''}|${widget.title || ''}|${widget.type}`;
+  let h = 7;
+  for (let i = 0; i < teks.length; i += 1) h = (h * 31 + teks.charCodeAt(i)) % 100003;
+  return h;
+};
+
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }) => {
   if (TIPE_CHART.includes(widget.type)) {
     return (
       <ChartEcharts
@@ -42,6 +58,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
         geoData={widget.geo}
         ganttData={widget.gantt}
         style={widget.style}
+        warnaSeed={seedWarna(widget, urutan)}
       />
     );
   }
@@ -50,6 +67,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
     case 'kpi':
       return (
         <KpiCard
+          variant={(widget.grid?.w ?? 0) >= 6 ? 'hero' : 'compact'}
           value={widget.kpi?.value ?? '-'}
           unit={widget.kpi?.unit}
           delta={widget.kpi?.delta}
@@ -83,6 +101,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
     case 'bullet-target':
       return (
         <KpiCard
+          variant={(widget.grid?.w ?? 0) >= 6 ? 'hero' : 'compact'}
           value={widget.kpi?.value ?? '-'}
           unit={widget.kpi?.unit}
           delta={widget.kpi?.delta}

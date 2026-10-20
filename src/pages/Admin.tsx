@@ -993,7 +993,7 @@ export const Admin: React.FC<AdminProps> = ({
                   </div>
                   <button
                     onClick={bukaTambahTenant}
-                    className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Tambah Instansi BUMD</span>
@@ -1078,7 +1078,7 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
                 <button
                   onClick={() => setIsAddUserOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Tambah Pengguna Baru</span>
@@ -1193,7 +1193,7 @@ export const Admin: React.FC<AdminProps> = ({
                   </button>
                   <button
                     onClick={bukaTambahTenant}
-                    className="px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Daftarkan BUMD Baru</span>
@@ -1417,7 +1417,7 @@ export const Admin: React.FC<AdminProps> = ({
                       type="button"
                       onClick={handleSimpanUjiKey}
                       disabled={keyTestLoading || !String(systemConfig.ragApiKey || '').trim()}
-                      className="shrink-0 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="shrink-0 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {keyTestLoading ? (
                         <>
@@ -1532,7 +1532,7 @@ export const Admin: React.FC<AdminProps> = ({
                         type="button"
                         onClick={handleSimpanUjiKms}
                         disabled={kmsLoading}
-                        className="shrink-0 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="shrink-0 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         data-testid="uji-kms"
                       >
                         {kmsLoading ? (
@@ -1711,7 +1711,7 @@ export const Admin: React.FC<AdminProps> = ({
                       }
                     }}
                     disabled={!kbInput.trim()}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     title="Simpan KB ini sebagai Knowledge Base default aplikasi"
                   >
                     <Check className="w-4 h-4" />
@@ -1977,7 +1977,7 @@ export const Admin: React.FC<AdminProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium"
+                    className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium"
                   >
                     Daftarkan Pengguna
                   </button>
@@ -2185,7 +2185,7 @@ export const Admin: React.FC<AdminProps> = ({
                   <button
                     type="submit"
                     disabled={tenantSaving || (tenantKbLoading && !tenantManual)}
-                    className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                    className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                   >
                     {tenantSaving ? (
                       <>
@@ -2423,7 +2423,7 @@ export const Admin: React.FC<AdminProps> = ({
                                         <button
                                           onClick={() => void pasangKbKeInstansi(k.knowledgeBaseId)}
                                           disabled={!terpilih || sedang}
-                                          className="px-3 py-1.5 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                                          className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                                           data-testid={`pakai-${k.knowledgeBaseId}`}
                                         >
                                           {sedang ? (

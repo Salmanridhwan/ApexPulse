@@ -323,7 +323,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
             </button>
             <button
               onClick={() => bukaInput(snapshotAktif)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
             >
               <Pencil className="w-3.5 h-3.5" />
               {snapshotAktif ? 'Ubah Periode Ini' : 'Input Data'}
@@ -363,7 +363,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
             </p>
             <button
               onClick={() => bukaInput(null)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" />
               Input Data Keuangan
@@ -671,7 +671,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
                 <button
                   type="submit"
                   disabled={sedangSimpan || !fPeriode.trim()}
-                  className="px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sedangSimpan ? 'Menyimpan…' : 'Simpan'}
                 </button>

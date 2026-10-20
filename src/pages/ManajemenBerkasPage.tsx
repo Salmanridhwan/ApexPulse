@@ -232,7 +232,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
         label: 'Total Ukuran',
         nilai: formatUkuran(ringkas?.totalKb),
         ikon: <HardDrive className="w-4 h-4" />,
-        warna: 'bg-ink',
+        warna: 'bg-solid',
       },
       {
         label: 'Terindeks RAG',
@@ -282,7 +282,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
             {data?.terpetakan && (
               <button
                 onClick={() => setPanelUnggah((v) => !v)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
                 data-testid="buka-panel-unggah"
               >
                 <Upload className="w-3.5 h-3.5" />
@@ -477,7 +477,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                   <button
                     onClick={() => void unggah()}
                     disabled={sedangUnggah}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-ink disabled:opacity-60 text-on-brand rounded-control text-xs font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:brightness-95 disabled:opacity-60 text-on-brand rounded-control text-xs font-medium transition-colors"
                     data-testid="kirim-unggah"
                   >
                     <Upload className="w-3.5 h-3.5" />

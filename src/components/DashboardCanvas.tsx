@@ -96,9 +96,10 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   };
   if (widgets.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-surface-2/50 rounded-control border-2 border-dashed border-line">
-        <div className="w-16 h-16 rounded-control bg-surface-2 flex items-center justify-center text-brand mb-4">
-          <LayoutGrid className="w-8 h-8" />
+      <div className="canvas-tegas flex-1 flex flex-col items-center justify-center p-12 text-center">
+        <div className="w-14 h-14 rounded-[6px] flex items-center justify-center mb-4"
+          style={{ backgroundColor: 'var(--tegas-accent)', boxShadow: '3px 3px 0 0 var(--tegas-ink)' }}>
+          <LayoutGrid className="w-7 h-7 text-on-brand" />
         </div>
         <h3 className="text-base font-semibold text-ink">
           Bangun dashboard pertama Anda
@@ -112,7 +113,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           {onOpenChat && (
             <button
               onClick={onOpenChat}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:bg-brand-ink rounded-control shadow-sm transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:brightness-95 rounded-control shadow-sm transition-colors"
             >
               <Sparkles className="w-4 h-4" />
               <span>Buat via Chat</span>
@@ -133,8 +134,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-12">
-      {widgets.map((widget) => {
+    <div className="canvas-tegas p-4 sm:p-5">
+      <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-4">
+      {widgets.map((widget, urutan) => {
         // Map grid.w to responsive Tailwind column span
         // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
         const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
@@ -188,6 +190,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           >
             <WidgetCard
               widget={widget}
+              urutan={urutan}
               preview={preview}
               onEdit={onEditWidget}
               onManualCorrection={onManualCorrection}
@@ -209,6 +212,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           </div>
         );
       })}
+      </div>
     </div>
   );
 };

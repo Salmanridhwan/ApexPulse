@@ -160,7 +160,7 @@ const KartuPreset: React.FC<KartuPresetProps> = ({
           onClick={onAdd}
           disabled={isMemuat}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-semibold transition-all disabled:opacity-60 ${
-            isAdded ? 'bg-pos text-on-pos' : 'bg-brand text-on-brand hover:bg-brand-ink'
+            isAdded ? 'bg-pos text-on-pos' : 'bg-brand text-on-brand hover:brightness-95'
           }`}
         >
           {isMemuat ? (

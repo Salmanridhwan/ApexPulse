@@ -244,7 +244,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
           <button
             onClick={onExit}
             title="Keluar presentasi (Esc)"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors"
           >
             <X className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Keluar</span>
@@ -281,7 +281,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
             <p className="text-xs text-ink-2 max-w-md">{galat}</p>
             <button
               onClick={() => void siapkan(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:bg-brand-ink rounded-control"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Coba lagi
             </button>

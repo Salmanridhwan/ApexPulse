@@ -193,7 +193,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <button
                 onClick={handleGenerateShareLink}
                 disabled={isLoading}
-                className="w-full py-2.5 bg-brand hover:bg-brand-ink text-white rounded-card font-medium shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-2.5 bg-brand hover:brightness-95 text-on-brand rounded-card font-medium shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
                 <span>{isLoading ? 'Membuat Tautan...' : 'Buat Tautan Berbagi'}</span>
@@ -214,7 +214,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   />
                   <button
                     onClick={copyToClipboard}
-                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
+                    className="px-3 py-2 bg-solid hover:bg-solid/90 text-on-solid rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
                     {isCopied ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
@@ -252,7 +252,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   />
                   <button
                     onClick={copyEmbedSnippet}
-                    className="px-3 py-2 bg-ink hover:bg-ink/90 text-surface rounded-control transition-colors shrink-0 flex items-center gap-1"
+                    className="px-3 py-2 bg-solid hover:bg-solid/90 text-on-solid rounded-control transition-colors shrink-0 flex items-center gap-1"
                   >
                     {isCopiedEmbed ? <Check className="w-3.5 h-3.5 text-pos" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{isCopiedEmbed ? 'Tersalin' : 'Salin'}</span>
@@ -267,7 +267,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <div className="p-4 border-t border-line bg-surface-2 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-ink hover:bg-ink/90 text-surface text-xs font-medium rounded-control transition-colors"
+            className="px-4 py-2 bg-solid hover:bg-solid/90 text-on-solid text-xs font-medium rounded-control transition-colors"
           >
             Tutup
           </button>

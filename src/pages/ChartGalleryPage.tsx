@@ -130,22 +130,21 @@ export const ChartGalleryPage: React.FC<ChartGalleryPageProps> = ({ onBukaKatalo
         </div>
 
         <div className="px-3.5 pt-2.5">
-          {/* Pratinjau pada UKURAN ASLINYA: lebar sesuai kolom grid di kanvas + tinggi badan kartu.
-              Wadah luar bisa digeser mendatar supaya chart tidak pernah diperkecil (diperkecil =
-              label & legenda terpotong, yang justru dihindari). */}
-          <div className="overflow-x-auto pb-1">
-            <div
-              className="rounded-control border border-line bg-surface-2 overflow-hidden"
-              style={{ width: ukuran.w, height: ukuran.h }}
-              data-testid={`pratinjau-${tipe.type}`}
-              data-ukuran={`${ukuran.w}x${ukuran.h}`}
-            >
-              {tampil && <WidgetRenderer widget={specPratinjau(tipe.type)} />}
-            </div>
+          {/* Pratinjau: tinggi mengikuti ukuran asli badan kartu, lebar menyesuaikan
+              kolom galeri. Dulu lebar dipatok ukuran kanvas sehingga kartu galeri
+              terpaksa satu baris penuh (satu grafik per layar); sekarang galeri bisa
+              menampilkan banyak grafik sekaligus. */}
+          <div
+            className="rounded-control border border-line bg-surface-2 overflow-hidden w-full"
+            style={{ height: ukuran.h }}
+            data-testid={`pratinjau-${tipe.type}`}
+            data-ukuran={`${ukuran.w}x${ukuran.h}`}
+          >
+            {tampil && <WidgetRenderer widget={specPratinjau(tipe.type)} />}
           </div>
           <p className="text-[9px] text-ink-3 mt-1">
-            Ukuran asli di kanvas: {ukuran.w} × {ukuran.h} px ({ukuran.kolom} dari 12 kolom) — angka contoh,
-            bukan angka dokumen
+            Tinggi asli di kanvas {ukuran.h} px · lebar {ukuran.kolom} dari 12 kolom ({ukuran.w} px) —
+            angka contoh, bukan angka dokumen
           </p>
         </div>
 
@@ -201,7 +200,7 @@ export const ChartGalleryPage: React.FC<ChartGalleryPageProps> = ({ onBukaKatalo
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Judul & keterangan */}
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-surface shrink-0">
+          <div className="w-10 h-10 rounded-control bg-solid flex items-center justify-center text-on-solid shrink-0">
             <BarChart3 className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -271,14 +270,14 @@ export const ChartGalleryPage: React.FC<ChartGalleryPageProps> = ({ onBukaKatalo
                   </h3>
                   <span className="text-[10px] text-ink-3">{anggota.length} tipe</span>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
                   {anggota.map((t) => kartu(t))}
                 </div>
               </section>
             );
           })
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
             {daftar.map((t) => kartu(t))}
           </div>
         )}

@@ -268,7 +268,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
   const kartuRingkas = useMemo(
     () => [
       { label: 'Dokumen', nilai: String(ringkasan?.total ?? 0), ikon: <FileSignature className="w-4 h-4" />, warna: 'bg-brand' },
-      { label: 'Indikator', nilai: String(ringkasan?.jumlahIndikator ?? 0), ikon: <ClipboardList className="w-4 h-4" />, warna: 'bg-ink' },
+      { label: 'Indikator', nilai: String(ringkasan?.jumlahIndikator ?? 0), ikon: <ClipboardList className="w-4 h-4" />, warna: 'bg-solid' },
       { label: 'Indikator Tercapai', nilai: String(ringkasan?.indikatorTercapai ?? 0), ikon: <CheckCircle2 className="w-4 h-4" />, warna: 'bg-pos' },
       {
         label: 'Capaian Rata-rata',
@@ -310,7 +310,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Buat Perjanjian Kinerja</span>
@@ -399,7 +399,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
             {bisaKelola && (
               <button
                 onClick={bukaTambah}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-ink text-on-brand rounded-control text-xs font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Buat Perjanjian Kinerja
@@ -728,7 +728,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
               <button
                 onClick={() => void simpan()}
                 disabled={sedangSimpan}
-                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60"
+                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
               >
                 {sedangSimpan ? 'Menyimpan…' : 'Simpan'}
               </button>
@@ -795,7 +795,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
               <button
                 onClick={() => void simpanRealisasi()}
                 disabled={sedangSimpan}
-                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60"
+                className="px-4 py-2 text-xs font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
               >
                 {sedangSimpan ? 'Menyimpan…' : 'Catat Realisasi'}
               </button>

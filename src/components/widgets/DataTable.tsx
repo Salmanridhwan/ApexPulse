@@ -1,9 +1,11 @@
 import React from 'react';
 import { useThemeMode } from '../../theme';
+import { PALET_GELAP, PALET_TERANG } from './chartOptions';
 
-// Palet dot selaras palet chart (Clean Grid) — disesuaikan per mode agar kontras.
-const DOT_COLORS_LIGHT = ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85', '#5b9bd5'];
-const DOT_COLORS_DARK = ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0', '#5b9bd5'];
+// Palet dot memakai SATU sumber dengan palet chart (chartOptions) supaya warna
+// tabel dan grafik tidak pernah berbeda.
+const DOT_COLORS_LIGHT = PALET_TERANG;
+const DOT_COLORS_DARK = PALET_GELAP;
 
 interface Column {
   key: string;

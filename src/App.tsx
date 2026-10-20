@@ -1156,14 +1156,14 @@ export default function App() {
                 <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
                   {/* Visual Header & Toolbar Card */}
                   {activeDashboard && !isPresentationMode && (
-                    <div className="mb-5 card">
+                    <div className="mb-5 card border-l-[3px]" style={{ borderLeftColor: 'var(--tegas-accent)' }}>
                       {/* Baris atas: info dashboard */}
                       <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="min-w-0">
                           {/* Judul dashboard — dipindah dari navbar; navbar cukup "Workspace" */}
                           {activeDashboard.title && (
                             <h1
-                              className="text-lg sm:text-xl font-extrabold text-ink tracking-tight truncate mb-1"
+                              className="text-xl sm:text-2xl font-black text-ink tracking-[-0.02em] truncate mb-1"
                               title={activeDashboard.title}
                             >
                               {activeDashboard.title}
@@ -1250,7 +1250,7 @@ export default function App() {
                           </button>
                           <button
                             onClick={() => setIsShareOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-brand hover:bg-brand-ink rounded-control transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors"
                           >
                             <Share2 className="w-3 h-3" />
                             Bagikan
@@ -1338,7 +1338,7 @@ export default function App() {
       {!isPresentationMode && !isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-white bg-brand hover:bg-brand-ink shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
           title="Buka RAG Copilot"
         >
           <Sparkles className="w-4 h-4 animate-pulse" />

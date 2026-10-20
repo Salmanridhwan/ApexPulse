@@ -22,11 +22,42 @@ import {
 } from '../../services/spec/analitik';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 
-/** Palet chart per mode tema (ECharts tidak bisa membaca CSS variable). */
+/**
+ * Palet seri bawaan — 12 warna yang sengaja BERAGAM (bukan 6 warna kembar muda),
+ * supaya grafik banyak kategori tidak berulang warna dan tiap jenis chart punya
+ * identitas. Urutan indeks 0..4 punya MAKNA dan dipakai di banyak tempat:
+ *   0 biru  = seri utama / nilai acuan
+ *   2 hijau = naik / positif
+ *   4 merah = turun / negatif
+ * Jangan menukar 0, 2, atau 4 tanpa memeriksa pemakaian `T.series[0|2|4]`
+ * (andil, waterfall, skenario, gauge).
+ * ECharts tidak bisa membaca CSS variable, jadi palet wajib di file ini.
+ */
+export const PALET_TERANG = [
+  '#0057ff', // biru sinyal
+  '#7c3aed', // violet
+  '#00a878', // hijau
+  '#f59e0b', // amber
+  '#e11d48', // merah
+  '#0d9488', // teal
+  '#db2777', // pink
+  '#65a30d', // lime
+  '#0284c7', // biru langit
+  '#ea580c', // oranye
+  '#a21caf', // fuchsia
+  '#475569', // slate
+];
+
+export const PALET_GELAP = [
+  '#3d8bff', '#a78bfa', '#00d68f', '#ffb020', '#ff5c74', '#2dd4bf',
+  '#f472b6', '#a3e635', '#38bdf8', '#fb923c', '#e879f9', '#94a3b8',
+];
+
+/** Palet chart per mode tema. */
 export function chartTheme(mode: 'light' | 'dark', latarKartu?: string) {
   const dasar = mode === 'dark'
-    ? { series: ['#38c6e2', '#9a9be8', '#3fd29a', '#ffb547', '#f2503a', '#7fdcf0'], accent: '#38c6e2', accentSoft: '#7fdcf0', track: '#2a2f37', tick: '#6b7280', muted: '#8b93a1', strong: '#f2f4f7', text2: '#b6bdc8', grid: '#2a2f37', tipBg: '#1f2329', tooltipInk: '#f2f4f7', surface: '#171a1f', heatLow: '#1f2329' }
-    : { series: ['#1fa6cc', '#7f80d8', '#0f7a53', '#8f5e08', '#c62f22', '#0f6b85'], accent: '#1fa6cc', accentSoft: '#0f6b85', track: '#e8ecf1', tick: '#6b7280', muted: '#6b7280', strong: '#1a1d1f', text2: '#4b5563', grid: '#e8ecf1', tipBg: '#1a1d1f', tooltipInk: '#f2f4f7', surface: '#ffffff', heatLow: '#e6f6fb' };
+    ? { series: PALET_GELAP, accent: '#3d8bff', accentSoft: '#7fb0ff', track: '#2b2f36', tick: '#7f8792', muted: '#8b93a1', strong: '#f4f5f7', text2: '#b6bdc8', grid: '#242830', tipBg: '#f4f5f7', tooltipInk: '#0b0c0e', surface: '#111316', heatLow: '#1a1e24' }
+    : { series: PALET_TERANG, accent: '#0057ff', accentSoft: '#7fa6ff', track: '#e2e6ec', tick: '#5b6470', muted: '#6b7280', strong: '#0b0c0e', text2: '#414b57', grid: '#e6e8ec', tipBg: '#0b0c0e', tooltipInk: '#f7f8fa', surface: '#ffffff', heatLow: '#e8efff' };
 
   // Kartu berlatar pilihan pengguna: warna teks & garis chart diturunkan dari
   // latar itu, kalau tidak label sumbu/legenda jadi tak terbaca (mis. teks abu
@@ -72,13 +103,47 @@ export type ChartTheme = ReturnType<typeof chartTheme>;
  * RAG lama otomatis konsisten, tanpa perlu migrasi data manual.
  */
 const WARNA_LEGACY: Record<string, string> = {
-  '#0284c7': '#1fa6cc', '#0ea5e9': '#1fa6cc', '#3b82f6': '#1fa6cc',
-  '#1d4ed8': '#7f80d8', '#10b981': '#0f7a53', '#059669': '#0f7a53',
-  '#f59e0b': '#8f5e08', '#ea580c': '#8f5e08', '#8b5cf6': '#7f80d8',
-  '#7c3aed': '#7f80d8', '#e11d48': '#c62f22', '#94a3b8': '#7f80d8',
+  '#0284c7': '#0057ff', '#0ea5e9': '#0057ff', '#3b82f6': '#0057ff',
+  '#1d4ed8': '#0057ff', '#1fa6cc': '#0057ff', '#0f6b85': '#0284c7',
+  '#10b981': '#00a878', '#059669': '#00a878', '#0f7a53': '#00a878',
+  '#f59e0b': '#f59e0b', '#ea580c': '#ea580c', '#8f5e08': '#f59e0b',
+  '#8b5cf6': '#7c3aed', '#7c3aed': '#7c3aed', '#7f80d8': '#7c3aed',
+  '#e11d48': '#e11d48', '#c62f22': '#e11d48', '#94a3b8': '#475569',
+  // Hijau-cyan merek lama (dashboard BUMD lama): tetap dikenali sebagai warna
+  // "tema", supaya widget tersimpan ikut palet beragam dan bukan satu warna.
+  '#38c6e2': '#0057ff', '#22d3ee': '#0057ff', '#38bdf8': '#0284c7',
+  '#2bb8a8': '#00a878', '#14b8a6': '#0d9488', '#0d9488': '#0d9488',
+  '#a78bfa': '#7c3aed', '#84cc16': '#65a30d', '#a3e635': '#65a30d',
 };
-export const keWarnaTema = (c?: string): string | undefined =>
-  c ? (WARNA_LEGACY[c.toLowerCase()] ?? c) : c;
+
+/**
+ * Warna lama -> warna palet aktif. Bila `palet` diberi, warna lama digeser ke
+ * indeks yang maknanya sama di palet itu (sehingga widget lama ikut beragam,
+ * mengikuti `putarPalet`), bukan dikunci ke satu hue.
+ */
+export const keWarnaTema = (c?: string, palet?: string[], seed = 0): string | undefined => {
+  if (!c) return c;
+  const kunci = c.toLowerCase();
+  const lama = WARNA_LEGACY[kunci];
+  if (!lama) return c;
+  if (!palet || palet.length === 0) return lama;
+  const i = PALET_TERANG.findIndex((x) => x.toLowerCase() === lama.toLowerCase());
+  return i >= 0 ? palet[(i + seed) % palet.length] : lama;
+};
+
+/**
+ * Geser urutan palet supaya tiap widget mulai dari hue berbeda.
+ *
+ * Sebelumnya semua grafik satu-seri memakai `series[0]` (biru), jadi sederet
+ * kartu di dashboard terlihat "statis". Dengan geseran yang stabil per widget
+ * (seed dari id/judul), grafik pertama biru, berikutnya violet, hijau, dst.,
+ * tetapi warnanya tetap sama setiap kali dashboard dibuka (bukan acak).
+ */
+export const putarPalet = (palet: string[], seed = 0): string[] => {
+  if (!palet.length) return palet;
+  const n = Math.abs(Math.trunc(seed)) % palet.length;
+  return n === 0 ? palet : [...palet.slice(n), ...palet.slice(0, n)];
+};
 
 /** Data satu seri yang sudah dinormalisasi satuan. */
 export interface SeriView {
@@ -109,6 +174,11 @@ export interface ChartData {
   heatmap?: { rows: string[]; columns: string[]; data: number[][]; unit?: string };
   /** Nama map ECharts yang sudah di-register (untuk type 'map'). */
   mapRegistered?: boolean;
+  /**
+   * Geseran palet untuk widget ini (stabil, dari id/judul widget). Membuat
+   * grafik satu-seri di dashboard tidak semuanya berwarna biru.
+   */
+  warnaSeed?: number;
 }
 
 const satuan = (u?: string) => (u ? ' ' + u : '');
@@ -228,6 +298,10 @@ export function buildChartOption(
   T: ChartTheme
 ): EChartsOption {
   const { xAxis: xView, series: seriesView, unit, stacked, showLegend = true } = data;
+  // Geseran palet per widget: dipakai semua tipe chart supaya tak ada dashboard
+  // yang seluruh grafiknya dimulai dari warna yang sama.
+  const seed = data.warnaSeed ?? 0;
+  const paletTema = putarPalet(T.series, seed);
   const displayUnit = unit || '';
   const isCartesian = ['line', 'area', 'bar', 'hbar', 'combo', 'scatter', 'bubble', 'histogram', 'boxplot', 'waterfall'].includes(type);
 
@@ -286,8 +360,8 @@ export function buildChartOption(
         {
           name: seriesView[0]?.name || 'Nilai dokumen',
           type: 'line', data: deret, symbol: 'circle', symbolSize: 5,
-          lineStyle: { width: 1.5, color: T.series[0], opacity: 0.75 },
-          itemStyle: { color: T.series[0], opacity: 0.75 },
+          lineStyle: { width: 1.5, color: paletTema[0], opacity: 0.75 },
+          itemStyle: { color: paletTema[0], opacity: 0.75 },
           z: 2,
         },
         {
@@ -340,7 +414,7 @@ export function buildChartOption(
         {
           name: seriesView[0]?.name || 'Nilai dokumen',
           type: 'line', data: aktual, symbol: 'circle', symbolSize: 5,
-          lineStyle: { width: 2, color: T.series[0] }, itemStyle: { color: T.series[0] },
+          lineStyle: { width: 2, color: paletTema[0] }, itemStyle: { color: paletTema[0] },
           z: 3,
         },
         // Pita prediksi = dua seri bertumpuk: batas bawah + selisihnya. Batas bawah
@@ -394,7 +468,7 @@ export function buildChartOption(
         {
           name: seriesView[0]?.name || 'Nilai dokumen',
           type: 'line', data: deret, symbol: 'circle', symbolSize: 6,
-          lineStyle: { width: 2, color: T.series[0] }, itemStyle: { color: T.series[0] },
+          lineStyle: { width: 2, color: paletTema[0] }, itemStyle: { color: paletTema[0] },
           markLine: {
             silent: true, symbol: 'none',
             data: [{ yAxis: Number(an.rata.toFixed(4)) }],
@@ -432,7 +506,7 @@ export function buildChartOption(
       symbolSize: 15,
       // Cincin putih supaya titik tidak menyatu dengan garis centroid yang berwarna sama.
       itemStyle: {
-        color: T.series[ci % T.series.length],
+        color: paletTema[ci % paletTema.length],
         borderColor: '#fff',
         borderWidth: 2,
       },
@@ -462,7 +536,7 @@ export function buildChartOption(
             silent: true, symbol: 'none',
             data: kl.centroid.map((c, i) => ({
               yAxis: Number(c.toFixed(4)),
-              lineStyle: { type: 'dashed', color: T.series[i % T.series.length], width: 1, opacity: 0.6 },
+              lineStyle: { type: 'dashed', color: paletTema[i % paletTema.length], width: 1, opacity: 0.6 },
               label: { formatter: `K${i + 1}`, color: T.muted, fontSize: 9 },
             })),
           },
@@ -755,7 +829,7 @@ export function buildChartOption(
           data: donutView,
         },
       ],
-      color: T.series,
+      color: paletTema,
     };
   }
 
@@ -767,7 +841,7 @@ export function buildChartOption(
     // pada colorSaturation level, yang bisa membuat kotak tak terlihat).
     const anakBerwarna = anak.map((a, i) => ({
       ...a,
-      itemStyle: { color: T.series[i % T.series.length] },
+      itemStyle: { color: paletTema[i % paletTema.length] },
     }));
     return {
       tooltip: { ...tooltipDasar, formatter: (p: any) => `${p.name}: <b>${fmtAngka(p.value)}${satuan(displayUnit)}</b>` },
@@ -808,7 +882,7 @@ export function buildChartOption(
           data: funnelData,
         },
       ],
-      color: T.series,
+      color: paletTema,
     };
   }
 
@@ -865,7 +939,7 @@ export function buildChartOption(
           links,
         },
       ],
-      color: T.series,
+      color: paletTema,
     };
   }
 
@@ -1066,9 +1140,18 @@ export function buildChartOption(
   const isHbar = type === 'hbar';
   const isCombo = type === 'combo';
   const paletSoft = T.series;
+  // Hue awal grafik ini digeser per widget (lihat putarPalet) supaya tiap kartu
+  // tidak memakai warna pertama yang sama.
+  const paletWidget = putarPalet(T.series, seed);
+  // Bar/hbar satu seri: warnai tiap kategori dari palet supaya batang tidak
+  // monoton satu warna. Berlaku hanya bila tidak ditumpuk & tanpa makna naik/turun
+  // (waterfall/skenario punya warnanya sendiri di cabang lain).
+  const perKategoriDasar = (type === 'bar' || type === 'hbar') && !stacked;
 
   const echartsSeries = seriesView.map((s, sIdx) => {
-    const baseColor = keWarnaTema(s.color) || paletSoft[sIdx % paletSoft.length];
+    // Warna lama yang tersimpan (mis. #38c6e2 merek lama) digeser ke palet aktif
+    // memakai seed widget, jadi tiap kartu mulai dari hue berbeda.
+    const baseColor = keWarnaTema(s.color, paletTema) || paletWidget[sIdx % paletWidget.length];
     // 'hbar' bukan tipe seri ECharts — ia bar biasa dengan sumbu ditukar.
     const tipeSeri: any = isCombo
       ? (s.kind || (sIdx === 0 ? 'bar' : 'line'))
@@ -1077,6 +1160,9 @@ export function buildChartOption(
         : isHbar
           ? 'bar'
           : type;
+    // Combo: batang juga diwarnai per kategori (garis tetap satu hue) supaya
+    // kartu tidak terlihat "satu warna" seperti sebelumnya.
+    const perKategori = perKategoriDasar || (isCombo && tipeSeri === 'bar' && !stacked);
     return {
       name: s.name,
       type: tipeSeri,
@@ -1088,7 +1174,9 @@ export function buildChartOption(
       data: s.data,
       barMaxWidth: 18,
       itemStyle: {
-        color: baseColor,
+        color: perKategori
+          ? ((p: any) => paletTema[(p?.dataIndex ?? 0) % paletTema.length])
+          : baseColor,
         borderRadius: tipeSeri === 'bar' ? (isHbar ? [0, 4, 4, 0] : [4, 4, 0, 0]) : 0,
       },
       lineStyle: { width: 2.5, color: baseColor },

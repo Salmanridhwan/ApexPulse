@@ -631,7 +631,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <button
             type="submit"
             disabled={!inputPrompt.trim() || isStreaming}
-            className="absolute right-1.5 p-1.5 rounded-control bg-brand hover:bg-brand-ink text-on-brand disabled:opacity-40 disabled:hover:bg-brand transition-colors"
+            className="absolute right-1.5 p-1.5 rounded-control bg-brand hover:brightness-95 text-on-brand disabled:opacity-40 disabled:hover:bg-brand transition-colors"
           >
             {isStreaming ? (
               <Loader2 className="w-4 h-4 animate-spin" />

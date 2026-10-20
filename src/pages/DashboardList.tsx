@@ -150,7 +150,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={onCreateDashboard}
-                className="px-4 py-2 text-xs font-bold text-surface bg-ink hover:bg-ink rounded-card transition-all shadow-xs"
+                className="px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs"
               >
                 + Dashboard Baru
               </button>

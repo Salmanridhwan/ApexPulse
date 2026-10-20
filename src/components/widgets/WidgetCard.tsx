@@ -32,6 +32,8 @@ interface WidgetCardProps {
   onDuplicate: (widget: WidgetSpec) => void;
   /** Mode pratinjau (mis. galeri template): sembunyikan menu ⋯ karena widget belum nyata. */
   preview?: boolean;
+  /** Posisi kartu di kanvas: dipakai menggeser hue awal grafik. */
+  urutan?: number;
 }
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
@@ -41,6 +43,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   onDelete,
   onDuplicate,
   preview = false,
+  urutan,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   /**
@@ -96,24 +99,29 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   const mode = useThemeMode();
   const tema = temaKartu(widget.style?.kartu, mode);
   const pakaiWarnaKartu = warnaKartuValid(widget.style?.kartu);
-  const gayaKartu = pakaiWarnaKartu ? (tema.vars as React.CSSProperties) : undefined;
+  // Tema "Bersih & Tegas": satu aksen untuk semua kartu, warna lain hanya
+  // untuk status data. Aksen tidak lagi bergantung pada jenis widget.
+  const gayaKartu: React.CSSProperties = pakaiWarnaKartu ? (tema.vars as React.CSSProperties) : {};
 
   return (
     <div
-      className="relative card card-lift flex flex-col h-full overflow-hidden group"
+      className="relative card-tegas flex flex-col h-full overflow-hidden group"
       style={gayaKartu}
       data-kartu-warna={pakaiWarnaKartu ? widget.style?.kartu : undefined}
     >
+      {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
+      <span aria-hidden="true" className="accent-bar" />
+
       {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
       <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-bold text-ink truncate" title={widget.title}>
+          <h3 className="text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]" title={widget.title}>
             {widget.title}
           </h3>
           {/* Subtitle disembunyikan untuk KPI yang punya target — badan kartu sudah
               menampilkan baris target di progress bar, jadi tidak dobel. */}
           {widget.subtitle && !(widget.type === 'kpi' && widget.kpi?.target !== undefined) && (
-            <p className="text-xs text-ink-2 truncate mt-0.5" title={widget.subtitle}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-2 truncate mt-1" title={widget.subtitle}>
               {widget.subtitle}
             </p>
           )}
@@ -166,7 +174,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                             onClick={() => onEdit({ ...widget, type: t })}
                             className={`text-[11px] font-semibold px-1.5 py-1.5 rounded-chip border transition-colors truncate ${
                               widget.type === t
-                                ? 'bg-ink text-surface border-ink'
+                                ? 'bg-solid text-on-solid border-solid'
                                 : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
                             }`}
                             title={LABEL_TIPE[t]}
@@ -248,7 +256,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             </p>
           </div>
         ) : (
-          <WidgetRenderer widget={widget} />
+          <WidgetRenderer widget={widget} urutan={urutan} />
         )}
       </div>
     </div>

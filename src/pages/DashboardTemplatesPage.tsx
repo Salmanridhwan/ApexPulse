@@ -114,7 +114,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1">
         {/* Kepala halaman */}
         <div className="bg-surface p-5 rounded-card border border-line mb-5 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-control bg-ink flex items-center justify-center text-surface shrink-0">
+          <div className="w-10 h-10 rounded-control bg-solid flex items-center justify-center text-on-solid shrink-0">
             <LayoutTemplate className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -233,7 +233,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               onClick={pakai}
               disabled={memuat || !currentTenant}
               data-testid={`pakai-template-${aktif.sektor}`}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:bg-brand-ink rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
               <span>{memuat ? 'Mengambil dari dokumen…' : 'Pakai Template Ini'}</span>
