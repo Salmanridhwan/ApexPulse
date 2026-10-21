@@ -3536,12 +3536,28 @@ async function startServer() {
       if (ada.organizationId) {
         org = (await daftarProjectKms()).find((o) => o.id === ada.organizationId) || { id: ada.organizationId, name: ada.projectKms || tenant.name };
       } else {
-        org = await klienKms().buatOrganisasi({
-          name: tenant.name,
-          code: tenant.code || tenant.id,
-          industry: tenant.sector,
-          description: `Repositori berkas ${tenant.name}${tenant.city ? ` (${tenant.city})` : ''} — dibuat dari ApexPulse.`,
-        });
+        // Ragkms mewajibkan `type` (bukan hanya `industry`), dan kode proyek harus
+        // unik — kalau bentrok (dua instansi ber-KB sama) pakai akhiran id instansi.
+        const kodeDasar = tenant.code || tenant.id;
+        const keterangan = `Repositori berkas ${tenant.name}${tenant.city ? ` (${tenant.city})` : ''} — dibuat dari ApexPulse.`;
+        const buat = (kode: string) =>
+          klienKms().buatOrganisasi({
+            name: tenant.name,
+            code: kode,
+            type: tenant.sector || 'BUMD',
+            industry: tenant.sector,
+            description: keterangan,
+          });
+        try {
+          org = await buat(kodeDasar);
+        } catch (errBuat: any) {
+          const pesan = String(errBuat?.detail || errBuat?.message || '');
+          if (errBuat?.status === 400 && /sudah digunakan/i.test(pesan)) {
+            org = await buat(`${kodeDasar}-${tenant.id.slice(-6)}`);
+          } else {
+            throw errBuat;
+          }
+        }
         if (!org) return res.status(502).json({ error: 'KMS tidak mengembalikan project yang dibuat.' });
         dibuat = true;
         cacheOrgKms = null;

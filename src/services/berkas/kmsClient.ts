@@ -44,6 +44,10 @@ function jelaskanKms(err: any, status?: number): KmsServiceError {
   if (status === 413) {
     return new KmsServiceError('Berkas terlalu besar untuk repositori dokumen.', 'Batas satu berkas adalah 50 MB.', status);
   }
+  if (status === 400) {
+    // Ragkms memakai 400 untuk penolakan isian (field wajib kurang, kode sudah dipakai).
+    return new KmsServiceError('Repositori dokumen menolak permintaan.', String(err?.message || ''), status);
+  }
   if (kode === 'ENOTFOUND') {
     return new KmsServiceError('Alamat repositori dokumen tidak ditemukan.', 'Domain repositori dokumen salah ketik atau tidak ada.', status);
   }
@@ -105,7 +109,7 @@ export class KmsClient {
   }
 
   /** Buat project KMS baru (KMS otomatis membuat knowledge base RAG-nya). */
-  async buatOrganisasi(input: { name: string; code: string; industry: string; description?: string }): Promise<OrganisasiKMS | null> {
+  async buatOrganisasi(input: { name: string; code: string; type: string; industry?: string; description?: string }): Promise<OrganisasiKMS | null> {
     const data = await this.panggil(
       '/api/organizations',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) },
