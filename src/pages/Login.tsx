@@ -314,7 +314,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
 
   return (
     <div className="relative min-h-screen flex flex-col justify-between font-sans antialiased text-ink overflow-x-hidden">
-      {/* Latar bergerak: dokumen RAG mengalir menjadi dashboard. */}
+      {/* Latar bergerak: dokumen instansi mengalir menjadi dashboard. */}
       <AuthBackdrop />
 
       {/* Header */}
@@ -351,14 +351,14 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                 {mode === 'register' ? 'Buat Akun Aiones Boards' : 'Masuk ke Portal Aiones Boards'}
               </h1>
               <p className="text-xs text-shell-ink-2 mt-2 leading-relaxed">
-                Dashboard kinerja instansi berbasis dokumen resmi RAG.
+                Dashboard kinerja instansi dari dokumen resmi Anda.
               </p>
             </div>
 
             <ul className="space-y-2.5 text-xs text-shell-ink-2 border-t border-shell-line pt-4">
               <li className="auth-rise-l flex items-start gap-2.5" style={{ animationDelay: '0.3s' }}>
                 <CheckCircle2 className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
-                <span>Data tervalidasi dengan sitasi dokumen sumber</span>
+                <span>Angka diambil langsung dari dokumen instansi</span>
               </li>
               <li className="auth-rise-l flex items-start gap-2.5" style={{ animationDelay: '0.42s' }}>
                 <CheckCircle2 className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />

@@ -199,7 +199,7 @@ export const AuthBackdrop: React.FC = () => {
         </div>
       </div>
 
-      {/* D. Dokumen RAG — kanan bawah: inti tema (dokumen -> dashboard) */}
+      {/* D. Dokumen instansi — kanan bawah: inti tema (dokumen -> dashboard) */}
       <div
         className="auth-tile hidden xl:block"
         style={{ bottom: '13%', left: 'calc(50% + 462px)', width: 180, '--dur': '16s', '--kedalaman': '1.1', '--rot': '2deg' } as React.CSSProperties}
@@ -220,7 +220,7 @@ export const AuthBackdrop: React.FC = () => {
               <div className="text-[10px] font-semibold text-ink truncate">RKAP 2026.pdf</div>
               <div className="text-[8px] text-ink-3 font-mono">12 hal · 8.802 token</div>
               <div className="mt-1 flex items-center gap-1">
-                <span className="auth-chip">tersitasi</span>
+                <span className="auth-chip">terverifikasi</span>
                 <span className="auth-chip auth-chip--tunda">hal. 24</span>
               </div>
             </div>
