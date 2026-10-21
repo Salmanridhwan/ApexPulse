@@ -37,9 +37,14 @@ export function cariProjectKmsDariKb(
 ): OrganisasiKMS | null {
   const kb = bentukNormal(knowledgeBaseId);
   if (!kb) return null;
-  return (Array.isArray(daftarProject) ? daftarProject : []).find(
-    (o) => bentukNormal(o?.knowledgeBase) === kb
-  ) || null;
+  const daftar = Array.isArray(daftarProject) ? daftarProject : [];
+  // Persis dulu: `kb_pam_jaya` dan `kb_pamjaya` bisa project BERBEDA di KMS.
+  const persis = String(knowledgeBaseId).trim().toLowerCase();
+  return (
+    daftar.find((o) => String(o?.knowledgeBase || '').trim().toLowerCase() === persis) ||
+    daftar.find((o) => bentukNormal(o?.knowledgeBase) === kb) ||
+    null
+  );
 }
 
 /**

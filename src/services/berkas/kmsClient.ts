@@ -104,6 +104,17 @@ export class KmsClient {
     return ambilDaftarOrganisasi(data);
   }
 
+  /** Buat project KMS baru (KMS otomatis membuat knowledge base RAG-nya). */
+  async buatOrganisasi(input: { name: string; code: string; industry: string; description?: string }): Promise<OrganisasiKMS | null> {
+    const data = await this.panggil(
+      '/api/organizations',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) },
+      60
+    );
+    const org = data?.organization || data?.data?.organization || data?.data;
+    return org && org.id ? (org as OrganisasiKMS) : null;
+  }
+
   /** Daftar berkas. `organizationId='all'` untuk semua project. */
   async daftarBerkas(organizationId = 'all'): Promise<BerkasKMS[]> {
     const q = encodeURIComponent(organizationId || 'all');
