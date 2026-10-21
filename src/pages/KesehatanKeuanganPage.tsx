@@ -570,8 +570,8 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
 
       {/* ===== Modal: Input snapshot ===== */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -590,14 +590,14 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
             <form onSubmit={simpanSnapshot} className="space-y-4">
               <div className="flex items-end gap-3 flex-wrap">
                 <div className="flex-1 min-w-[12rem]">
-                  <label className="block text-ink-2 font-medium mb-1">Periode *</label>
+                  <label className="label">Periode *</label>
                   <input
                     type="text"
                     required
                     value={fPeriode}
                     onChange={(e) => setFPeriode(e.target.value)}
                     placeholder="2026, 2026-Q1, 2026-06"
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
                 {bisaTarikRag && (
@@ -617,7 +617,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {URUTAN_KOMPONEN.map((k) => (
                   <div key={k}>
-                    <label className="block text-ink-2 font-medium mb-1">
+                    <label className="label">
                       {LABEL_KOMPONEN[k]}
                       {fSitasi[k] && (
                         <span className="ml-1 text-[9px] text-brand-ink" title={fSitasi[k]?.chunkSnippet}>
@@ -645,7 +645,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Catatan</label>
+                <label className="label">Catatan</label>
                 <textarea
                   rows={2}
                   value={fCatatan}

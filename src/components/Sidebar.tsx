@@ -186,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {tenants.map((t) => (
                     <option key={t.id} value={t.id} className="bg-shell-2 text-shell-ink">
-                      {t.name}{t.documentCount ? ` · ${t.documentCount} dok RAG` : ''}
+                      {t.name}{t.documentCount ? ` · ${t.documentCount} dokumen` : ''}
                     </option>
                   ))}
                 </select>
@@ -202,8 +202,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
             <div className="flex items-center justify-between text-[10px] px-0.5">
               <span className="capitalize font-medium text-shell-ink-2 truncate max-w-[140px]">{currentTenant?.sector || 'Sektor Publik'}</span>
-              <span className="text-[9px] text-pos bg-pos/15 px-1 rounded-chip font-medium" title="Basis dokumen RAG instansi ini">
-                RAG{currentTenant?.documentCount ? ` · ${currentTenant.documentCount} dok` : ' Aktif'}
+              <span className="text-[9px] text-pos bg-pos/15 px-1 rounded-chip font-medium" title="Jumlah dokumen instansi ini">
+                {currentTenant?.documentCount ? `${currentTenant.documentCount} dokumen` : 'Aktif'}
               </span>
             </div>
           </div>

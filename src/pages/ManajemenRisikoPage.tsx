@@ -600,8 +600,8 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
 
       {/* ===== Modal: Tambah/Ubah Risiko ===== */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -619,21 +619,21 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Kode</label>
+                  <label className="label-strong">Kode</label>
                   <input
                     type="text"
                     value={fKode}
                     onChange={(e) => setFKode(e.target.value)}
                     placeholder="R-01"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block font-semibold text-ink-2 mb-1">Kategori</label>
+                  <label className="label-strong">Kategori</label>
                   <select
                     value={fKategori}
                     onChange={(e) => setFKategori(e.target.value as KategoriRisiko)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     {URUTAN_KATEGORI.map((k) => (
                       <option key={k} value={k}>
@@ -644,7 +644,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Pernyataan risiko *</label>
+                <label className="label-strong">Pernyataan risiko *</label>
                 <textarea
                   value={fPernyataan}
                   onChange={(e) => setFPernyataan(e.target.value)}
@@ -655,7 +655,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Penyebab</label>
+                  <label className="label-strong">Penyebab</label>
                   <textarea
                     value={fPenyebab}
                     onChange={(e) => setFPenyebab(e.target.value)}
@@ -664,7 +664,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Dampak</label>
+                  <label className="label-strong">Dampak</label>
                   <textarea
                     value={fDampak}
                     onChange={(e) => setFDampak(e.target.value)}
@@ -674,35 +674,35 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Sasaran/tujuan yang terancam</label>
+                <label className="label-strong">Sasaran/tujuan yang terancam</label>
                 <input
                   type="text"
                   value={fSasaran}
                   onChange={(e) => setFSasaran(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Kemungkinan (1-5)</label>
+                  <label className="label-strong">Kemungkinan (1-5)</label>
                   <input
                     type="number"
                     min={1}
                     max={5}
                     value={fKemungkinan}
                     onChange={(e) => setFKemungkinan(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Dampak (1-5)</label>
+                  <label className="label-strong">Dampak (1-5)</label>
                   <input
                     type="number"
                     min={1}
                     max={5}
                     value={fDampakSkala}
                     onChange={(e) => setFDampakSkala(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
@@ -717,26 +717,26 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Pemilik risiko (unit)</label>
+                  <label className="label-strong">Pemilik risiko (unit)</label>
                   <input
                     type="text"
                     value={fPemilik}
                     onChange={(e) => setFPemilik(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Batas waktu mitigasi</label>
+                  <label className="label-strong">Batas waktu mitigasi</label>
                   <input
                     type="date"
                     value={fBatas}
                     onChange={(e) => setFBatas(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Rencana mitigasi</label>
+                <label className="label-strong">Rencana mitigasi</label>
                 <textarea
                   value={fRencana}
                   onChange={(e) => setFRencana(e.target.value)}
@@ -766,8 +766,8 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
 
       {/* ===== Modal: Catat Mitigasi ===== */}
       {mitigasiUntuk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setMitigasiUntuk(null)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setMitigasiUntuk(null)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -785,7 +785,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
             <p className="text-ink-2 mb-3 line-clamp-2">{mitigasiUntuk.pernyataan}</p>
             <div className="space-y-3">
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Uraian tindakan mitigasi *</label>
+                <label className="label-strong">Uraian tindakan mitigasi *</label>
                 <textarea
                   value={mUraian}
                   onChange={(e) => setMUraian(e.target.value)}
@@ -796,11 +796,11 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Status setelah aksi</label>
+                  <label className="label-strong">Status setelah aksi</label>
                   <select
                     value={mStatus}
                     onChange={(e) => setMStatus(e.target.value as StatusRisiko)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     <option value="teridentifikasi">Teridentifikasi</option>
                     <option value="dimitigasi">Sedang Dimitigasi</option>
@@ -809,21 +809,21 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Tanggal</label>
+                  <label className="label-strong">Tanggal</label>
                   <input
                     type="date"
                     value={mTanggal}
                     onChange={(e) => setMTanggal(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Level residual setelah mitigasi (opsional)</label>
+                <label className="label-strong">Level residual setelah mitigasi (opsional)</label>
                 <select
                   value={mLevelResidual}
                   onChange={(e) => setMLevelResidual(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field"
                 >
                   <option value="">Tidak dinilai</option>
                   {URUTAN_LEVEL.map((l) => (
@@ -835,7 +835,7 @@ export const ManajemenRisikoPage: React.FC<ManajemenRisikoPageProps> = ({
               </div>
               {mStatus === 'ditutup' && (
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Alasan ditutup *</label>
+                  <label className="label-strong">Alasan ditutup *</label>
                   <textarea
                     value={mAlasan}
                     onChange={(e) => setMAlasan(e.target.value)}

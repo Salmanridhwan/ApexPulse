@@ -134,7 +134,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     logSummary.push(`[RAG Client Gagal] ${pesan}`);
     onProgress?.({
       id: 'step-2',
-      title: 'Layanan RAG tidak dapat dihubungi — dashboard tidak dibuat',
+      title: 'Layanan dokumen tidak dapat dihubungi — dashboard tidak dibuat',
       status: 'failed',
     });
     return {

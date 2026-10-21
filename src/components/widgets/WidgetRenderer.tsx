@@ -4,6 +4,7 @@ import { ChartEcharts } from './ChartEcharts';
 import { DataTable } from './DataTable';
 import { KpiCard } from './KpiCard';
 import { NarasiCard } from './NarasiCard';
+import { pasanganUntuk } from './paletPasangan';
 
 interface WidgetRendererProps {
   widget: WidgetSpec;
@@ -36,11 +37,21 @@ const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
 
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }) => {
   if (TIPE_CHART.includes(widget.type)) {
+    const seed = seedWarna(widget, urutan);
+    const seri = widget.chart?.series || [];
+    // Warna seri hanya diatur otomatis kalau pengguna belum memilih palet /
+    // warna seri sendiri. Dua seri (mis. Target vs Realisasi) memakai pasangan
+    // warna kontras yang bergiliran per kartu — dulu semuanya biru + kuning.
+    const warnaOtomatis = !widget.style?.warnaSeri?.length && (!widget.style?.palette || widget.style.palette === 'default');
+    const seriBerwarna =
+      warnaOtomatis && seri.length >= 2
+        ? seri.map((s, i) => ({ ...s, color: pasanganUntuk(seed)[i % 2] }))
+        : seri;
     return (
       <ChartEcharts
         type={widget.type}
         xAxis={widget.chart?.xAxis || []}
-        series={widget.chart?.series || []}
+        series={seriBerwarna}
         unit={widget.chart?.unit}
         stacked={widget.chart?.stacked}
         showLegend={widget.chart?.showLegend}
@@ -58,7 +69,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }
         geoData={widget.geo}
         ganttData={widget.gantt}
         style={widget.style}
-        warnaSeed={seedWarna(widget, urutan)}
+        warnaSeed={seed}
       />
     );
   }
@@ -70,12 +81,17 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }
           variant={(widget.grid?.w ?? 0) >= 6 ? 'hero' : 'compact'}
           value={widget.kpi?.value ?? '-'}
           unit={widget.kpi?.unit}
-          delta={widget.kpi?.delta}
-          deltaLabel={widget.kpi?.deltaLabel}
+          // Angka estimasi tidak dirender: sparkline hanya ditampilkan kalau
+          // deretnya benar-benar dari dokumen (`dokumen-seri`). Bentuk
+          // `turunan-nilai`/`turunan-delta` dihitung dari satu titik, jadi
+          // garisnya karangan — dan "+6,4% tren indikatif" hanyalah akibat
+          // garis karangan itu, bukan angka dokumen.
+          delta={widget.kpi?.deltaLabel === 'tren indikatif' ? undefined : widget.kpi?.delta}
+          deltaLabel={widget.kpi?.deltaLabel === 'tren indikatif' ? undefined : widget.kpi?.deltaLabel}
           target={widget.kpi?.target}
           targetLabel={widget.kpi?.targetLabel}
-          tampilkanTarget={false}
-          sparkline={widget.kpi?.sparkline}
+          tampilkanTarget
+          sparkline={widget.kpi?.sparklineAsal === 'dokumen-seri' ? widget.kpi?.sparkline : undefined}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
           style={widget.style}
@@ -104,11 +120,11 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }
           variant={(widget.grid?.w ?? 0) >= 6 ? 'hero' : 'compact'}
           value={widget.kpi?.value ?? '-'}
           unit={widget.kpi?.unit}
-          delta={widget.kpi?.delta}
+          delta={widget.kpi?.deltaLabel === 'tren indikatif' ? undefined : widget.kpi?.delta}
           deltaLabel={widget.kpi?.deltaLabel || 'Realisasi Target RKAP'}
           target={widget.kpi?.target}
           targetLabel={widget.kpi?.targetLabel}
-          sparkline={widget.kpi?.sparkline}
+          sparkline={widget.kpi?.sparklineAsal === 'dokumen-seri' ? widget.kpi?.sparkline : undefined}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
           style={widget.style}

@@ -48,8 +48,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
+    <div className="modal-layer">
+      <div className="scrim" onClick={onClose} />
 
       <div role="dialog" aria-modal="true" aria-labelledby="export-modal-title" className="relative w-full max-w-2xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}

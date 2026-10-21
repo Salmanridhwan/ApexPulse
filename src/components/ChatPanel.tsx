@@ -32,6 +32,28 @@ interface ChatPanelProps {
   onDashboardUpdated: (dashboard: Dashboard) => void;
 }
 
+/**
+ * Riwayat percakapan lama menyimpan istilah mesin ("Orchestrator", "RAG", baris
+ * "Penyebab: ..."). Ini dibersihkan saat ditampilkan supaya pengguna hanya melihat
+ * bahasa yang berguna; pesan aslinya di database tidak diubah.
+ */
+const bersihkanTeks = (teks: string): string =>
+  teks
+    .replace(/Aiones Boards Orchestrator/g, 'Asisten Aiones Boards')
+    .replace(/Konfigurasi RAG/gi, 'Pengaturan layanan')
+    .replace(/Provider RAG/gi, 'Penyedia dokumen')
+    .replace(/layanan RAG/gi, 'layanan dokumen')
+    .replace(/knowledge base/gi, 'kumpulan dokumen')
+    .replace(/^\s*Penyebab:.*$/gim, '')
+    // Blok sitasi di riwayat lama ("📄 **Sumber Dokumen:**" + daftar berkas) dibuang.
+    // Catatan: emoji adalah pasangan surrogate, jadi kelas karakter tanpa flag /u
+    // hanya memotong SATU bagian dan menyisakan "\uFFFD" di layar. Pakai alternasi + /u.
+    .replace(/\n*\s*(?:📄|📚)?\s*\*\*Sumber Dokumen:\*\*[\s\S]*$/iu, '')
+    // Sisa potongan surrogate (kalau ada dari riwayat lama) dibuang.
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   isOpen,
   onClose,
@@ -163,7 +185,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setCurrentSteps([
-      { id: 'step-0', title: 'Menghubungkan ke Aiones Boards Orchestrator...', status: 'in_progress' },
+      { id: 'step-0', title: 'Menghubungkan ke asisten...', status: 'in_progress' },
     ]);
 
     const streamStart = Date.now();
@@ -307,7 +329,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
           <div>
             <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-              <span>Chat Orchestrator RAG</span>
+              <span>Asisten Dashboard</span>
             </h2>
             <p className="text-xs text-ink-2">
               {chatId && dashboardId ? `Riwayat tersimpan · ${messages.length} pesan` : 'Tanya dokumen resmi atau buat dashboard BUMD'}
@@ -321,13 +343,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span>
                   Menjawab untuk <strong className="text-ink-2">{tenantName}</strong>
                 </span>
-                {tenantKbId ? (
-                  <span className="font-mono px-1 py-0.5 rounded-chip bg-surface-2 border border-line">
-                    {tenantKbId}
-                  </span>
-                ) : (
-                  <span className="text-warn">tanpa KB sendiri</span>
-                )}
               </p>
             )}
           </div>
@@ -385,7 +400,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                   <>
                     <Bot className="w-3 h-3 text-brand" />
-                    <span>Aiones Boards Orchestrator</span>
+                    <span>Asisten Aiones Boards</span>
                   </>
                 )}
                 <span>•</span>
@@ -394,7 +409,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
               {/* Message text – render markdown: bold, code, headings, bullet, newline */}
               <div className="leading-relaxed space-y-1">
-                {msg.text.split('\n').map((rawLine, li) => {
+                {/* Riwayat lama menyimpan istilah teknis (nama mesin, "RAG", baris
+                    "Penyebab: ..."). Dibersihkan saat ditampilkan — tanpa migrasi data. */}
+                {bersihkanTeks(msg.text)
+                  .split('\n').map((rawLine, li) => {
                   const line = rawLine.trim();
                   if (!line) return <div key={li} className="h-1.5" />;
 
@@ -483,7 +501,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="mt-2.5 pt-2 border-t border-line/60 flex items-center gap-2 text-[10px]">
                   <span className="inline-flex items-center gap-1 text-neg font-semibold bg-neg/15 px-2 py-0.5 rounded border border-neg/40">
                     <AlertCircle className="w-3 h-3 text-neg" />
-                    Layanan RAG tidak terhubung
+                    Layanan dokumen tidak tersedia
                   </span>
                 </div>
               )}
@@ -514,7 +532,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
                   </div>
                   <div>
-                    <span className="font-bold text-ink text-[11px] block">Aiones Boards Orchestrator</span>
+                    <span className="font-bold text-ink text-[11px] block">Asisten Aiones Boards</span>
                     <span role="status" aria-live="polite" className="text-[10px] text-brand font-medium flex items-center gap-1">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                       Sedang memproses & menganalisis...
@@ -641,7 +659,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </button>
         </form>
         <p className="text-[10px] text-ink-3 text-center mt-1.5">
-          Jawaban & angka bersumber dari dokumen instansi lewat layanan RAG
+          Jawaban & angka bersumber dari dokumen instansi
         </p>
       </div>
     </div>

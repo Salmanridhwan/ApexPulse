@@ -42,6 +42,27 @@ export function cariProjectKmsDariKb(
   ) || null;
 }
 
+/**
+ * Cari project KMS dari NAMA instansi (cadangan saat KB belum tertaut di KMS).
+ *
+ * Dicocokkan bentuk-normal dan hanya bila salah satu nama MEMUAT yang lain dengan
+ * panjang minimal 6 karakter — supaya "pam jaya" tidak menyerempet "pam jaya barat"
+ * milik instansi lain, tetapi "Perumda Air Minum Jaya" tetap cocok dengan
+ * "Perumda Air Minum Jaya (PAM JAYA)".
+ */
+export function cariProjectKmsDariNama(
+  daftarProject: OrganisasiKMS[],
+  namaInstansi: unknown
+): OrganisasiKMS | null {
+  const nama = bentukNormal(namaInstansi);
+  if (nama.length < 6) return null;
+  const kandidat = (Array.isArray(daftarProject) ? daftarProject : [])
+    .map((o) => ({ o, n: bentukNormal(o?.name) }))
+    .filter(({ n }) => n.length >= 6 && (n.includes(nama) || nama.includes(n)))
+    .sort((a, b) => Math.abs(a.n.length - nama.length) - Math.abs(b.n.length - nama.length));
+  return kandidat[0]?.o || null;
+}
+
 /** Jenis berkas yang diterima KMS (maks 50 MB per berkas). */
 export const EKSTENSI_DIIZINKAN = [
   'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',

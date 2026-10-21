@@ -17,6 +17,8 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "strictNullChecks": true
+  },
+  "include": ["src", "server.ts", "vite.config.ts"]
 }

@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   Database,
+  Eye,
+  EyeOff,
   FolderOpen,
   Key,
   LogOut,
@@ -13,17 +15,20 @@ import {
   Radio,
   RefreshCw,
   Search,
+  Server,
   Settings,
   Shield,
   ShieldCheck,
   Trash2,
   UserPlus,
   X,
+  Zap,
 } from 'lucide-react';
 import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
 import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
+import { MENU_KINERJA } from '../components/menuKinerja';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 /** Label sektor untuk ditampilkan (sektor tetap dipetakan dari dokumen KB). */
@@ -97,6 +102,22 @@ const cocokBarisKb = (k: any, cari: string, hanyaBelumDipakai: boolean): boolean
   return true;
 };
 
+/**
+ * Sidik jari pengaturan integrasi (RAG + KMS).
+ *
+ * Dipakai untuk memberi tahu admin apakah masih ada perubahan yang belum
+ * disimpan, tanpa perlu membandingkan seluruh objek sistem.
+ */
+const jejakCfg = (c: any) =>
+  JSON.stringify({
+    p: c?.ragProvider ?? '',
+    u: c?.ragApiUrl ?? '',
+    k: c?.ragApiKey ?? '',
+    kb: c?.ragKnowledgeBaseId ?? '',
+    ku: c?.kmsApiUrl ?? '',
+    kk: c?.kmsApiKey ?? '',
+  });
+
 interface AdminProps {
   currentUser: User | null;
   onLogout: () => void;
@@ -129,10 +150,24 @@ export const Admin: React.FC<AdminProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [systemConfig, setSystemConfig] = useState<any>(null);
+  /** Sidik jari konfigurasi saat terakhir tersimpan — untuk menandai "belum disimpan". */
+  const [cfgTersimpan, setCfgTersimpan] = useState('');
+  /** Tampilkan API key sebagai teks (bawaan: bertopeng). */
+  const [tampilKunci, setTampilKunci] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+  /** Pendaftar yang menunggu persetujuan admin instansi (manual maupun Google). */
+  const [permintaanGabung, setPermintaanGabung] = useState<
+    { id: string; name: string; email: string; tenantId: string; tenantName: string | null; viaGoogle: boolean; emailVerified: boolean; requestedAt: string | null }[]
+  >([]);
+  /** Peran yang dipilih admin untuk tiap permintaan (default mengikuti permintaan). */
+  const [rolePermintaan, setRolePermintaan] = useState<Record<string, UserRole>>({});
+  const [memproses, setMemproses] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  /** Pesan kegagalan aksi admin (simpan config, buat/nonaktifkan pengguna).
+   *  Dulu kegagalan hanya masuk console sehingga UI tetap terlihat berhasil. */
+  const [galatAksi, setGalatAksi] = useState<string | null>(null);
 
   // RAG Probe State (uji koneksi RAG)
   const [probeLoading, setProbeLoading] = useState(false);
@@ -152,6 +187,8 @@ export const Admin: React.FC<AdminProps> = ({
 
   // Panel Knowledge Base: daftar dokumen sebuah KB (dipisah dari form umum).
   const [kbInput, setKbInput] = useState('');
+  /** true saat kbInput diisi OTOMATIS dari config — menahan pemeriksaan KB otomatis. */
+  const kbIsiOtomatis = useRef(false);
   const [kbLoading, setKbLoading] = useState(false);
 
   // Uji koneksi KMS (repositori berkas) — memakai konfigurasi yang TERSIMPAN.
@@ -266,9 +303,22 @@ export const Admin: React.FC<AdminProps> = ({
       if (statsRes) setStats(statsRes);
       if (Array.isArray(usersRes)) setUsers(usersRes);
       if (Array.isArray(tenantsRes)) setTenants(tenantsRes);
-      if (configRes) setSystemConfig(configRes);
+      if (configRes) {
+        setSystemConfig(configRes);
+        // Titik acuan "belum disimpan": setiap kali data dimuat ulang, anggap bersih.
+        setCfgTersimpan(jejakCfg(configRes));
+      }
       if (Array.isArray(logsRes)) setAuditLogs(logsRes);
       if (Array.isArray(alertsRes)) setAlertRules(alertsRes);
+      const gabungRes = await fetch('/api/admin/join-requests').then(j);
+      if (Array.isArray(gabungRes)) {
+        setPermintaanGabung(gabungRes);
+        setRolePermintaan((prev) => {
+          const next = { ...prev };
+          for (const p of gabungRes) if (!next[p.id]) next[p.id] = 'analis';
+          return next;
+        });
+      }
       if (Array.isArray(tenantsRes) && tenantsRes.length > 0 && !userTenantId) {
         // Default kolom instansi pada form pengguna = instansi admin sendiri,
         // bukan instansi pertama pada daftar (urutannya arbitrer).
@@ -288,10 +338,90 @@ export const Admin: React.FC<AdminProps> = ({
     loadData();
   }, []);
 
+  /** Setujui pendaftar: akun menjadi aktif pada instansi yang diminta. */
+  const setujuiPermintaan = async (p: { id: string; tenantId: string }) => {
+    setMemproses(p.id);
+    try {
+      const res = await fetch(`/api/admin/join-requests/${p.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: rolePermintaan[p.id] || 'analis', tenantId: p.tenantId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Gagal menyetujui (HTTP ${res.status}).`);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menyetujui pendaftaran.');
+    } finally {
+      setMemproses(null);
+    }
+  };
+
+  /** Tolak pendaftar: akun tidak bisa dipakai masuk. */
+  const tolakPermintaan = async (p: { id: string; name: string }) => {
+    if (!window.confirm(`Tolak pendaftaran "${p.name}"? Akun ini tidak akan bisa masuk.`)) return;
+    setMemproses(p.id);
+    try {
+      const res = await fetch(`/api/admin/join-requests/${p.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Gagal menolak (HTTP ${res.status}).`);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menolak pendaftaran.');
+    } finally {
+      setMemproses(null);
+    }
+  };
+
+  /** Ubah satu aturan ambang batas dari panel admin (ambang / status aktif). */
+  const ubahAturanAlert = async (rule: AlertRule, perubahan: Partial<AlertRule>) => {
+    try {
+      const res = await fetch(`/api/alerts/${rule.id}?tenantId=${encodeURIComponent(rule.tenantId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...perubahan, tenantId: rule.tenantId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Gagal menyimpan (HTTP ${res.status}).`);
+      }
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menyimpan aturan ambang batas.');
+    }
+  };
+
+  /** Hapus aturan ambang batas beserta notifikasinya. */
+  const hapusAturanAlert = async (rule: AlertRule) => {
+    const yakin = window.confirm(
+      `Hapus aturan "${rule.metricName} ${rule.operator} ${rule.threshold} ${rule.unit}"? Tindakan ini tidak bisa dibatalkan.`
+    );
+    if (!yakin) return;
+    try {
+      const res = await fetch(`/api/alerts/${rule.id}?tenantId=${encodeURIComponent(rule.tenantId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Gagal menghapus (HTTP ${res.status}).`);
+      }
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menghapus aturan ambang batas.');
+    }
+  };
+
   // Isi kolom Knowledge Base dari konfigurasi tersimpan begitu config dimuat.
   useEffect(() => {
     const kb = (systemConfig as any)?.ragKnowledgeBaseId;
-    if (typeof kb === 'string' && kb && !kbInput) setKbInput(kb);
+    if (typeof kb === 'string' && kb && !kbInput) {
+      kbIsiOtomatis.current = true; // jangan picu pemeriksaan otomatis
+      setKbInput(kb);
+    }
   }, [systemConfig]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -310,6 +440,11 @@ export const Admin: React.FC<AdminProps> = ({
         }),
       });
       const newUser = await res.json();
+      if (!res.ok) {
+        setGalatAksi(newUser?.error || 'Pengguna gagal dibuat.');
+        return;
+      }
+      setGalatAksi(null);
       setUsers((prev) => [...prev, newUser]);
       setIsAddUserOpen(false);
       setUserName('');
@@ -323,7 +458,12 @@ export const Admin: React.FC<AdminProps> = ({
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Apakah Anda yakin ingin menonaktifkan pengguna ini?')) return;
     try {
-      await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setGalatAksi('Pengguna gagal dinonaktifkan.');
+        return;
+      }
+      setGalatAksi(null);
       setUsers((prev) => prev.filter((u) => u.id !== id));
       loadData();
     } catch (err) {
@@ -449,8 +589,8 @@ export const Admin: React.FC<AdminProps> = ({
     setIsAddTenantOpen(true);
   };
 
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveConfig = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     try {
       const res = await fetch('/api/admin/config', {
         method: 'POST',
@@ -458,7 +598,13 @@ export const Admin: React.FC<AdminProps> = ({
         body: JSON.stringify(systemConfig),
       });
       const saved = await res.json();
+      if (!res.ok) {
+        setGalatAksi(saved?.error || 'Pengaturan gagal disimpan.');
+        return;
+      }
+      setGalatAksi(null);
       setSystemConfig(saved);
+      setCfgTersimpan(jejakCfg(saved));
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
       loadData();
@@ -482,7 +628,10 @@ export const Admin: React.FC<AdminProps> = ({
         body: JSON.stringify(systemConfig),
       });
       const data = await res.json();
-      if (data?.konfigurasi) setSystemConfig(data.konfigurasi);
+      if (data?.konfigurasi) {
+        setSystemConfig(data.konfigurasi);
+        setCfgTersimpan(jejakCfg(data.konfigurasi));
+      }
       if (data?.tersimpan) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2500);
@@ -522,7 +671,10 @@ export const Admin: React.FC<AdminProps> = ({
         body: JSON.stringify(systemConfig),
       });
       const dataSimpan = await simpan.json().catch(() => ({}));
-      if (dataSimpan?.kmsApiKey !== undefined) setSystemConfig(dataSimpan);
+      if (dataSimpan?.kmsApiKey !== undefined) {
+        setSystemConfig(dataSimpan);
+        setCfgTersimpan(jejakCfg(dataSimpan));
+      }
 
       const res = await fetch('/api/admin/kms-uji', { method: 'POST' });
       const hasil = await res.json().catch(() => ({}));
@@ -698,6 +850,51 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  const [menyimpanMenu, setMenyimpanMenu] = useState<string | null>(null);
+
+  /**
+   * Simpan daftar menu yang disembunyikan untuk satu instansi.
+   *
+   * Disimpan per instansi (Tenant.menuSembunyi) karena satu deployment melayani
+   * banyak BUMD dengan kebutuhan modul berbeda. Server menyaring key yang tidak
+   * dikenal, jadi payload di sini boleh apa adanya.
+   */
+  const simpanMenuInstansi = async (tenant: Tenant, sembunyi: string[]) => {
+    setMenyimpanMenu(tenant.id);
+    setGalatAksi(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menuSembunyi: sembunyi }),
+      });
+      const hasil = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGalatAksi(hasil?.error || 'Tampilan menu instansi gagal disimpan.');
+        return;
+      }
+      setTenants((prev) =>
+        prev.map((t) => (t.id === tenant.id ? { ...t, menuSembunyi: hasil.menuSembunyi || [] } : t))
+      );
+      onTenantsRefreshed?.();
+    } finally {
+      setMenyimpanMenu(null);
+    }
+  };
+
+  /** Nyalakan/matikan satu menu. */
+  const ubahMenuInstansi = async (tenant: Tenant, key: string, tampil: boolean) => {
+    const sembunyi = new Set(tenant.menuSembunyi || []);
+    if (tampil) sembunyi.delete(key);
+    else sembunyi.add(key);
+    await simpanMenuInstansi(tenant, [...sembunyi]);
+  };
+
+  /** Sakelar borongan: matikan semua menu sekaligus, atau hidupkan semuanya. */
+  const ubahSemuaMenu = async (tenant: Tenant, aktif: boolean) => {
+    await simpanMenuInstansi(tenant, aktif ? [] : MENU_KINERJA.map((m) => m.key));
+  };
+
   /**
    * Perbarui SEMUA instansi berurutan (sengaja tidak paralel supaya layanan RAG
    * tidak dihujani permintaan sekaligus), lalu rangkum hasilnya.
@@ -809,12 +1006,17 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
-  // Auto-isi: cukup mengetik/tempel KB ID, daftar dokumen langsung diperiksa sendiri
-  // (tanpa klik tombol). Diberi jeda 700 ms supaya tidak memanggil server tiap ketukan.
+  // Auto-periksa saat admin MENGETIK KB ID. Isian yang terisi otomatis dari
+  // konfigurasi tersimpan sengaja tidak memicu permintaan: halaman dibuka langsung
+  // tenang, dan pemeriksaan berjalan saat admin memang memintanya.
   useEffect(() => {
     const kb = kbInput.trim();
     if (!kb) {
       setKbHasil(null);
+      return;
+    }
+    if (kbIsiOtomatis.current) {
+      kbIsiOtomatis.current = false;
       return;
     }
     const timer = setTimeout(() => {
@@ -955,6 +1157,19 @@ export const Admin: React.FC<AdminProps> = ({
 
         {/* Main Body */}
         <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+          {galatAksi && (
+            <div className="p-3 bg-neg/10 border border-neg/30 rounded-card text-neg text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
+              <span className="flex-1">{galatAksi}</span>
+              <button
+                onClick={() => setGalatAksi(null)}
+                className="text-neg/70 hover:text-neg"
+                aria-label="Tutup pesan galat"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {/* ================= TAB 1: OVERVIEW ================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
@@ -1085,6 +1300,94 @@ export const Admin: React.FC<AdminProps> = ({
                 </button>
               </div>
 
+              {/* Permintaan bergabung: pendaftaran manual & Google sama-sama harus
+                  disetujui admin sebelum akunnya bisa dipakai masuk. */}
+              {permintaanGabung.length > 0 && (
+                <div className="border border-warn/40 bg-warn/5 rounded-card overflow-hidden">
+                  <div className="px-3.5 py-2.5 border-b border-warn/30 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-warn" />
+                      <span className="text-xs font-bold text-ink">
+                        Permintaan Bergabung ({permintaanGabung.length})
+                      </span>
+                      <span className="text-[10px] text-ink-3">
+                        pendaftaran manual dan Google menunggu persetujuan
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadData()}
+                      className="p-1 rounded text-ink-3 hover:text-ink hover:bg-line/60 transition-colors"
+                      title="Muat ulang permintaan"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="divide-y divide-warn/20">
+                    {permintaanGabung.map((p) => (
+                      <div key={p.id} className="p-3 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-ink">{p.name}</span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-chip font-semibold border ${
+                                p.viaGoogle
+                                  ? 'text-brand-ink bg-brand/10 border-brand/30'
+                                  : 'text-ink-2 bg-surface-2 border-line'
+                              }`}
+                            >
+                              {p.viaGoogle ? 'Google' : 'Kata sandi'}
+                            </span>
+                            {p.emailVerified && (
+                              <span className="text-[10px] text-pos font-semibold">email terverifikasi</span>
+                            )}
+                          </div>
+                          <p className="text-ink-2 mt-0.5 truncate">{p.email}</p>
+                          <p className="text-[11px] text-ink-3">
+                            {p.tenantName || p.tenantId}
+                            {p.requestedAt
+                              ? ` · ${new Date(p.requestedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}`
+                              : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <select
+                            value={rolePermintaan[p.id] || 'analis'}
+                            onChange={(e) =>
+                              setRolePermintaan((prev) => ({ ...prev, [p.id]: e.target.value as UserRole }))
+                            }
+                            className="text-[11px] px-2 py-1.5 border border-line rounded-control bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                            title="Peran saat disetujui"
+                          >
+                            <option value="analis">Analis</option>
+                            <option value="direksi">Direksi</option>
+                            <option value="admin">Administrator</option>
+                          </select>
+                          <button
+                            type="button"
+                            disabled={memproses === p.id}
+                            onClick={() => void setujuiPermintaan(p)}
+                            className="px-2.5 py-1.5 rounded-control bg-pos text-on-pos font-semibold text-[11px] hover:brightness-95 transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Setujui
+                          </button>
+                          <button
+                            type="button"
+                            disabled={memproses === p.id}
+                            onClick={() => void tolakPermintaan(p)}
+                            className="px-2.5 py-1.5 rounded-control border border-neg/40 text-neg font-semibold text-[11px] hover:bg-neg/10 transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Tolak
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Table */}
               <div className="overflow-x-auto border border-line rounded-card">
                 <table className="w-full text-left text-xs">
@@ -1105,6 +1408,17 @@ export const Admin: React.FC<AdminProps> = ({
                           <td className="p-3 font-medium flex items-center gap-2">
                             <AvatarTile name={u.name} id={u.id} size="sm" />
                             <span>{u.name}</span>
+                            {(u.status || 'active') !== 'active' && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-chip font-semibold border ${
+                                  (u.status || 'active') === 'pending'
+                                    ? 'text-warn bg-warn/10 border-warn/30'
+                                    : 'text-neg bg-neg/10 border-neg/30'
+                                }`}
+                              >
+                                {(u.status || 'active') === 'pending' ? 'Menunggu' : 'Ditolak'}
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-ink-2">{u.email}</td>
                           <td className="p-3">
@@ -1323,121 +1637,367 @@ export const Admin: React.FC<AdminProps> = ({
           )}
 
           {/* ================= TAB 4: RAG CONFIG ================= */}
-          {activeTab === 'rag' && systemConfig && (
-            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-5">
-              <div>
-                <h3 className="text-sm font-bold text-ink">
-                  Konfigurasi Integrasi RAG API
-                </h3>
-                <p className="text-xs text-ink-2">
-                  Tempel Base URL & API Key RAG dari penyedia layanan, pilih provider
-                  <strong> HTTP</strong>, lalu simpan.
+          {activeTab === 'menu' && (
+            <div className="space-y-4" data-testid="tab-tampilan-menu">
+              <div className="bg-surface p-5 rounded-card border border-line shadow-2xs">
+                <h3 className="text-sm font-bold text-ink">Tampilan Menu Instansi</h3>
+                <p className="text-xs text-ink-2 mt-1">
+                  Pilih menu grup <span className="font-semibold">Kinerja &amp; Kepatuhan</span> yang tampil
+                  untuk setiap instansi. Menu yang dimatikan hilang dari sidebar dan halamannya tidak bisa
+                  dibuka lagi. Perubahan tersimpan begitu switch ditekan.
                 </p>
               </div>
 
-              {saveSuccess && (
-                <div className="p-3 bg-pos/15 border border-pos/30 rounded-card text-pos text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-pos" />
-                  <span>Pengaturan sistem berhasil disimpan dan diperbarui!</span>
+              {tenants.length === 0 && (
+                <div className="bg-surface p-5 rounded-card border border-line text-xs text-ink-2">
+                  Belum ada instansi terdaftar.
                 </div>
               )}
 
-              {/* Jebakan paling sering: URL & key sudah diisi, provider masih Mock. */}
-              {systemConfig.ragProvider !== 'http' && (systemConfig.ragApiUrl || systemConfig.ragApiKey) && (
-                <div className="p-3 bg-warn/15 border border-warn/30 rounded-card text-warn text-xs flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
-                  <span>
-                    Provider masih <strong>Mock</strong>, jadi Base URL &amp; API Key di bawah{' '}
-                    <strong>tidak dipakai</strong>. Dashboard tetap disusun dari data contoh. Ubah
-                    Provider ke <strong>HTTP</strong> lalu simpan, baru klik “Uji Koneksi Sekarang”.
-                  </span>
-                </div>
-              )}
+              {tenants.map((t) => {
+                const sembunyi = t.menuSembunyi || [];
+                const jumlahTampil = MENU_KINERJA.length - MENU_KINERJA.filter((m) => sembunyi.includes(m.key)).length;
+                const sedangSimpan = menyimpanMenu === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3"
+                    data-testid={`menu-tenant-${t.id}`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-ink">{t.name}</h4>
+                        <p className="text-xs text-ink-2">
+                          {t.code} · {t.sector.toUpperCase()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <span className="text-[11px] px-2 py-0.5 rounded-chip border border-line text-ink-2">
+                          {jumlahTampil}/{MENU_KINERJA.length} menu tampil
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void ubahSemuaMenu(t, jumlahTampil === 0)}
+                          disabled={sedangSimpan}
+                          className={`px-3 py-1.5 rounded-control text-[11px] font-semibold border transition-colors disabled:opacity-60 ${
+                            jumlahTampil === 0
+                              ? 'border-brand/40 text-brand hover:bg-brand/10'
+                              : 'border-line text-ink-2 hover:bg-surface-2'
+                          }`}
+                          title={
+                            jumlahTampil === 0
+                              ? 'Tampilkan lagi seluruh menu Kinerja & Kepatuhan'
+                              : 'Sembunyikan seluruh menu Kinerja & Kepatuhan untuk instansi ini'
+                          }
+                        >
+                          {jumlahTampil === 0 ? 'Aktifkan semua' : 'Nonaktifkan semua'}
+                        </button>
+                      </div>
+                    </div>
 
-              <form onSubmit={handleSaveConfig} className="space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">
-                      Provider RAG API
-                    </label>
-                    <select
-                      value={systemConfig.ragProvider}
-                      onChange={(e) =>
-                        setSystemConfig({ ...systemConfig, ragProvider: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
-                    >
-                      <option value="mock">Mock: data demo lokal</option>
-                      <option value="http">HTTP: API RAG eksternal</option>
-                    </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {MENU_KINERJA.map((m) => {
+                        const tampil = !sembunyi.includes(m.key);
+                        return (
+                          <button
+                            key={m.key}
+                            type="button"
+                            role="switch"
+                            aria-checked={tampil}
+                            aria-label={`${tampil ? 'Sembunyikan' : 'Tampilkan'} ${m.label}`}
+                            disabled={sedangSimpan}
+                            onClick={() => void ubahMenuInstansi(t, m.key, !tampil)}
+                            className={`flex items-start gap-3 p-3 rounded-control border text-left transition-colors disabled:opacity-60 ${
+                              tampil ? 'border-line bg-surface hover:bg-surface-2' : 'border-line bg-surface-2 hover:bg-surface'
+                            }`}
+                          >
+                            <span
+                              className={`w-9 h-5 rounded-full shrink-0 relative mt-0.5 transition-colors ${
+                                tampil ? 'bg-brand' : 'bg-line'
+                              }`}
+                            >
+                              <span
+                                className="absolute top-0.5 w-4 h-4 rounded-full bg-surface transition-all"
+                                style={{ left: tampil ? 18 : 2 }}
+                              />
+                            </span>
+                            <span className="min-w-0">
+                              <span className={`block text-xs font-semibold ${tampil ? 'text-ink' : 'text-ink-3'}`}>
+                                {m.label}
+                              </span>
+                              <span className="block text-[11px] text-ink-2 leading-snug">{m.ket}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {activeTab === 'rag' && systemConfig && (() => {
+            const modeHttp = systemConfig.ragProvider === 'http';
+            const berubah = jejakCfg(systemConfig) !== cfgTersimpan;
+            const kunciKosong = modeHttp && !String(systemConfig.ragApiKey || '').trim();
+            return (
+              <div className={`space-y-4 ${berubah ? 'pb-24' : ''}`} data-testid="tab-rag">
+                {/* ---------- RINGKASAN: sedang pakai apa, sehat atau tidak ---------- */}
+                <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="space-y-2 min-w-0">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-chip ${
+                          modeHttp ? 'bg-pos/15 text-pos' : 'bg-warn/15 text-warn'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${modeHttp ? 'bg-pos' : 'bg-warn'}`} />
+                        {modeHttp ? 'MODE LAYANAN RAG' : 'MODE DEMO'}
+                      </span>
+                      <p className="text-sm font-bold text-ink break-all">
+                        {modeHttp
+                          ? systemConfig.ragApiUrl || 'Alamat layanan belum diisi'
+                          : 'Data contoh lokal, tanpa panggilan ke layanan luar'}
+                      </p>
+                      <p className="text-xs text-ink-2">
+                        KB default{' '}
+                        <span className="font-semibold text-ink">
+                          {systemConfig.ragKnowledgeBaseId || 'belum diset'}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleProbeRag}
+                        disabled={probeLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {probeLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                        {probeLoading ? 'Menguji…' : 'Uji koneksi'}
+                      </button>
+                    </div>
                   </div>
 
-                </div>
-
-                <div>
-                  <label className="block text-ink-2 font-semibold mb-1">
-                    Base URL RAG
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://rag-teman-anda.example.com/v1"
-                    value={systemConfig.ragApiUrl}
-                    onChange={(e) =>
-                      setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                  />
-                  <p className="text-[10px] text-ink-3 mt-1">
-                    Sertakan prefix API-nya, mis. <span className="font-mono">https://rag.aiones.app/api/v1</span>.
-                    Kalau hanya domain, aplikasi mencoba menambahkan <span className="font-mono">/api/v1</span> otomatis.
-                  </p>
-                </div>
-
-                {/* API Key + tombol uji. Tombolnya menyimpan konfigurasi dulu, baru
-                    mengecek key-nya ke layanan RAG — jadi yang diuji benar-benar key
-                    yang baru ditempel, bukan key lama yang masih tersimpan. */}
-                <div>
-                  <label className="block text-ink-2 font-semibold mb-1">
-                    API Key LLM / RAG
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="password"
-                        placeholder="tempel API key di sini"
-                        value={systemConfig.ragApiKey}
-                        onChange={(e) =>
-                          setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })
-                        }
-                        className="w-full px-3 py-2 pr-9 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                      />
-                      <Key className="w-4 h-4 text-ink-3 absolute right-3 top-2.5" />
+                  {saveSuccess && (
+                    <div className="p-3 bg-pos/15 border border-pos/30 rounded-card text-pos text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-pos shrink-0" />
+                      <span>Pengaturan tersimpan dan langsung dipakai.</span>
                     </div>
+                  )}
+
+                  {probeResult && (
+                    <div
+                      className={`p-4 rounded-card border text-xs space-y-2 ${
+                        probeResult.status === 'healthy'
+                          ? 'bg-pos/15 border-pos/30'
+                          : probeResult.status === 'degraded'
+                            ? 'bg-warn/15 border-warn/30'
+                            : 'bg-neg/15 border-neg/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold">
+                        {probeResult.status === 'healthy' ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-pos" />
+                            <span className="text-pos">RAG berjalan normal ({probeResult.latencyMs} ms)</span>
+                          </>
+                        ) : probeResult.status === 'degraded' ? (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-warn" />
+                            <span className="text-warn">RAG merespons, tetapi terbatas ({probeResult.latencyMs} ms)</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-neg" />
+                            <span className="text-neg">Koneksi RAG gagal</span>
+                          </>
+                        )}
+                      </div>
+                      {probeResult.peringatan && (
+                        <p className="text-warn font-semibold flex items-start gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>{probeResult.peringatan}</span>
+                        </p>
+                      )}
+                      {probeResult.modeDetected && (
+                        <p className="text-ink-2">
+                          Mode terdeteksi: <strong>{probeResult.modeDetected}</strong>
+                          {typeof probeResult.sampleChunksCount === 'number' && (
+                            <> · potongan dokumen terambil: <strong>{probeResult.sampleChunksCount}</strong></>
+                          )}
+                        </p>
+                      )}
+                      <ul className="list-disc list-inside text-ink-2 space-y-0.5">
+                        {(probeResult.details || []).map((d: string, i: number) => (
+                          <li key={i}>{d}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* ---------- LANGKAH 1 ---------- */}
+                <section className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
+                  <header className="flex items-start gap-2.5">
+                    <span className="inline-grid place-items-center w-6 h-6 rounded-full bg-brand text-on-brand text-[11px] font-black shrink-0 mt-0.5">1</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-ink">Pilih sumber data</h4>
+                      <p className="text-xs text-ink-2 mt-0.5">Menentukan dari mana angka dashboard diambil.</p>
+                    </div>
+                  </header>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSystemConfig({ ...systemConfig, ragProvider: 'mock' })}
+                      aria-pressed={!modeHttp}
+                      data-testid="mode-demo"
+                      className={`text-left p-4 rounded-control border transition-colors ${
+                        !modeHttp ? 'border-brand bg-brand-soft' : 'border-line hover:border-line-strong bg-surface'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-ink flex items-center gap-2">
+                          <Database className="w-4 h-4 text-brand-ink" /> Demo lokal
+                        </span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 shrink-0 ${
+                            !modeHttp ? 'border-brand bg-brand' : 'border-line-strong'
+                          }`}
+                        />
+                      </div>
+                      <p className="text-xs text-ink-2 mt-2 leading-relaxed">
+                        Data contoh bawaan. Cepat, tanpa internet, cocok untuk mencoba alur aplikasi.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSystemConfig({ ...systemConfig, ragProvider: 'http' })}
+                      aria-pressed={modeHttp}
+                      data-testid="mode-rag"
+                      className={`text-left p-4 rounded-control border transition-colors ${
+                        modeHttp ? 'border-brand bg-brand-soft' : 'border-line hover:border-line-strong bg-surface'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-ink flex items-center gap-2">
+                          <Server className="w-4 h-4 text-brand-ink" /> Layanan RAG
+                        </span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 shrink-0 ${
+                            modeHttp ? 'border-brand bg-brand' : 'border-line-strong'
+                          }`}
+                        />
+                      </div>
+                      <p className="text-xs text-ink-2 mt-2 leading-relaxed">
+                        Angka diambil dari dokumen instansi melalui API RAG, lengkap dengan halaman sumber.
+                      </p>
+                    </button>
+                  </div>
+                  {!modeHttp && (systemConfig.ragApiUrl || systemConfig.ragApiKey) && (
+                    <p className="text-xs text-warn flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>Alamat dan kunci sudah tersimpan, tetapi tidak dipakai selama mode demo aktif.</span>
+                    </p>
+                  )}
+                </section>
+
+                {/* ---------- LANGKAH 2 ---------- */}
+                <section
+                  className={`bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4 ${
+                    modeHttp ? '' : 'opacity-60'
+                  }`}
+                >
+                  <header className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-grid place-items-center w-6 h-6 rounded-full bg-brand text-on-brand text-[11px] font-black shrink-0 mt-0.5">2</span>
+                      <div>
+                        <h4 className="text-sm font-bold text-ink">Alamat &amp; kunci layanan</h4>
+                        <p className="text-xs text-ink-2 mt-0.5">Hanya dipakai pada mode layanan RAG.</p>
+                      </div>
+                    </div>
+                    {!modeHttp && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-chip bg-surface-2 text-ink-3 shrink-0">
+                        TIDAK AKTIF
+                      </span>
+                    )}
+                  </header>
+
+                  <div>
+                    <label className="label" htmlFor="ragUrl">Base URL layanan</label>
+                    <input
+                      id="ragUrl"
+                      type="text"
+                      disabled={!modeHttp}
+                      placeholder="https://rag.contoh.go.id/api/v1"
+                      value={systemConfig.ragApiUrl || ''}
+                      onChange={(e) => setSystemConfig({ ...systemConfig, ragApiUrl: e.target.value })}
+                      className="field-lg font-mono text-xs disabled:cursor-not-allowed"
+                      data-testid="input-rag-url"
+                    />
+                    <p className="text-xs text-ink-3 mt-1">
+                      Tulis lengkap sampai <span className="font-mono">/api/v1</span>. Kalau hanya domain,
+                      aplikasi menambahkan <span className="font-mono">/api/v1</span> sendiri.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label" htmlFor="ragKey">API key</label>
+                    <div className="relative">
+                      <input
+                        id="ragKey"
+                        type={tampilKunci ? 'text' : 'password'}
+                        disabled={!modeHttp}
+                        placeholder="tempel API key di sini"
+                        value={systemConfig.ragApiKey || ''}
+                        onChange={(e) => setSystemConfig({ ...systemConfig, ragApiKey: e.target.value })}
+                        className="field-lg font-mono text-xs pr-11 disabled:cursor-not-allowed"
+                        data-testid="input-rag-key"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setTampilKunci((v) => !v)}
+                        disabled={!modeHttp}
+                        aria-label={tampilKunci ? 'Sembunyikan kunci' : 'Tampilkan kunci'}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-ink-3 hover:bg-surface-2 disabled:opacity-40"
+                      >
+                        {tampilKunci ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-ink-3 mt-1">
+                      {String(systemConfig.ragApiKey || '')
+                        ? 'Nilai tersimpan tampil bertopeng. Ganti hanya kalau kuncinya memang berubah.'
+                        : 'Belum ada kunci tersimpan untuk layanan ini.'}
+                    </p>
+                    {kunciKosong && (
+                      <p className="text-[11px] font-semibold text-neg mt-1">
+                        Mode layanan RAG butuh API key. Isi dulu sebelum menyimpan.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={handleSimpanUjiKey}
-                      disabled={keyTestLoading || !String(systemConfig.ragApiKey || '').trim()}
-                      className="shrink-0 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      disabled={keyTestLoading || !modeHttp || kunciKosong}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {keyTestLoading ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menguji…
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="w-3.5 h-3.5" /> Simpan &amp; Uji API Key
-                        </>
-                      )}
+                      {keyTestLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                      {keyTestLoading ? 'Menguji…' : 'Uji kunci ini'}
                     </button>
+                    <span className="text-xs text-ink-3 max-w-sm">
+                      Menyimpan perubahan di halaman ini lebih dulu, lalu memanggil layanan untuk memastikan
+                      kuncinya benar-benar diterima.
+                    </span>
                   </div>
 
-                  {/* Hasil uji API Key — dibedakan jujur: valid / ditolak / tidak terhubung. */}
                   {keyTestHasil && (
                     <div
-                      className={`mt-2 p-3 rounded-card border text-[11px] flex items-start gap-2 ${
-                        keyTestHasil.ok
-                          ? 'bg-pos/15 border-pos/30 text-pos'
-                          : 'bg-neg/15 border-neg/30 text-neg'
+                      className={`p-3 rounded-card border text-[11px] flex items-start gap-2 ${
+                        keyTestHasil.ok ? 'bg-pos/15 border-pos/30 text-pos' : 'bg-neg/15 border-neg/30 text-neg'
                       }`}
                     >
                       {keyTestHasil.ok ? (
@@ -1446,109 +2006,229 @@ export const Admin: React.FC<AdminProps> = ({
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                       )}
                       <div className="space-y-0.5">
-                        <div className="font-semibold">
-                          {keyTestHasil.ok ? 'API Key Berjalan' : 'API Key Bermasalah'}
-                        </div>
+                        <div className="font-semibold">{keyTestHasil.ok ? 'Kunci diterima' : 'Kunci bermasalah'}</div>
                         <div className="text-ink-2">{keyTestHasil.pesan}</div>
                         {keyTestHasil.kodeGalat && (
                           <div className="text-ink-3 font-mono">Kode: {keyTestHasil.kodeGalat}</div>
                         )}
                         {keyTestHasil.baseDipakai && (
-                          <div className="text-ink-3 font-mono break-all">
-                            Diuji ke: {keyTestHasil.baseDipakai}
-                          </div>
+                          <div className="text-ink-3 font-mono break-all">Diuji ke: {keyTestHasil.baseDipakai}</div>
                         )}
                       </div>
                     </div>
                   )}
-                  <p className="text-[10px] text-ink-3 mt-1">
-                    Tombol ini menyimpan konfigurasi lalu benar-benar memanggil layanan RAG untuk
-                    memastikan key-nya diterima (bukan sekadar tersimpan).
+                </section>
+
+                {/* ---------- LANGKAH 3: KNOWLEDGE BASE ---------- */}
+                <section className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
+                  <header className="flex items-start gap-2.5">
+                    <span className="inline-grid place-items-center w-6 h-6 rounded-full bg-brand text-on-brand text-[11px] font-black shrink-0 mt-0.5">3</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-ink">Knowledge Base default</h4>
+                      <p className="text-xs text-ink-2 mt-0.5">
+                        KB yang dipakai instansi tanpa KB sendiri. Isinya bisa diperiksa dulu sebelum dipakai.
+                      </p>
+                    </div>
+                  </header>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <label className="label" htmlFor="kbDefault">Knowledge Base ID</label>
+                      <input
+                        id="kbDefault"
+                        type="text"
+                        placeholder="kb_pam_jaya"
+                        value={kbInput}
+                        onChange={(e) => setKbInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleCekKb();
+                          }
+                        }}
+                        className="field-lg font-mono text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleCekKb()}
+                      disabled={kbLoading || !kbInput.trim()}
+                      className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${kbLoading ? 'animate-spin' : ''}`} />
+                      {kbLoading ? 'Memeriksa…' : 'Periksa isi'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const kb = kbInput.trim();
+                        if (!kb || !systemConfig) return;
+                        const res = await fetch('/api/admin/config', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ ragKnowledgeBaseId: kb }),
+                        });
+                        if (res.ok) {
+                          const baru = { ...systemConfig, ragKnowledgeBaseId: kb };
+                          setSystemConfig(baru);
+                          setCfgTersimpan(jejakCfg(baru));
+                          setSaveSuccess(true);
+                          setTimeout(() => setSaveSuccess(false), 2500);
+                        }
+                      }}
+                      disabled={!kbInput.trim()}
+                      className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="Simpan KB ini sebagai Knowledge Base default aplikasi"
+                    >
+                      <Check className="w-4 h-4" />
+                      Jadikan default
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-ink-3">
+                    KB khusus satu instansi diatur di tab <strong>Instansi &amp; KB</strong>, bukan di sini.
                   </p>
-                </div>
 
-
-                <div className="flex items-start gap-2 p-3 bg-surface-2 border border-line rounded-card">
-                  <input
-                    id="ragUseExtract"
-                    type="checkbox"
-                    checked={systemConfig.ragUseExtract !== false}
-                    onChange={(e) =>
-                      setSystemConfig({ ...systemConfig, ragUseExtract: e.target.checked })
-                    }
-                    className="mt-0.5 w-4 h-4 accent-brand"
-                  />
-                  <label htmlFor="ragUseExtract" className="text-[11px] text-ink-2 leading-relaxed">
-                    <span className="font-semibold text-ink">
-                      Jalur A: pakai endpoint /extract
-                    </span>{' '}
-                    (disarankan). Angka dashboard diambil langsung dari dokumen beserta halaman
-                    sumbernya, jadi tidak lagi mengandalkan deret contoh. Kalau layanan RAG tidak
-                    punya /extract, aplikasi otomatis memakai jalur retrieval biasa.
-                  </label>
-                </div>
-
-                {/* ===== KMS: repositori berkas (menu Manajemen Berkas) ===== */}
-                <div className="pt-4 border-t border-line space-y-3" data-testid="konfigurasi-kms">
-                  <div>
-                    <h4 className="font-bold text-ink flex items-center gap-1.5">
-                      <FolderOpen className="w-4 h-4 text-brand" />
-                      <span>KMS — Repositori Berkas</span>
-                    </h4>
-                    <p className="text-[11px] text-ink-2 mt-0.5">
-                      Layanan penyimpanan berkas instansi (menu <strong>Manajemen Berkas</strong>). Satu API
-                      key KMS dapat mengakses <strong>banyak</strong> project, jadi tiap instansi dipetakan ke
-                      satu project di tab <strong>Instansi &amp; KB</strong>.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">Base URL KMS</label>
-                    <input
-                      type="text"
-                      placeholder="https://ragkms.aiones.app"
-                      value={systemConfig.kmsApiUrl || ''}
-                      onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiUrl: e.target.value })}
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                      data-testid="input-kms-url"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-ink-2 font-semibold mb-1">API Key KMS</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="password"
-                          placeholder="tempel API key KMS di sini"
-                          value={systemConfig.kmsApiKey || ''}
-                          onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiKey: e.target.value })}
-                          className="w-full px-3 py-2 pr-9 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono"
-                          data-testid="input-kms-key"
-                        />
-                        <Key className="w-4 h-4 text-ink-3 absolute right-3 top-2.5" />
+                  {kbHasil && (
+                    <div className="space-y-3">
+                      <div
+                        className={`p-3 rounded-card border text-xs ${
+                          kbHasil.jumlah > 0 ? 'bg-pos/15 border-pos/30' : 'bg-warn/15 border-warn/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 font-bold">
+                          {kbHasil.jumlah > 0 ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-pos" />
+                              <span className="text-pos">
+                                KB <span className="font-mono">{kbHasil.kbId}</span> memuat {kbHasil.jumlah} dokumen
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="w-4 h-4 text-warn" />
+                              <span className="text-warn">
+                                KB <span className="font-mono">{kbHasil.kbId || '(kosong)'}</span> tidak memuat dokumen
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {kbHasil.catatan && <p className="text-ink-2 mt-1.5">{kbHasil.catatan}</p>}
+                        {kbHasil.provider && (
+                          <p className="text-ink-3 mt-1">
+                            Provider RAG aktif: <span className="font-mono">{kbHasil.provider}</span>
+                          </p>
+                        )}
                       </div>
+
+                      {kbHasil.jumlah > 0 && (
+                        <div className="overflow-x-auto border border-line rounded-card">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
+                              <tr>
+                                <th className="p-3 w-8">#</th>
+                                <th className="p-3">Nama Dokumen</th>
+                                <th className="p-3">Status</th>
+                                <th className="p-3 text-right">Halaman</th>
+                                <th className="p-3 text-right">Potongan</th>
+                                <th className="p-3 text-right">Token</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-line text-ink-2">
+                              {kbHasil.dokumen.map((d: any, i: number) => (
+                                <tr key={d.id || i} className="hover:bg-surface-2/60 transition-colors align-top">
+                                  <td className="p-3 font-mono text-ink-3">{i + 1}</td>
+                                  <td className="p-3">
+                                    <span className="text-ink font-medium break-all">{d.nama}</span>
+                                    {d.id && <span className="block text-[10px] text-ink-3 font-mono mt-0.5">{d.id}</span>}
+                                  </td>
+                                  <td className="p-3">
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        !d.status || /complete|done|ready|selesai/i.test(d.status)
+                                          ? 'bg-pos/15 text-pos'
+                                          : 'bg-warn/15 text-warn'
+                                      }`}
+                                    >
+                                      {d.status || 'siap'}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-right font-mono">{d.halaman ?? '—'}</td>
+                                  <td className="p-3 text-right font-mono">{d.potongan ?? '—'}</td>
+                                  <td className="p-3 text-right font-mono">{d.token ?? '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                {/* ---------- KMS (terpisah, dilipat) ---------- */}
+                <details
+                  className="bg-surface rounded-card border border-line shadow-2xs overflow-hidden"
+                  open={Boolean(systemConfig.kmsApiUrl)}
+                  data-testid="konfigurasi-kms"
+                >
+                  <summary className="px-5 py-4 cursor-pointer flex items-center justify-between gap-3 select-none">
+                    <span className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-brand" />
+                      <span className="text-sm font-bold text-ink">Opsional · KMS repositori berkas</span>
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-chip bg-surface-2 text-ink-3">
+                      {systemConfig.kmsApiUrl ? 'TERISI' : 'BELUM DIISI'}
+                    </span>
+                  </summary>
+                  <div className="px-5 pb-5 space-y-3 border-t border-line pt-4">
+                    <p className="text-xs text-ink-2">
+                      Penyimpanan berkas untuk menu <strong>Manajemen Berkas</strong>. Satu API key KMS bisa
+                      mengakses banyak project, jadi tiap instansi dipetakan ke satu project di tab{' '}
+                      <strong>Instansi &amp; KB</strong>.
+                    </p>
+                    <div>
+                      <label className="label" htmlFor="kmsUrl">Base URL KMS</label>
+                      <input
+                        id="kmsUrl"
+                        type="text"
+                        placeholder="https://ragkms.aiones.app"
+                        value={systemConfig.kmsApiUrl || ''}
+                        onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiUrl: e.target.value })}
+                        className="field-lg font-mono text-xs"
+                        data-testid="input-kms-url"
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="kmsKey">API key KMS</label>
+                      <input
+                        id="kmsKey"
+                        type="password"
+                        placeholder="tempel API key KMS di sini"
+                        value={systemConfig.kmsApiKey || ''}
+                        onChange={(e) => setSystemConfig({ ...systemConfig, kmsApiKey: e.target.value })}
+                        className="field-lg font-mono text-xs"
+                        data-testid="input-kms-key"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
                         onClick={handleSimpanUjiKms}
                         disabled={kmsLoading}
-                        className="shrink-0 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="uji-kms"
                       >
-                        {kmsLoading ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menguji…
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-3.5 h-3.5" /> Simpan &amp; Uji KMS
-                          </>
-                        )}
+                        {kmsLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                        {kmsLoading ? 'Menguji…' : 'Simpan & uji KMS'}
                       </button>
+                      <span className="text-xs text-ink-3">
+                        Menyimpan lalu membaca daftar project dari KMS, bukan sekadar menyimpan.
+                      </span>
                     </div>
                     {kmsHasil && (
                       <div
-                        className={`mt-2 p-3 rounded-card border text-[11px] flex items-start gap-2 ${
+                        className={`p-3 rounded-card border text-[11px] flex items-start gap-2 ${
                           kmsHasil.ok ? 'bg-pos/15 border-pos/30 text-pos' : 'bg-neg/15 border-neg/30 text-neg'
                         }`}
                         data-testid="hasil-uji-kms"
@@ -1561,243 +2241,38 @@ export const Admin: React.FC<AdminProps> = ({
                         <span>{kmsHasil.pesan}</span>
                       </div>
                     )}
-                    <p className="text-[10px] text-ink-3 mt-1">
-                      Tombol ini menyimpan konfigurasi lalu benar-benar membaca daftar project dari KMS —
-                      bukan sekadar menyimpan.
-                    </p>
                   </div>
-                </div>
-              </form>
+                </details>
 
-              {/* ===== UJI KONEKSI RAG ===== */}
-              <div className="pt-4 border-t border-line space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h4 className="font-bold text-ink flex items-center gap-1.5">
-                      <Radio className="w-4 h-4 text-brand" />
-                      <span>Uji Koneksi RAG</span>
-                    </h4>
-                    <p className="text-[11px] text-ink-2 mt-0.5">
-                      Kirim sampel query ke layanan RAG aktif untuk memastikan koneksi, metadata,
-                      dan keluaran JSON terstruktur berjalan dengan baik.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleProbeRag}
-                    disabled={probeLoading}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${probeLoading ? 'animate-spin' : ''}`} />
-                    {probeLoading ? 'Menguji...' : 'Uji Koneksi Sekarang'}
-                  </button>
-                </div>
-
-                {probeResult && (
-                  <div
-                    className={`p-4 rounded-card border text-xs space-y-2 ${
-                      probeResult.status === 'healthy'
-                        ? 'bg-pos/15 border-pos/30'
-                        : probeResult.status === 'degraded'
-                          ? 'bg-warn/15 border-warn/30'
-                          : 'bg-neg/15 border-neg/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 font-bold">
-                      {probeResult.status === 'healthy' ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-pos" />
-                          <span className="text-pos">
-                            RAG Berjalan Normal ({probeResult.latencyMs} ms)
-                          </span>
-                        </>
-                      ) : probeResult.status === 'degraded' ? (
-                        <>
-                          <AlertTriangle className="w-4 h-4 text-warn" />
-                          <span className="text-warn">
-                            RAG Merespons, Tapi Terbatas ({probeResult.latencyMs} ms)
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="w-4 h-4 text-neg" />
-                          <span className="text-neg">Koneksi RAG Gagal</span>
-                        </>
-                      )}
+                {/* ---------- BILAH SIMPAN: hanya muncul kalau memang ada perubahan ---------- */}
+                {berubah && (
+                  <div className="sticky bottom-3 z-10">
+                    <div className="bg-surface px-4 py-3 rounded-card border border-line-strong flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-pop">
+                      <p className="text-xs text-warn font-semibold">Ada perubahan yang belum disimpan.</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void loadData()}
+                          className="px-4 py-2 btn-ghost text-xs font-semibold"
+                        >
+                          Muat ulang
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveConfig()}
+                          disabled={kunciKosong}
+                          className="px-4 py-2 btn-primary text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                          data-testid="simpan-rag"
+                        >
+                          Simpan pengaturan
+                        </button>
+                      </div>
                     </div>
-                    {probeResult.peringatan && (
-                      <p className="text-warn font-semibold flex items-start gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        <span>{probeResult.peringatan}</span>
-                      </p>
-                    )}
-                    {(probeResult.details || []).map((d: string, i: number) =>
-                      /^PERINGATAN/i.test(d) ? (
-                        <p key={i} className="text-warn font-semibold">{d}</p>
-                      ) : null
-                    )}
-                    {probeResult.modeDetected && (
-                      <p className="text-ink-2">
-                        Mode terdeteksi: <strong>{probeResult.modeDetected}</strong>
-                        {typeof probeResult.sampleChunksCount === 'number' && (
-                          <> • Potongan dokumen terambil: <strong>{probeResult.sampleChunksCount}</strong></>
-                        )}
-                      </p>
-                    )}
-                    <ul className="list-disc list-inside text-ink-2 space-y-0.5">
-                      {(probeResult.details || []).map((d: string, i: number) => (
-                        <li key={i}>{d}</li>
-                      ))}
-                    </ul>
                   </div>
                 )}
               </div>
-
-              {/* ===== KNOWLEDGE BASE (DIPISAH DARI FORM UMUM) ===== */}
-              <div className="pt-4 border-t border-line space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h4 className="font-bold text-ink flex items-center gap-1.5">
-                      <Database className="w-4 h-4 text-brand" />
-                      <span>Knowledge Base</span>
-                    </h4>
-                    <p className="text-[11px] text-ink-2 mt-0.5">
-                      Tempel Knowledge Base ID lalu periksa isinya: aplikasi akan menampilkan{' '}
-                      <strong>ada berapa dokumen</strong> dan <strong>dokumen apa saja</strong> di KB itu.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-end gap-2 flex-wrap">
-                  <div className="flex-1 min-w-[240px]">
-                    <label className="block text-ink-2 font-semibold mb-1 text-xs">Knowledge Base ID</label>
-                    <input
-                      type="text"
-                      placeholder="kb_pam_jaya"
-                      value={kbInput}
-                      onChange={(e) => setKbInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          void handleCekKb();
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand font-mono text-xs"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleCekKb()}
-                    disabled={kbLoading || !kbInput.trim()}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line-strong hover:bg-surface-2 text-brand-ink rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${kbLoading ? 'animate-spin' : ''}`} />
-                    {kbLoading ? 'Memeriksa...' : 'Periksa Dokumen'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const kb = kbInput.trim();
-                      if (!kb || !systemConfig) return;
-                      const res = await fetch('/api/admin/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ragKnowledgeBaseId: kb }),
-                      });
-                      if (res.ok) {
-                        setSystemConfig({ ...systemConfig, ragKnowledgeBaseId: kb });
-                        setSaveSuccess(true);
-                        setTimeout(() => setSaveSuccess(false), 2500);
-                      }
-                    }}
-                    disabled={!kbInput.trim()}
-                    className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control font-semibold text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    title="Simpan KB ini sebagai Knowledge Base default aplikasi"
-                  >
-                    <Check className="w-4 h-4" />
-                    Jadikan KB Default
-                  </button>
-                </div>
-
-                {kbHasil && (
-                  <div className="space-y-3">
-                    <div
-                      className={`p-3 rounded-card border text-xs ${
-                        kbHasil.jumlah > 0 ? 'bg-pos/15 border-pos/30' : 'bg-warn/15 border-warn/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 font-bold">
-                        {kbHasil.jumlah > 0 ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-pos" />
-                            <span className="text-pos">
-                              KB <span className="font-mono">{kbHasil.kbId}</span> memuat{' '}
-                              {kbHasil.jumlah} dokumen
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertTriangle className="w-4 h-4 text-warn" />
-                            <span className="text-warn">
-                              KB <span className="font-mono">{kbHasil.kbId || '(kosong)'}</span> tidak memuat dokumen
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {kbHasil.catatan && <p className="text-ink-2 mt-1.5">{kbHasil.catatan}</p>}
-                      {kbHasil.provider && (
-                        <p className="text-ink-3 mt-1">
-                          Provider RAG aktif: <span className="font-mono">{kbHasil.provider}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {kbHasil.jumlah > 0 && (
-                      <div className="overflow-x-auto border border-line rounded-card">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
-                            <tr>
-                              <th className="p-3 w-8">#</th>
-                              <th className="p-3">Nama Dokumen</th>
-                              <th className="p-3">Status</th>
-                              <th className="p-3 text-right">Halaman</th>
-                              <th className="p-3 text-right">Potongan</th>
-                              <th className="p-3 text-right">Token</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-line text-ink-2">
-                            {kbHasil.dokumen.map((d, i) => (
-                              <tr key={d.id || i} className="hover:bg-surface-2/60 transition-colors align-top">
-                                <td className="p-3 font-mono text-ink-3">{i + 1}</td>
-                                <td className="p-3">
-                                  <span className="text-ink font-medium break-all">{d.nama}</span>
-                                  {d.id && <span className="block text-[10px] text-ink-3 font-mono mt-0.5">{d.id}</span>}
-                                </td>
-                                <td className="p-3">
-                                  <span
-                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                      !d.status || /complete|done|ready|selesai/i.test(d.status)
-                                        ? 'bg-pos/15 text-pos'
-                                        : 'bg-warn/15 text-warn'
-                                    }`}
-                                  >
-                                    {d.status || 'siap'}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right font-mono">{d.halaman ?? '—'}</td>
-                                <td className="p-3 text-right font-mono">{d.potongan ?? '—'}</td>
-                                <td className="p-3 text-right font-mono">{d.token ?? '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ================= TAB 5: ALERTS ================= */}
           {activeTab === 'alerts' && (
@@ -1839,10 +2314,52 @@ export const Admin: React.FC<AdminProps> = ({
                         </p>
                       </div>
 
-                      <div className="shrink-0 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-pos font-medium bg-pos/15 px-2 py-1 rounded-chip border border-pos/30">
-                          <Check className="w-3 h-3" /> Aktif
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-chip border ${
+                            rule.isActive
+                              ? 'text-pos bg-pos/15 border-pos/30'
+                              : 'text-ink-3 bg-surface border-line'
+                          }`}
+                        >
+                          <Check className="w-3 h-3" /> {rule.isActive ? 'Aktif' : 'Nonaktif'}
                         </span>
+                        <button
+                          type="button"
+                          title={rule.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                          onClick={() => void ubahAturanAlert(rule, { isActive: !rule.isActive })}
+                          className="p-1.5 rounded-chip text-ink-3 hover:text-ink hover:bg-line/60 transition-colors"
+                        >
+                          <Radio className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Ubah ambang batas"
+                          onClick={() => {
+                            const nilai = window.prompt(
+                              `Ambang batas baru untuk "${rule.metricName}" (saat ini ${rule.operator} ${rule.threshold} ${rule.unit}):`,
+                              String(rule.threshold)
+                            );
+                            if (nilai === null) return;
+                            const angka = Number(nilai.replace(',', '.'));
+                            if (!Number.isFinite(angka)) {
+                              alert('Ambang batas harus berupa angka.');
+                              return;
+                            }
+                            void ubahAturanAlert(rule, { threshold: angka });
+                          }}
+                          className="p-1.5 rounded-chip text-brand hover:bg-brand/10 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Hapus aturan"
+                          onClick={() => void hapusAturanAlert(rule)}
+                          className="p-1.5 rounded-chip text-neg hover:bg-neg/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -1904,8 +2421,8 @@ export const Admin: React.FC<AdminProps> = ({
 
         {/* ================= MODAL TAMBAH PENGGUNA ================= */}
         {isAddUserOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAddUserOpen(false)} />
+          <div className="modal-layer">
+            <div className="scrim" onClick={() => setIsAddUserOpen(false)} />
             <div role="dialog" aria-modal="true" aria-labelledby="add-user-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 id="add-user-title" className="font-bold text-sm text-ink">Tambah Pengguna BUMD Baru</h3>
@@ -1916,7 +2433,7 @@ export const Admin: React.FC<AdminProps> = ({
 
               <form onSubmit={handleCreateUser} className="space-y-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Nama Lengkap</label>
+                  <label className="label">Nama Lengkap</label>
                   <input
                     type="text"
                     placeholder="Contoh: Ahmad Fauzi, S.E."
@@ -1928,7 +2445,7 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Email Resmi</label>
+                  <label className="label">Email Resmi</label>
                   <input
                     type="email"
                     placeholder="ahmad@pdam-tirta.id"
@@ -1940,11 +2457,11 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Peran Hak Akses (Role)</label>
+                  <label className="label">Peran Hak Akses (Role)</label>
                   <select
                     value={userRole}
                     onChange={(e) => setUserRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value="analis">Analis Kinerja (Dapat membuat & mengedit dashboard)</option>
                     <option value="direksi">Direksi / Pengawas (Hak akses lihat & terima laporan)</option>
@@ -1953,11 +2470,11 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Penugasan Instansi BUMD</label>
+                  <label className="label">Penugasan Instansi BUMD</label>
                   <select
                     value={userTenantId}
                     onChange={(e) => setUserTenantId(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     {tenants.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1989,8 +2506,8 @@ export const Admin: React.FC<AdminProps> = ({
 
         {/* ================= MODAL TAMBAH/UBAH INSTANSI ================= */}
         {isAddTenantOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={tutupModalTenant} />
+          <div className="modal-layer">
+            <div className="scrim" onClick={tutupModalTenant} />
             <div role="dialog" aria-modal="true" aria-labelledby="add-tenant-title" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h3 id="add-tenant-title" className="font-bold text-sm text-ink">
@@ -2204,9 +2721,9 @@ export const Admin: React.FC<AdminProps> = ({
 
         {/* ================= PANEL KATALOG KB (PERBARUI RAG) ================= */}
         {katalogTerbuka && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="modal-layer">
             <div
-              className="fixed inset-0 bg-scrim/50 backdrop-blur-xs"
+              className="scrim"
               onClick={() => setKatalogTerbuka(false)}
             />
             <div

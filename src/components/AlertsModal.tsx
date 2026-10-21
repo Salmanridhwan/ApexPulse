@@ -68,8 +68,8 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
+    <div className="modal-layer">
+      <div className="scrim" onClick={onClose} />
 
       <div role="dialog" aria-modal="true" aria-labelledby="alerts-modal-title" className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[85vh]">
         {/* Header */}
@@ -215,7 +215,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
           ) : (
             <form onSubmit={handleCreateRule} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Judul Peringatan
                 </label>
                 <input
@@ -229,7 +229,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Nama Indikator / Metrik
                 </label>
                 <input
@@ -244,11 +244,11 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Operator</label>
+                  <label className="label">Operator</label>
                   <select
                     value={operator}
                     onChange={(e) => setOperator(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value=">=">&gt;= (Lebih atau sama)</option>
                     <option value="<=">&lt;= (Kurang atau sama)</option>
@@ -257,7 +257,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Nilai Batas</label>
+                  <label className="label">Nilai Batas</label>
                   <input
                     type="number"
                     step="any"
@@ -268,7 +268,7 @@ export const AlertsModal: React.FC<AlertsModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Satuan</label>
+                  <label className="label">Satuan</label>
                   <input
                     type="text"
                     value={unit}

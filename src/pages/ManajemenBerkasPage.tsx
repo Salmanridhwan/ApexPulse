@@ -405,7 +405,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Judul *</span>
+                    <span className="label-strong">Judul *</span>
                     <input
                       value={fJudul}
                       onChange={(e) => setFJudul(e.target.value)}
@@ -415,7 +415,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     />
                   </label>
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Kategori *</span>
+                    <span className="label-strong">Kategori *</span>
                     <input
                       value={fKategori}
                       onChange={(e) => setFKategori(e.target.value)}
@@ -434,7 +434,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     </datalist>
                   </label>
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Unit / Departemen</span>
+                    <span className="label-strong">Unit / Departemen</span>
                     <input
                       value={fDepartemen}
                       onChange={(e) => setFDepartemen(e.target.value)}
@@ -443,7 +443,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     />
                   </label>
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Tahun</span>
+                    <span className="label-strong">Tahun</span>
                     <input
                       type="number"
                       value={fTahun}
@@ -452,7 +452,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     />
                   </label>
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Jenis</span>
+                    <span className="label-strong">Jenis</span>
                     <select
                       value={fTipe}
                       onChange={(e) => setFTipe(e.target.value as 'document' | 'photo')}
@@ -463,7 +463,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     </select>
                   </label>
                   <label className="text-xs">
-                    <span className="block font-semibold text-ink-2 mb-1">Catatan</span>
+                    <span className="label-strong">Catatan</span>
                     <input
                       value={fCatatan}
                       onChange={(e) => setFCatatan(e.target.value)}

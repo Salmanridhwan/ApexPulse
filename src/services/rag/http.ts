@@ -47,11 +47,6 @@ export type RagConfigFetcher = () => {
   timeoutMs: number;
   /** Knowledge base id layanan RAG (mis. kontrak ragjev: retrieval selalu scoped KB). */
   kbId?: string;
-  /**
-   * Pakai endpoint /extract untuk Jalur A (JSON terstruktur berisi angka nyata
-   * dari dokumen). Default aktif.
-   */
-  useExtract?: boolean;
 };
 
 /** Skema ringkas yang diminta ke endpoint /extract untuk menyusun widget. */
@@ -589,9 +584,55 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
     });
   }
 
-  return widgets;
+  // Grafik yang angkanya tidak mungkin berasal dari dokumen TIDAK dirender.
+  // Dua penanda yang terbukti muncul di uji nyata:
+  //  (a) semua kategori bernilai sama persis (3,3,3,3,3) — dokumen naratif hanya
+  //      menyebut daftar butir, lalu model mengisi angkanya sendiri;
+  //  (b) tidak satu pun angka grafik muncul di potongan dokumen sumbernya.
+  // Lebih baik dashboard kehilangan satu grafik daripada menampilkan angka karangan.
+  const bersih = widgets.filter((w: any) => alasanGrafikKarangan(w) === null);
+  if (bersih.length !== widgets.length) {
+    console.warn(`[rag] ${widgets.length - bersih.length} grafik tidak dirender: angkanya tidak terlacak dokumen.`);
+  }
+  return bersih;
 }
 
+/** Angka dari potongan dokumen: "17.943", "99.7%", "1.164" → [17943, 99.7, 1164]. */
+function angkaPotongan(teks: string): number[] {
+  const hasil: number[] = [];
+  for (const m of String(teks || '').matchAll(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?/g)) {
+    let s = m[0];
+    if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(?:\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    else s = s.replace(',', '.');
+    const n = parseFloat(s);
+    if (Number.isFinite(n)) hasil.push(n);
+  }
+  return hasil;
+}
+
+/**
+ * Alasan sebuah grafik tidak boleh dirender, atau null kalau lolos.
+ * MURNI (tanpa I/O) supaya bisa diuji.
+ */
+export function alasanGrafikKarangan(w: any): string | null {
+  const series = w?.chart?.series;
+  if (!Array.isArray(series) || series.length === 0) return null;
+  const nilai = series
+    .flatMap((s: any) => (Array.isArray(s?.data) ? s.data : []))
+    .filter((v: any) => typeof v === 'number' && Number.isFinite(v));
+  if (nilai.length < 3) return null;
+  if (nilai.every((v: number) => Math.abs(v - nilai[0]) < 1e-9)) {
+    return 'semua kategori bernilai sama';
+  }
+  const potongan = (w?.citations || []).map((c: any) => c?.chunkSnippet || '').join(' ');
+  const angkaDok = angkaPotongan(potongan);
+  if (angkaDok.length === 0) return null; // dokumen tanpa angka: bukan bukti karangan
+  const unik = [...new Set(nilai)];
+  const ada = unik.filter((v) => angkaDok.some((d) => Math.abs(d - v) < 0.05));
+  if (ada.length === 0) return 'tidak ada angka yang cocok dengan potongan dokumen';
+  return null;
+}
 
 const MASK = '*********';
 
@@ -669,10 +710,14 @@ export class ConfigurableRagClient implements RagClient {
     instruksi: string,
     skema: any = SKEMA_EKSTRAKSI,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; timeoutMs?: number }
   ): Promise<any | null> {
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), Math.max(5, cfg.timeoutMs || 60) * 1000);
+    // Batas waktu bisa dipersempit per panggilan: saat generasi dashboard, beberapa
+    // ekstraksi berjalan paralel dan satu panggilan yang lambat tidak boleh menahan
+    // seluruh permintaan sampai batas global.
+    const batasDetik = Math.max(5, opsi?.timeoutMs ?? cfg.timeoutMs ?? 60);
+    const timer = setTimeout(() => ac.abort(), batasDetik * 1000);
     // KB per-instansi (kalau ada) menimpa KB global. KB campur dilewati supaya
     // tidak pernah jadi sumber (lihat kbAman).
     const kbEfektif = kbAman(kbId, cfg.kbId);
@@ -781,20 +826,56 @@ export class ConfigurableRagClient implements RagClient {
     cfg: { apiKey: string; kbId?: string; timeoutMs: number },
     options: RagQueryOptions
   ): Promise<{ structuredJson: any; citations: Citation[]; chunks: SectorDocumentChunk[] } | null> {
-    const item = await this.ambilPayloadExtract(
-      base,
-      cfg,
-      this.instruksiDashboard(options),
-      SKEMA_EKSTRAKSI,
-      options.kbId
-    );
-    if (!item) return null;
+    // Skema UTUH (satu dashboard) dan 4 ekstraksi FOKUS berjalan BERBARENGAN.
+    //
+    // Uji E2E 2026-10-20: untuk skema besar, layanan RAG sering membalas 200 dengan
+    // `kpi`/`grafik` kosong, atau lebih lambat dari batas waktu (35-183 detik, kadang
+    // dipotong gerbang 502/524). Akibatnya dashboard gagal dibuat padahal dokumen
+    // memuat angka. Hasil fokus (skema kecil, yang terbukti terisi) dipakai sebagai
+    // jaring: skema utuh tetap diutamakan bila menghasilkan dashboard yang layak.
+    const batasUtama = Math.min(Math.max(30, cfg.timeoutMs || 60), 60);
+    const [itemUtama, fokus] = await Promise.all([
+      this.ambilPayloadExtract(
+        base,
+        cfg,
+        this.instruksiDashboard(options),
+        SKEMA_EKSTRAKSI,
+        options.kbId,
+        { timeoutMs: batasUtama }
+      ),
+      this.ekstrakFokusParalel(base, cfg, options),
+    ]);
 
-    const widgets = payloadKeWidgetSpec(item, options.sector);
+    const widgetsUtama = itemUtama ? payloadKeWidgetSpec(itemUtama, options.sector) : [];
+    // Tipe yang benar-benar digambar sebagai grafik (bukan kartu angka/tabel).
+    const TIPE_GRAFIK = new Set(['line', 'area', 'bar', 'hbar', 'donut', 'pie', 'radar', 'scatter', 'bubble', 'heatmap', 'waterfall', 'funnel', 'combo', 'gauge']);
+    const tipeGrafik = (ws: any[]) => new Set(ws.filter((w) => TIPE_GRAFIK.has(w.type)).map((w) => w.type));
+    // Skema utuh kadang hanya menghasilkan SATU jenis grafik walau instruksi sudah
+    // meminta beragam — dashboard jadi monoton. Hasil ekstraksi fokus (berjalan
+    // paralel, jadi tanpa tambahan waktu tunggu) dipakai untuk melengkapi variasi,
+    // bukan hanya saat jumlah widget kurang.
+    const kurangJenisGrafik = tipeGrafik(widgetsUtama).size < 2;
+    const gabung: any[] = [...widgetsUtama];
+    if (widgetsUtama.length < 3 || kurangJenisGrafik) {
+      for (const w of fokus.widgets) {
+        const tipeSudahAda = gabung.some((x: any) => x.type === w.type);
+        // Grafik: boleh menambah walau tipenya sudah ada selama jenis grafik
+        // masih kurang dari dua (mis. dua batang tetap lebih informatif daripada
+        // satu), selain itu hanya tipe yang belum ada.
+        if (!tipeSudahAda || (TIPE_GRAFIK.has(w.type) && tipeGrafik(gabung).size < 2)) gabung.push(w);
+      }
+    }
+    const widgets = widgetsUtama.length >= 3 && !kurangJenisGrafik ? widgetsUtama : gabung;
     if (widgets.length === 0) {
-      console.warn('[rag] /extract mengembalikan data, tetapi tidak ada widget yang lolos — lanjut ke Jalur B');
+      console.warn('[rag] /extract tidak menghasilkan widget (skema utuh & fokus sama-sama kosong)');
       return null;
     }
+    if ((widgetsUtama.length < 3 || kurangJenisGrafik) && fokus.widgets.length > 0) {
+      console.log(
+        `[rag] Jalur A dilengkapi ekstraksi fokus (${fokus.widgets.length} widget): skema utuh ${widgetsUtama.length} widget, ${tipeGrafik(widgetsUtama).size} jenis grafik.`
+      );
+    }
+    const item: any = itemUtama || { dashboardTitle: fokus.judul, description: fokus.deskripsi };
     const structuredJson = {
       dashboardTitle: potong(item.dashboardTitle, BATAS_TEKS.judulDash) || `Dashboard ${options.sector.toUpperCase()}`,
       description:
@@ -823,6 +904,115 @@ export class ConfigurableRagClient implements RagClient {
   }
 
   /**
+   * Instruksi ekstraksi untuk SATU fokus (kpi/grafik/tabel/narasi).
+   *
+   * Dipakai bersama oleh katalog (`ambilDataWidget`) dan fallback generasi dashboard
+   * supaya aturan "angka wajib dari dokumen + wajib sitasi" tidak berbeda antar jalur.
+   */
+  private instruksiFokus(
+    fokus: 'kpi' | 'grafik' | 'tabel' | 'narasi',
+    query: string,
+    sector: BumdSector,
+    instansi?: string,
+    kbId?: string,
+    /** 'umum' = pertanyaan sudah dibersihkan dari jargon internal (percobaan kedua katalog). */
+    gaya: 'normal' | 'umum' = 'normal'
+  ): string {
+    const aturanFokus =
+      fokus === 'kpi'
+        ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". ' +
+          'Kalau dokumen juga memuat angka PERIODE SEBELUMNYA untuk indikator ini (tahun lalu/triwulan lalu), isi "nilaiLalu" dengan angka itu; kalau tidak ada, kosongkan. '
+        : fokus === 'grafik'
+          ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. '
+          : fokus === 'tabel'
+            ? 'Isi maksimal 4 kolom dan 5 baris dengan angka nyata dari dokumen. '
+            : 'Isi maksimal 45 kata ringkasan dari dokumen, bukan visi misi atau kebijakan internal. ';
+    const sebutanInstansi = kbId?.trim()
+      ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
+      : instansi?.trim()
+        ? `Instansi yang diminta: "${instansi.trim()}" (sektor ${sector.toUpperCase()}). Ambil angka HANYA dari dokumen instansi ini; abaikan dokumen instansi lain. `
+        : `Konteks instansi: ${sector.toUpperCase()}. `;
+    if (gaya === 'umum') {
+      return (
+        `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
+        sebutanInstansi +
+        `Pertanyaan: "${query}". ` +
+        `Pakai angka TERDEKAT yang benar-benar ada di dokumen (misalnya pendapatan, aset, laba, jumlah pelanggan, ` +
+        `atau rasio yang tersedia) dan sebutkan dasar angkanya secara singkat pada label atau judul (maksimal 8 kata). ` +
+        aturanFokus +
+        `Semua angka wajib dari dokumen, tidak boleh dikarang. Wajib mengisi docName, page, dan chunkSnippet asli.`
+      );
+    }
+    return (
+      `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
+      sebutanInstansi +
+      `Indikator yang diminta: "${query}". ` +
+      `Kalau dokumen tidak memuat istilah persisnya (misalnya target atau pagu RKAP, laporan bulanan, ` +
+      `atau istilah internal yang tidak ada), pakai angka terdekat yang BENAR-BENAR ADA di dokumen dan ` +
+      `sebutkan dasar angkanya secara singkat (maksimal 8 kata). Semua angka wajib dari dokumen. ` +
+      aturanFokus +
+      `Wajib mengisi docName, page, dan chunkSnippet dengan isi dokumen aslinya.`
+    );
+  }
+
+  /** Bungkus satu item hasil fokus ke bentuk payload dashboard (kpi[]/grafik/tabel/narasi). */
+  private bungkusFokus(fokus: 'kpi' | 'grafik' | 'tabel' | 'narasi', hasil: any) {
+    return fokus === 'kpi'
+      ? { dashboardTitle: hasil?.label, kpi: [hasil] }
+      : fokus === 'grafik'
+        ? { dashboardTitle: hasil?.judul, grafik: hasil }
+        : fokus === 'tabel'
+          ? { dashboardTitle: hasil?.judul, tabel: hasil }
+          : { dashboardTitle: hasil?.judul, narasi: hasil };
+  }
+
+  /**
+   * Ekstraksi PARALEL per fokus (kpi, grafik, tabel, narasi) dengan skema kecil.
+   *
+   * Skema kecil terbukti lebih sering terisi dibanding satu skema besar, dan berjalan
+   * bersamaan sehingga total waktunya mendekati satu panggilan saja. Hanya widget yang
+   * benar-benar lolos pemetaan yang dikembalikan; tidak ada angka contoh.
+   */
+  private async ekstrakFokusParalel(
+    base: string,
+    cfg: { apiKey?: string; kbId?: string; timeoutMs: number },
+    options: RagQueryOptions
+  ): Promise<{ widgets: any[]; judul?: string; deskripsi?: string }> {
+    const fokusList = ['kpi', 'grafik', 'tabel', 'narasi'] as const;
+    const batas = Math.min(Math.max(40, cfg.timeoutMs || 60), 90);
+    const hasil = await Promise.allSettled(
+      fokusList.map(async (fokus) => {
+        const item = await this.ambilPayloadExtract(
+          base,
+          cfg,
+          this.instruksiFokus(fokus, options.prompt, options.sector, options.instansi, options.kbId),
+          SKEMA_FOKUS[fokus],
+          options.kbId,
+          { timeoutMs: batas }
+        );
+        if (!item) return { fokus, widgets: [] as any[], judul: undefined as string | undefined };
+        const widgets = payloadKeWidgetSpec(this.bungkusFokus(fokus, item), options.sector);
+        const judul =
+          typeof item?.judul === 'string'
+            ? item.judul
+            : typeof item?.label === 'string'
+              ? item.label
+              : undefined;
+        return { fokus, widgets, judul };
+      })
+    );
+    const sukses = hasil
+      .filter((h) => h.status === 'fulfilled')
+      .map((h) => (h as PromiseFulfilledResult<{ fokus: string; widgets: any[]; judul?: string }>).value);
+    const widgets = sukses.flatMap((s) => s.widgets);
+    const judul = sukses.find((s) => s.judul)?.judul;
+    if (widgets.length === 0) {
+      console.warn('[rag] ekstraksi fokus tidak menghasilkan widget (kpi/grafik/tabel/narasi kosong)');
+    }
+    return { widgets, judul };
+  }
+
+  /**
    * Ambil data NYATA satu indikator untuk katalog preset widget.
    * Tidak ada angka contoh: kalau dokumen tidak memuat indikator itu, hasilnya null
    * dan pemanggil harus menampilkan pesan gagal, bukan angka karangan.
@@ -848,44 +1038,18 @@ export class ConfigurableRagClient implements RagClient {
           : tipeTarget === 'table'
             ? 'tabel'
             : 'narasi';
-    const aturanFokus =
-      fokus === 'kpi'
-        ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". ' +
-          'Kalau dokumen juga memuat angka PERIODE SEBELUMNYA untuk indikator ini (tahun lalu/triwulan lalu), isi "nilaiLalu" dengan angka itu; kalau tidak ada, kosongkan. '
-        : fokus === 'grafik'
-          ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. '
-          : fokus === 'tabel'
-            ? 'Isi maksimal 4 kolom dan 5 baris dengan angka nyata dari dokumen. '
-            : 'Isi maksimal 45 kata ringkasan dari dokumen, bukan visi misi atau kebijakan internal. ';
-    const sebutanInstansi = kbId?.trim()
-      ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
-      : instansi?.trim()
-        ? `Instansi yang diminta: "${instansi.trim()}" (sektor ${sector.toUpperCase()}). Ambil angka HANYA dari dokumen instansi ini; abaikan dokumen instansi lain. `
-        : `Konteks instansi: ${sector.toUpperCase()}. `;
-    const instruksi =
-      `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
-      sebutanInstansi +
-      `Indikator yang diminta: "${query}". ` +
-      `Kalau dokumen tidak memuat istilah persisnya (misalnya target atau pagu RKAP, laporan bulanan, ` +
-      `atau istilah internal yang tidak ada), pakai angka terdekat yang BENAR-BENAR ADA di dokumen dan ` +
-      `sebutkan dasar angkanya secara singkat (maksimal 8 kata). Semua angka wajib dari dokumen. ` +
-      aturanFokus +
-      `Wajib mengisi docName, page, dan chunkSnippet dengan isi dokumen aslinya.`;
+    const instruksi = this.instruksiFokus(fokus, query, sector, instansi, kbId);
     // Bungkus hasil fokus ke bentuk payload dashboard supaya pemetaan & pembersih
     // (potong teks, angka gaya Indonesia, satuan seragam) dipakai ulang apa adanya.
-    const bungkus = (hasil: any) =>
-      payloadKeWidgetSpec(
-        fokus === 'kpi'
-          ? { dashboardTitle: hasil?.label, kpi: [hasil] }
-          : fokus === 'grafik'
-            ? { dashboardTitle: hasil?.judul, grafik: hasil }
-            : fokus === 'tabel'
-              ? { dashboardTitle: hasil?.judul, tabel: hasil }
-              : { dashboardTitle: hasil?.judul, narasi: hasil },
-        sector
-      );
+    const bungkus = (hasil: any) => payloadKeWidgetSpec(this.bungkusFokus(fokus, hasil), sector);
 
-    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId, opsi);
+    // Batasi tiap percobaan: satu percobaan yang menggantung tidak boleh menghabiskan
+    // seluruh anggaran waktu sebelum percobaan kedua sempat berjalan.
+    const batasPercobaan = Math.min(Math.max(30, cfg.timeoutMs || 60), 60);
+    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId, {
+      ...(opsi || {}),
+      timeoutMs: batasPercobaan,
+    });
     if (!item) return null;
     let widgets = bungkus(item);
 
@@ -901,15 +1065,11 @@ export class ConfigurableRagClient implements RagClient {
         .replace(/\s+([?.!,])/g, '$1')
         .trim();
       console.warn(`[rag] percobaan kedua untuk preset: "${polos}"`);
-      const instruksiUmum =
-        `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
-        sebutanInstansi +
-        `Pertanyaan: "${polos || query}". ` +
-        `Pakai angka TERDEKAT yang benar-benar ada di dokumen (misalnya pendapatan, aset, laba, jumlah pelanggan, ` +
-        `atau rasio yang tersedia) dan sebutkan dasar angkanya secara singkat pada label atau judul (maksimal 8 kata). ` +
-        aturanFokus +
-        `Semua angka wajib dari dokumen, tidak boleh dikarang. Wajib mengisi docName, page, dan chunkSnippet asli.`;
-      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId, opsi);
+      const instruksiUmum = this.instruksiFokus(fokus, polos || query, sector, instansi, kbId, 'umum');
+      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId, {
+        ...(opsi || {}),
+        timeoutMs: batasPercobaan,
+      });
       if (item2) {
         item = item2;
         widgets = bungkus(item2);
@@ -1037,7 +1197,7 @@ export class ConfigurableRagClient implements RagClient {
       // JALUR A lebih dulu: /extract mengembalikan angka nyata + sumbernya.
       // Jika mode === 'prose' (tanya-jawab / chat biasa), langsung gunakan /query
       // agar dijawab oleh LLM dengan narasi teks dan kutipan sumber.
-      if (options.mode !== 'prose' && cfg.useExtract !== false) {
+      if (options.mode !== 'prose') {
         const hasil = await this.cobaExtractJalurA(dipakai, cfg, options);
         if (hasil) {
           return {
@@ -1847,9 +2007,7 @@ export class ConfigurableRagClient implements RagClient {
         extractTersedia = ex.status === 422 || ex.status === 400;
         if (extractTersedia) {
           catatan.push(
-            cfg.useExtract === false
-              ? 'Endpoint /extract tersedia tetapi dimatikan di konfigurasi (Jalur A nonaktif)'
-              : 'Endpoint /extract tersedia — Jalur A (angka nyata + halaman sumber) dipakai lebih dulu'
+            'Endpoint /extract tersedia — Jalur A (angka nyata + halaman sumber) dipakai lebih dulu'
           );
         }
       } catch {
@@ -1862,10 +2020,10 @@ export class ConfigurableRagClient implements RagClient {
 
       return {
         latencyMs: Date.now() - start,
-        canOutputJson: !!structured || (extractTersedia && cfg.useExtract !== false),
+        canOutputJson: !!structured || extractTersedia,
         hasMetadata: chunks.length > 0,
         sampleChunksCount: chunks.length,
-        detectedMode: !!structured || (extractTersedia && cfg.useExtract !== false) ? 'Jalur A' : 'Jalur B',
+        detectedMode: !!structured || extractTersedia ? 'Jalur A' : 'Jalur B',
         baseDipakai: dipakai,
         baseDisesuaikan: disesuaikan,
         catatan,

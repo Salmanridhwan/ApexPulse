@@ -1,8 +1,14 @@
 export type ThemeMode = 'light' | 'dark';
 
-const KEY = 'apexpulse-theme';
+const KEY = 'aiones-theme';
 
-/** Tema awal: pilihan tersimpan, jika tidak ada ikuti pengaturan sistem. */
+/**
+ * Tema awal: pilihan tersimpan pengguna, kalau belum ada pakai GELAP.
+ *
+ * Gelap dijadikan bawaan (bukan mengikuti setelan sistem) karena seluruh tampilan
+ * dirancang untuk latar gelap. Preferensi sistem sengaja tidak dipakai supaya
+ * pengguna dengan OS bertema terang tetap mendapat tampilan yang sama.
+ */
 export function getInitialTheme(): ThemeMode {
   try {
     const saved = localStorage.getItem(KEY);
@@ -10,7 +16,7 @@ export function getInitialTheme(): ThemeMode {
   } catch {
     /* localStorage tidak tersedia */
   }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return 'dark';
 }
 
 export function applyTheme(mode: ThemeMode): void {

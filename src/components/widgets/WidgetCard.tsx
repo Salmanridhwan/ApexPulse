@@ -112,8 +112,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
       <span aria-hidden="true" className="accent-bar" />
 
-      {/* Widget Header — minimal: judul + titik tiga (ala referensi) */}
-      <div className="px-5 pt-4 pb-1 flex items-start justify-between gap-2">
+      {/* Widget Header — pita judul terpisah dari badan kartu oleh garis 1px,
+          supaya judul tidak "berenang" bersama grafiknya. */}
+      <div className="px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line">
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]" title={widget.title}>
             {widget.title}
@@ -238,7 +239,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
 
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
-        className={`px-5 pb-4 pt-1 flex-1 flex flex-col ${
+        className={`px-5 pb-4 pt-3 flex-1 flex flex-col ${
           ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
             'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
             'radar', 'map', 'gantt', 'table'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'

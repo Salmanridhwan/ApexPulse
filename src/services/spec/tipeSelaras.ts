@@ -83,6 +83,29 @@ function denganLegenda(widget: WidgetSpec): WidgetSpec {
   return { ...widget, chart: { ...chart, showLegend: true } };
 }
 
+/** Sebutan manusiawi untuk tipe widget, dipakai di pesan penolakan. */
+const SEBUTAN_TIPE: Record<string, string> = {
+  bar: 'diagram batang',
+  'grouped-bar': 'diagram batang kelompok',
+  'stacked-bar': 'diagram batang bertumpuk',
+  area: 'diagram area',
+  line: 'diagram garis',
+  pie: 'diagram lingkaran',
+  donut: 'diagram donat',
+  scatter: 'diagram sebaran',
+  bubble: 'diagram gelembung',
+  heatmap: 'peta panas',
+  treemap: 'treemap',
+  boxplot: 'boxplot',
+  histogram: 'histogram',
+  radar: 'diagram radar',
+  funnel: 'diagram corong',
+  gantt: 'bagan gantt',
+  map: 'peta wilayah',
+  waterfall: 'diagram waterfall',
+  table: 'tabel',
+};
+
 /**
  * Apakah `tipe` bisa dihormati dengan data `widget`?
  * Mengembalikan widget bertipe `tipe` bila bisa, atau alasan penolakan.
@@ -160,7 +183,13 @@ export function selaraskanTipe(widget: WidgetSpec | null | undefined, tipe: stri
     (tipe === 'treemap' && !!widget.treemap);
 
   if (!chart && !punyaBlokSendiri) {
-    return { ok: false, alasan: 'Data dokumen untuk indikator ini bukan berbentuk grafik.' };
+    // Pesan menyebut JENIS tampilan yang diminta, bukan selalu "grafik": dulu memilih
+    // tabel/heatmap tetap dibalas "bukan berbentuk grafik" sehingga sulit dimengerti.
+    const sebutan = SEBUTAN_TIPE[tipe] || 'tampilan ini';
+    return {
+      ok: false,
+      alasan: `Data dokumen untuk indikator ini tidak bisa disusun sebagai ${sebutan} (butuh kategori dan seri angka).`,
+    };
   }
 
   // Combo = batang + garis. Dengan satu seri ia cuma jadi batang biasa, berbeda dari

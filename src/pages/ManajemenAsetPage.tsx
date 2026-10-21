@@ -535,8 +535,8 @@ export const ManajemenAsetPage: React.FC<ManajemenAsetPageProps> = ({ tenantId, 
 
       {/* ===== Modal: Tambah/Ubah Aset ===== */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -554,33 +554,33 @@ export const ManajemenAsetPage: React.FC<ManajemenAsetPageProps> = ({ tenantId, 
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Kode</label>
+                  <label className="label-strong">Kode</label>
                   <input
                     type="text"
                     value={fKode}
                     onChange={(e) => setFKode(e.target.value)}
                     placeholder="AST-001"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block font-semibold text-ink-2 mb-1">Nama aset *</label>
+                  <label className="label-strong">Nama aset *</label>
                   <input
                     type="text"
                     value={fNama}
                     onChange={(e) => setFNama(e.target.value)}
                     placeholder="Pompa air 75 kW"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Kategori</label>
+                  <label className="label-strong">Kategori</label>
                   <select
                     value={fKategori}
                     onChange={(e) => setFKategori(e.target.value as KategoriAset)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     {URUTAN_KATEGORI_ASET.map((k) => (
                       <option key={k} value={k}>
@@ -590,68 +590,68 @@ export const ManajemenAsetPage: React.FC<ManajemenAsetPageProps> = ({ tenantId, 
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Lokasi / unit pemakai</label>
+                  <label className="label-strong">Lokasi / unit pemakai</label>
                   <input
                     type="text"
                     value={fLokasi}
                     onChange={(e) => setFLokasi(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Tahun perolehan</label>
+                  <label className="label-strong">Tahun perolehan</label>
                   <input
                     type="number"
                     value={fTahun}
                     onChange={(e) => setFTahun(Number(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Umur ekonomis (tahun)</label>
+                  <label className="label-strong">Umur ekonomis (tahun)</label>
                   <input
                     type="number"
                     min={1}
                     max={50}
                     value={fUmur}
                     onChange={(e) => setFUmur(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Nilai perolehan (Rp)</label>
+                  <label className="label-strong">Nilai perolehan (Rp)</label>
                   <input
                     type="number"
                     min={0}
                     value={fPerolehan}
                     onChange={(e) => setFPerolehan(e.target.value)}
                     placeholder="0"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Nilai residu (Rp)</label>
+                  <label className="label-strong">Nilai residu (Rp)</label>
                   <input
                     type="number"
                     min={0}
                     value={fResidu}
                     onChange={(e) => setFResidu(e.target.value)}
                     placeholder="0"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Kondisi</label>
+                  <label className="label-strong">Kondisi</label>
                   <select
                     value={fKondisi}
                     onChange={(e) => setFKondisi(e.target.value as KondisiAset)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     {URUTAN_KONDISI.map((k) => (
                       <option key={k} value={k}>
@@ -661,11 +661,11 @@ export const ManajemenAsetPage: React.FC<ManajemenAsetPageProps> = ({ tenantId, 
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Pemanfaatan</label>
+                  <label className="label-strong">Pemanfaatan</label>
                   <select
                     value={fPemanfaatan}
                     onChange={(e) => setFPemanfaatan(e.target.value as StatusPemanfaatan)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     <option value="digunakan">Digunakan Operasional</option>
                     <option value="idle">Idle / Tak Termanfaatkan</option>
@@ -675,7 +675,7 @@ export const ManajemenAsetPage: React.FC<ManajemenAsetPageProps> = ({ tenantId, 
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Catatan</label>
+                <label className="label-strong">Catatan</label>
                 <textarea
                   value={fCatatan}
                   onChange={(e) => setFCatatan(e.target.value)}

@@ -779,8 +779,8 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
 
       {/* ===== Modal: Tambah Kewajiban ===== */}
       {isKewajibanOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsKewajibanOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsKewajibanOpen(false)} />
           <div role="dialog" aria-modal="true" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <h3 className="font-bold text-sm text-ink">Tambah Kewajiban Lapor</h3>
@@ -790,23 +790,23 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
             </div>
             <form onSubmit={simpanKewajiban} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Nama Laporan</label>
+                <label className="label">Nama Laporan</label>
                 <input
                   type="text"
                   required
                   value={kewNama}
                   onChange={(e) => setKewNama(e.target.value)}
                   placeholder="Contoh: Laporan Kinerja Triwulanan"
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Jenis Periode</label>
+                  <label className="label">Jenis Periode</label>
                   <select
                     value={kewJenis}
                     onChange={(e) => setKewJenis(e.target.value as JenisLaporan)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value="bulanan">Bulanan</option>
                     <option value="triwulanan">Triwulanan</option>
@@ -815,14 +815,14 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                   </select>
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Tenggat (hari)</label>
+                  <label className="label">Tenggat (hari)</label>
                   <input
                     type="number"
                     min={0}
                     max={180}
                     value={kewTenggat}
                     onChange={(e) => setKewTenggat(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                   <span className="text-[10px] text-ink-3 mt-0.5 block">
                     Setelah periode berakhir
@@ -830,23 +830,23 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 </div>
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Penerima Laporan (opsional)</label>
+                <label className="label">Penerima Laporan (opsional)</label>
                 <input
                   type="text"
                   value={kewPenerima}
                   onChange={(e) => setKewPenerima(e.target.value)}
                   placeholder="Contoh: Pemda / Dewan Pengawas / BPKP"
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 />
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Dasar Hukum / Permintaan (opsional)</label>
+                <label className="label">Dasar Hukum / Permintaan (opsional)</label>
                 <input
                   type="text"
                   value={kewDasar}
                   onChange={(e) => setKewDasar(e.target.value)}
                   placeholder="Contoh: Permendagri 118/2018"
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 />
               </div>
               <div className="pt-2 flex justify-end gap-2">
@@ -872,8 +872,8 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
 
       {/* ===== Modal: Isi Laporan ===== */}
       {isiUntuk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsiUntuk(null)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsiUntuk(null)} />
           <div role="dialog" aria-modal="true" className="relative w-full max-w-md bg-surface rounded-card shadow-2xl border border-line p-5 z-10 text-xs space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <h3 className="font-bold text-sm text-ink">
@@ -891,11 +891,11 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
             </div>
             <form onSubmit={simpanLaporan} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Status</label>
+                <label className="label">Status</label>
                 <select
                   value={isiStatus}
                   onChange={(e) => setIsiStatus(e.target.value as StatusLaporan)}
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 >
                   <option value="draf">Draf (masih dikerjakan)</option>
                   <option value="terkirim">Terkirim (sudah disampaikan)</option>
@@ -904,7 +904,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 </select>
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Catatan / Ringkasan (opsional)</label>
+                <label className="label">Catatan / Ringkasan (opsional)</label>
                 <textarea
                   rows={3}
                   value={isiCatatan}
@@ -914,7 +914,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 />
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Nama Berkas Lampiran (satu per baris, opsional)
                 </label>
                 <textarea
@@ -951,9 +951,9 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
 
       {/* ===== Modal: Tindak Lanjut Verifikasi ===== */}
       {verifikasiUntuk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="modal-layer">
           <div
-            className="fixed inset-0 bg-scrim/50 backdrop-blur-xs"
+            className="scrim"
             onClick={() => setVerifikasiUntuk(null)}
           />
           <div
@@ -1022,7 +1022,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
 
             <form onSubmit={kirimVerifikasi} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Tindakan</label>
+                <label className="label">Tindakan</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -1051,7 +1051,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                 </div>
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Catatan {verifikasiAksi === 'revisi' ? '' : '(opsional)'}
                 </label>
                 <textarea
@@ -1091,8 +1091,8 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
 
       {/* ===== Modal: Alur Verifikasi (admin) ===== */}
       {isAlurOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsAlurOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsAlurOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -1109,14 +1109,14 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
             </div>
             <form onSubmit={simpanAlur} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Nama Alur</label>
+                <label className="label">Nama Alur</label>
                 <input
                   type="text"
                   required
                   value={alurNama}
                   onChange={(e) => setAlurNama(e.target.value)}
                   placeholder="Contoh: Alur Laporan Keuangan"
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 />
               </div>
 

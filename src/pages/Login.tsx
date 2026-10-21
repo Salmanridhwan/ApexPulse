@@ -10,6 +10,8 @@ import {
   User as UserIcon,
   Building2,
   UserPlus,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
 import { Tenant, User } from '../types';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -93,6 +95,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   // Google Sign-In
   const [googleClientId, setGoogleClientId] = useState<string>('');
   const [googleError, setGoogleError] = useState<string | null>(null);
+  /**
+   * Pendaftaran berhasil DITERIMA tetapi belum aktif: akun menunggu persetujuan
+   * admin instansi. Sesi sengaja tidak dibuat, jadi halaman ini menggantikan form.
+   */
+  const [pendingInfo, setPendingInfo] = useState<{ email: string; tenantName?: string | null; message: string } | null>(
+    null
+  );
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   /** Simpan profil user untuk boot UI cepat (sesi asli tetap cookie HttpOnly). */
@@ -140,7 +149,30 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
         body: JSON.stringify({ credential, tenantId: regTenant }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || 'Login Google gagal.');
+      if (!res.ok) {
+        if (data?.kode === 'BUTUH_INSTANSI') {
+          // Server tidak lagi menebak instansi: arahkan ke form daftar yang punya dropdown.
+          setMode('register');
+          throw new Error(data.error || 'Pilih instansi Anda dulu, lalu klik tombol Google lagi.');
+        }
+        if (data?.kode === 'PENDING_APPROVAL' || data?.kode === 'ACCOUNT_REJECTED') {
+          setPendingInfo({
+            email: '',
+            tenantName: data?.tenantName || null,
+            message: data?.error || 'Akun Anda belum aktif.',
+          });
+          return;
+        }
+        throw new Error(data?.error || 'Login Google gagal.');
+      }
+      if (data?.status === 'pending' || !data?.user) {
+        setPendingInfo({
+          email: data?.email || '',
+          tenantName: data?.tenantName || null,
+          message: data?.message || 'Pendaftaran diterima dan menunggu persetujuan admin instansi.',
+        });
+        return;
+      }
       simpanSesi(data.user, rememberMe);
     } catch (err: any) {
       setGoogleError(err.message || 'Login Google gagal.');
@@ -204,7 +236,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Email atau kata sandi tidak sesuai.');
+      if (!response.ok) {
+        if (data?.kode === 'PENDING_APPROVAL' || data?.kode === 'ACCOUNT_REJECTED') {
+          setPendingInfo({
+            email: email.trim(),
+            tenantName: data.tenantName || null,
+            message: data.error || 'Akun Anda belum aktif.',
+          });
+          return;
+        }
+        throw new Error(data.error || 'Email atau kata sandi tidak sesuai.');
+      }
       simpanSesi(data.user, rememberMe);
     } catch (err: any) {
       setErrorMessage(err.message || 'Gagal terhubung ke server.');
@@ -240,6 +282,19 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Pendaftaran gagal.');
+      // 202 = pendaftaran diterima, bukan sesi. Akun menunggu persetujuan admin.
+      if (data?.status === 'pending' || !data?.user) {
+        setPendingInfo({
+          email: data?.email || regEmail.trim(),
+          tenantName: data?.tenantName || null,
+          message: data?.message || 'Pendaftaran diterima dan menunggu persetujuan admin instansi.',
+        });
+        setRegName('');
+        setRegEmail('');
+        setRegPassword('');
+        setRegPassword2('');
+        return;
+      }
       simpanSesi(data.user, rememberMe);
     } catch (err: any) {
       setErrorMessage(err.message || 'Gagal terhubung ke server.');
@@ -286,7 +341,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
         <div className="auth-rise w-full max-w-4xl card overflow-hidden grid grid-cols-1 md:grid-cols-12 shadow-2xl">
           {/* Left: konteks singkat — panel gelap senada sidebar */}
           <div className="md:col-span-5 relative bg-shell p-6 sm:p-8 border-b md:border-b-0 md:border-r border-shell-line flex flex-col justify-center space-y-5">
-            <div className="hidden sm:block h-40 -mt-2 -mb-1">
+            <div className="hidden sm:block h-56 -mt-2">
               <React.Suspense fallback={null}>
                 <Hero3D className="w-full h-full" />
               </React.Suspense>
@@ -317,7 +372,50 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
           </div>
 
           {/* Right: form */}
-          <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-center space-y-5 bg-surface/85 backdrop-blur-sm">
+          <div className="relative md:col-span-7 p-6 sm:p-8 flex flex-col justify-center space-y-5 bg-surface/85 backdrop-blur-sm">
+
+            {/* Pendaftaran diterima tetapi belum aktif: tidak ada sesi, form diganti
+                panel status supaya pendaftar tahu harus menunggu persetujuan admin. */}
+            {pendingInfo && (
+              <div className="absolute inset-0 z-20 bg-surface p-6 sm:p-8 flex flex-col justify-center gap-4">
+                <div className="w-11 h-11 rounded-control bg-warn/15 border border-warn/30 flex items-center justify-center text-warn">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-base font-bold text-ink">Menunggu persetujuan admin</h2>
+                  <p className="text-xs text-ink-2 leading-relaxed">{pendingInfo.message}</p>
+                </div>
+                <div className="p-3 bg-surface-2 border border-line rounded-card text-xs space-y-1">
+                  {pendingInfo.email && (
+                    <div className="flex items-center gap-1.5 text-ink-2">
+                      <Mail className="w-3.5 h-3.5 text-ink-3" />
+                      <span className="font-mono">{pendingInfo.email}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-ink-2">
+                    <Building2 className="w-3.5 h-3.5 text-ink-3" />
+                    <span>{pendingInfo.tenantName || 'Instansi yang Anda pilih'}</span>
+                  </div>
+                  <p className="text-[11px] text-ink-3 pt-1 leading-relaxed">
+                    Anda belum bisa masuk sampai admin instansi menyetujui pendaftaran ini. Setelah
+                    disetujui, gunakan halaman masuk seperti biasa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingInfo(null);
+                    setMode('login');
+                    setPassword('');
+                  }}
+                  className="w-full py-2.5 bg-brand text-on-brand rounded-card font-semibold text-xs hover:brightness-95 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Kembali ke halaman masuk
+                </button>
+              </div>
+            )}
+
             {/* Tab Masuk / Daftar */}
             <div className="auth-rise-r flex p-1 rounded-control bg-surface-2 border border-line" style={{ animationDelay: '0.2s' }}>
               <button
@@ -357,26 +455,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
               <div role="alert" aria-live="assertive" className="p-3 bg-neg/15 border border-neg/30 rounded-control text-neg text-xs flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{errorMessage}</span>
-              </div>
-            )}
-
-            {/* Google Sign-In (tampil bila Client ID tersedia) */}
-            {googleClientId ? (
-              <div className="auth-rise-r space-y-2" style={{ animationDelay: '0.28s' }}>
-                <div ref={googleBtnRef} className="flex justify-center min-h-[40px]" />
-                {googleError && (
-                  <p className="text-[11px] text-neg text-center leading-relaxed">{googleError}</p>
-                )}
-                <div className="flex items-center gap-3 pt-1">
-                  <div className="flex-1 h-px bg-line" />
-                  <span className="text-[10.5px] text-ink-3 font-medium">atau dengan email</span>
-                  <div className="flex-1 h-px bg-line" />
-                </div>
-              </div>
-            ) : (
-              <div className="auth-rise-r p-2.5 bg-surface-2 border border-line rounded-control text-[10.5px] text-ink-3 leading-relaxed" style={{ animationDelay: '0.28s' }}>
-                Login Google belum aktif. Untuk mengaktifkannya, isi <span className="font-mono">GOOGLE_CLIENT_ID</span> di
-                berkas <span className="font-mono">.env</span> lalu mulai ulang server.
               </div>
             )}
 
@@ -571,6 +649,30 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                   dapat menyesuaikan peran setelahnya.
                 </p>
               </form>
+            )}
+
+            {/* Google Sign-In — sengaja DI BAWAH form: email+sandi jalur utama,
+                Google alternatif. Divider dipindah ke atas tombol karena posisinya
+                kini mengikuti form, bukan mendahuluinya. */}
+            {googleClientId ? (
+              <div className="auth-rise-r space-y-2" style={{ animationDelay: '0.66s' }}>
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="flex-1 h-px bg-line" />
+                  <span className="text-[10.5px] text-ink-3 font-medium">
+                    {mode === 'register' ? 'atau daftar dengan Google' : 'atau masuk dengan Google'}
+                  </span>
+                  <div className="flex-1 h-px bg-line" />
+                </div>
+                <div ref={googleBtnRef} className="flex justify-center min-h-[40px]" />
+                {googleError && (
+                  <p className="text-[11px] text-neg text-center leading-relaxed">{googleError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="auth-rise-r p-2.5 bg-surface-2 border border-line rounded-control text-[10.5px] text-ink-3 leading-relaxed" style={{ animationDelay: '0.66s' }}>
+                Login Google belum aktif. Untuk mengaktifkannya, isi <span className="font-mono">GOOGLE_CLIENT_ID</span> di
+                berkas <span className="font-mono">.env</span> lalu mulai ulang server.
+              </div>
             )}
 
             <p className="auth-rise-r text-[11px] text-ink-3 border-t border-line pt-4" style={{ animationDelay: '0.68s' }}>

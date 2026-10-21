@@ -829,7 +829,9 @@ export function buildChartOption(
           data: donutView,
         },
       ],
-      color: paletTema,
+      // Warna potongan donat memakai palet terang tanpa geseran: geseran bisa
+      // mendarat di abu-abu (#94a3b8) sehingga donat tampak kelabu, bukan berwarna.
+      color: T.series,
     };
   }
 

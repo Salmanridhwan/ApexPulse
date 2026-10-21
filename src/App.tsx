@@ -37,6 +37,7 @@ import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
+import { MENU_KINERJA, menuTampil } from './components/menuKinerja';
 import { GlobalFiltersBar } from './components/GlobalFiltersBar';
 import { PresentationMode } from './components/PresentationMode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
@@ -160,8 +161,41 @@ export default function App() {
   });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
+
+  /**
+   * Menu grup "Kinerja & Kepatuhan" boleh disembunyikan admin per instansi.
+   * Dipakai untuk dua hal: menentukan callback sidebar dan menjaga viewMode.
+   */
+  const tampilMenu = (key: string) => menuTampil(currentTenant?.menuSembunyi, key);
+
+  useEffect(() => {
+    if (MENU_KINERJA.some((m) => m.key === viewMode) && !menuTampil(currentTenant?.menuSembunyi, viewMode)) {
+      setViewMode('workspace');
+    }
+  }, [viewMode, currentTenant?.menuSembunyi]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
+
+  /** Perbarui dashboard aktif di dua tempat sekaligus: state aktif + daftar.
+   *  Dulu lima baris ini disalin 14x; satu tempat supaya keduanya tidak pernah
+   *  berbeda isi. */
+  const terapkanDashboard = (d: Dashboard) => {
+    setActiveDashboard(d);
+    setDashboards((prev) => prev.map((x) => (x.id === d.id ? d : x)));
+  };
+
+  /** Simpan daftar widget ke server (UI sudah diperbarui optimistis lebih dulu).
+   *  Satu tempat untuk PATCH + cek gagal; sebelumnya disalin 7x tanpa cek respons,
+   *  jadi penyimpanan yang ditolak server tidak pernah terlihat. */
+  const simpanWidget = async (widgets: WidgetSpec[]) => {
+    if (!activeDashboard || !currentTenant) return;
+    const res = await fetch(`/api/dashboards/${activeDashboard.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgets, tenantId: currentTenant.id }),
+    });
+    if (!res.ok) console.error('Gagal menyimpan widget:', res.status);
+  };
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Drawer navigasi mobile: sidebar disembunyikan di <md, dibuka sebagai overlay.
@@ -485,19 +519,9 @@ export default function App() {
     );
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: updatedWidgets,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   /**
@@ -520,16 +544,9 @@ export default function App() {
     });
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ widgets: updatedWidgets, tenantId: currentTenant.id }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -537,19 +554,9 @@ export default function App() {
     const updatedWidgets = activeDashboard.widgets.filter((w) => w.id !== widgetId);
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: updatedWidgets,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   const handleDuplicateWidget = async (widget: WidgetSpec) => {
@@ -563,19 +570,9 @@ export default function App() {
     const updatedWidgets = [newWidget, ...activeDashboard.widgets];
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: updatedWidgets,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   // Reorder widget via drag-and-drop: simpan urutan baru lalu persist.
@@ -586,19 +583,9 @@ export default function App() {
     if (ordered.length !== activeDashboard.widgets.length) return; // ada id tak dikenal — abaikan
     const updatedDashboard = { ...activeDashboard, widgets: ordered };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: ordered,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(ordered);
   };
 
   // Resize lebar widget: grid.w diubah (bucket 4/6/8/12) lalu persist.
@@ -609,19 +596,9 @@ export default function App() {
     );
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: updatedWidgets,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   const handleAddWidgetFromCatalog = async (widget: WidgetSpec) => {
@@ -629,29 +606,16 @@ export default function App() {
     const updatedWidgets = [widget, ...activeDashboard.widgets];
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
-    await fetch(`/api/dashboards/${activeDashboard.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        widgets: updatedWidgets,
-        tenantId: currentTenant.id,
-      }),
-    });
+    await simpanWidget(updatedWidgets);
   };
 
   // Handler for Global Filters
   const handleGlobalFiltersChange = async (filters: GlobalFilters) => {
     if (!activeDashboard || !currentTenant) return;
     const updatedDashboard = { ...activeDashboard, globalFilters: filters };
-    setActiveDashboard(updatedDashboard);
-    setDashboards((prev) =>
-      prev.map((d) => (d.id === updatedDashboard.id ? updatedDashboard : d))
-    );
+    terapkanDashboard(updatedDashboard);
 
     await fetch(`/api/dashboards/${activeDashboard.id}`, {
       method: 'PATCH',
@@ -768,38 +732,38 @@ export default function App() {
                 setViewMode('templates');
                 setIsMobileNavOpen(false);
               }}
-              onOpenPelaporan={() => {
+              onOpenPelaporan={tampilMenu('pelaporan') ? () => {
                 setViewMode('pelaporan');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenTindakLanjutAudit={() => {
+              } : undefined}
+              onOpenTindakLanjutAudit={tampilMenu('auditTl') ? () => {
                 setViewMode('auditTl');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenKesehatanKeuangan={() => {
+              } : undefined}
+              onOpenKesehatanKeuangan={tampilMenu('keuangan') ? () => {
                 setViewMode('keuangan');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenManajemenRisiko={() => {
+              } : undefined}
+              onOpenManajemenRisiko={tampilMenu('risiko') ? () => {
                 setViewMode('risiko');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenManajemenAset={() => {
+              } : undefined}
+              onOpenManajemenAset={tampilMenu('aset') ? () => {
                 setViewMode('aset');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenPerjanjianKinerja={() => {
+              } : undefined}
+              onOpenPerjanjianKinerja={tampilMenu('pk') ? () => {
                 setViewMode('pk');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenLKjIP={() => {
+              } : undefined}
+              onOpenLKjIP={tampilMenu('lkjip') ? () => {
                 setViewMode('lkjip');
                 setIsMobileNavOpen(false);
-              }}
-              onOpenManajemenBerkas={() => {
+              } : undefined}
+              onOpenManajemenBerkas={tampilMenu('berkas') ? () => {
                 setViewMode('berkas');
                 setIsMobileNavOpen(false);
-              }}
+              } : undefined}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
@@ -1334,15 +1298,15 @@ export default function App() {
         />
       )}
 
-      {/* Floating Action Button RAG Copilot di Ujung Kanan Bawah (hanya tampil saat panel chat tertutup) */}
+      {/* Tombol buka asisten (hanya tampil saat panel chat tertutup) */}
       {!isPresentationMode && !isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
           className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
-          title="Buka RAG Copilot"
+          title="Buka asisten"
         >
           <Sparkles className="w-4 h-4 animate-pulse" />
-          <span>RAG Copilot</span>
+          <span>Asisten</span>
         </button>
       )}
 

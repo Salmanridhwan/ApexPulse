@@ -47,6 +47,14 @@ export interface Tenant {
    * tujuan unggah memakai `kmsOrganizationId`.
    */
   kmsKnowledgeBase?: string;
+  /**
+   * Menu grup "Kinerja & Kepatuhan" yang DISEMBUNYIKAN admin untuk instansi ini.
+   *
+   * Isinya key menu (lihat `src/components/menuKinerja.ts`), mis. ['risiko','aset'].
+   * Kosong/tidak ada = semua menu tampil. Opt-out, bukan opt-in, supaya instansi
+   * lama otomatis tetap lengkap tanpa migrasi data.
+   */
+  menuSembunyi?: string[];
 }
 
 export interface User {
@@ -65,6 +73,21 @@ export interface User {
   googleSub?: string;
   /** Akun ini masuk lewat Google (bukan kata sandi lokal). */
   viaGoogle?: boolean;
+  /**
+   * Status keanggotaan akun. Kosong = `active` (akun lama sebelum fitur persetujuan).
+   *
+   * Pendaftaran mandiri (email + kata sandi maupun Google) TIDAK langsung memberi
+   * akses: akun berstatus `pending` sampai admin instansi menyetujui. Tanpa status
+   * eksplisit, siapa pun yang tahu daftar instansi bisa langsung membaca dashboard
+   * instansi tersebut.
+   */
+  status?: 'pending' | 'active' | 'rejected';
+  /** Instansi yang diminta saat mendaftar (dipakai saat admin menyetujui). */
+  requestedTenantId?: string;
+  /** Waktu permintaan dibuat (ISO), untuk urutan & tampilan di panel admin. */
+  requestedAt?: string;
+  /** Identitas email sudah diverifikasi Google (klaim `email_verified`). */
+  emailVerified?: boolean;
 }
 
 /**

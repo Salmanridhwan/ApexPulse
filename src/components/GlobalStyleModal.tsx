@@ -44,8 +44,8 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
   const akanMengubah = adaGaya(style);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
+    <div className="modal-layer">
+      <div className="scrim" onClick={onClose} />
 
       <div
         role="dialog"

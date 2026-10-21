@@ -446,8 +446,8 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
 
       {/* ===== Modal: Susun/Ubah LKjIP ===== */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -465,50 +465,50 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Tahun anggaran *</label>
+                  <label className="label-strong">Tahun anggaran *</label>
                   <input
                     type="text"
                     value={fPeriode}
                     onChange={(e) => setFPeriode(e.target.value)}
                     placeholder="2026"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block font-semibold text-ink-2 mb-1">Nomor *</label>
+                  <label className="label-strong">Nomor *</label>
                   <input
                     type="text"
                     value={fNomor}
                     onChange={(e) => setFNomor(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Judul laporan *</label>
+                <label className="label-strong">Judul laporan *</label>
                 <input
                   type="text"
                   value={fJudul}
                   onChange={(e) => setFJudul(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Tanggal penyusunan</label>
+                  <label className="label-strong">Tanggal penyusunan</label>
                   <input
                     type="date"
                     value={fTanggal}
                     onChange={(e) => setFTanggal(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Status</label>
+                  <label className="label-strong">Status</label>
                   <select
                     value={fStatus}
                     onChange={(e) => setFStatus(e.target.value as StatusLKjIP)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     {URUTAN_STATUS_LKJIP.map((s) => (
                       <option key={s} value={s}>
@@ -549,7 +549,7 @@ export const LKjIPPage: React.FC<LKjIPPageProps> = ({ tenantId, onBackToWorkspac
               </div>
 
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Ringkasan eksekutif</label>
+                <label className="label-strong">Ringkasan eksekutif</label>
                 <textarea
                   value={fRingkasan}
                   onChange={(e) => setFRingkasan(e.target.value)}

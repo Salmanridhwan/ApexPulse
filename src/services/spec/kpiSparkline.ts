@@ -52,22 +52,12 @@ export function sparklineDariData(
     return { deret, sumber: 'dokumen-seri' };
   }
 
-  const nilai = nilaiKpi(widget);
-  if (nilai === null || nilai === 0) return null;
-
-  // 2. Nilai + delta dokumen: bentuk tren mengikuti pertumbuhan yang tercatat.
-  const delta = widget.kpi?.delta;
-  if (angka(delta) && Math.abs(delta) > 0.5 && Math.abs(delta) < 200) {
-    const awal = nilai / (1 + delta / 100);
-    const deret = [0, 1, 2, 3].map((i) => Number((awal + ((nilai - awal) * i) / 3).toFixed(4)));
-    return { deret, sumber: 'turunan-delta' };
-  }
-
-  // 3. Hanya nilai akhir: bentuk indikatif yang mendekat ke nilai akhir.
-  return {
-    deret: [nilai * 0.94, nilai * 0.97, nilai * 0.99, nilai].map((n) => Number(n.toFixed(4))),
-    sumber: 'turunan-nilai',
-  };
+  // Tidak ada deret di dokumen → TIDAK ada sparkline. Dulu di sini dibentuk
+  // deret "indikatif" (0,94 / 0,97 / 0,99 × nilai) yang terlihat seperti tren
+  // padahal hanya satu titik dokumen; delta +6,4% pada semua kartu berasal dari
+  // pola itu. Sekarang grafik tren hanya muncul kalau dokumen benar-benar
+  // memuat deretnya.
+  return null;
 }
 
 /**
@@ -102,11 +92,8 @@ export function persenPerubahanKpi(
     return { delta: bulat(((nilai - target) / target) * 100), label: `vs target ${target}` };
   }
 
-  // 3. Dokumen hanya memuat satu titik: pakai bentuk tren yang digambar (berlabel indikatif).
-  const d = (deretTurunan ?? []).filter(angka);
-  if (d.length >= 2 && d[0] !== 0) {
-    return { delta: bulat(((d[d.length - 1] - d[0]) / d[0]) * 100), label: 'tren indikatif' };
-  }
+  // Dokumen hanya memuat satu titik → tidak ada persentase perubahan. Angka
+  // "tren indikatif" tidak lagi dibuat karena dasarnya deret karangan.
   return null;
 }
 

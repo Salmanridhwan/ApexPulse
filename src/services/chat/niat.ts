@@ -12,7 +12,7 @@
 
 /** Kata perintah membuat/memperbarui, termasuk bentuk berimbuhan (mem-/di-/ter-). */
 const PERINTAH =
-  /(?:^|[^a-z])(?:mem(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|di(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|buat|buatkan|bikin|bikinkan|generate|hasilkan|susun|rancang|ciptakan|sediakan|desain|tampilkan|perbarui|perbaharui|update|refresh|tambah(?:kan)?)(?:kan|lah|nya|in)?(?:[^a-z]|$)/i;
+  /(?:^|[^a-z])(?:mem(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|di(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|buat|buatkan|bikin|bikinkan|generate|hasilkan|susun|rancang|ciptakan|sediakan|desain|tampilkan|perbarui|perbaharui|update|refresh|isi|lengkapi|penuhi|tambah(?:kan)?)(?:kan|lah|nya|in)?(?:[^a-z]|$)/i;
 
 /**
  * Objek dashboard, termasuk bentuk berimbuhan/klitik: "dashboardnya",
@@ -67,7 +67,16 @@ const OBJEK_WIDGET =
 export function niatTambahWidget(prompt: unknown): boolean {
   const teks = String(prompt || '').toLowerCase();
   if (!teks.trim()) return false;
-  return PERINTAH_WIDGET.test(teks) && OBJEK_WIDGET.test(teks);
+  if (!PERINTAH_WIDGET.test(teks) || !OBJEK_WIDGET.test(teks)) return false;
+  // "buatkan dashboard berisi grafik garis" menyebut grafik, tetapi yang diminta
+  // adalah DASHBOARD. Dulu kalimat ini dibajak jalur tambah-widget dan mentok
+  // di "Buka dulu salah satu dashboard". Kata kerja menambah ("tambahkan
+  // grafik ke dashboard") tetap masuk jalur widget.
+  const buatDashboard =
+    /(?:^|[^a-z])(?:buat(?:kan)?|bikin(?:kan)?|susun|rancang|desain|ciptakan|sediakan|generate|hasilkan|mem(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan))(?:kan|lah|nya|in)?(?:[^a-z]|$)/i;
+  const objekDashboard = /(?:^|[^a-z])(?:dashboard|kanvas|canvas)(?:nya|ku|mu)?(?:[^a-z]|$)/i;
+  if (buatDashboard.test(teks) && objekDashboard.test(teks)) return false;
+  return true;
 }
 
 /**

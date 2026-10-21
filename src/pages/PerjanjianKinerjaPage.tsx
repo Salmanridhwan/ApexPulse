@@ -536,8 +536,8 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
 
       {/* ===== Modal: Buat/Ubah Perjanjian Kinerja ===== */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -555,23 +555,23 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <label className="block font-semibold text-ink-2 mb-1">Nomor dokumen *</label>
+                  <label className="label-strong">Nomor dokumen *</label>
                   <input
                     type="text"
                     value={fNomor}
                     onChange={(e) => setFNomor(e.target.value)}
                     placeholder="PK-01/DIR/2026"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Periode *</label>
+                  <label className="label-strong">Periode *</label>
                   <input
                     type="text"
                     value={fPeriode}
                     onChange={(e) => setFPeriode(e.target.value)}
                     placeholder="2026"
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
               </div>
@@ -613,20 +613,20 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Tanggal penetapan</label>
+                  <label className="label-strong">Tanggal penetapan</label>
                   <input
                     type="date"
                     value={fTanggal}
                     onChange={(e) => setFTanggal(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-ink-2 mb-1">Status</label>
+                  <label className="label-strong">Status</label>
                   <select
                     value={fStatus}
                     onChange={(e) => setFStatus(e.target.value as StatusPerjanjianKinerja)}
-                    className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field"
                   >
                     {URUTAN_STATUS_PK.map((s) => (
                       <option key={s} value={s}>
@@ -709,7 +709,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
               </div>
 
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Catatan</label>
+                <label className="label-strong">Catatan</label>
                 <textarea
                   value={fCatatan}
                   onChange={(e) => setFCatatan(e.target.value)}
@@ -739,8 +739,8 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
 
       {/* ===== Modal: Catat Realisasi ===== */}
       {realisasiUntuk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setRealisasiUntuk(null)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setRealisasiUntuk(null)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -764,7 +764,7 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">
+                <label className="label-strong">
                   Realisasi ({realisasiUntuk.ind.satuan}) *
                 </label>
                 <input
@@ -772,11 +772,11 @@ export const PerjanjianKinerjaPage: React.FC<PerjanjianKinerjaPageProps> = ({ te
                   min={0}
                   value={rNilai}
                   onChange={(e) => setRNilai(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-ink-2 mb-1">Catatan capaian</label>
+                <label className="label-strong">Catatan capaian</label>
                 <textarea
                   value={rCatatan}
                   onChange={(e) => setRCatatan(e.target.value)}

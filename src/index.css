@@ -24,6 +24,9 @@
   --color-brand-ink: #0f6b85;   /* digelapkan: teks & chip lulus WCAG AA (6.07:1) */
   --color-on-brand: #10141d;    /* teks/ikon di ATAS latar brand solid — lulus AA (6.48:1); tetap gelap di kedua mode agar brand terang (mode gelap) juga terbaca */
   --color-brand-soft: #e6f6fb;
+  /* Isi latar brand SOLID (tombol/badge/avatar). Di mode gelap digelapkan supaya
+     teks putih di atasnya tetap lulus kontras. */
+  --color-brand-solid: var(--color-brand);
   --color-violet: #7f80d8;      /* periwinkle */
   --color-coral: #ee4b32;       /* merah-oranye */
 
@@ -77,6 +80,10 @@
   --color-ink-3: #98a1af;   /* dinaikkan untuk teks mikro di mode gelap (6.4:1) */
 
   --color-brand: #38c6e2;
+  /* Teks/ikon di atas latar biru solid: PUTIH (permintaan tampilan gelap). */
+  --color-on-brand: #ffffff;
+  /* Biru solid digelapkan: putih di atas #38c6e2 hanya 2:1, di sini 5,6:1. */
+  --color-brand-solid: #12708c;
   --color-brand-ink: #7fdcf0;
   --color-brand-soft: #1a3a44;
   --color-violet: #9a9be8;
@@ -100,8 +107,9 @@
   --color-shell-active: #1f2329;
 
   /* Mode gelap: tombol utama memakai aksen brand, bukan putih. */
-  --color-solid: #38c6e2;
-  --color-on-solid: #0b1013;
+  /* Tombol utama di mode gelap: biru digelapkan + teks PUTIH (5,6:1). */
+  --color-solid: #12708c;
+  --color-on-solid: #ffffff;
 
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
   --shadow-pop-sm: 0 2px 8px rgb(0 0 0 / 0.4);
@@ -196,10 +204,76 @@
   background-color: var(--color-solid);
   color: var(--color-on-solid);
 }
+/* ===== KONTRAS TEKS OTOMATIS DI ATAS LATAR SOLID =====
+   Setiap elemen yang latarnya `brand` (biru) atau `solid` otomatis memakai warna
+   teks pasangannya. Tanpa ini, teks yang tidak menyebut warna akan mewarisi `ink`
+   (gelap di mode terang, terang di mode gelap): di mode gelap latar brand justru
+   terang, jadi teks terang nyaris hilang. Aturan ini menjadi jaring, bukan
+   pengganti kelas eksplisit seperti `text-on-brand` (nilainya sama).
+
+   Ditulis tanpa `:where()` supaya menang atas warna warisan, tetapi sengaja hanya
+   menyasar kelas latar SOLID. Varian tipis seperti `bg-brand/10` atau
+   `hover:bg-brand/10` tidak tersentuh karena warnanya butuh teks `brand-ink`. */
+@layer utilities {
+  .bg-brand {
+    background-color: var(--color-brand-solid);
+    color: var(--color-on-brand);
+  }
+  .bg-solid {
+    color: var(--color-on-solid);
+  }
+  /* Transisi ke latar biru saat hover juga harus mengganti warna teks. */
+  .hover\:bg-brand:hover {
+    background-color: var(--color-brand-solid);
+    color: var(--color-on-brand);
+  }
+  .hover\:bg-solid:hover {
+    color: var(--color-on-solid);
+  }
+  /* Tombol dengan latar brand yang dinonaktifkan tetap terbaca. */
+  .bg-brand:disabled {
+    color: var(--color-on-brand);
+  }
+}
+
+/* ===== POTONGAN KELAS YANG PALING SERING DIPAKAI ULANG =====
+   Isinya @apply dari rangkaian kelas yang dulu disalin di puluhan tempat
+   (field 30x, field-lg 25x, scrim 23x, modal-layer 22x, label 49x+46x).
+   Hasil render identik karena kelasnya sama; bedanya cuma satu tempat untuk
+   mengubah gaya input, label, dan latar modal. */
+@utility field {
+  @apply w-full px-2.5 py-1.5 bg-surface-2 border border-line rounded-control text-ink focus:outline-none focus:ring-1 focus:ring-brand;
+}
+@utility field-lg {
+  @apply w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand;
+}
+@utility label {
+  @apply block text-ink-2 font-medium mb-1;
+}
+@utility label-strong {
+  @apply block font-semibold text-ink-2 mb-1;
+}
+@utility scrim {
+  @apply fixed inset-0 bg-scrim/50 backdrop-blur-xs;
+}
+@utility modal-layer {
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+}
 /* Kartu stat beraksen (solid 1 warna, seperti referensi). Teks selalu putih
    agar lulus kontras; warna via accent-*. Ditaruh di @layer components (bukan
    @utility) karena aksen dipilih DINAMIS dari data — tidak boleh di-tree-shake. */
 @layer components {
+  /* Tile monogram (logo instansi & avatar inisial). Warna isi/tinta dari BrandMark
+     lewat CSS variable; mode gelap menimpanya supaya monogram PUTIH, bukan hitam. */
+  .tile-mark {
+    background-color: var(--tile-bg);
+    color: var(--tile-ink);
+  }
+  [data-theme='dark'] .tile-mark {
+    color: #ffffff;
+    /* Putih di atas cyan #1fa6cc hanya 2.84:1; dicampur gelap -> 5,9:1. */
+    background-color: color-mix(in srgb, var(--tile-bg) 45%, #0b1220);
+  }
   .card-accent {
     border-radius: var(--radius-card);
     /* Teks di atas warna aksen memakai tinta "on-brand" (gelap) supaya
@@ -441,6 +515,18 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* PENGECUALIAN: indikator proses (spinner & denyut status) tetap bergerak.
+     Tanpa gerak, pengguna tidak bisa membedakan "sedang bekerja" dari "macet" —
+     ini umpan balik fungsi, bukan hiasan. Hanya nama/keyframes milik utilitas
+     Tailwind yang dipakai ulang, jadi tidak ada animasi baru yang ditambahkan. */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+  .animate-pulse {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 
@@ -469,33 +555,21 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Knot dekoratif hero login (pengganti three.js WebGL, hemat ~531 KB).
-   Animasi berputar + mengambang halus; berhenti saat reduced-motion. */
-.hero-knot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+/* Panggung WebGL hero login (three.js / @react-three/fiber).
+   Kanvas mengisi wadah, latar transparan supaya panel gelap di belakangnya
+   tetap terlihat dan komponen bisa dipasang di mana pun. */
+.hero-webgl { position: relative; width: 100%; height: 100%; }
+.hero-webgl canvas { display: block; border-radius: inherit; }
+/* Kalau WebGL tidak tersedia: tampilkan bidang gradasi sederhana, bukan area kosong. */
+.hero-webgl-fallback {
+  position: absolute;
+  inset: 22% 12% 30%;
+  border-radius: 18px;
+  border: 1px solid var(--color-line-strong);
+  background: linear-gradient(160deg, var(--color-surface-2), var(--color-surface));
+  opacity: 0.6;
 }
-.hero-knot-svg {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  overflow: visible;
-}
-@keyframes knot-spin {
-  0% { transform: rotate(0deg) translateY(0); }
-  50% { transform: rotate(180deg) translateY(-6px); }
-  100% { transform: rotate(360deg) translateY(0); }
-}
-.hero-knot-spin {
-  transform-origin: 100px 100px;
-  animation: knot-spin 18s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-knot-spin { animation: none; }
-}
+
 .card-rise { animation: card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ============================================================
@@ -573,31 +647,85 @@
   to   { background-position: 44px 44px, 44px 44px; }
 }
 
-/* ---- Kartu widget kecil yang mengapung ---- */
-.auth-float {
+/* ---- Kartu widget kaca yang mengapung (gaya React Bits) ----
+   Tiap kartu: parallax + tilt mengikuti kursor (--px/--py diisi JS),
+   sorot cahaya (spotlight) yang ikut kursor, dan bayangan berlapis supaya
+   terasa seperti kaca bertimbul, bukan kotak datar. */
+.auth-tile {
   position: absolute;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--color-line);
-  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
-  backdrop-filter: blur(6px);
-  box-shadow: var(--elev-card);
-  padding: 8px 10px;
+  perspective: 760px;
   animation: auth-float-y var(--dur, 14s) ease-in-out infinite;
   will-change: transform;
 }
 @keyframes auth-float-y {
-  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
-  50%      { transform: translateY(-16px) rotate(var(--rot, 0deg)); }
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-16px); }
 }
 
-/* Batang chart tumbuh-mengempis bergantian. */
-.auth-bar {
-  transform-origin: bottom;
-  animation: auth-bar-grow var(--bdur, 3.6s) ease-in-out infinite;
+.auth-glass {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: linear-gradient(
+    152deg,
+    color-mix(in srgb, var(--color-surface) 90%, transparent),
+    color-mix(in srgb, var(--color-surface) 66%, transparent)
+  );
+  backdrop-filter: blur(10px) saturate(1.12);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 40%, transparent),
+    0 20px 44px -24px color-mix(in srgb, var(--color-ink) 60%, transparent),
+    0 5px 12px -7px color-mix(in srgb, var(--color-ink) 32%, transparent);
+  transform:
+    translate3d(
+      calc(var(--px, 0) * var(--kedalaman, 1) * 9px),
+      calc(var(--py, 0) * var(--kedalaman, 1) * 7px),
+      0
+    )
+    rotateX(calc(var(--py, 0) * -7deg))
+    rotateY(calc(var(--px, 0) * 10deg))
+    rotate(var(--rot, 0deg));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
-@keyframes auth-bar-grow {
-  0%, 100% { transform: scaleY(0.55); }
-  50%      { transform: scaleY(1); }
+
+/* Sorot cahaya mengikuti kursor di dalam kartu. */
+.auth-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    170px circle at var(--mxp, 50%) var(--myp, 50%),
+    color-mix(in srgb, var(--color-brand) 24%, transparent),
+    transparent 64%
+  );
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Pantulan tepi: kesan kaca. */
+.auth-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    118deg,
+    color-mix(in srgb, #ffffff 20%, transparent),
+    transparent 40%
+  );
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Batang equalizer: tumbuh-mengempis bergantian, seperti data masuk. */
+.auth-eq {
+  transform-origin: bottom;
+  animation: auth-eq-var var(--bdur, 2.4s) ease-in-out infinite alternate;
+}
+@keyframes auth-eq-var {
+  from { transform: scaleY(0.42); opacity: 0.72; }
+  to   { transform: scaleY(1);    opacity: 1; }
 }
 
 /* Garis tren menggambar dirinya lalu pudar, berulang. */
@@ -613,11 +741,64 @@
   100% { stroke-dashoffset: 0; opacity: 0; }
 }
 
-/* Cincin donut berputar. */
-.auth-donut { animation: auth-donut 5.5s ease-in-out infinite; }
-@keyframes auth-donut {
-  0%, 100% { stroke-dasharray: 66 94; }
-  50%      { stroke-dasharray: 96 64; }
+/* Cincin donat: lengkung conic berputar, angka tetap di tengah. */
+.auth-ring {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+}
+.auth-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -0.5deg,
+    var(--color-brand) 0 calc(var(--p, 68) * 1%),
+    transparent calc(var(--p, 68) * 1%) calc(var(--p, 68) * 1% + 2.5%),
+    color-mix(in srgb, var(--color-violet) 80%, var(--color-surface-2)) calc(var(--p, 68) * 1% + 2.5%) 100%
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
+  animation: auth-ring-spin 11s linear infinite;
+}
+@keyframes auth-ring-spin {
+  to { transform: rotate(360deg); }
+}
+.auth-ring > span {
+  position: relative;
+  z-index: 1;
+}
+
+/* Chip kecil pada kartu dokumen. */
+.auth-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-pos);
+  background: color-mix(in srgb, var(--color-pos) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-pos) 30%, transparent);
+}
+.auth-chip--tunda {
+  color: var(--color-ink-3);
+  background: color-mix(in srgb, var(--color-ink-3) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-ink-3) 26%, transparent);
+  animation: auth-chip-in 6s ease-in-out infinite;
+}
+@keyframes auth-chip-in {
+  0%, 40%   { opacity: 0.35; transform: translateY(2px); }
+  55%, 100% { opacity: 1;    transform: translateY(0); }
+}
+
+/* Titik cahaya pada garis tren. */
+.auth-spark-dot {
+  filter: drop-shadow(0 0 4px var(--color-pos));
 }
 
 /* Garis pindai pada ikon dokumen. */
@@ -680,21 +861,6 @@
   100% { transform: scale(1.6); opacity: 0; }
 }
 
-/* ---- Knot hero: lingkaran orbit + denyut cahaya ---- */
-.hero-orbit { animation: hero-orbit 9s linear infinite; transform-origin: 100px 100px; }
-@keyframes hero-orbit {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-.hero-glow { animation: hero-glow 5.5s ease-in-out infinite; transform-origin: 100px 100px; }
-@keyframes hero-glow {
-  0%, 100% { opacity: 0.30; transform: scale(0.94); }
-  50%      { opacity: 0.55; transform: scale(1.06); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-orbit, .hero-glow { animation: none; }
-}
-
 /* ------------------------------------------------------------
    PENGECUALIAN SADAR: halaman login TETAP beranimasi walau
    pengaturan OS "reduce motion" aktif.
@@ -714,18 +880,15 @@
   .auth-blob-c { animation: auth-drift-c 42s ease-in-out infinite !important; }
   .auth-grid   { animation: auth-grid-pan 60s linear infinite !important; }
 
-  .auth-float  { animation: auth-float-y var(--dur, 14s) ease-in-out infinite !important; }
-  .auth-bar    { animation: auth-bar-grow var(--bdur, 3.6s) ease-in-out infinite !important; }
+  .auth-tile   { animation: auth-float-y var(--dur, 14s) ease-in-out infinite !important; }
+  .auth-eq     { animation: auth-eq-var var(--bdur, 2.4s) ease-in-out infinite alternate !important; }
+  .auth-ring::before { animation: auth-ring-spin 11s linear infinite !important; }
   .auth-line-draw { animation: auth-draw 4.6s ease-in-out infinite !important; }
-  .auth-donut  { animation: auth-donut 5.5s ease-in-out infinite !important; }
+  .auth-chip--tunda { animation: auth-chip-in 6s ease-in-out infinite !important; }
   .auth-scanline { animation: auth-scan 3.2s ease-in-out infinite !important; }
 
   .auth-btn-shine::after { animation: auth-shine 3.6s ease-in-out infinite !important; }
   .auth-logo-pulse::before { animation: auth-ring 2.8s ease-out infinite !important; }
-
-  .hero-knot-spin { animation: knot-spin 18s linear infinite !important; }
-  .hero-orbit { animation: hero-orbit 9s linear infinite !important; }
-  .hero-glow  { animation: hero-glow 5.5s ease-in-out infinite !important; }
 
   /* Animasi masuk: tetap tampil sekali agar halaman tidak "melompat". */
   .auth-rise   { animation: auth-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both !important; }

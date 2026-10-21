@@ -167,9 +167,9 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="modal-layer">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="scrim" onClick={onClose} />
 
       {/* Modal Dialog */}
       <div role="dialog" aria-modal="true" aria-labelledby="widget-editor-title" className="relative w-full max-w-xl bg-surface rounded-card shadow-2xl border border-line overflow-hidden z-10 flex flex-col max-h-[90vh]">
@@ -239,7 +239,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               {/* Judul & Subtitle */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">
+                  <label className="label">
                     Judul Widget
                   </label>
                   <input
@@ -250,7 +250,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">
+                  <label className="label">
                     Keterangan / Subtitle
                   </label>
                   <input
@@ -306,11 +306,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               {/* Kategori & Periode */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Kategori</label>
+                  <label className="label">Kategori</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value="Keuangan">Keuangan</option>
                     <option value="Operasional">Operasional</option>
@@ -319,11 +319,11 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Periode Data</label>
+                  <label className="label">Periode Data</label>
                   <select
                     value={periode}
                     onChange={(e) => setPeriode(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value="2026-Q1">Triwulan I 2026 (Aktual)</option>
                     <option value="2026-Q2">Triwulan II 2026</option>
@@ -369,7 +369,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Nilai Baru Hasil Koreksi (Override)
                 </label>
                 <input
@@ -379,32 +379,32 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                     setCorrectedValue(e.target.value);
                     setIsApplyingCorrection(true);
                   }}
-                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-sm"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-warn font-mono text-sm"
                   placeholder="Contoh: Rp 45,20 M"
                 />
               </div>
 
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Nama Petugas Pengoreksi
                 </label>
                 <input
                   type="text"
                   value={correctedBy}
                   onChange={(e) => setCorrectedBy(e.target.value)}
-                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-warn"
                 />
               </div>
 
               <div>
-                <label className="block text-ink-2 font-medium mb-1">
+                <label className="label">
                   Alasan & Dasar Koreksi (Wajib untuk Audit)
                 </label>
                 <textarea
                   rows={3}
                   value={correctionReason}
                   onChange={(e) => setCorrectionReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs"
+                  className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-warn text-xs"
                   placeholder="Contoh: Penyesuaian saldo piutang berdasarkan Surat Keputusan Direksi No. 42/2026..."
                 />
               </div>

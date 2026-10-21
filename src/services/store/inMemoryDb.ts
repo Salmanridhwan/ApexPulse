@@ -306,9 +306,6 @@ export class InMemoryDb {
     ragApiKey: 'rag_live_sec_*********',
     ragModel: 'gpt-4o-mini',
     ragKnowledgeBaseId: '',
-    ragTimeoutSeconds: 60,
-    /** Jalur A via endpoint /extract (angka nyata + halaman sumber) — default aktif. */
-    ragUseExtract: true,
     smtpHost: 'smtp.mailgun.org',
     smtpPort: 587,
     smtpUser: 'alert@bumd-pemda.go.id',
@@ -1074,7 +1071,7 @@ export class InMemoryDb {
         {
           id: `msg-welcome-${Date.now()}`,
           sender: 'system',
-          text: 'Halo! Saya Aiones Boards Orchestrator, asisten dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
+          text: 'Halo! Saya Asisten Aiones Boards, siap membantu dengan dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
           timestamp: now,
         },
       ],
@@ -1113,7 +1110,7 @@ export class InMemoryDb {
         {
           id: `msg-welcome-${Date.now()}`,
           sender: 'system',
-          text: 'Halo! Saya Aiones Boards Orchestrator, asisten dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
+          text: 'Halo! Saya Asisten Aiones Boards, siap membantu dengan dokumen resmi instansi Anda. Tanyakan apa saja seputar dokumen (kinerja, anggaran, SOP), atau minta saya membuatkan/memperbarui dashboard BUMD.',
           timestamp: now,
         },
       ],

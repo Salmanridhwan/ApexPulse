@@ -59,8 +59,8 @@ export const LogoTile: React.FC<LogoTileProps> = ({ name, id, size = 'md', class
   const bg = warnaTile(id || name || 'AP');
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-control font-bold tracking-wide select-none shrink-0 ${ukuran} ${className}`}
-      style={{ backgroundColor: bg, color: warnaTeksTile(bg) }}
+      className={`tile-mark inline-flex items-center justify-center rounded-control font-bold tracking-wide select-none shrink-0 ${ukuran} ${className}`}
+      style={{ '--tile-bg': bg, '--tile-ink': warnaTeksTile(bg) } as React.CSSProperties}
       title={name}
     >
       {monogram(name || 'Aiones Boards')}
@@ -81,8 +81,8 @@ export const AvatarTile: React.FC<AvatarTileProps> = ({ name, id, size = 'md', c
   const bg = warnaTile(id || name || 'U');
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full font-bold select-none shrink-0 ${ukuran} ${className}`}
-      style={{ backgroundColor: bg, color: warnaTeksTile(bg) }}
+      className={`tile-mark inline-flex items-center justify-center rounded-full font-bold select-none shrink-0 ${ukuran} ${className}`}
+      style={{ '--tile-bg': bg, '--tile-ink': warnaTeksTile(bg) } as React.CSSProperties}
       title={name}
     >
       {monogram(name || 'Pengguna')}

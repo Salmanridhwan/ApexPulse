@@ -11,6 +11,13 @@ import { createServer as createViteServer } from 'vite';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
+import {
+  bagianSumber,
+  bagianTujuan,
+  judulWidgetMirip,
+  perintahHapusWidget,
+  tipeGrafikDariTeks,
+} from './src/services/chat/perintahWidget';
 import { ConfigurableRagClient, RagServiceError, jelaskanError, maskKey } from './src/services/rag/http';
 import {
   hitungRingkasanKatalog,
@@ -36,7 +43,7 @@ import {
   verifySession,
   SessionPayload,
 } from './src/services/auth/session';
-import { BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, WidgetGrid, WidgetSpec } from './src/types';
+import { AlertRule, BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -123,6 +130,7 @@ import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
 import {
   BATAS_UKURAN_BYTE,
   cariProjectKmsDariKb,
+  cariProjectKmsDariNama,
   hitungRingkasanBerkas,
   saringBerkas,
   validasiBerkas,
@@ -135,7 +143,7 @@ import {
  * dan TIDAK mengarang angka saat dokumen tidak memuatnya.
  */
 const CHATBOT_PERSONA =
-  'Kamu adalah "Aiones Boards Orchestrator", asisten AI ramah untuk instansi BUMD (Badan Usaha Milik Daerah). ' +
+  'Kamu adalah "Asisten Aiones Boards", asisten AI ramah untuk instansi BUMD (Badan Usaha Milik Daerah). ' +
   'Jawab dalam Bahasa Indonesia yang natural, ringkas, dan profesional. ' +
   'ATURAN WAJIB: (1) Untuk pertanyaan tentang data, angka, kinerja, atau isi dokumen instansi, jawab HANYA berdasarkan ' +
   'dokumen resmi di knowledge base ini dan sebutkan sumbernya; kalau dokumen tidak memuat, katakan jujur bahwa datanya ' +
@@ -171,8 +179,36 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
     res.status(401).json({ error: 'Sesi tidak valid atau telah berakhir. Silakan login ulang.' });
     return null;
   }
+  // Akun yang belum/tidak disetujui tidak boleh memakai sesi lama: kalau admin
+  // menonaktifkan atau menolak akun, cookie yang masih hidup harus langsung mati.
+  // User yang tidak ditemukan di memori dibiarkan lewat (bisa berasal dari instance
+  // lain yang belum tersinkron) supaya tidak memutus sesi yang sah.
+  const user = db.users.find((u) => u.id === session.userId);
+  if (user && (user.status || 'active') !== 'active') {
+    const menunggu = (user.status || 'active') === 'pending';
+    res.status(403).json({
+      error: menunggu
+        ? 'Akun Anda masih menunggu persetujuan admin instansi.'
+        : 'Akses akun Anda tidak aktif. Hubungi admin instansi.',
+      kode: menunggu ? 'PENDING_APPROVAL' : 'ACCOUNT_REJECTED',
+    });
+    return null;
+  }
   (req as AuthedRequest).session = session;
   return session;
+}
+
+/**
+ * Gerbang admin. Mengembalikan `true` bila boleh lanjut; bila tidak, respons 403
+ * sudah dikirim sehingga pemanggil cukup `if (!requireAdmin(...)) return;`.
+ *
+ * Semua route admin memakai ini supaya bentuk penolakan seragam dan cakupannya
+ * bisa diaudit dengan satu grep, bukan 41 salinan blok if yang gampang terlewat.
+ */
+function requireAdmin(session: SessionPayload, res: Response, pesan = 'Hanya administrator yang boleh melakukan tindakan ini.'): boolean {
+  if (session.role === 'admin') return true;
+  res.status(403).json({ error: pesan });
+  return false;
 }
 
 /**
@@ -214,9 +250,11 @@ async function startServer() {
     provider: db.systemConfig.ragProvider,
     baseUrl: db.systemConfig.ragApiUrl,
     apiKey: db.systemConfig.ragApiKey,
-    timeoutMs: db.systemConfig.ragTimeoutSeconds,
+    // Batas tunggu & jalur pengambilan sengaja TIDAK lagi jadi setelan admin:
+    // aplikasi selalu mencoba /extract lebih dulu (angka nyata + halaman sumber)
+    // dan otomatis jatuh ke retrieval biasa kalau layanan tidak punya /extract.
+    timeoutMs: 90,
     kbId: (db.systemConfig as any).ragKnowledgeBaseId || '',
-    useExtract: (db.systemConfig as any).ragUseExtract !== false,
   }));
   // Seed awal dari env (kalau ada) — admin tetap bisa override via panel.
   if (process.env.RAG_PROVIDER === 'http') db.systemConfig.ragProvider = 'http';
@@ -348,6 +386,21 @@ async function startServer() {
       });
     }
 
+    // Status keanggotaan diperiksa SETELAH kata sandi benar, supaya pesan
+    // "menunggu persetujuan" tidak bisa dipakai menebak email mana yang terdaftar.
+    const statusAkun = user.status || 'active';
+    if (statusAkun !== 'active') {
+      const namaInstansi = db.tenants.find((t) => t.id === (user!.requestedTenantId || user!.tenantId))?.name;
+      return res.status(403).json({
+        error:
+          statusAkun === 'pending'
+            ? `Akun Anda masih menunggu persetujuan admin ${namaInstansi || 'instansi'}.`
+            : 'Pendaftaran akun Anda ditolak. Hubungi admin instansi untuk informasi lebih lanjut.',
+        kode: statusAkun === 'pending' ? 'PENDING_APPROVAL' : 'ACCOUNT_REJECTED',
+        tenantName: namaInstansi || null,
+      });
+    }
+
     const token = signSession({
       userId: user.id,
       role: user.role,
@@ -457,6 +510,8 @@ async function startServer() {
       return res.status(400).json({ error: 'Instansi yang dipilih tidak dikenal.' });
     }
 
+    // Akun TIDAK langsung aktif. Pendaftaran mandiri hanya membuat permintaan
+    // `pending` yang harus disetujui admin instansi; sesi baru terbit setelah itu.
     const newUser: SafeUser = {
       id: `user-${Date.now()}`,
       email,
@@ -464,9 +519,27 @@ async function startServer() {
       role: 'analis',
       tenantId,
       avatar: '👤',
+      status: 'pending',
+      requestedTenantId: tenantId,
+      requestedAt: new Date().toISOString(),
     };
     db.createUser(newUser, hashPassword(password));
-    return terbitkanSesi(res, newUser, 'pendaftaran akun baru');
+    const instansiTujuan = db.tenants.find((t) => t.id === tenantId);
+    db.addAuditLog({
+      tenantId,
+      userId: newUser.id,
+      userName: newUser.name,
+      action: 'Pendaftaran Akun (menunggu persetujuan)',
+      target: instansiTujuan?.name || tenantId,
+      details: `Pendaftaran mandiri ${newUser.email} menunggu persetujuan admin instansi.`,
+    });
+    return res.status(202).json({
+      status: 'pending',
+      email,
+      tenantId,
+      tenantName: instansiTujuan?.name || null,
+      message: `Pendaftaran diterima. Akun Anda menunggu persetujuan admin ${instansiTujuan?.name || 'instansi'}.`,
+    });
   });
 
   /**
@@ -507,31 +580,65 @@ async function startServer() {
           error: 'Akun Google ini belum terdaftar dan pendaftaran sedang ditutup. Hubungi admin instansi.',
         });
       }
-      const tenantId = String(req.body?.tenantId || '').trim() || 'tenant-pdam';
+      // Instansi WAJIB dipilih. Dulu server diam-diam memakai 'tenant-pdam' atau
+      // instansi pertama, sehingga akun Google bisa mendarat di BUMD yang salah
+      // tanpa sepengetahuan pendaftar.
+      const tenantId = String(req.body?.tenantId || '').trim();
+      const instansiTujuan = db.tenants.find((t) => t.id === tenantId);
+      if (!instansiTujuan) {
+        return res.status(400).json({
+          error: 'Pilih instansi Anda sebelum mendaftar dengan Google.',
+          kode: 'BUTUH_INSTANSI',
+          instansiTersedia: db.tenants.map((t) => ({ id: t.id, name: t.name })),
+        });
+      }
       const baru: SafeUser = {
         id: `user-g-${profil.sub || Date.now()}`,
         email: profil.email,
         name: profil.name,
         role: 'analis',
-        tenantId: db.tenants.some((t) => t.id === tenantId) ? tenantId : 'tenant-pdam',
+        tenantId: instansiTujuan.id,
         avatar: profil.picture || '👤',
         googleSub: profil.sub,
         viaGoogle: true,
+        emailVerified: profil.emailVerified,
+        status: 'pending',
+        requestedTenantId: instansiTujuan.id,
+        requestedAt: new Date().toISOString(),
       };
       db.createUser(baru);
       db.addAuditLog({
         tenantId: baru.tenantId,
         userId: baru.id,
         userName: baru.name,
-        action: 'Registrasi via Google',
-        target: baru.name,
-        details: `Akun baru dibuat otomatis dari login Google (${baru.email})`,
+        action: 'Pendaftaran via Google (menunggu persetujuan)',
+        target: instansiTujuan.name,
+        details: `Akun Google ${baru.email} menunggu persetujuan admin instansi.`,
       });
-      user = baru;
+      return res.status(202).json({
+        status: 'pending',
+        email: baru.email,
+        tenantId: baru.tenantId,
+        tenantName: instansiTujuan.name,
+        message: `Pendaftaran diterima. Akun Anda menunggu persetujuan admin ${instansiTujuan.name}.`,
+      });
     } else if (!user.googleSub) {
       // Akun lokal dengan email sama: tautkan ke Google agar login berikutnya mulus.
       const updated = db.updateUser(user.id, { googleSub: profil.sub } as any);
       if (updated) user = updated;
+    }
+
+    const statusGoogle = user.status || 'active';
+    if (statusGoogle !== 'active') {
+      const namaInstansiG = db.tenants.find((t) => t.id === (user!.requestedTenantId || user!.tenantId))?.name;
+      return res.status(403).json({
+        error:
+          statusGoogle === 'pending'
+            ? `Akun Google Anda terdaftar dan masih menunggu persetujuan admin ${namaInstansiG || 'instansi'}.`
+            : 'Pendaftaran akun Anda ditolak. Hubungi admin instansi untuk informasi lebih lanjut.',
+        kode: statusGoogle === 'pending' ? 'PENDING_APPROVAL' : 'ACCOUNT_REJECTED',
+        tenantName: namaInstansiG || null,
+      });
     }
 
     return terbitkanSesi(res, user, 'Google Sign-In');
@@ -795,7 +902,7 @@ async function startServer() {
       // Layanan RAG tidak terhubung → jujur, tanpa angka contoh.
       if (err instanceof RagServiceError) {
         return res.status(502).json({
-          error: `Layanan RAG tidak dapat dihubungi: ${err.message}`,
+          error: `Layanan dokumen tidak dapat dihubungi: ${err.message}`,
           petunjuk: err.detail,
         });
       }
@@ -942,6 +1049,16 @@ async function startServer() {
     const { query, tipe } = req.body || {};
     if (!query || typeof query !== 'string' || query.trim().length < 10) {
       return res.status(400).json({ error: 'Kueri indikator terlalu pendek (minimal 10 karakter).' });
+    }
+    // Validasi tipe SEBELUM memanggil RAG. Tanpa ini, tipe ngawur (mis. "grafik" atau
+    // "tabel") diteruskan ke gerbang bentuk dan ditolak dengan pesan "bukan berbentuk
+    // grafik" — menyesatkan, karena masalahnya nama tipe yang tidak dikenal.
+    const TIPE_WIDGET_SAH = [...TIPE_SERI, 'kpi', 'gauge', 'bullet-target', 'table', 'narasi'];
+    if (tipe !== undefined && !TIPE_WIDGET_SAH.includes(String(tipe))) {
+      return res.status(400).json({
+        error: `Tipe widget "${String(tipe)}" tidak dikenal.`,
+        tipeSah: TIPE_WIDGET_SAH,
+      });
     }
 
     const tenantId = effectiveTenantId(req, session);
@@ -1184,7 +1301,20 @@ async function startServer() {
           // (judul + subjudul + periode + tipe), jangan tambah duplikat. Menambah
           // kartu kedua yang menanyakan hal sama membuat jumlah widget menipu.
           const kunciBaru = kunciKembarWidget(widgetBaru);
-          const kembar = activeDash.widgets.find((w) => kunciKembarWidget(w) === kunciBaru);
+          // Kunci kembar butuh subjudul & periode identik, sehingga indikator yang
+          // sama dengan judul sedikit berbeda ("Kepuasan Pengguna Penanganan" vs
+          // "Kepuasan pengguna atas penanganan") lolos jadi kartu kedua. Bandingkan
+          // juga judulnya; periode berbeda tetap dianggap widget berbeda.
+          const periodeSama = (a?: string, b?: string) => {
+            const x = String(a || '').toLowerCase().trim();
+            const y = String(b || '').toLowerCase().trim();
+            return !x || !y || x === y;
+          };
+          const kembar =
+            activeDash.widgets.find((w) => kunciKembarWidget(w) === kunciBaru) ||
+            activeDash.widgets.find(
+              (w) => judulWidgetMirip(w.title, widgetBaru.title) && periodeSama(w.periode, widgetBaru.periode)
+            );
           if (kembar) {
             const pesan =
               `Widget **"${kembar.title}"** sudah ada di kanvas dengan isi yang sama, jadi tidak saya tambahkan lagi. ` +
@@ -1236,7 +1366,7 @@ async function startServer() {
             target: widgetBaru.title,
             details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
           });
-          const pesan = `Widget **"${widgetBaru.title}"** ditambahkan ke kanvas dari data dokumen instansi (${widgetBaru.citations.length} sitasi).`;
+          const pesan = `Widget **"${widgetBaru.title}"** ditambahkan ke kanvas dari data dokumen instansi.`;
           sendEvent('step', { id: 's0', title: 'Widget ditambahkan dari dokumen', status: 'completed' });
           catatAsisten({ sender: 'system', text: pesan, actionTaken: 'add_widget' } as any);
           sendEvent('result', {
@@ -1249,9 +1379,11 @@ async function startServer() {
         } catch (err: any) {
           const detail =
             err instanceof RagServiceError ? err.detail || err.message : err?.message || 'kesalahan jaringan';
+          console.warn('[chat] tambah widget gagal:', detail);
+          // Pesan untuk pengguna: tanpa istilah teknis (RAG, kode HTTP, detail jaringan).
           const pesan =
-            `⚠️ Belum bisa menambahkan widget karena **layanan RAG tidak dapat dihubungi**.\n\nPenyebab: ${detail}`;
-          sendEvent('step', { id: 's0', title: 'Layanan RAG tidak dapat dihubungi', status: 'failed' });
+            `⚠️ Belum bisa menambahkan widget karena **layanan dokumen sedang tidak tersedia**.\n\nSilakan coba lagi beberapa saat lagi.`;
+          sendEvent('step', { id: 's0', title: 'Layanan dokumen tidak tersedia', status: 'failed' });
           catatAsisten({ sender: 'system', text: pesan, actionTaken: 'rag_error' } as any);
           sendEvent('result', { actionTaken: 'rag_error', message: pesan });
           sendEvent('done', { ok: false });
@@ -1260,15 +1392,24 @@ async function startServer() {
       }
 
       // Case 1: Hapus widget
-      if (lower.startsWith('hapus widget') || lower.includes('delete widget')) {
+      // Deteksi lewat pola, bukan awalan kalimat: "tolong hapus widget X" dulu
+      // lolos ke jalur tanya-jawab karena hanya `startsWith('hapus widget')`
+      // yang dikenali.
+      const kueriHapus = perintahHapusWidget(prompt);
+      if (kueriHapus !== null) {
         sendEvent('step', { id: 's1', title: 'Menganalisis widget yang akan dihapus...', status: 'in_progress' });
         await new Promise((r) => setTimeout(r, 400));
 
         if (activeDash && activeDash.widgets.length > 0) {
-          const query = lower.replace('hapus widget', '').trim();
-          const targetIdx = activeDash.widgets.findIndex((w) =>
-            w.title.toLowerCase().includes(query) || (w.category && w.category.toLowerCase().includes(query))
-          );
+          const query = kueriHapus;
+          const targetIdx = query
+            ? activeDash.widgets.findIndex(
+                (w) =>
+                  judulWidgetMirip(w.title, query) ||
+                  w.title.toLowerCase().includes(query) ||
+                  (w.category && w.category.toLowerCase().includes(query))
+              )
+            : -1;
 
           if (targetIdx !== -1) {
             const removed = activeDash.widgets[targetIdx];
@@ -1298,6 +1439,17 @@ async function startServer() {
             sendEvent('done', { ok: true });
             return res.end();
           }
+
+          // Sasaran tidak ketemu: beri tahu, jangan diam lalu dijawab jalur lain.
+          const daftarJudul = activeDash.widgets.slice(0, 6).map((w) => `"${w.title}"`).join(', ');
+          const pesan = query
+            ? `Tidak ada widget bernama **"${query}"** di dashboard ini. Yang ada: ${daftarJudul}.`
+            : `Sebutkan widget yang ingin dihapus, misalnya: hapus widget "${activeDash.widgets[0]?.title || 'Ringkasan Kinerja'}".`;
+          sendEvent('step', { id: 's1', title: 'Widget tidak ditemukan', status: 'failed' });
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+          sendEvent('result', { actionTaken: 'none', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
         }
       }
 
@@ -1312,16 +1464,25 @@ async function startServer() {
         sendEvent('step', { id: 's1', title: 'Menyesuaikan konfigurasi visualisasi widget...', status: 'in_progress' });
         await new Promise((r) => setTimeout(r, 400));
 
-        let newType: WidgetSpec['type'] = 'bar';
-        if (lower.includes('garis') || lower.includes('line')) newType = 'line';
-        if (lower.includes('area')) newType = 'area';
-        if (lower.includes('donat') || lower.includes('donut')) newType = 'donut';
-        if (lower.includes('kpi')) newType = 'kpi';
-        if (lower.includes('tabel') || lower.includes('table')) newType = 'table';
+        // Tipe TUJUAN hanya dibaca dari bagian SETELAH "menjadi/jadi/ke". Jenis
+        // yang disebut sebelumnya adalah SASARAN: "ubah grafik donat menjadi
+        // batang" berarti donat yang diubah menjadi batang — dulu kebalikannya
+        // (grafik garis pertama diubah jadi donat).
+        const tipeTujuan = tipeGrafikDariTeks(bagianTujuan(prompt));
+        const newType = (tipeTujuan || 'bar') as WidgetSpec['type'];
+        const tipeSumber = tipeGrafikDariTeks(bagianSumber(prompt));
 
         if (activeDash && activeDash.widgets.length > 0) {
-          // Find first chart widget or match title
+          const disebut = bagianSumber(prompt);
+          // Urutan sasaran: judul yang disebut → tipe sumber yang disebut
+          // ("grafik donat") → grafik pertama → widget pertama.
           const target =
+            activeDash.widgets.find(
+              (w) =>
+                String(w.title || '').trim().length > 2 &&
+                disebut.includes(String(w.title || '').toLowerCase().trim())
+            ) ||
+            (tipeSumber ? activeDash.widgets.find((w) => w.type === tipeSumber) : undefined) ||
             activeDash.widgets.find((w) => ['line', 'area', 'bar', 'donut'].includes(w.type)) ||
             activeDash.widgets[0];
 
@@ -1438,23 +1599,18 @@ async function startServer() {
 
           // Buang token template yang kadang "bocor" dari LLM (mis. `{-chart-}`)
           // supaya tidak tampil sebagai teks aneh di jawaban.
-          const answerBersih = answer.replace(/\{-[^}]*-\}/g, '').replace(/[ \t]+\n/g, '\n').trim();
+          const answerBersih = answer
+            .replace(/\{-[^}]*-\}/g, '')
+            // Tanda rujukan inline dari layanan dokumen ("[2]", "[16]") tidak perlu
+            // ditampilkan: pengguna cukup membaca jawabannya.
+            .replace(/\[\d{1,3}\]/g, '')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .trim();
 
-          // Bangun teks balasan: jawaban + daftar sumber dokumen (kalau ada).
-          let replyText = answerBersih;
-          if (citationsCount > 0) {
-            const sumberUnik = Array.from(
-              new Map(
-                ragResult.citations
-                  .filter((c) => c.docName)
-                  .map((c) => [c.docName, c])
-              ).values()
-            )
-              .slice(0, 4)
-              .map((c) => `• ${c.docName}${c.page ? ` (hal. ${c.page})` : ''}`)
-              .join('\n');
-            if (sumberUnik) replyText += `\n\n📄 **Sumber Dokumen:**\n${sumberUnik}`;
-          }
+          // Daftar sitasi TIDAK ditempel ke balasan: pengguna hanya butuh jawabannya.
+          // Jumlah sitasi tetap dihitung dan dikirim sebagai metadata untuk log.
+          const replyText = answerBersih;
 
           catatAsisten({
             sender: 'system',
@@ -1481,9 +1637,8 @@ async function startServer() {
               ? err.detail || err.message
               : err?.message || 'kesalahan jaringan';
           const pesanGalat =
-            `⚠️ Maaf, saya belum bisa menjawab karena **layanan RAG tidak dapat dihubungi**.\n\n` +
-            `Penyebab: ${detail}\n\n` +
-            `Silakan periksa koneksi layanan RAG (Admin → Konfigurasi RAG), lalu coba lagi. ` +
+            `⚠️ Maaf, saya belum bisa menjawab saat ini karena **layanan dokumen sedang tidak tersedia**.\n\n` +
+            `Silakan coba lagi beberapa saat lagi. ` +
             `Saya tidak menampilkan data contoh agar jawaban tidak menyesatkan.`;
           console.warn('[chat] chatbot RAG gagal:', detail);
 
@@ -1494,7 +1649,7 @@ async function startServer() {
             modeUsed: 'Gagal (Layanan RAG)',
           } as any);
 
-          sendEvent('step', { id: 'sc0', title: 'Layanan RAG tidak dapat dihubungi', status: 'failed' });
+          sendEvent('step', { id: 'sc0', title: 'Layanan dokumen tidak tersedia', status: 'failed' });
           sendEvent('result', {
             actionTaken: 'rag_error',
             message: pesanGalat,
@@ -1530,15 +1685,16 @@ async function startServer() {
       // resmi padahal angkanya karangan.
       if (!genResult.ok) {
         const gagalLayanan = genResult.modeUsed === 'Gagal (Layanan RAG)';
+        // Alasan teknis hanya untuk log server — pengguna cukup tahu layanannya
+        // sedang tidak tersedia dan apa yang bisa dilakukan.
+        if (genResult.alasanGagal) console.warn('[chat] dashboard gagal:', genResult.alasanGagal);
         const pesanGagal = gagalLayanan
-          ? `⚠️ Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}" karena **layanan RAG tidak dapat dihubungi**.\n\n` +
-            `Penyebab: ${genResult.alasanGagal || 'layanan tidak merespons'}\n\n` +
-            `Periksa koneksi layanan RAG (Admin → Konfigurasi RAG) lalu coba lagi. ` +
+          ? `⚠️ Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}" karena **layanan dokumen sedang tidak tersedia**.\n\n` +
+            `Silakan coba lagi beberapa saat lagi. ` +
             `Saya tidak membuat dashboard dari data contoh agar tidak menyesatkan.`
           : `Saya belum bisa membuat dashboard untuk instansi "${tenantAktif?.name || tenantId}". ` +
-            (genResult.alasanGagal || 'Dokumen instansi ini tidak memadai.') +
-            ` Yang bisa dilakukan: tambahkan atau rapikan dokumen instansi ini di knowledge base ` +
-            `(${kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || 'KB belum ditautkan'}), lalu coba lagi.`;
+            `Dokumen instansi ini belum memadai untuk angka yang bisa dipertanggungjawabkan. ` +
+            `Yang bisa dilakukan: tambahkan atau rapikan dokumen instansi ini, lalu coba lagi.`;
         catatAsisten({
           sender: 'system',
           text: pesanGagal,
@@ -1623,7 +1779,7 @@ async function startServer() {
 
       replyText +=
         genResult.modeUsed === 'Jalur A (LLM JSON)'
-          ? `Seluruh angka bersitasi dokumen resmi instansi ini (**${genResult.citationsCount} sitasi**).\n`
+          ? `Seluruh angka diambil dari dokumen resmi instansi ini.\n`
           : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
 
       // JUJUR soal jumlah widget: kalau pengguna meminta jumlah tertentu
@@ -1675,9 +1831,7 @@ async function startServer() {
     if (!session) return;
     // Probe menyentuh layanan RAG (Base URL/API key) — hanya admin yang boleh.
     // Non-admin (analis/direksi) dilarang menyentuh konfigurasi RAG sama sekali.
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh menguji koneksi RAG.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menguji koneksi RAG.')) return;
     const cfg = db.systemConfig;
     try {
       const probeRes = await ragClient.probe();
@@ -1708,7 +1862,7 @@ async function startServer() {
           ...(probeRes.baseDipakai ? [`Base URL aktif: ${probeRes.baseDipakai}${probeRes.baseDisesuaikan ? ' (disesuaikan otomatis)' : ''}`] : []),
           `Mode yang terdeteksi dari sampel query: ${probeRes.detectedMode}`,
           `Potongan dokumen terambil dari sampel: ${probeRes.sampleChunksCount}`,
-          `Jalur A (/extract) menyusun angka dari dokumen: ${cfg.ragProvider === 'http' && (db.systemConfig as any).ragUseExtract !== false ? 'aktif' : 'nonaktif'}`,
+          `Jalur A (/extract) dicoba lebih dulu; retrieval biasa dipakai otomatis bila layanan tidak punya /extract`,
           `Ketersediaan metadata angka per dokumen: ${probeRes.hasMetadata ? `${probeRes.sampleChunksCount} potongan siap diambil` : 'tidak ada'}`,
           `Dukungan keluaran JSON terstruktur: ${probeRes.canOutputJson ? 'Tersedia' : 'Tidak tersedia'}`,
           ...(probeRes.catatan || []),
@@ -1761,6 +1915,79 @@ async function startServer() {
     db.alertRules.push(newRule);
     db.persist();
     res.status(201).json(newRule);
+  });
+
+  /**
+   * Ubah aturan ambang batas. Dulu aturan hanya bisa DIBUAT: salah ketik ambang atau
+   * salah indikator membuat aturan permanen (tidak ada jalur ubah/hapus di UI maupun API).
+   * Validasi nilai ketat supaya PATCH tidak diam-diam menormalkan input ngawur.
+   */
+  app.patch('/api/alerts/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const rule = db.alertRules.find((r) => r.id === req.params.id && r.tenantId === tenantId);
+    if (!rule) return res.status(404).json({ error: 'Aturan ambang batas tidak ditemukan.' });
+
+    const OPERATOR_SAH: AlertRule['operator'][] = ['>', '>=', '<', '<='];
+    const SEVERITY_SAH: AlertRule['severity'][] = ['info', 'warning', 'critical'];
+    const body = req.body || {};
+
+    if (body.operator !== undefined && !OPERATOR_SAH.includes(body.operator)) {
+      return res.status(400).json({ error: `Operator "${body.operator}" tidak dikenal.`, operatorSah: OPERATOR_SAH });
+    }
+    if (body.severity !== undefined && !SEVERITY_SAH.includes(body.severity)) {
+      return res.status(400).json({ error: `Tingkat keparahan "${body.severity}" tidak dikenal.`, severitySah: SEVERITY_SAH });
+    }
+    if (body.threshold !== undefined) {
+      const angka = Number(body.threshold);
+      if (!Number.isFinite(angka)) return res.status(400).json({ error: 'Ambang batas harus berupa angka.' });
+    }
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return res.status(400).json({ error: 'Status aktif harus berupa boolean.' });
+    }
+
+    if (body.title !== undefined) rule.title = String(body.title).trim() || rule.title;
+    if (body.metricKey !== undefined) rule.metricKey = String(body.metricKey).trim() || rule.metricKey;
+    if (body.metricName !== undefined) rule.metricName = String(body.metricName).trim() || rule.metricName;
+    if (body.operator !== undefined) rule.operator = body.operator;
+    if (body.threshold !== undefined) rule.threshold = Number(body.threshold);
+    if (body.unit !== undefined) rule.unit = String(body.unit).trim() || rule.unit;
+    if (body.severity !== undefined) rule.severity = body.severity;
+    if (body.isActive !== undefined) rule.isActive = body.isActive;
+    if (Array.isArray(body.channels) && body.channels.length > 0) {
+      rule.channels = body.channels.map((c: unknown) => String(c)).filter(Boolean) as AlertRule['channels'];
+    }
+
+    db.persist();
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Ambang Batas',
+      target: rule.metricName,
+      details: `Aturan ${rule.metricName} ${rule.operator} ${rule.threshold} ${rule.unit} (${rule.isActive ? 'aktif' : 'nonaktif'})`,
+    });
+    res.json(rule);
+  });
+
+  app.delete('/api/alerts/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const idx = db.alertRules.findIndex((r) => r.id === req.params.id && r.tenantId === tenantId);
+    if (idx < 0) return res.status(404).json({ error: 'Aturan ambang batas tidak ditemukan.' });
+    const [dihapus] = db.alertRules.splice(idx, 1);
+    db.persist();
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Ambang Batas',
+      target: dihapus.metricName,
+      details: `Aturan ${dihapus.metricName} ${dihapus.operator} ${dihapus.threshold} ${dihapus.unit} dihapus.`,
+    });
+    res.json({ ok: true, id: dihapus.id });
   });
 
   // Evaluasi ambang batas: aturan hanya menyala kalau nilai indikator dari dokumen
@@ -2146,9 +2373,7 @@ async function startServer() {
   app.post('/api/pelaporan/alur', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengatur alur verifikasi.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengatur alur verifikasi.')) return;
     const tenantId = effectiveTenantId(req, session);
     const nama = String(req.body?.nama || '').trim();
     if (!nama) return res.status(400).json({ error: 'Nama alur verifikasi wajib diisi.' });
@@ -2184,9 +2409,7 @@ async function startServer() {
   app.delete('/api/pelaporan/alur/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus alur verifikasi.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus alur verifikasi.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deleteAlurVerifikasi(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'Alur verifikasi tidak ditemukan.' });
@@ -2239,9 +2462,7 @@ async function startServer() {
   app.post('/api/audit/temuan', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menambah temuan audit.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menambah temuan audit.')) return;
     const tenantId = effectiveTenantId(req, session);
     const galat = validasiTemuan(req.body);
     if (galat) return res.status(400).json({ error: galat });
@@ -2283,9 +2504,7 @@ async function startServer() {
   app.patch('/api/audit/temuan/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah temuan audit.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengubah temuan audit.')) return;
     const tenantId = effectiveTenantId(req, session);
     if (!db.getTemuanAuditById(req.params.id, tenantId)) {
       return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
@@ -2323,9 +2542,7 @@ async function startServer() {
   app.delete('/api/audit/temuan/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus temuan audit.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus temuan audit.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ada = db.getTemuanAuditById(req.params.id, tenantId);
     if (!ada) return res.status(404).json({ error: 'Temuan audit tidak ditemukan.' });
@@ -2414,9 +2631,7 @@ async function startServer() {
   app.post('/api/risiko', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menambah risiko.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menambah risiko.')) return;
     const tenantId = effectiveTenantId(req, session);
     const galat = validasiRisiko(req.body);
     if (galat) return res.status(400).json({ error: galat });
@@ -2461,9 +2676,7 @@ async function startServer() {
   app.patch('/api/risiko/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah risiko.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengubah risiko.')) return;
     const tenantId = effectiveTenantId(req, session);
     const lama = db.getRisikoById(req.params.id, tenantId);
     if (!lama) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
@@ -2509,9 +2722,7 @@ async function startServer() {
   app.delete('/api/risiko/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus risiko.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus risiko.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deleteRisiko(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'Risiko tidak ditemukan.' });
@@ -2609,9 +2820,7 @@ async function startServer() {
   app.post('/api/aset', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menambah aset.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menambah aset.')) return;
     const tenantId = effectiveTenantId(req, session);
     const galat = validasiAset(req.body);
     if (galat) return res.status(400).json({ error: galat });
@@ -2645,9 +2854,7 @@ async function startServer() {
   app.patch('/api/aset/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah aset.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengubah aset.')) return;
     const tenantId = effectiveTenantId(req, session);
     const lama = db.getAsetById(req.params.id, tenantId);
     if (!lama) return res.status(404).json({ error: 'Aset tidak ditemukan.' });
@@ -2687,9 +2894,7 @@ async function startServer() {
   app.delete('/api/aset/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus aset.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus aset.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deleteAset(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'Aset tidak ditemukan.' });
@@ -2732,9 +2937,7 @@ async function startServer() {
   app.post('/api/perjanjian-kinerja', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh membuat Perjanjian Kinerja.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh membuat Perjanjian Kinerja.')) return;
     const tenantId = effectiveTenantId(req, session);
     const galat = validasiPerjanjianKinerja(req.body);
     if (galat) return res.status(400).json({ error: galat });
@@ -2774,9 +2977,7 @@ async function startServer() {
   app.patch('/api/perjanjian-kinerja/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah Perjanjian Kinerja.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengubah Perjanjian Kinerja.')) return;
     const tenantId = effectiveTenantId(req, session);
     const lama = db.getPerjanjianKinerjaById(req.params.id, tenantId);
     if (!lama) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
@@ -2821,9 +3022,7 @@ async function startServer() {
   app.delete('/api/perjanjian-kinerja/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus Perjanjian Kinerja.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus Perjanjian Kinerja.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deletePerjanjianKinerja(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'Perjanjian Kinerja tidak ditemukan.' });
@@ -2919,9 +3118,7 @@ async function startServer() {
   app.post('/api/lkjip', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh membuat LKjIP.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh membuat LKjIP.')) return;
     const tenantId = effectiveTenantId(req, session);
     const galat = validasiLKjIP(req.body);
     if (galat) return res.status(400).json({ error: galat });
@@ -2962,9 +3159,7 @@ async function startServer() {
   app.patch('/api/lkjip/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh mengubah LKjIP.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh mengubah LKjIP.')) return;
     const tenantId = effectiveTenantId(req, session);
     const lama = db.getLKjIPById(req.params.id, tenantId);
     if (!lama) return res.status(404).json({ error: 'LKjIP tidak ditemukan.' });
@@ -3010,9 +3205,7 @@ async function startServer() {
   app.delete('/api/lkjip/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus LKjIP.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus LKjIP.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deleteLKjIP(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'LKjIP tidak ditemukan.' });
@@ -3086,12 +3279,42 @@ async function startServer() {
     if (eksplisit) return { organizationId: eksplisit, otomatis: false };
     try {
       const orgs = await daftarProjectKms();
-      const cocok = cariProjectKmsDariKb(orgs, tenant?.knowledgeBaseId);
-      if (cocok) return { organizationId: cocok.id, otomatis: true, projectKms: cocok.name };
+      const cocokKb = cariProjectKmsDariKb(orgs, tenant?.knowledgeBaseId);
+      if (cocokKb) return { organizationId: cocokKb.id, otomatis: true, projectKms: cocokKb.name };
+      // Cadangan: cocokkan NAMA instansi ke nama project KMS. Tanpa ini instansi yang
+      // KB-nya belum ditautkan di KMS selalu "belum dipetakan" walau project-nya ada,
+      // sehingga unggah/lihat/unduh berkas buntu (400) sampai admin mengisi manual.
+      const cocokNama = cariProjectKmsDariNama(orgs, tenant?.name);
+      if (cocokNama) return { organizationId: cocokNama.id, otomatis: true, projectKms: cocokNama.name };
     } catch {
       // KMS tak bisa dihubungi — jangan menebak. Pemanggil yang menampilkan galat.
     }
     return { organizationId: '', otomatis: false };
+  }
+
+  /**
+   * Balasan 400 saat instansi belum terpetakan, LENGKAP dengan daftar project KMS
+   * yang tersedia. Pesan lama hanya "belum dipetakan" tanpa jalan keluar, sehingga
+   * admin tidak tahu project mana yang harus dipilih.
+   */
+  async function balasBelumTerpetakan(res: Response) {
+    let daftar: { id: string; name: string; knowledgeBase?: string }[] = [];
+    try {
+      daftar = (await daftarProjectKms()).slice(0, 15).map((o) => ({
+        id: o.id,
+        name: o.name,
+        ...(o.knowledgeBase ? { knowledgeBase: o.knowledgeBase } : {}),
+      }));
+    } catch {
+      // KMS tak bisa dihubungi: tetap balas dengan petunjuk, tanpa daftar.
+    }
+    return res.status(400).json({
+      error: 'Instansi ini belum dipetakan ke project KMS.',
+      petunjuk:
+        'Isi "Project KMS" pada instansi di panel admin (Instansi & KB → Project KMS). ' +
+        'Pencocokan otomatis sudah dicoba lewat Knowledge Base dan nama instansi, tetapi tidak ada yang sama.',
+      projectTersedia: daftar,
+    });
   }
 
   /** Ambil instansi efektif + project KMS-nya. */
@@ -3180,6 +3403,9 @@ async function startServer() {
     const session = requireAuth(req, res);
     if (!session) return;
     const { tenant, organizationId } = await konteksBerkas(req, session);
+    // Cek pemetaan lebih dulu supaya balasannya berisi daftar project KMS, bukan
+    // "metadata tidak sah" yang menyesatkan dari validasi metadata.
+    if (!organizationId) return balasBelumTerpetakan(res);
 
     const nama = String(req.body?.nama || '').trim();
     const galatBerkas = validasiBerkas({ nama, ukuran: req.body?.ukuran, tipe: req.body?.tipe });
@@ -3238,12 +3464,10 @@ async function startServer() {
   app.delete('/api/berkas/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus berkas dari repositori.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus berkas dari repositori.')) return;
     const { tenant, organizationId } = await konteksBerkas(req, session);
     if (!organizationId) {
-      return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
+      return balasBelumTerpetakan(res);
     }
     try {
       await klienKms().hapusBerkas(req.params.id);
@@ -3272,7 +3496,7 @@ async function startServer() {
     if (!session) return;
     const { organizationId } = await konteksBerkas(req, session);
     if (!organizationId) {
-      return res.status(400).json({ error: 'Instansi ini belum dipetakan ke project KMS.' });
+      return balasBelumTerpetakan(res);
     }
     try {
       const { isi, contentType, namaBerkas } = await klienKms().ambilIsiBerkas(req.params.id, mode);
@@ -3295,9 +3519,7 @@ async function startServer() {
   app.get('/api/admin/kms-organisasi', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh melihat daftar project KMS.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh melihat daftar project KMS.')) return;
     try {
       const organisasi = await klienKms().daftarOrganisasi();
       res.json({ organisasi, baseUrl: (db.systemConfig as any).kmsApiUrl || '' });
@@ -3310,9 +3532,7 @@ async function startServer() {
   app.post('/api/admin/kms-uji', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh menguji koneksi KMS.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menguji koneksi KMS.')) return;
     const hasil = await klienKms().uji();
     res.status(hasil.ok ? 200 : 502).json(hasil);
   });
@@ -3351,9 +3571,7 @@ async function startServer() {
   app.post('/api/keuangan/ekstrak', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menarik data keuangan dari dokumen.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menarik data keuangan dari dokumen.')) return;
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const periode = req.body?.periode ? String(req.body.periode).trim() : '';
@@ -3435,9 +3653,7 @@ async function startServer() {
   app.delete('/api/keuangan/snapshot/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya admin yang boleh menghapus snapshot keuangan.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya admin yang boleh menghapus snapshot keuangan.')) return;
     const tenantId = effectiveTenantId(req, session);
     const ok = db.deleteSnapshotKeuangan(req.params.id, tenantId);
     if (!ok) return res.status(404).json({ error: 'Snapshot keuangan tidak ditemukan.' });
@@ -3552,6 +3768,19 @@ async function startServer() {
   });
 
   // ================= SHARE ROUTES =================
+  /** Masa berlaku bawaan tautan bagikan: 30 hari. `expiresInDays: 0` = tanpa kedaluwarsa. */
+  const HARI_KEDALUWARSA_TAUTAN = 30;
+  const kedaluwarsaTautan = (meta: any): number | null => {
+    const iso = typeof meta === 'object' && meta ? meta.expiresAt : null;
+    if (!iso) return null;
+    const t = Date.parse(String(iso));
+    return Number.isFinite(t) ? t : null;
+  };
+  const tautanKedaluwarsa = (meta: any): boolean => {
+    const batas = kedaluwarsaTautan(meta);
+    return batas !== null && Date.now() > batas;
+  };
+
   app.post('/api/dashboards/:id/share', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -3561,9 +3790,77 @@ async function startServer() {
     }
     const token = `share_${randomBytes(12).toString('hex')}`;
     const mode = req.body?.mode === 'editable' ? 'editable' : 'readonly';
-    db.shareTokens[token] = { dashboardId: req.params.id, mode } as any;
+    // Tautan sekarang punya masa berlaku dan tercatat pembuatnya. Dulu tautan
+    // berlaku selamanya dan tidak bisa dicabut — satu tautan bocor = akses permanen.
+    const diminta = Number(req.body?.expiresInDays);
+    const hari = Number.isFinite(diminta) && diminta >= 0 ? diminta : HARI_KEDALUWARSA_TAUTAN;
+    const sekarang = new Date();
+    const expiresAt = hari === 0 ? null : new Date(sekarang.getTime() + hari * 86_400_000).toISOString();
+    db.shareTokens[token] = {
+      dashboardId: req.params.id,
+      mode,
+      createdAt: sekarang.toISOString(),
+      expiresAt,
+      createdBy: session.name,
+    } as any;
     db.persist();
-    res.json({ token, shareUrl: `/share/${token}`, mode });
+    db.addAuditLog({
+      tenantId: dash.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Buat Tautan Bagikan',
+      target: dash.title,
+      details: `Mode ${mode}, berlaku ${hari === 0 ? 'tanpa batas' : `${hari} hari`} (${expiresAt || '-'}).`,
+    });
+    res.json({ token, shareUrl: `/share/${token}`, mode, expiresAt });
+  });
+
+  /** Daftar tautan aktif untuk satu dashboard (dipakai panel Bagikan untuk mencabut). */
+  app.get('/api/dashboards/:id/shares', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const dash = db.getDashboardById(req.params.id, effectiveTenantId(req, session));
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
+    const daftar = Object.entries(db.shareTokens)
+      .map(([token, meta]: [string, any]) => {
+        const dashboardId = typeof meta === 'object' && meta ? meta.dashboardId : meta;
+        if (dashboardId !== dash.id) return null;
+        return {
+          token,
+          mode: (typeof meta === 'object' && meta && meta.mode) || 'readonly',
+          createdAt: (typeof meta === 'object' && meta && meta.createdAt) || null,
+          expiresAt: (typeof meta === 'object' && meta && meta.expiresAt) || null,
+          createdBy: (typeof meta === 'object' && meta && meta.createdBy) || null,
+          kedaluwarsa: tautanKedaluwarsa(meta),
+        };
+      })
+      .filter(Boolean);
+    res.json(daftar);
+  });
+
+  /** Cabut tautan bagikan: tautan langsung tidak bisa dipakai lagi (410). */
+  app.delete('/api/share/:token', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const token = req.params.token;
+    const meta: any = db.shareTokens[token];
+    if (!meta) return res.status(404).json({ error: 'Tautan tidak ditemukan.' });
+    const dashboardId = typeof meta === 'object' ? meta.dashboardId : meta;
+    const dash = db.dashboards.find((d) => d.id === dashboardId);
+    if (!dash || dash.tenantId !== effectiveTenantId(req, session)) {
+      return res.status(404).json({ error: 'Tautan tidak ditemukan.' });
+    }
+    delete db.shareTokens[token];
+    db.persist();
+    db.addAuditLog({
+      tenantId: dash.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Cabut Tautan Bagikan',
+      target: dash.title,
+      details: `Tautan ${token} dicabut (mode ${(typeof meta === 'object' && meta.mode) || 'readonly'}).`,
+    });
+    res.json({ ok: true, token });
   });
 
   app.get('/api/share/:token', (req: Request, res: Response) => {
@@ -3572,7 +3869,10 @@ async function startServer() {
     const mode = typeof shareMeta === 'object' && shareMeta ? shareMeta.mode : 'readonly';
 
     if (!dashId) {
-      return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan atau telah kedaluwarsa.' });
+      return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan atau telah dicabut.' });
+    }
+    if (tautanKedaluwarsa(shareMeta)) {
+      return res.status(410).json({ error: 'Tautan berbagi sudah kedaluwarsa. Minta pembuat dashboard membuat tautan baru.' });
     }
     const dash = db.dashboards.find((d) => d.id === dashId);
     if (!dash) {
@@ -3597,48 +3897,79 @@ async function startServer() {
     if (!dashId) {
       return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
     }
+    if (tautanKedaluwarsa(shareMeta)) {
+      return res.status(410).json({ error: 'Tautan berbagi sudah kedaluwarsa.' });
+    }
     if (mode !== 'editable') {
       return res.status(403).json({ error: 'Tautan ini bersifat Read-Only dan tidak dapat diedit.' });
+    }
+    // Hanya `widgets` yang boleh diubah lewat tautan publik. Field lain (mis. `title`)
+    // dulu diabaikan diam-diam sehingga klien mengira perubahannya tersimpan.
+    // `title` ikut didukung: kanvas tautan mode edit punya judul dashboard yang bisa
+    // diubah. Dulu field ini ditolak/diabaikan, sehingga perubahan judul tidak tersimpan.
+    const fieldDidukung = ['widgets', 'title'];
+    const fieldAsing = Object.keys(req.body || {}).filter((k) => !fieldDidukung.includes(k));
+    if (fieldAsing.length > 0) {
+      return res.status(400).json({
+        error: `Field tidak didukung pada tautan publik: ${fieldAsing.join(', ')}. Yang bisa diubah: ${fieldDidukung.join(', ')}.`,
+        fieldDidukung,
+      });
     }
 
     const dash = db.dashboards.find((d) => d.id === dashId);
     if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
 
     const widgets = req.body?.widgets as WidgetSpec[] | undefined;
-    if (!Array.isArray(widgets)) {
-      return res.status(400).json({ error: 'Field "widgets" wajib berupa array.' });
+    const judulBaru = req.body?.title;
+    if (widgets === undefined && judulBaru === undefined) {
+      return res.status(400).json({ error: 'Kirim minimal satu field: "widgets" atau "title".' });
     }
-    // Paritas penuh dengan kanvas pembuat: urutkan, ubah lebar, edit, gandakan,
-    // tambah, dan hapus. Bentuk tiap widget tetap divalidasi (tidak sekadar
-    // dipercaya) supaya tautan publik tak bisa menyimpan data rusak.
-    const sah = widgets.filter(
-      (w) => w && typeof w.id === 'string' && WidgetSpecSchema.safeParse(w).success
+    if (judulBaru !== undefined && (typeof judulBaru !== 'string' || judulBaru.trim().length === 0)) {
+      return res.status(400).json({ error: 'Field "title" wajib berupa teks yang tidak kosong.' });
+    }
+    let sah: WidgetSpec[] = dash.widgets;
+    let rincian = '';
+    if (widgets !== undefined) {
+      if (!Array.isArray(widgets)) {
+        return res.status(400).json({ error: 'Field "widgets" wajib berupa array.' });
+      }
+      // Paritas penuh dengan kanvas pembuat: urutkan, ubah lebar, edit, gandakan,
+      // tambah, dan hapus. Bentuk tiap widget tetap divalidasi (tidak sekadar
+      // dipercaya) supaya tautan publik tak bisa menyimpan data rusak.
+      const kandidat = widgets.filter(
+        (w) => w && typeof w.id === 'string' && WidgetSpecSchema.safeParse(w).success
+      );
+      if (kandidat.length === 0 && widgets.length > 0) {
+        return res.status(400).json({ error: 'Tidak ada widget valid untuk diperbarui.' });
+      }
+      const idSebelum = new Set(dash.widgets.map((w) => w.id));
+      const idSesudah = new Set(kandidat.map((w) => w.id));
+      const ditambah = [...idSesudah].filter((id) => !idSebelum.has(id)).length;
+      const dihapus = [...idSebelum].filter((id) => !idSesudah.has(id)).length;
+      rincian = [
+        ditambah > 0 ? `+${ditambah} ditambah` : null,
+        dihapus > 0 ? `-${dihapus} dihapus` : null,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      sah = kandidat;
+    }
+
+    const updated = db.updateDashboard(
+      dashId,
+      { widgets: sah, ...(judulBaru !== undefined ? { title: judulBaru.trim() } : {}) },
+      dash.tenantId
     );
-    if (sah.length === 0 && widgets.length > 0) {
-      return res.status(400).json({ error: 'Tidak ada widget valid untuk diperbarui.' });
-    }
-    const idSebelum = new Set(dash.widgets.map((w) => w.id));
-    const idSesudah = new Set(sah.map((w) => w.id));
-    const ditambah = [...idSesudah].filter((id) => !idSebelum.has(id)).length;
-    const dihapus = [...idSebelum].filter((id) => !idSesudah.has(id)).length;
-
-    const updated = db.updateDashboard(dashId, { widgets: sah }, dash.tenantId);
     if (!updated) return res.status(500).json({ error: 'Gagal menyimpan perubahan.' });
-
-    // Catat jejak audit: perubahan lewat tautan publik (termasuk tambah/hapus).
-    const rincian = [
-      ditambah > 0 ? `+${ditambah} ditambah` : null,
-      dihapus > 0 ? `-${dihapus} dihapus` : null,
-    ]
-      .filter(Boolean)
-      .join(', ');
     db.auditLogs.unshift({
       id: `audit_${randomBytes(8).toString('hex')}`,
       tenantId: dash.tenantId,
       userId: 'public-link',
       userName: 'Editor Tautan Publik',
       action: 'UPDATE',
-      target: `Dashboard "${dash.title}" via tautan publik — ${sah.length} widget${rincian ? ` (${rincian})` : ''}`,
+      target: `Dashboard "${dash.title}" via tautan publik — ${sah.length} widget${rincian ? ` (${rincian})` : ''}${
+        judulBaru !== undefined && judulBaru.trim() !== dash.title ? `, judul diubah menjadi "${judulBaru.trim()}"` : ''
+      }`,
       timestamp: new Date().toISOString(),
     } as (typeof db.auditLogs)[number]);
     db.persist();
@@ -3673,9 +4004,7 @@ async function startServer() {
   app.get('/api/admin/stats', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const totalWidgets = db.dashboards.reduce((acc, d) => acc + d.widgets.length, 0);
     const totalCitations = db.dashboards.reduce(
       (acc, d) => acc + d.widgets.reduce((wAcc, w) => wAcc + (w.citations?.length || 0), 0),
@@ -3696,18 +4025,103 @@ async function startServer() {
   app.get('/api/admin/users', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     res.json(db.users);
+  });
+
+  // ================= PERMINTAAN BERGABUNG (PERSETUJUAN ADMIN) =================
+  // Pendaftaran mandiri (email + kata sandi MAUPUN Google) tidak langsung memberi
+  // akses. Admin instansi melihat daftar permintaan di sini, lalu menyetujui atau
+  // menolak. Sesi hanya terbit untuk akun berstatus `active`.
+  app.get('/api/admin/join-requests', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Panel admin bersifat lintas instansi: tanpa `?tenantId=` tampilkan SEMUA
+    // permintaan pending supaya admin tidak perlu berpindah konteks satu per satu.
+    const filterTenant = String(req.query.tenantId || '').trim();
+    const daftar = db.users
+      .filter((u) => (u.status || 'active') === 'pending' && (!filterTenant || u.tenantId === filterTenant))
+      .sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')))
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        tenantId: u.tenantId,
+        tenantName: db.tenants.find((t) => t.id === u.tenantId)?.name || null,
+        viaGoogle: !!u.viaGoogle,
+        emailVerified: !!u.emailVerified,
+        requestedAt: u.requestedAt || null,
+      }));
+    res.json(daftar);
+  });
+
+  app.post('/api/admin/join-requests/:id/approve', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menyetujui pendaftaran.')) return;
+    const user = db.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    if ((user.status || 'active') !== 'pending') {
+      return res.status(409).json({ error: 'Akun ini bukan permintaan yang menunggu persetujuan.' });
+    }
+    const ROLE_SAH: UserRole[] = ['admin', 'analis', 'direksi'];
+    const roleDiminta = req.body?.role;
+    if (roleDiminta !== undefined && !ROLE_SAH.includes(roleDiminta)) {
+      return res.status(400).json({ error: `Peran "${roleDiminta}" tidak dikenal.`, roleSah: ROLE_SAH });
+    }
+    const tenantTujuan =
+      String(req.body?.tenantId || '').trim() ||
+      user.requestedTenantId ||
+      user.tenantId;
+    if (!db.tenants.some((t) => t.id === tenantTujuan)) {
+      return res.status(400).json({ error: 'Instansi tujuan tidak dikenal.' });
+    }
+    const updated = db.updateUser(user.id, {
+      status: 'active',
+      tenantId: tenantTujuan,
+      requestedTenantId: undefined,
+      role: (roleDiminta as UserRole) || user.role,
+    } as any);
+    if (!updated) return res.status(500).json({ error: 'Gagal menyetujui permintaan.' });
+    db.addAuditLog({
+      tenantId: tenantTujuan,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Setujui Pendaftaran',
+      target: updated.name,
+      details: `Akun ${updated.email} disetujui sebagai ${updated.role} di ${db.tenants.find((t) => t.id === tenantTujuan)?.name || tenantTujuan} (${updated.viaGoogle ? 'Google' : 'kata sandi'}).`,
+    });
+    res.json({ ok: true, user: safeUser(updated) });
+  });
+
+  app.post('/api/admin/join-requests/:id/reject', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menolak pendaftaran.')) return;
+    const user = db.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    if ((user.status || 'active') !== 'pending') {
+      return res.status(409).json({ error: 'Akun ini bukan permintaan yang menunggu persetujuan.' });
+    }
+    const updated = db.updateUser(user.id, { status: 'rejected' } as any);
+    if (!updated) return res.status(500).json({ error: 'Gagal menolak permintaan.' });
+    db.addAuditLog({
+      tenantId: updated.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tolak Pendaftaran',
+      target: updated.name,
+      details: `Pendaftaran ${updated.email} ditolak${req.body?.alasan ? `: ${String(req.body.alasan).slice(0, 200)}` : '.'}`,
+    });
+    res.json({ ok: true, id: updated.id });
   });
 
   app.post('/api/admin/users', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const email = (req.body.email || `user${Date.now()}@bumd.id`).trim().toLowerCase();
     if (db.users.some((u) => u.email.toLowerCase() === email)) {
       return res.status(409).json({ error: 'Email sudah terdaftar di sistem.' });
@@ -3738,9 +4152,7 @@ async function startServer() {
   app.patch('/api/admin/users/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const updated = db.updateUser(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
@@ -3759,9 +4171,7 @@ async function startServer() {
   app.delete('/api/admin/users/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     if (req.params.id === session.userId) {
       return res.status(400).json({ error: 'Tidak bisa menghapus akun sendiri.' });
     }
@@ -3784,9 +4194,7 @@ async function startServer() {
   app.post('/api/admin/tenants', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const newTenant = {
       id: `tenant-${Date.now()}`,
       name: req.body.name || 'BUMD Baru',
@@ -3822,8 +4230,13 @@ async function startServer() {
   app.patch('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Hanya key menu yang dikenal yang disimpan; sisanya dibuang supaya salah
+    // ketik/tambahan dari versi frontend lain tidak ikut masuk ke data tenant.
+    if ('menuSembunyi' in (req.body || {})) {
+      const sah = ['pelaporan', 'auditTl', 'keuangan', 'risiko', 'aset', 'pk', 'lkjip', 'berkas'];
+      const masuk = Array.isArray(req.body.menuSembunyi) ? req.body.menuSembunyi : [];
+      req.body.menuSembunyi = [...new Set(masuk.filter((k: unknown) => typeof k === 'string' && sah.includes(k)))];
     }
     // Segarkan dulu supaya tenant yang dibuat di instance lain tetap bisa diubah.
     await db.segarkanTenantDariMysql();
@@ -3849,9 +4262,7 @@ async function startServer() {
   app.delete('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const target = db.tenants.find((t) => t.id === req.params.id);
     const success = await db.deleteTenant(req.params.id);
     if (!success) {
@@ -3969,9 +4380,7 @@ async function startServer() {
   app.post('/api/admin/tenants/:id/sinkron-rag', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh menyinkronkan RAG.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menyinkronkan RAG.')) return;
     const hasil = await sinkronTenantRag(req.params.id, session);
     if (!hasil.ok) return res.status(hasil.status).json({ error: hasil.error });
     res.json({
@@ -3989,9 +4398,7 @@ async function startServer() {
   app.get('/api/admin/config', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     // API key dikirim ter-mask — nilai asli hanya hidup di server.
     res.json({
       ...db.systemConfig,
@@ -4009,9 +4416,7 @@ async function startServer() {
   app.get('/api/admin/knowledge', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const kb = String((req.query.kb as string) || (db.systemConfig as any).ragKnowledgeBaseId || '').trim();
     try {
       const hasil = await ragClient.daftarDokumen(kb);
@@ -4034,9 +4439,7 @@ async function startServer() {
   app.get('/api/admin/kb-profil', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const kb = String(req.query.kb || '').trim();
     try {
       const hasil = await ragClient.profilInstansi(kb);
@@ -4063,9 +4466,7 @@ async function startServer() {
   app.get('/api/admin/kb-tersedia', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh melihat katalog knowledge base.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh melihat katalog knowledge base.')) return;
 
     let hasil: { kbs: any[]; catatan?: string };
     try {
@@ -4108,9 +4509,7 @@ async function startServer() {
   app.post('/api/admin/config-simpan-uji', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengubah konfigurasi.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengubah konfigurasi.')) return;
 
     const sebelum = { ...db.systemConfig };
     try {
@@ -4169,9 +4568,7 @@ async function startServer() {
   app.post('/api/admin/config', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
-      return res.status(403).json({ error: 'Hanya administrator yang boleh mengakses panel ini.' });
-    }
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     // API key jangan pernah tersimpan ter-mask sebagai nilai aktif. Dua kasus:
     // (a) nilai yang dikirim sama dengan mask key saat ini -> pertahankan key lama
     // (b) nilai yang dikirim SUDAH BERBENTUK MASK (mis. panel dibuka sebelum key

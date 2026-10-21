@@ -189,11 +189,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       {/* Font & ukuran */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-ink-2 font-medium mb-1">Jenis Font</label>
+          <label className="label">Jenis Font</label>
           <select
             value={style.font || ''}
             onChange={(e) => ubah({ font: (e.target.value || undefined) as WidgetStyle['font'] })}
-            className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+            className="field-lg"
           >
             <option value="">Bawaan (Inter)</option>
             {FONT_TERSEDIA.map((f) => (
@@ -202,7 +202,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           </select>
         </div>
         <div>
-          <label className="block text-ink-2 font-medium mb-1">
+          <label className="label">
             Ukuran Font Label: {style.fontUkuran ?? 10} px
           </label>
           <input
@@ -223,7 +223,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       {/* Ketebalan garis */}
       {tampilGaris && (
         <div>
-          <label className="block text-ink-2 font-medium mb-1">
+          <label className="label">
             Ketebalan Garis: {style.garisTebal ?? 2} px
           </label>
           <input
@@ -244,7 +244,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       {/* Sudut batang */}
       {tampilBatang && (
         <div>
-          <label className="block text-ink-2 font-medium mb-1">
+          <label className="label">
             Sudut Batang: {style.batangRadius ?? 4} px
           </label>
           <input

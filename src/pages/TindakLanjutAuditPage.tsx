@@ -609,8 +609,8 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
 
       {/* ===== Modal: Tambah/Ubah Temuan (admin) ===== */}
       {isTemuanOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setIsTemuanOpen(false)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setIsTemuanOpen(false)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -628,11 +628,11 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
             <form onSubmit={simpanTemuan} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Sumber Pemeriksa</label>
+                  <label className="label">Sumber Pemeriksa</label>
                   <select
                     value={fSumber}
                     onChange={(e) => setFSumber(e.target.value as SumberAudit)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     {(Object.keys(LABEL_SUMBER_AUDIT) as SumberAudit[]).map((s) => (
                       <option key={s} value={s}>
@@ -642,51 +642,51 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Tanggal LHP</label>
+                  <label className="label">Tanggal LHP</label>
                   <input
                     type="date"
                     value={fTanggalLHP}
                     onChange={(e) => setFTanggalLHP(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Nomor LHP *</label>
+                  <label className="label">Nomor LHP *</label>
                   <input
                     type="text"
                     required
                     value={fNomorLHP}
                     onChange={(e) => setFNomorLHP(e.target.value)}
                     placeholder="mis. 05/LHP/XX/2025"
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Periode Diperiksa</label>
+                  <label className="label">Periode Diperiksa</label>
                   <input
                     type="text"
                     value={fPeriode}
                     onChange={(e) => setFPeriode(e.target.value)}
                     placeholder="mis. 2024"
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Judul Temuan *</label>
+                <label className="label">Judul Temuan *</label>
                 <input
                   type="text"
                   required
                   value={fJudul}
                   onChange={(e) => setFJudul(e.target.value)}
                   placeholder="Ringkasan singkat temuan"
-                  className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="field-lg"
                 />
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Uraian</label>
+                <label className="label">Uraian</label>
                 <textarea
                   rows={3}
                   value={fUraian}
@@ -696,7 +696,7 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Rekomendasi *</label>
+                <label className="label">Rekomendasi *</label>
                 <textarea
                   rows={3}
                   required
@@ -708,33 +708,33 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Nilai (Rp)</label>
+                  <label className="label">Nilai (Rp)</label>
                   <input
                     type="number"
                     min={0}
                     value={fNilai}
                     onChange={(e) => setFNilai(e.target.value)}
                     placeholder="opsional"
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Batas Waktu</label>
+                  <label className="label">Batas Waktu</label>
                   <input
                     type="date"
                     value={fBatasWaktu}
                     onChange={(e) => setFBatasWaktu(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">PIC</label>
+                  <label className="label">PIC</label>
                   <input
                     type="text"
                     value={fPIC}
                     onChange={(e) => setFPIC(e.target.value)}
                     placeholder="Unit/pejabat"
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
               </div>
@@ -761,8 +761,8 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
 
       {/* ===== Modal: Catat Tindak Lanjut ===== */}
       {tlUntuk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-scrim/50 backdrop-blur-xs" onClick={() => setTlUntuk(null)} />
+        <div className="modal-layer">
+          <div className="scrim" onClick={() => setTlUntuk(null)} />
           <div
             role="dialog"
             aria-modal="true"
@@ -814,7 +814,7 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
 
             <form onSubmit={simpanTindakLanjut} className="space-y-3">
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Uraian Tindak Lanjut *</label>
+                <label className="label">Uraian Tindak Lanjut *</label>
                 <textarea
                   rows={3}
                   required
@@ -826,20 +826,20 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Tanggal</label>
+                  <label className="label">Tanggal</label>
                   <input
                     type="date"
                     value={tlTanggal}
                     onChange={(e) => setTlTanggal(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Status Sesudah</label>
+                  <label className="label">Status Sesudah</label>
                   <select
                     value={tlStatus}
                     onChange={(e) => setTlStatus(e.target.value as StatusTindakLanjut)}
-                    className="w-full px-3 py-2 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="field-lg"
                   >
                     <option value="proses">Sedang Ditindaklanjuti</option>
                     <option value="selesai">Selesai</option>
@@ -849,7 +849,7 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
               </div>
               {tlStatus === 'tidak_ditindaklanjuti' && (
                 <div>
-                  <label className="block text-ink-2 font-medium mb-1">Alasan *</label>
+                  <label className="label">Alasan *</label>
                   <textarea
                     rows={2}
                     required
@@ -861,7 +861,7 @@ export const TindakLanjutAuditPage: React.FC<TindakLanjutAuditPageProps> = ({
                 </div>
               )}
               <div>
-                <label className="block text-ink-2 font-medium mb-1">Bukti (satu per baris)</label>
+                <label className="label">Bukti (satu per baris)</label>
                 <textarea
                   rows={2}
                   value={tlBukti}

@@ -66,10 +66,20 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
       try {
         const res = await fetch(`/api/share/${token}`);
         if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error('Tautan ini tidak ditemukan, telah kedaluwarsa, atau dicabut.');
+          // Server membedakan 404 (token tidak ada/dicabut) dan 410 (kedaluwarsa),
+          // dan mengirim alasannya di `error`. Pakai pesan itu kalau ada.
+          const data = await res.json().catch(() => null);
+          if (res.status === 410) {
+            throw new Error(
+              data?.error || 'Masa berlaku tautan ini sudah habis. Minta pemilik dashboard membuat tautan baru.'
+            );
           }
-          throw new Error(`Gagal memuat dashboard (Status: ${res.status})`);
+          if (res.status === 404) {
+            throw new Error(
+              data?.error || 'Tautan ini tidak ditemukan atau sudah dicabut oleh pemilik dashboard.'
+            );
+          }
+          throw new Error(data?.error || `Gagal memuat dashboard (Status: ${res.status})`);
         }
         const dashData: Dashboard & { accessMode?: 'readonly' | 'editable'; tenant?: Tenant | null } = await res.json();
         setDashboard(dashData);
