@@ -3360,6 +3360,7 @@ async function startServer() {
           uploadedAt: d.dibuat,
           chunksCount: d.potongan,
           halaman: d.halaman,
+          token: d.token,
           ragStatus: d.status === 'completed' ? 'indexed' : d.status,
           hanyaBasis: true,
         }));

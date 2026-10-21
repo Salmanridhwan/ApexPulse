@@ -622,6 +622,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           {Number.isFinite(Number(b.chunksCount)) && Number(b.chunksCount) > 0 && (
                             <span>· {b.chunksCount} potongan teks terindeks</span>
                           )}
+                          {Number(b.token) > 0 && (
+                            <span>· {Number(b.token).toLocaleString('id-ID')} token</span>
+                          )}
                           {b.organizationName && cakupanAll && <span>· {b.organizationName}</span>}
                         </div>
                         {!sudahTerindeks(b.ragStatus) && (

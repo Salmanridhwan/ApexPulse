@@ -1235,6 +1235,8 @@ export interface BerkasKMS {
   cdnFileId?: string | null;
   /** Jumlah halaman (dari basis dokumen, bukan repositori). */
   halaman?: number;
+  /** Jumlah token teks yang terindeks di basis dokumen. */
+  token?: number;
   /** true = dokumen sudah ada di basis dokumen instansi tetapi belum pernah
    *  masuk repositori, jadi belum ada salinan berkas untuk pratinjau/unduh. */
   hanyaBasis?: boolean;
