@@ -127,10 +127,10 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
     try {
       const res = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}/kms-hubungkan`, { method: 'POST' });
       const isi = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(isi?.error || 'Gagal menghubungkan ke KMS.');
+      if (!res.ok) throw new Error(isi?.error || 'Gagal menghubungkan ke repositori dokumen.');
       setPesan({
         tipe: 'ok',
-        teks: `${isi.dibuat ? 'Project baru dibuat' : 'Terhubung'} di Ragkms: ${isi.organisasi?.name} (${isi.organisasi?.id}).`,
+        teks: `${isi.dibuat ? 'Repositori baru dibuat' : 'Terhubung'} di repositori dokumen: ${isi.organisasi?.name} (${isi.organisasi?.id}).`,
       });
       await muat();
     } catch (err: any) {
@@ -217,7 +217,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       const cdn = balasan?.berkas?.cdnFileId;
       setPesan({
         tipe: 'ok',
-        teks: `Berkas "${fJudul.trim()}" berhasil diunggah ke Ragkms${kb ? ` · KB ${kb}` : ''}${cdn ? ` · CDN ✓` : ' · CDN belum tercatat'}${status ? ` · status RAG: ${status}` : ''}.`,
+        teks: `Berkas "${fJudul.trim()}" berhasil diunggah ke repositori dokumen${kb ? ` · basis dokumen ${kb}` : ''}${cdn ? ` · salinan media ✓` : ' · salinan media belum tercatat'}${status ? ` · status indeks: ${status}` : ''}.`,
       });
       resetForm();
       setPanelUnggah(false);
@@ -230,7 +230,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   };
 
   const hapus = async (b: BerkasKMS) => {
-    if (!window.confirm(`Hapus "${b.title}" dari repositori? Berkas juga dihapus dari CDN & RAG.`)) return;
+    if (!window.confirm(`Hapus "${b.title}" dari repositori? Berkas juga dihapus dari salinan media dan indeks pencarian.`)) return;
     try {
       const res = await fetch(`/api/berkas/${encodeURIComponent(b.id)}?tenantId=${encodeURIComponent(tenantId)}`, { method: 'DELETE' });
       const balasan = await res.json().catch(() => ({}));
@@ -257,7 +257,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
         warna: 'bg-solid',
       },
       {
-        label: 'Terindeks RAG',
+        label: 'Terindeks',
         nilai: String(ringkas?.terindeks ?? 0),
         ikon: <ShieldCheck className="w-4 h-4" />,
         warna: 'bg-pos',
@@ -284,11 +284,11 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-ink">Manajemen Berkas</h1>
               <p className="text-xs sm:text-sm text-ink-2 mt-1.5">
-                Repositori dokumen instansi — unggah berkas ke knowledge base, lalu AI &amp; dashboard membacanya
+                Repositori dokumen instansi — unggah berkas ke basis dokumen instansi, lalu AI &amp; dashboard membacanya
               </p>
               <p className="text-[11px] text-ink-3 mt-1">
                 Menerima semua jenis berkas (PDF, Word, Excel, PowerPoint, teks, gambar) · maksimal 50 MB per berkas ·
-                terindeks otomatis ke RAG
+                terindeks otomatis untuk pencarian AI
               </p>
             </div>
           </div>
@@ -339,7 +339,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
           /* Belum dipetakan ke project KMS — jujur, bukan "0 berkas". */
           <div className="bg-surface p-8 rounded-card border border-line text-center" data-testid="berkas-belum-terpetakan">
             <Info className="w-9 h-9 text-warn mx-auto mb-3" />
-            <p className="text-sm font-semibold text-ink mb-1">Instansi belum dipetakan ke project KMS</p>
+            <p className="text-sm font-semibold text-ink mb-1">Instansi belum terhubung ke repositori dokumen</p>
             <p className="text-xs text-ink-3 max-w-xl mx-auto">{data.catatan}</p>
             {bisaHapus && (
               <button
@@ -349,7 +349,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                 data-testid="hubungkan-kms"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>{sedangHubung ? 'Menghubungkan…' : 'Hubungkan instansi ini ke Ragkms'}</span>
+                <span>{sedangHubung ? 'Menghubungkan…' : 'Hubungkan instansi ini ke repositori dokumen'}</span>
               </button>
             )}
           </div>
@@ -364,14 +364,14 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
               >
                 <ShieldCheck className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>
-                  Project KMS dipetakan <strong>otomatis</strong> dari Knowledge Base instansi
+                  Repositori dokumen dipetakan <strong>otomatis</strong> dari basis dokumen instansi
                   {data.projectKms ? (
                     <>
                       {' '}
                       → <strong>{data.projectKms}</strong>
                     </>
                   ) : null}
-                  . Admin bisa menimpanya lewat panel admin (Instansi &amp; KB → Project KMS).
+                  . Admin bisa menimpanya lewat panel admin (Instansi &amp; KB → Repositori Dokumen).
                 </span>
               </div>
             )}
@@ -514,7 +514,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     data-testid="kirim-unggah"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    {sedangUnggah ? 'Mengunggah…' : 'Unggah ke Knowledge Base'}
+                    {sedangUnggah ? 'Mengunggah…' : 'Unggah berkas'}
                   </button>
                   <button
                     onClick={() => {
@@ -615,7 +615,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           <span>· {formatUkuran(b.fileSizeKb)}</span>
                           <span>· {tanggalJam(b.uploadedAt)}</span>
                           {Number.isFinite(Number(b.chunksCount)) && Number(b.chunksCount) > 0 && (
-                            <span>· {b.chunksCount} potongan RAG</span>
+                            <span>· {b.chunksCount} potongan teks terindeks</span>
                           )}
                           {b.organizationName && cakupanAll && <span>· {b.organizationName}</span>}
                         </div>

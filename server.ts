@@ -3309,10 +3309,10 @@ async function startServer() {
       // KMS tak bisa dihubungi: tetap balas dengan petunjuk, tanpa daftar.
     }
     return res.status(400).json({
-      error: 'Instansi ini belum dipetakan ke project KMS.',
+      error: 'Instansi ini belum terhubung ke repositori dokumen.',
       petunjuk:
-        'Isi "Project KMS" pada instansi di panel admin (Instansi & KB → Project KMS). ' +
-        'Pencocokan otomatis sudah dicoba lewat Knowledge Base dan nama instansi, tetapi tidak ada yang sama.',
+        'Isi "Repositori Dokumen" pada instansi di panel admin (Instansi & KB). ' +
+        'Pencocokan otomatis sudah dicoba lewat basis dokumen dan nama instansi, tetapi tidak ada yang sama.',
       projectTersedia: daftar,
     });
   }
@@ -3355,7 +3355,7 @@ async function startServer() {
         organizationId: null,
         instansi: tenant?.name || null,
         catatan:
-          'Instansi ini belum dipetakan ke project KMS. Saya sudah mencoba mencocokkan otomatis lewat Knowledge Base instansi, tetapi tidak ada project KMS yang KB-nya sama. Atur "Project KMS" pada instansi di panel admin, lalu berkas bisa diunggah & dibaca dari sini.',
+          'Instansi ini belum terhubung ke repositori dokumen. Pencocokan otomatis lewat basis dokumen instansi sudah dicoba, tetapi tidak ada repositori dengan basis yang sama. Atur "Repositori Dokumen" pada instansi di panel admin, lalu berkas bisa diunggah & dibaca dari sini.',
       });
     }
 
@@ -3551,7 +3551,7 @@ async function startServer() {
         tenantId: tenant.id,
         userId: session.userId,
         userName: session.name,
-        action: dibuat ? 'Buat Project KMS' : 'Hubungkan Project KMS',
+        action: dibuat ? 'Buat Repositori Dokumen' : 'Hubungkan Repositori Dokumen',
         target: tenant.name,
         details: `Instansi ${tenant.name} → project KMS ${org.id}${org.knowledgeBase ? ` (KB ${org.knowledgeBase})` : ''}`,
       });

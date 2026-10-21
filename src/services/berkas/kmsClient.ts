@@ -36,24 +36,24 @@ export interface KmsConfig {
 function jelaskanKms(err: any, status?: number): KmsServiceError {
   const kode = err?.cause?.code || err?.code;
   if (status === 401 || status === 403) {
-    return new KmsServiceError('API key KMS ditolak.', 'Periksa kembali API key KMS di panel admin.', status);
+    return new KmsServiceError('Kunci akses repositori dokumen ditolak.', 'Periksa kembali kunci akses repositori dokumen di panel admin.', status);
   }
   if (status === 404) {
-    return new KmsServiceError('Endpoint KMS tidak ditemukan.', 'Periksa Base URL KMS di panel admin.', status);
+    return new KmsServiceError('Alamat layanan repositori dokumen tidak ditemukan.', 'Periksa alamat layanan repositori dokumen di panel admin.', status);
   }
   if (status === 413) {
-    return new KmsServiceError('Berkas terlalu besar untuk KMS.', 'Batas satu berkas adalah 50 MB.', status);
+    return new KmsServiceError('Berkas terlalu besar untuk repositori dokumen.', 'Batas satu berkas adalah 50 MB.', status);
   }
   if (kode === 'ENOTFOUND') {
-    return new KmsServiceError('Alamat KMS tidak ditemukan.', 'Domain KMS salah ketik atau tidak ada.', status);
+    return new KmsServiceError('Alamat repositori dokumen tidak ditemukan.', 'Domain repositori dokumen salah ketik atau tidak ada.', status);
   }
   if (kode === 'ECONNREFUSED') {
-    return new KmsServiceError('KMS menolak koneksi.', 'Alamat benar tetapi layanan tidak menerima koneksi.', status);
+    return new KmsServiceError('Repositori dokumen menolak koneksi.', 'Alamat benar tetapi layanan tidak menerima koneksi.', status);
   }
   if (err?.name === 'TimeoutError' || kode === 'ABORT_ERR') {
-    return new KmsServiceError('KMS tidak menjawab tepat waktu.', 'Coba lagi atau perbesar batas waktu di panel admin.', status);
+    return new KmsServiceError('Repositori dokumen tidak menjawab tepat waktu.', 'Coba lagi atau perbesar batas waktu di panel admin.', status);
   }
-  return new KmsServiceError('Gagal menghubungi KMS.', String(err?.message || err || ''), status);
+  return new KmsServiceError('Gagal menghubungi repositori dokumen.', String(err?.message || err || ''), status);
 }
 
 export class KmsClient {
@@ -204,7 +204,7 @@ export class KmsClient {
       const orgs = await this.daftarOrganisasi();
       return { ok: true, jumlahProject: orgs.length, pesan: `Terhubung — ${orgs.length} project terbaca.` };
     } catch (err: any) {
-      return { ok: false, jumlahProject: 0, pesan: err?.message || 'Gagal menghubungi KMS.' };
+      return { ok: false, jumlahProject: 0, pesan: err?.message || 'Gagal menghubungi repositori dokumen.' };
     }
   }
 }

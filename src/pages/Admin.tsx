@@ -2592,7 +2592,7 @@ export const Admin: React.FC<AdminProps> = ({
                 <div className="p-3 bg-surface-2 border border-line rounded-card space-y-2" data-testid="pemetaan-kms">
                   <div className="flex items-center justify-between gap-2">
                     <label className="block text-ink-2 font-medium">
-                      Project KMS <span className="font-normal text-ink-3">(tujuan unggah berkas)</span>
+                      Repositori Dokumen <span className="font-normal text-ink-3">(tujuan unggah berkas)</span>
                     </label>
                     <button
                       type="button"
