@@ -3562,16 +3562,26 @@ async function startServer() {
         dibuat = true;
         cacheOrgKms = null;
       }
-      await db.updateTenant(tenant.id, { kmsOrganizationId: org.id });
+      // Project yang dibuat Ragkms punya basis dokumen SENDIRI. Kalau instansi
+      // tetap memakai basis lama, berkas yang diunggah ke project baru tidak
+      // terbaca asisten — jadi basis instansi ikut diarahkan ke basis project.
+      const basisBaru = org.knowledgeBase;
+      const gantiBasis = !!basisBaru && basisBaru !== tenant.knowledgeBaseId;
+      await db.updateTenant(tenant.id, {
+        kmsOrganizationId: org.id,
+        ...(gantiBasis ? { knowledgeBaseId: basisBaru } : {}),
+      });
       db.addAuditLog({
         tenantId: tenant.id,
         userId: session.userId,
         userName: session.name,
         action: dibuat ? 'Buat Repositori Dokumen' : 'Hubungkan Repositori Dokumen',
         target: tenant.name,
-        details: `Instansi ${tenant.name} → project KMS ${org.id}${org.knowledgeBase ? ` (KB ${org.knowledgeBase})` : ''}`,
+        details: `Instansi ${tenant.name} → project KMS ${org.id}${basisBaru ? ` (KB ${basisBaru})` : ''}${
+          gantiBasis ? ` · basis dokumen dialihkan dari ${tenant.knowledgeBaseId || '(kosong)'}` : ''
+        }`,
       });
-      res.json({ ok: true, dibuat, organisasi: org });
+      res.json({ ok: true, dibuat, basisDokumen: basisBaru || null, basisDialihkan: gantiBasis, organisasi: org });
     } catch (err: any) {
       balasGalatKms(res, err);
     }

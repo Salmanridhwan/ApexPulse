@@ -130,7 +130,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       if (!res.ok) throw new Error(isi?.error || 'Gagal menghubungkan ke repositori dokumen.');
       setPesan({
         tipe: 'ok',
-        teks: `${isi.dibuat ? 'Repositori baru dibuat' : 'Terhubung'} di repositori dokumen: ${isi.organisasi?.name} (${isi.organisasi?.id}).`,
+        teks: `${isi.dibuat ? 'Repositori baru dibuat' : 'Terhubung'} di repositori dokumen: ${isi.organisasi?.name} (${isi.organisasi?.id}).${
+          isi.basisDialihkan && isi.basisDokumen ? ` Basis dokumen instansi dialihkan ke ${isi.basisDokumen}, supaya berkas yang diunggah langsung dibaca asisten.` : ''
+        }`,
       });
       await muat();
     } catch (err: any) {
