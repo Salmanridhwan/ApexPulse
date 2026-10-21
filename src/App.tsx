@@ -828,7 +828,8 @@ export default function App() {
                       : viewMode === 'charts' ? 'Chart'
                       : viewMode === 'templates' ? 'Template Dashboard'
                       : viewMode === 'pelaporan' ? 'Kinerja & Kepatuhan'
-                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' || viewMode === 'berkas' ? 'Kinerja & Kepatuhan'
+                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' ? 'Kinerja & Kepatuhan'
+                      : viewMode === 'berkas' ? 'Referensi'
                       : 'Workspace'}
                   </span>
                 </div>
@@ -859,7 +860,9 @@ export default function App() {
                                           ? 'Perjanjian Kinerja'
                                           : viewMode === 'lkjip'
                                             ? 'LKjIP'
-                                            : 'Template Chart'}
+                                            : viewMode === 'berkas'
+                                              ? 'Repositori Dokumen'
+                                              : 'Template Chart'}
                   </h1>
                 )}
               </div>
