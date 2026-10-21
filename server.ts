@@ -3585,6 +3585,9 @@ async function startServer() {
     const nama = dok?.nama || docId;
 
     const potongan = new Map<string, { isi: string; halaman?: number; bagian?: string }>();
+    // Kalau layanan basis menyimpan tautan berkas asli (source_url), pakai itu —
+    // pratinjau jadi berkas aslinya, bukan teks hasil ekstraksi.
+    let sumberAsli = '';
     // Beberapa kueri supaya potongan yang relevan ikut terambil (RAG membatasi top_k).
     const kueri = [nama.replace(/[_\-.]/g, ' '), `${nama.replace(/[_\-.]/g, ' ')} isi lengkap dokumen`];
     for (const q of kueri) {
@@ -3597,13 +3600,17 @@ async function startServer() {
         });
         const j: any = await r.json().catch(() => null);
         for (const x of j?.data?.results || []) {
-          if (x.document_id !== docId || !x.content) continue;
+          if (x.document_id !== docId) continue;
+          if (!sumberAsli && typeof x.source_url === 'string' && /^https?:/i.test(x.source_url)) sumberAsli = x.source_url;
+          if (!x.content) continue;
           if (!potongan.has(x.chunk_id)) potongan.set(x.chunk_id, { isi: x.content, halaman: x.page, bagian: x.section });
         }
       } catch {
         // kueri gagal: lanjutkan dengan potongan yang sudah ada
       }
     }
+
+    if (sumberAsli) return res.redirect(sumberAsli);
 
     const urut = [...potongan.entries()].sort((a, b) => a[0].localeCompare(b[0]));
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
