@@ -3446,15 +3446,16 @@ async function startServer() {
         catatan: req.body?.catatan ? String(req.body.catatan).trim() : undefined,
         mimeType: req.body?.tipe ? String(req.body.tipe) : undefined,
       });
+      const kbTujuan = (await daftarProjectKms().catch(() => [])).find((o) => o.id === organizationId)?.knowledgeBase;
       db.addAuditLog({
         tenantId: tenant?.id || session.tenantId,
         userId: session.userId,
         userName: session.name,
         action: 'Unggah Berkas',
         target: String(req.body?.judul || nama),
-        details: `Berkas ${nama} (${(isi.length / 1024).toFixed(0)} KB) diunggah ke project KMS ${organizationId}${berkas?.ragStatus ? ` · status RAG: ${berkas.ragStatus}` : ''}`,
+        details: `Berkas ${nama} (${(isi.length / 1024).toFixed(0)} KB) diunggah ke project KMS ${organizationId}${kbTujuan ? ` · KB ${kbTujuan}` : ''}${berkas?.cdnFileId ? ` · CDN ${berkas.cdnFileId}` : ''}${berkas?.ragStatus ? ` · status RAG: ${berkas.ragStatus}` : ''}`,
       });
-      res.status(201).json({ success: true, berkas });
+      res.status(201).json({ success: true, berkas, knowledgeBase: kbTujuan || null });
     } catch (err: any) {
       balasGalatKms(res, err);
     }
@@ -3514,6 +3515,51 @@ async function startServer() {
 
   app.get('/api/berkas/:id/lihat', (req: Request, res: Response) => void teruskanBerkas(req, res, 'view'));
   app.get('/api/berkas/:id/unduh', (req: Request, res: Response) => void teruskanBerkas(req, res, 'download'));
+
+  /**
+   * Hubungkan instansi ke project KMS (khusus admin). Bila belum ada project
+   * yang cocok dengan KB instansi, buat project baru di KMS — KMS otomatis
+   * membuat knowledge base RAG-nya, jadi berkas yang diunggah langsung terindeks.
+   */
+  app.post('/api/admin/tenants/:id/kms-hubungkan', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Hanya administrator yang boleh menghubungkan instansi ke KMS.' });
+    }
+    const tenant = db.tenants.find((t) => t.id === req.params.id);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    try {
+      const ada = await projectKmsEfektif(tenant);
+      let org: OrganisasiKMS | null = null;
+      let dibuat = false;
+      if (ada.organizationId) {
+        org = (await daftarProjectKms()).find((o) => o.id === ada.organizationId) || { id: ada.organizationId, name: ada.projectKms || tenant.name };
+      } else {
+        org = await klienKms().buatOrganisasi({
+          name: tenant.name,
+          code: tenant.code || tenant.id,
+          industry: tenant.sector,
+          description: `Repositori berkas ${tenant.name}${tenant.city ? ` (${tenant.city})` : ''} — dibuat dari ApexPulse.`,
+        });
+        if (!org) return res.status(502).json({ error: 'KMS tidak mengembalikan project yang dibuat.' });
+        dibuat = true;
+        cacheOrgKms = null;
+      }
+      await db.updateTenant(tenant.id, { kmsOrganizationId: org.id });
+      db.addAuditLog({
+        tenantId: tenant.id,
+        userId: session.userId,
+        userName: session.name,
+        action: dibuat ? 'Buat Project KMS' : 'Hubungkan Project KMS',
+        target: tenant.name,
+        details: `Instansi ${tenant.name} → project KMS ${org.id}${org.knowledgeBase ? ` (KB ${org.knowledgeBase})` : ''}`,
+      });
+      res.json({ ok: true, dibuat, organisasi: org });
+    } catch (err: any) {
+      balasGalatKms(res, err);
+    }
+  });
 
   /** Daftar project KMS — untuk pemetaan instansi di panel admin (khusus admin). */
   app.get('/api/admin/kms-organisasi', async (req: Request, res: Response) => {

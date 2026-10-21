@@ -120,6 +120,26 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, cakupanAll]);
 
+  // Admin: buat/hubungkan project Ragkms untuk instansi aktif (KB RAG ikut dibuat KMS).
+  const [sedangHubung, setSedangHubung] = useState(false);
+  const hubungkanKms = async () => {
+    setSedangHubung(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}/kms-hubungkan`, { method: 'POST' });
+      const isi = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(isi?.error || 'Gagal menghubungkan ke KMS.');
+      setPesan({
+        tipe: 'ok',
+        teks: `${isi.dibuat ? 'Project baru dibuat' : 'Terhubung'} di Ragkms: ${isi.organisasi?.name} (${isi.organisasi?.id}).`,
+      });
+      await muat();
+    } catch (err: any) {
+      setPesan({ tipe: 'err', teks: err.message });
+    } finally {
+      setSedangHubung(false);
+    }
+  };
+
   const semuaBerkas = useMemo(() => data?.berkas || [], [data]);
   const tipeTersedia = useMemo(() => daftarTipeBerkas(semuaBerkas), [semuaBerkas]);
 
@@ -193,9 +213,11 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       const balasan = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(balasan?.error || 'Berkas gagal diunggah.');
       const status = balasan?.berkas?.ragStatus;
+      const kb = balasan?.knowledgeBase;
+      const cdn = balasan?.berkas?.cdnFileId;
       setPesan({
         tipe: 'ok',
-        teks: `Berkas "${fJudul.trim()}" berhasil diunggah${status ? ` · status RAG: ${status}` : ''}.`,
+        teks: `Berkas "${fJudul.trim()}" berhasil diunggah ke Ragkms${kb ? ` · KB ${kb}` : ''}${cdn ? ` · CDN ✓` : ' · CDN belum tercatat'}${status ? ` · status RAG: ${status}` : ''}.`,
       });
       resetForm();
       setPanelUnggah(false);
@@ -319,6 +341,17 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
             <Info className="w-9 h-9 text-warn mx-auto mb-3" />
             <p className="text-sm font-semibold text-ink mb-1">Instansi belum dipetakan ke project KMS</p>
             <p className="text-xs text-ink-3 max-w-xl mx-auto">{data.catatan}</p>
+            {bisaHapus && (
+              <button
+                onClick={() => void hubungkanKms()}
+                disabled={sedangHubung}
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium disabled:opacity-60"
+                data-testid="hubungkan-kms"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>{sedangHubung ? 'Menghubungkan…' : 'Hubungkan instansi ini ke Ragkms'}</span>
+              </button>
+            )}
           </div>
         ) : (
           <>
