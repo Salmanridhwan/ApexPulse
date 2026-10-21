@@ -3563,7 +3563,69 @@ async function startServer() {
     }
   }
 
-  app.get('/api/berkas/:id/lihat', (req: Request, res: Response) => void teruskanBerkas(req, res, 'view'));
+  /**
+   * Pratinjau dokumen yang hanya ada di basis dokumen instansi (belum ada
+   * berkasnya di repositori). RAG menyimpan potongan teks, bukan berkas asli —
+   * jadi yang ditampilkan adalah isi teks yang sudah terindeks, diambil lewat
+   * /search lalu diurutkan menurut nomor potongan.
+   */
+  async function pratinjauBasis(req: Request, res: Response) {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const { tenant } = await konteksBerkas(req, session);
+    const kb = String(tenant?.knowledgeBaseId || '').trim();
+    const docId = String(req.params.id).replace(/^basis:/, '');
+    if (!kb) return res.status(400).send('Instansi ini belum punya basis dokumen.');
+
+    const cfg: any = db.systemConfig || {};
+    const base = String(cfg.ragApiUrl || '').replace(/\/+$/, '');
+    const kunci = String(cfg.ragApiKey || '');
+    const daftar = await ragClient.daftarDokumen(kb).catch(() => null);
+    const dok = daftar?.dokumen.find((d) => d.id === docId);
+    const nama = dok?.nama || docId;
+
+    const potongan = new Map<string, { isi: string; halaman?: number; bagian?: string }>();
+    // Beberapa kueri supaya potongan yang relevan ikut terambil (RAG membatasi top_k).
+    const kueri = [nama.replace(/[_\-.]/g, ' '), `${nama.replace(/[_\-.]/g, ' ')} isi lengkap dokumen`];
+    for (const q of kueri) {
+      try {
+        const r = await fetch(`${base}/search`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${kunci}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ knowledge_base_id: kb, query: q, top_k: 50 }),
+          signal: AbortSignal.timeout(60000),
+        });
+        const j: any = await r.json().catch(() => null);
+        for (const x of j?.data?.results || []) {
+          if (x.document_id !== docId || !x.content) continue;
+          if (!potongan.has(x.chunk_id)) potongan.set(x.chunk_id, { isi: x.content, halaman: x.page, bagian: x.section });
+        }
+      } catch {
+        // kueri gagal: lanjutkan dengan potongan yang sudah ada
+      }
+    }
+
+    const urut = [...potongan.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const isi = urut.map(([, v]) => v.isi.trim()).join('\n\n');
+    const kurang = (dok?.potongan || 0) > urut.length;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${esc(nama)}</title>
+<style>body{font-family:system-ui,Segoe UI,sans-serif;max-width:860px;margin:32px auto;padding:0 20px;color:#111;line-height:1.6}
+h1{font-size:18px;margin:0 0 4px}small{color:#666}pre{white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f7f7f8;border:1px solid #e5e5e5;border-radius:8px;padding:16px}
+.note{background:#fff8e1;border:1px solid #f0d68a;border-radius:8px;padding:10px 12px;font-size:12px;margin:12px 0}</style></head>
+<body><h1>${esc(nama)}</h1>
+<small>${dok?.halaman ? `${dok.halaman} halaman · ` : ''}${urut.length}${dok?.potongan ? `/${dok.potongan}` : ''} potongan teks · basis dokumen instansi</small>
+${kurang ? '<div class="note">Pratinjau ini memuat sebagian potongan teks yang bisa diambil dari basis dokumen — berkas aslinya belum ada di repositori.</div>' : ''}
+${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum bisa diambil dari basis dokumen.</div>'}
+</body></html>`);
+  }
+
+  app.get('/api/berkas/:id/lihat', (req: Request, res: Response) => {
+    if (String(req.params.id).startsWith('basis:')) return void pratinjauBasis(req, res);
+    return void teruskanBerkas(req, res, 'view');
+  });
   app.get('/api/berkas/:id/unduh', (req: Request, res: Response) => void teruskanBerkas(req, res, 'download'));
 
   /**

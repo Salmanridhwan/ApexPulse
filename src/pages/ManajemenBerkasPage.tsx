@@ -80,7 +80,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   const [pesan, setPesan] = useState<{ tipe: 'ok' | 'err'; teks: string } | null>(null);
   const [cari, setCari] = useState('');
   const [filterTipe, setFilterTipe] = useState('');
-  const [cakupanAll, setCakupanAll] = useState(false);
 
   // Form unggah
   const [panelUnggah, setPanelUnggah] = useState(false);
@@ -102,7 +101,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       // Instansi aktif dari sidebar. WAJIB dikirim: untuk admin, server memakai
       // tenantId ini; tanpa itu admin selalu melihat instansi miliknya sendiri.
       if (tenantId) qs.set('tenantId', tenantId);
-      if (cakupanAll) qs.set('cakupan', 'all');
       const res = await fetch(`/api/berkas${qs.toString() ? `?${qs}` : ''}`);
       const isi = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(isi?.error || 'Gagal memuat daftar berkas.');
@@ -118,7 +116,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   useEffect(() => {
     void muat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, cakupanAll]);
+  }, [tenantId]);
 
   // Admin: buat/hubungkan project Ragkms untuk instansi aktif (KB RAG ikut dibuat KMS).
   const [sedangHubung, setSedangHubung] = useState(false);
@@ -560,17 +558,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     </option>
                   ))}
                 </select>
-                {peran === 'admin' && (
-                  <label className="inline-flex items-center gap-1.5 text-xs text-ink-2">
-                    <input
-                      type="checkbox"
-                      checked={cakupanAll}
-                      onChange={(e) => setCakupanAll(e.target.checked)}
-                      data-testid="cakupan-all"
-                    />
-                    Semua project
-                  </label>
-                )}
               </div>
             </div>
 
@@ -625,7 +612,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           {Number(b.token) > 0 && (
                             <span>· {Number(b.token).toLocaleString('id-ID')} token</span>
                           )}
-                          {b.organizationName && cakupanAll && <span>· {b.organizationName}</span>}
                         </div>
                         {!sudahTerindeks(b.ragStatus) && (
                           <p className="text-[11px] text-warn mt-1">
@@ -634,23 +620,24 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                         )}
                         {b.hanyaBasis && (
                           <p className="text-[11px] text-ink-3 mt-1">
-                            Sudah dibaca asisten, tetapi berkas aslinya belum diunggah ke repositori — pratinjau &amp; unduh belum tersedia.
+                            Sudah dibaca asisten. Berkas aslinya belum ada di repositori, jadi pratinjau menampilkan teks yang terindeks.
                           </p>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {!b.hanyaBasis && (
-                          <>
                         <a
                           href={`/api/berkas/${encodeURIComponent(b.id)}/lihat?tenantId=${encodeURIComponent(tenantId)}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 text-ink-3 hover:text-brand-ink rounded-control hover:bg-brand/10 transition-colors"
                           aria-label="Lihat berkas"
-                          title="Lihat"
+                          title="Lihat isi dokumen"
+                          data-testid="lihat-berkas"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </a>
+                        {!b.hanyaBasis && (
+                          <>
                         <a
                           href={`/api/berkas/${encodeURIComponent(b.id)}/unduh?tenantId=${encodeURIComponent(tenantId)}`}
                           className="p-1.5 text-ink-3 hover:text-brand-ink rounded-control hover:bg-brand/10 transition-colors"
