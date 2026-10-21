@@ -119,6 +119,19 @@ export class KmsClient {
     return org && org.id ? (org as OrganisasiKMS) : null;
   }
 
+  /**
+   * Ubah data project yang sudah ada. Dipakai untuk menyelaraskan basis dokumen
+   * project dengan basis dokumen instansi (`knowledgeBase`), supaya dokumen
+   * lama instansi tetap terbaca asisten setelah dihubungkan.
+   */
+  async perbaruiOrganisasi(id: string, patch: { knowledgeBase?: string }): Promise<void> {
+    await this.panggil(
+      `/api/organizations/${encodeURIComponent(id)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) },
+      40
+    );
+  }
+
   /** Daftar berkas. `organizationId='all'` untuk semua project. */
   async daftarBerkas(organizationId = 'all'): Promise<BerkasKMS[]> {
     const q = encodeURIComponent(organizationId || 'all');

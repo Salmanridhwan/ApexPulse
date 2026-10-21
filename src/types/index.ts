@@ -1233,6 +1233,11 @@ export interface BerkasKMS {
   /** 'indexed' | 'pending' | 'failed' | … (status indeks ke RAG). */
   ragStatus?: string;
   cdnFileId?: string | null;
+  /** Jumlah halaman (dari basis dokumen, bukan repositori). */
+  halaman?: number;
+  /** true = dokumen sudah ada di basis dokumen instansi tetapi belum pernah
+   *  masuk repositori, jadi belum ada salinan berkas untuk pratinjau/unduh. */
+  hanyaBasis?: boolean;
 }
 
 /** Project/organisasi di layanan KMS (satu project = satu knowledge base). */

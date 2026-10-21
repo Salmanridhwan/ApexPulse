@@ -127,6 +127,7 @@ import {
   validasiLKjIP,
 } from './src/services/kinerja/lkjip';
 import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
+import type { BerkasKMS } from './src/types';
 import {
   BATAS_UKURAN_BYTE,
   cariProjectKmsDariKb,
@@ -3336,6 +3337,45 @@ async function startServer() {
   }
 
   /**
+   * ponytail: dokumen yang sudah ada di basis dokumen instansi (yang dibaca
+   * asisten) tetapi belum pernah masuk repositori tetap ditampilkan, supaya
+   * angka di halaman sama dengan isi basis — bukan cuma isi repositori.
+   * Dokumen seperti ini belum punya salinan berkas, jadi tanpa pratinjau/unduh.
+   */
+  async function gabungBerkasBasis(tenant: any, berkas: BerkasKMS[]): Promise<BerkasKMS[]> {
+    const kb = String(tenant?.knowledgeBaseId || '').trim();
+    if (!kb) return berkas;
+    try {
+      const hasil = await ragClient.daftarDokumen(kb);
+      const sudahAda = new Set(berkas.map((b) => String(b.title || '').trim().toLowerCase()));
+      const tambahan = hasil.dokumen
+        .filter((d) => !sudahAda.has(String(d.nama || '').trim().toLowerCase()))
+        // Dokumen sambutan repositori juga ikut terindeks ke basis — bukan dokumen instansi.
+        .filter((d) => !String(d.nama || '').startsWith('Info Project - '))
+        .map<BerkasKMS>((d) => ({
+          id: `basis:${d.id}`,
+          organizationId: '',
+          title: d.nama,
+          fileType: String(d.nama || '').split('.').pop()?.toUpperCase(),
+          uploadedAt: d.dibuat,
+          chunksCount: d.potongan,
+          halaman: d.halaman,
+          ragStatus: d.status === 'completed' ? 'indexed' : d.status,
+          hanyaBasis: true,
+        }));
+      return [...berkas, ...tambahan];
+    } catch {
+      // Basis tak terjangkau: tampilkan isi repositori apa adanya, jangan gagal total.
+      return berkas;
+    }
+  }
+
+  /** Dokumen sambutan bawaan repositori bukan dokumen instansi — jangan dihitung. */
+  function tanpaDokumenSambutan(berkas: BerkasKMS[]): BerkasKMS[] {
+    return berkas.filter((b) => !String(b.id).startsWith('doc-seed-info-'));
+  }
+
+  /**
    * Daftar berkas instansi aktif + ringkasan.
    * Admin boleh `?cakupan=all` untuk melihat seluruh project sekaligus.
    */
@@ -3360,7 +3400,8 @@ async function startServer() {
     }
 
     try {
-      const berkas = await klienKms().daftarBerkas(org);
+      const mentah = await klienKms().daftarBerkas(org);
+      const berkas = cakupanAll ? mentah : await gabungBerkasBasis(tenant, tanpaDokumenSambutan(mentah));
       const cari = typeof req.query.cari === 'string' ? req.query.cari : '';
       const tipe = typeof req.query.tipe === 'string' ? req.query.tipe : '';
       const tersaring = cari || tipe ? saringBerkas(berkas, { cari, tipe }) : berkas;
@@ -3383,10 +3424,12 @@ async function startServer() {
   app.get('/api/berkas/ringkasan', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { organizationId } = await konteksBerkas(req, session);
+    const { tenant, organizationId } = await konteksBerkas(req, session);
     if (!organizationId) return res.json({ ...berkasKosong(), terpetakan: false });
     try {
-      res.json({ ...hitungRingkasanBerkas(await klienKms().daftarBerkas(organizationId)), terpetakan: true });
+      const mentah = await klienKms().daftarBerkas(organizationId);
+      const berkas = await gabungBerkasBasis(tenant, tanpaDokumenSambutan(mentah));
+      res.json({ ...hitungRingkasanBerkas(berkas), terpetakan: true });
     } catch (err: any) {
       balasGalatKms(res, err);
     }
@@ -3469,6 +3512,12 @@ async function startServer() {
     const { tenant, organizationId } = await konteksBerkas(req, session);
     if (!organizationId) {
       return balasBelumTerpetakan(res);
+    }
+    if (String(req.params.id).startsWith('basis:')) {
+      // ponytail: dokumen basis belum punya salinan berkas di repositori.
+      return res.status(400).json({
+        error: 'Berkas ini baru ada di basis dokumen instansi, belum ada di repositori — tidak bisa dihapus dari sini.',
+      });
     }
     try {
       await klienKms().hapusBerkas(req.params.id);
@@ -3562,14 +3611,22 @@ async function startServer() {
         dibuat = true;
         cacheOrgKms = null;
       }
-      // Project yang dibuat Ragkms punya basis dokumen SENDIRI. Kalau instansi
-      // tetap memakai basis lama, berkas yang diunggah ke project baru tidak
-      // terbaca asisten — jadi basis instansi ikut diarahkan ke basis project.
-      const basisBaru = org.knowledgeBase;
-      const gantiBasis = !!basisBaru && basisBaru !== tenant.knowledgeBaseId;
+      // ponytail: basis dokumen instansi adalah sumber kebenaran — dokumen lama
+      // instansi sudah ada di sana dan dibaca asisten. Jadi project yang
+      // diarahkan ke basis instansi, BUKAN sebaliknya (kalau dibalik, dokumen
+      // lama instansi langsung tak terbaca asisten).
+      const basisInstansi = String(tenant.knowledgeBaseId || '').trim();
+      let basisDiselaraskan = false;
+      if (basisInstansi && org.knowledgeBase && org.knowledgeBase !== basisInstansi) {
+        await klienKms().perbaruiOrganisasi(org.id, { knowledgeBase: basisInstansi });
+        basisDiselaraskan = true;
+        cacheOrgKms = null;
+      }
+      const basisBaru = basisInstansi || org.knowledgeBase || null;
       await db.updateTenant(tenant.id, {
         kmsOrganizationId: org.id,
-        ...(gantiBasis ? { knowledgeBaseId: basisBaru } : {}),
+        // Basis instansi hanya diisi kalau memang belum punya sama sekali.
+        ...(basisBaru && basisBaru !== tenant.knowledgeBaseId ? { knowledgeBaseId: basisBaru } : {}),
       });
       db.addAuditLog({
         tenantId: tenant.id,
@@ -3577,11 +3634,11 @@ async function startServer() {
         userName: session.name,
         action: dibuat ? 'Buat Repositori Dokumen' : 'Hubungkan Repositori Dokumen',
         target: tenant.name,
-        details: `Instansi ${tenant.name} → project KMS ${org.id}${basisBaru ? ` (KB ${basisBaru})` : ''}${
-          gantiBasis ? ` · basis dokumen dialihkan dari ${tenant.knowledgeBaseId || '(kosong)'}` : ''
+        details: `Instansi ${tenant.name} → project KMS ${org.id}${basisBaru ? ` (basis ${basisBaru})` : ''}${
+          basisDiselaraskan ? ' · project diselaraskan ke basis dokumen instansi' : ''
         }`,
       });
-      res.json({ ok: true, dibuat, basisDokumen: basisBaru || null, basisDialihkan: gantiBasis, organisasi: org });
+      res.json({ ok: true, dibuat, basisDokumen: basisBaru, basisDiselaraskan, organisasi: org });
     } catch (err: any) {
       balasGalatKms(res, err);
     }

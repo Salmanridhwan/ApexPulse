@@ -131,7 +131,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       setPesan({
         tipe: 'ok',
         teks: `${isi.dibuat ? 'Repositori baru dibuat' : 'Terhubung'} di repositori dokumen: ${isi.organisasi?.name} (${isi.organisasi?.id}).${
-          isi.basisDialihkan && isi.basisDokumen ? ` Basis dokumen instansi dialihkan ke ${isi.basisDokumen}, supaya berkas yang diunggah langsung dibaca asisten.` : ''
+          isi.basisDiselaraskan && isi.basisDokumen
+            ? ` Repositori diselaraskan ke basis dokumen instansi (${isi.basisDokumen}), jadi dokumen yang sudah ada tetap dibaca asisten.`
+            : ''
         }`,
       });
       await muat();
@@ -614,7 +616,8 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           {b.category && <span>{b.category}</span>}
                           {b.department && <span>· {b.department}</span>}
                           {b.year ? <span>· {b.year}</span> : null}
-                          <span>· {formatUkuran(b.fileSizeKb)}</span>
+                          {Number(b.fileSizeKb) > 0 ? <span>· {formatUkuran(b.fileSizeKb)}</span> : null}
+                          {b.halaman ? <span>· {b.halaman} halaman</span> : null}
                           <span>· {tanggalJam(b.uploadedAt)}</span>
                           {Number.isFinite(Number(b.chunksCount)) && Number(b.chunksCount) > 0 && (
                             <span>· {b.chunksCount} potongan teks terindeks</span>
@@ -626,8 +629,15 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                             Belum siap dipakai AI — tunggu proses indeks selesai atau unggah ulang bila gagal.
                           </p>
                         )}
+                        {b.hanyaBasis && (
+                          <p className="text-[11px] text-ink-3 mt-1">
+                            Sudah dibaca asisten, tetapi berkas aslinya belum diunggah ke repositori — pratinjau &amp; unduh belum tersedia.
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {!b.hanyaBasis && (
+                          <>
                         <a
                           href={`/api/berkas/${encodeURIComponent(b.id)}/lihat?tenantId=${encodeURIComponent(tenantId)}`}
                           target="_blank"
@@ -656,6 +666,8 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
+                        )}
+                          </>
                         )}
                       </div>
                     </div>
