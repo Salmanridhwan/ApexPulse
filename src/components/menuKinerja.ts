@@ -23,7 +23,6 @@ export const MENU_KINERJA: ItemMenuKinerja[] = [
   { key: 'aset', label: 'Manajemen Aset', ket: 'Daftar aset, nilai buku, dan penyusutan' },
   { key: 'pk', label: 'Perjanjian Kinerja', ket: 'Target kinerja pejabat dan realisasinya' },
   { key: 'lkjip', label: 'LKjIP', ket: 'Laporan kinerja instansi pemerintah' },
-  { key: 'berkas', label: 'Manajemen Berkas', ket: 'Unggah dan penelusuran dokumen pendukung' },
 ];
 
 export const MENU_KINERJA_KEYS: string[] = MENU_KINERJA.map((m) => m.key);

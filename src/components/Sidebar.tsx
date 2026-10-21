@@ -265,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* GRUP 2: Referensi */} 
-        {(onOpenChartGallery || onOpenDashboardTemplates) && (
+        {(onOpenChartGallery || onOpenDashboardTemplates || onOpenManajemenBerkas) && (
           <div>
             {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Referensi</div>}
             <div className="space-y-0.5">
@@ -293,12 +293,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!isCollapsed && <span className="flex-1 truncate">Template Chart</span>}
                 </button>
               )}
+              {onOpenManajemenBerkas && (
+                <button
+                  onClick={onOpenManajemenBerkas}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'berkas' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Repositori Dokumen — unggah & kelola dokumen instansi"
+                  data-testid="buka-manajemen-berkas"
+                >
+                  {currentView === 'berkas' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <FolderOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'berkas' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Repositori Dokumen</span>}
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* GRUP 2.5: Kinerja & Kepatuhan (operasional BUMD) */}
-        {(onOpenPelaporan || onOpenTindakLanjutAudit || onOpenKesehatanKeuangan || onOpenManajemenRisiko || onOpenManajemenAset || onOpenPerjanjianKinerja || onOpenLKjIP || onOpenManajemenBerkas) && (
+        {(onOpenPelaporan || onOpenTindakLanjutAudit || onOpenKesehatanKeuangan || onOpenManajemenRisiko || onOpenManajemenAset || onOpenPerjanjianKinerja || onOpenLKjIP) && (
           <div>
             {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Kinerja & Kepatuhan</div>}
             <div className="space-y-0.5">
@@ -384,18 +396,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {currentView === 'lkjip' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
                   <BookOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'lkjip' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
                   {!isCollapsed && <span className="flex-1 truncate">LKjIP</span>}
-                </button>
-              )}
-              {onOpenManajemenBerkas && (
-                <button
-                  onClick={onOpenManajemenBerkas}
-                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'berkas' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
-                  title="Manajemen Berkas — unggah & kelola dokumen knowledge base instansi"
-                  data-testid="buka-manajemen-berkas"
-                >
-                  {currentView === 'berkas' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-                  <FolderOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'berkas' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-                  {!isCollapsed && <span className="flex-1 truncate">Manajemen Berkas</span>}
                 </button>
               )}
             </div>

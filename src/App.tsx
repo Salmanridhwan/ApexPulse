@@ -760,10 +760,10 @@ export default function App() {
                 setViewMode('lkjip');
                 setIsMobileNavOpen(false);
               } : undefined}
-              onOpenManajemenBerkas={tampilMenu('berkas') ? () => {
+              onOpenManajemenBerkas={() => {
                 setViewMode('berkas');
                 setIsMobileNavOpen(false);
-              } : undefined}
+              }}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);

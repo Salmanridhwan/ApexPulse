@@ -282,7 +282,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
               <FolderOpen className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-ink">Manajemen Berkas</h1>
+              <h1 className="text-lg font-bold text-ink">Repositori Dokumen</h1>
               <p className="text-xs sm:text-sm text-ink-2 mt-1.5">
                 Repositori dokumen instansi — unggah berkas ke basis dokumen instansi, lalu AI &amp; dashboard membacanya
               </p>
