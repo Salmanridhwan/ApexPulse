@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 // Untuk skrip QA lokal yang butuh port lain: set HONOR_SHELL_ENV=1 agar PORT dari shell menang.
 dotenv.config({ override: process.env.HONOR_SHELL_ENV !== '1' });
 import express, { NextFunction, Request, Response } from 'express';
-import { randomBytes, randomInt } from 'crypto';
+import { randomBytes, randomInt, randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,6 +50,7 @@ import { buatPembatas } from './src/services/auth/rateLimit';
 import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
 import { dekripsiNilai } from './src/services/config/rahasia';
 import { mulaiBackupTerjadwal } from './src/services/ops/backupTerjadwal';
+import { potongHalaman } from './src/services/http/halaman';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
@@ -310,12 +311,19 @@ async function startServer() {
    */
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     const mulai = Date.now();
+    // Id permintaan: dipakai untuk mencocokkan keluhan pengguna ("muncul pesan
+    // galat") dengan baris log yang tepat. Dikirim balik di header & pesan galat.
+    const idPermintaan = randomUUID().slice(0, 8);
+    (req as any).idPermintaan = idPermintaan;
+    res.setHeader('X-Request-Id', idPermintaan);
+    // Data instansi tidak boleh disimpan di cache proxy/browser bersama.
+    if (!res.getHeader('Cache-Control')) res.setHeader('Cache-Control', 'no-store');
     res.on('finish', () => {
       if (req.path === '/health') return;
       const sesi = verifySession(parseSessionCookie(req));
       const siapa = sesi ? ` user=${sesi.userId}` : '';
       console.log(
-        `[api] ${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} ${Date.now() - mulai}ms${siapa}`
+        `[api] ${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} ${Date.now() - mulai}ms${siapa} req=${idPermintaan}`
       );
     });
     next();
@@ -4471,7 +4479,13 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     const session = requireAuth(req, res);
     if (!session) return;
     const logs = db.auditLogs.filter((l) => l.tenantId === effectiveTenantId(req, session));
-    res.json(logs);
+    // Tanpa `limit` tetap balas array seperti sebelumnya (klien lama aman).
+    if (req.query.limit === undefined) {
+      res.json(logs);
+      return;
+    }
+    const { baris, total, limit, offset } = potongHalaman(logs, req.query.limit, req.query.offset);
+    res.json({ logs: baris, total, limit, offset });
   });
 
   app.post('/api/audit-logs', (req: Request, res: Response) => {
@@ -5141,13 +5155,17 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
    */
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = Number(err?.status || err?.statusCode) || 500;
-    console.error(`[AionesBoard] Galat ${req.method} ${req.originalUrl}:`, err?.stack || err);
+    const idPermintaan = (req as any).idPermintaan || '-';
+    console.error(`[AionesBoard] Galat ${req.method} ${req.originalUrl} req=${idPermintaan}:`, err?.stack || err);
     if (res.headersSent) return;
     res.status(status >= 400 && status <= 599 ? status : 500).json({
       error:
         status < 500
           ? err?.message || 'Permintaan tidak dapat diproses.'
           : 'Terjadi kesalahan pada server. Coba lagi beberapa saat lagi.',
+      // Kode ini bisa disebutkan pengguna saat melapor; operator tinggal
+      // mencari baris log dengan id yang sama.
+      kode: idPermintaan,
     });
   });
 

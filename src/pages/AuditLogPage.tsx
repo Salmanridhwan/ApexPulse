@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { History } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { History, Loader2 } from 'lucide-react';
 import { AuditLog } from '../types';
 
 interface AuditLogPageProps {
@@ -7,20 +7,63 @@ interface AuditLogPageProps {
   onBackToWorkspace: () => void;
 }
 
+/** Satu halaman = 50 entri; server membatasi maksimum 200 per permintaan. */
+const PER_HALAMAN = 50;
+
 export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWorkspace }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [memuatLagi, setMemuatLagi] = useState(false);
+
+  const ambil = useCallback(
+    async (offset: number) => {
+      const res = await fetch(
+        `/api/audit-logs?tenantId=${encodeURIComponent(tenantId)}&limit=${PER_HALAMAN}&offset=${offset}`
+      );
+      if (!res.ok) return { logs: [] as AuditLog[], total: 0 };
+      const data = await res.json();
+      // Server membalas { logs, total } untuk permintaan berhalaman.
+      return {
+        logs: Array.isArray(data?.logs) ? (data.logs as AuditLog[]) : [],
+        total: typeof data?.total === 'number' ? data.total : 0,
+      };
+    },
+    [tenantId]
+  );
 
   useEffect(() => {
+    let batal = false;
     setIsLoading(true);
-    fetch(`/api/audit-logs?tenantId=${tenantId}`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) setLogs(data);
+    ambil(0)
+      .then((hasil) => {
+        if (batal) return;
+        setLogs(hasil.logs);
+        setTotal(hasil.total);
       })
       .catch((err) => console.error('Failed to fetch audit logs:', err))
-      .finally(() => setIsLoading(false));
-  }, [tenantId]);
+      .finally(() => {
+        if (!batal) setIsLoading(false);
+      });
+    return () => {
+      batal = true;
+    };
+  }, [ambil]);
+
+  const muatLagi = async () => {
+    setMemuatLagi(true);
+    try {
+      const hasil = await ambil(logs.length);
+      setLogs((lama) => [...lama, ...hasil.logs]);
+      setTotal(hasil.total);
+    } catch (err) {
+      console.error('Failed to fetch more audit logs:', err);
+    } finally {
+      setMemuatLagi(false);
+    }
+  };
+
+  const sisa = Math.max(0, total - logs.length);
 
   return (
     <div className="flex-1 bg-canvas min-h-screen flex flex-col">
@@ -34,7 +77,7 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
             <h1 className="text-lg font-bold text-ink flex items-center gap-2.5 flex-wrap">
               Log Audit Sistem & Rekam Jejak Kepatuhan (F-14 & F-21)
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-2 text-brand-ink border border-line font-semibold">
-                {logs.length} Entri
+                {total} Entri
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-ink-2 mt-1.5">
@@ -84,6 +127,22 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ tenantId, onBackToWo
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {sisa > 0 && (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <span className="text-xs text-ink-3">
+                Menampilkan {logs.length} dari {total} entri terbaru
+              </span>
+              <button
+                onClick={muatLagi}
+                disabled={memuatLagi}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-control border border-line bg-surface-2 text-xs font-semibold text-ink hover:bg-surface disabled:opacity-60"
+              >
+                {memuatLagi && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Muat {Math.min(PER_HALAMAN, sisa)} entri lagi
+              </button>
             </div>
           )}
         </div>
