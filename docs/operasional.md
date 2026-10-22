@@ -138,6 +138,11 @@ insiden untuk mengetahui prosedurnya bekerja.
 - Cadangan pertama dibuat otomatis ±5 menit setelah start bila folder cadangan masih
   kosong (`BACKUP_AWAL_MENIT`), jadi rilis baru langsung punya titik pulih tanpa
   menunggu jadwal harian.
+- **Cadangan gagal → email peringatan.** Isi `SMTP_HOST` dan `ALERT_EMAIL_TO`
+  (boleh lebih dari satu, pisah koma) agar kegagalan cadangan dikirim ke email
+  admin, lengkap dengan potongan keluaran galat. Tanpa dua variabel itu,
+  peringatan hanya masuk log server. Cadangan yang gagal diam-diam sama saja
+  dengan tidak punya cadangan.
 - `GET /health` → status server, `dbMs` (latensi MySQL), `uptimeDetik`, `memoriMB`,
   dan `cadangan: { terakhir, umurJam, terlambat }`. Arahkan pemantauan uptime ke
   sini dan beri peringatan bila `terlambat: true` (cadangan terakhir > 26 jam)

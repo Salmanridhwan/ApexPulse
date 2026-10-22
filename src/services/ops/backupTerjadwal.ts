@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { antreEmail } from '../mailer';
 
 /**
  * Cadangan harian otomatis.
@@ -77,6 +78,35 @@ export function bersihkanCadanganLama(dir: string, hari: number): number {
   return buang.length;
 }
 
+/**
+ * Isi email peringatan saat cadangan gagal.
+ *
+ * ponytail: cadangan yang diam-diam gagal sama saja dengan tidak punya cadangan.
+ * Email dikirim lewat antrean mailer yang sudah ada (`SMTP_HOST` +
+ * `ALERT_EMAIL_TO`); kalau SMTP belum diisi, mailer mencatatnya di log dan
+ * server tetap jalan.
+ */
+export function pesanCadanganGagal(keluaran: string, waktu: Date) {
+  const potong = (keluaran || '').trim().slice(-1200);
+  const kapan = waktu.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  return {
+    subject: '[Aiones Boards] Cadangan harian GAGAL',
+    text:
+      `Cadangan database otomatis gagal pada ${kapan}.\n\n` +
+      `Periksa ruang disk, kredensial MySQL, dan izin folder cadangan.\n` +
+      `Selama cadangan gagal, tidak ada titik pulih baru.\n\n` +
+      `Keluaran terakhir:\n${potong || '(kosong)'}`,
+    html:
+      `<p>Cadangan database otomatis <b>gagal</b> pada ${kapan}.</p>` +
+      `<p>Periksa ruang disk, kredensial MySQL, dan izin folder cadangan. ` +
+      `Selama cadangan gagal, tidak ada titik pulih baru.</p>` +
+      `<pre style="white-space:pre-wrap;font-size:12px">${(potong || '(kosong)')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</pre>`,
+  };
+}
+
 function jalankanCadangan(): Promise<boolean> {
   return new Promise((resolve) => {
     const anak = spawn(process.execPath, ['scripts/backup-db.mjs'], {
@@ -89,6 +119,7 @@ function jalankanCadangan(): Promise<boolean> {
     anak.stderr.on('data', (d) => (keluaran += String(d)));
     anak.on('error', (err) => {
       console.error('[AionesBoard Backup] Gagal menjalankan cadangan:', err?.message || err);
+      antreEmail(pesanCadanganGagal(String(err?.message || err), new Date()));
       resolve(false);
     });
     anak.on('close', (kode) => {
@@ -98,6 +129,7 @@ function jalankanCadangan(): Promise<boolean> {
         resolve(true);
       } else {
         console.error('[AionesBoard Backup] Cadangan harian gagal (kode', kode, '):', keluaran.trim());
+        antreEmail(pesanCadanganGagal(keluaran, new Date()));
         resolve(false);
       }
     });
