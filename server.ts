@@ -49,6 +49,7 @@ import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
 import { dekripsiNilai } from './src/services/config/rahasia';
+import { mulaiBackupTerjadwal } from './src/services/ops/backupTerjadwal';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
@@ -5149,7 +5150,10 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Aiones Boards Server] Berjalan pada port ${PORT}`);
+    // Cadangan harian otomatis (produksi) — lihat docs/operasional.md.
+    hentikanBackup = mulaiBackupTerjadwal();
   });
+  let hentikanBackup: () => void = () => {};
 
   // Graceful shutdown: tutup server & pool MySQL saat menerima SIGINT/SIGTERM.
   // Tanpa ini, proses tertinggal (orphan) ketika dijalankan lewat wrapper
@@ -5159,6 +5163,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     if (sedangTutup) return;
     sedangTutup = true;
     console.log(`[Aiones Boards Server] Menerima ${sinyal} — menutup dengan rapi...`);
+    hentikanBackup();
     // Berhenti menerima koneksi baru; paksa tutup setelah 5 dtk bila ada yang menggantung.
     server.close(() => {
       console.log('[Aiones Boards Server] Koneksi HTTP ditutup.');

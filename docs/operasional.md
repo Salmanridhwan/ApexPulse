@@ -47,6 +47,22 @@ Ketiganya juga dijalankan otomatis oleh CI (`.github/workflows/ci.yml`) pada set
 
 ## 3. Cadangan harian
 
+**Otomatis (disarankan).** Di produksi server mencadangkan sendiri setiap hari
+pukul 02.00 dan menyimpan 14 hari terakhir, lalu menghapus yang lebih tua.
+
+| Variabel | Default | Keterangan |
+|---|---|---|
+| `BACKUP_OTOMATIS` | aktif bila `NODE_ENV=production` | `0` mematikan, `1` menyalakan walau bukan produksi |
+| `BACKUP_JAM` | `2` | Jam berjalan (0–23), waktu server |
+| `BACKUP_SIMPAN_HARI` | `14` | Cadangan lebih tua dari ini dihapus |
+| `BACKUP_DIR` | `backups` | Folder penyimpanan |
+
+Pastikan folder cadangan berada di disk yang berbeda dari database, atau
+salinan berkala dikirim ke lokasi lain (cadangan di disk yang sama ikut hilang
+bila disk rusak).
+
+**Manual / di luar server:**
+
 ```bash
 npm run backup
 # atau tentukan folder lain:
@@ -56,7 +72,7 @@ BACKUP_DIR=D:/cadangan/aionesboard npm run backup
 Hasil: `backups/aionesboard-<waktu>.json.gz` + `<berkas>.sha256`.
 Isinya **seluruh tabel** (17 tabel: tenant, user, dashboard, audit, dokumen, dsb.).
 
-Jadwalkan harian, misalnya:
+Bila ingin dijadwalkan sistem (mis. server tanpa `NODE_ENV=production`):
 
 - **Linux (cron)** — tiap hari 02.00:
   `0 2 * * * cd /srv/aiones-boards && /usr/bin/npm run backup >> /var/log/aiones-backup.log 2>&1`
