@@ -447,6 +447,11 @@ async function startServer() {
   const pembatasDaftar = buatPembatas(5, 60 * 60 * 1000);
   // Unggah berkas memakan memori + kuota penyimpanan: 20 berkas/jam per akun.
   const pembatasUnggah = buatPembatas(20, 60 * 60 * 1000);
+  // PIN tautan hanya 6 angka (1 juta kemungkinan). Tanpa batas percobaan,
+  // PIN bisa ditebak otomatis dalam hitungan menit — batas ini yang membuatnya
+  // tidak praktis. Kunci: tautan + IP, supaya satu tautan bocor tidak bisa
+  // ditebak beramai-ramai dari banyak alamat.
+  const pembatasPin = buatPembatas(10, 15 * 60 * 1000);
   setInterval(() => {
     pembatasIp.sapu();
     pembatasAkun.sapu();
@@ -4360,9 +4365,20 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
         kode: 'PIN_BELUM_DIATUR',
       });
     }
+    const kunciPin = `pin:${token}:${req.ip || '-'}`;
+    const izin = pembatasPin.cek(kunciPin);
+    if (!izin.boleh) {
+      res.setHeader('Retry-After', String(izin.tungguDetik));
+      return res.status(429).json({
+        error: `Terlalu banyak percobaan PIN. Coba lagi dalam ${Math.ceil(izin.tungguDetik / 60)} menit.`,
+        kode: 'TERLALU_BANYAK_PERCOBAAN',
+      });
+    }
     if (!verifyPassword(String(req.body?.pin || ''), hashPin)) {
+      pembatasPin.gagal(kunciPin);
       return res.status(401).json({ error: 'PIN salah.', kode: 'PIN_SALAH' });
     }
+    pembatasPin.bersihkan(kunciPin);
     res.json({ ok: true });
   });
 
@@ -4412,9 +4428,20 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
         kode: 'PIN_BELUM_DIATUR',
       });
     }
+    const kunciPin = `pin:${token}:${req.ip || '-'}`;
+    const izin = pembatasPin.cek(kunciPin);
+    if (!izin.boleh) {
+      res.setHeader('Retry-After', String(izin.tungguDetik));
+      return res.status(429).json({
+        error: `Terlalu banyak percobaan PIN. Coba lagi dalam ${Math.ceil(izin.tungguDetik / 60)} menit.`,
+        kode: 'TERLALU_BANYAK_PERCOBAAN',
+      });
+    }
     if (!pinDikirim || !verifyPassword(pinDikirim, hashPin)) {
+      pembatasPin.gagal(kunciPin);
       return res.status(401).json({ error: 'PIN tautan salah atau belum diisi.', kode: 'PIN_SALAH' });
     }
+    pembatasPin.bersihkan(kunciPin);
     if (mode !== 'editable') {
       return res.status(403).json({ error: 'Tautan ini bersifat Read-Only dan tidak dapat diedit.' });
     }

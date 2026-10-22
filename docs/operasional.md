@@ -125,6 +125,9 @@ insiden untuk mengetahui prosedurnya bekerja.
 - **Bisa Edit**: wajib PIN 6 angka yang dibuat server saat tautan dibuat. PIN hanya
   tampil sekali — kirim terpisah dari tautannya. Bila PIN hilang, buat tautan baru
   dan cabut yang lama.
+- Percobaan PIN dibatasi 10 kali per 15 menit untuk setiap tautan+IP; setelah itu
+  balasan 429 dengan `Retry-After` dan PIN yang benar pun ditolak sampai jendela
+  berakhir. Ini yang membuat 6 angka tidak bisa ditebak paksa.
 - Tautan punya masa berlaku (7/30/90/365 hari atau tanpa batas) dan dapat dicabut
   kapan saja dari panel Bagikan; tautan yang dicabut langsung tidak bisa dipakai (410).
 

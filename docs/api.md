@@ -69,7 +69,7 @@ curl -s -b cookie.txt 'http://127.0.0.1:3000/api/audit-logs?limit=2&offset=0'
 | Metode | Jalur | Keterangan |
 |---|---|---|
 | `GET` | `/api/share/:token` | Data dashboard untuk tautan. Token kedaluwarsa/dicabut → **410**. |
-| `POST` | `/api/share/:token/verifikasi-pin` | Body `{ pin }` → 200 bila cocok, 401 bila salah. |
+| `POST` | `/api/share/:token/verifikasi-pin` | Body `{ pin }` → 200 bila cocok, 401 bila salah. Maksimal **10 percobaan / 15 menit** per tautan+IP; setelah itu **429** dengan `Retry-After`. |
 | `PATCH` | `/api/share/:token` | Menyimpan perubahan widget. Tautan `editable` **wajib** menyertakan header `x-share-pin`; tanpa itu 401 `PIN_SALAH`. |
 
 ## Berkas
