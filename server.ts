@@ -46,6 +46,8 @@ import {
 import { AlertRule, BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
+import { buatPembatas } from './src/services/auth/rateLimit';
+import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
@@ -195,6 +197,16 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
     });
     return null;
   }
+  // Akun dengan sandi sementara/bawaan hanya boleh mengakses endpoint auth
+  // sampai kata sandinya diganti — kalau tidak, sandi bersama tetap dipakai
+  // untuk memakai seluruh aplikasi.
+  if (session.mustChange && !req.path.startsWith('/api/auth/')) {
+    res.status(403).json({
+      error: 'Ganti kata sandi Anda dulu sebelum memakai aplikasi.',
+      kode: 'MUST_CHANGE_PASSWORD',
+    });
+    return null;
+  }
   (req as AuthedRequest).session = session;
   return session;
 }
@@ -319,6 +331,43 @@ async function startServer() {
   app.use(express.json({ limit: '70mb' }));
 
   /**
+   * Tolak permintaan pengubah data yang datang dari domain lain (CSRF).
+   *
+   * ponytail: cookie sesi sudah HttpOnly + SameSite=Lax, tapi itu belum menutup
+   * semua jalur (POST JSON lintas situs). Cukup bandingkan Origin dengan Host —
+   * tanpa paket tambahan. Klien non-browser (skrip/curl) tidak mengirim Origin,
+   * jadi tetap boleh (tidak ada cookie yang bisa dicuri di sana).
+   */
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+    const asal = req.headers.origin;
+    if (!asal) return next();
+    try {
+      if (new URL(asal).host !== req.headers.host) {
+        return res.status(403).json({ error: 'Permintaan dari domain lain ditolak.' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'Asal permintaan tidak sah.' });
+    }
+    next();
+  });
+
+  /**
+   * Pembatas percobaan login. Dua lapis:
+   * - per IP  : 30 percobaan / 15 menit (menahan satu penyerang menyapu banyak email)
+   * - per akun: 10 percobaan / 15 menit (menahan tebakan pada satu email)
+   * In-memory; kalau nanti banyak instance, batas ini berlaku per instance.
+   */
+  const pembatasIp = buatPembatas(30, 15 * 60 * 1000);
+  const pembatasAkun = buatPembatas(10, 15 * 60 * 1000);
+  const pembatasDaftar = buatPembatas(5, 60 * 60 * 1000);
+  setInterval(() => {
+    pembatasIp.sapu();
+    pembatasAkun.sapu();
+    pembatasDaftar.sapu();
+  }, 10 * 60 * 1000).unref();
+
+  /**
    * Sinkronisasi multi-instance: produksi berjalan di >1 instance backend yang
    * berbagi MySQL. Tanpa ini, data yang ditulis satu instance (dashboard, chat,
    * tenant) tidak terlihat di instance lain — daftar dashboard/riwayat "berkedip"
@@ -374,6 +423,22 @@ async function startServer() {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    // Batas percobaan: tanpa ini, kata sandi bisa ditebak otomatis tanpa henti.
+    const kunciIp = `ip:${req.ip || 'lokal'}`;
+    const kunciAkun = `akun:${cleanEmail}`;
+    const cekIp = pembatasIp.cek(kunciIp);
+    const cekAkun = pembatasAkun.cek(kunciAkun);
+    if (!cekIp.boleh || !cekAkun.boleh) {
+      const tunggu = Math.max(cekIp.tungguDetik, cekAkun.tungguDetik);
+      res.setHeader('Retry-After', String(tunggu));
+      return res.status(429).json({
+        error: `Terlalu banyak percobaan masuk. Coba lagi dalam ${Math.ceil(tunggu / 60)} menit.`,
+        kode: 'TERLALU_BANYAK_PERCOBAAN',
+        tungguDetik: tunggu,
+      });
+    }
+
     // findUserForLogin menyegarkan dari tabel auth khusus dulu, supaya user yang
     // didaftarkan di instance backend lain tetap bisa login di instance ini.
     const user = await db.findUserForLogin(cleanEmail);
@@ -382,10 +447,14 @@ async function startServer() {
     // untuk email tak dikenal & password salah (anti user-enumeration).
     const storedHash = user ? db.credentials[user.id] : undefined;
     if (!user || !storedHash || !verifyPassword(password, storedHash)) {
+      pembatasIp.gagal(kunciIp);
+      pembatasAkun.gagal(kunciAkun);
       return res.status(401).json({
         error: 'Email atau kata sandi tidak sesuai dengan kredensial instansi.',
       });
     }
+    pembatasIp.bersihkan(kunciIp);
+    pembatasAkun.bersihkan(kunciAkun);
 
     // Status keanggotaan diperiksa SETELAH kata sandi benar, supaya pesan
     // "menunggu persetujuan" tidak bisa dipakai menebak email mana yang terdaftar.
@@ -402,11 +471,17 @@ async function startServer() {
       });
     }
 
+    // Kata sandi bawaan lama (dipakai bersama oleh banyak akun) dianggap tidak
+    // sah sebagai sandi akhir → pengguna wajib menggantinya sebelum memakai
+    // aplikasi. Akun hasil reset admin juga ditandai lewat mustChangePassword.
+    const wajibGanti = user.mustChangePassword === true || adalahSandiBawaan(password);
+
     const token = signSession({
       userId: user.id,
       role: user.role,
       tenantId: user.tenantId,
       name: user.name,
+      mustChange: wajibGanti,
     });
 
     db.addAuditLog({
@@ -421,7 +496,8 @@ async function startServer() {
     // Token dikirim via cookie HttpOnly — tidak bisa dicuri JS browser.
     res.setHeader('Set-Cookie', sessionCookieHeader(token));
     res.json({
-      user: safeUser(user),
+      user: { ...(safeUser(user) as any), mustChangePassword: wajibGanti },
+      mustChangePassword: wajibGanti,
     });
   });
 
@@ -456,11 +532,18 @@ async function startServer() {
 
   /** Terbitkan sesi + audit log untuk user yang sudah lolos verifikasi. */
   function terbitkanSesi(res: Response, user: SafeUser, cara: string) {
+    // Kata sandi bawaan lama (dipakai bersama oleh banyak akun) dianggap tidak
+    // sah sebagai sandi akhir → pengguna wajib menggantinya sebelum memakai
+    // aplikasi. Akun hasil reset admin juga ditandai lewat mustChangePassword.
+    // Login Google tidak memakai sandi lokal → hanya flag akun yang berlaku.
+    const wajibGanti = user.mustChangePassword === true;
+
     const token = signSession({
       userId: user.id,
       role: user.role,
       tenantId: user.tenantId,
       name: user.name,
+      mustChange: wajibGanti,
     });
     db.addAuditLog({
       tenantId: user.tenantId,
@@ -481,6 +564,17 @@ async function startServer() {
    * penyalahgunaan, pendaftaran bisa ditutup lewat env `ALLOW_REGISTRATION=false`.
    */
   app.post('/api/auth/register', async (req: Request, res: Response) => {
+    // Pendaftaran massal dari satu IP = pembuatan akun sampah; batasi 5/jam.
+    const cekDaftar = pembatasDaftar.cek(`ip:${req.ip || 'lokal'}`);
+    if (!cekDaftar.boleh) {
+      res.setHeader('Retry-After', String(cekDaftar.tungguDetik));
+      return res.status(429).json({
+        error: 'Terlalu banyak pendaftaran dari jaringan ini. Coba lagi nanti.',
+        kode: 'TERLALU_BANYAK_PERCOBAAN',
+      });
+    }
+    pembatasDaftar.gagal(`ip:${req.ip || 'lokal'}`);
+
     if (process.env.ALLOW_REGISTRATION === 'false') {
       return res.status(403).json({ error: 'Pendaftaran akun sedang ditutup. Hubungi admin instansi.' });
     }
@@ -496,9 +590,8 @@ async function startServer() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'Format email tidak valid.' });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Kata sandi minimal 8 karakter.' });
-    }
+    const masalahSandi = masalahKataSandi(password, email);
+    if (masalahSandi) return res.status(400).json({ error: masalahSandi });
     // Segarkan dari tabel auth khusus dulu agar email yang sudah didaftarkan di
     // instance backend lain tidak dibuat dobel (multi-instance).
     const sudahAda = await db.findUserForLogin(email);
@@ -643,6 +736,56 @@ async function startServer() {
     }
 
     return terbitkanSesi(res, user, 'Google Sign-In');
+  });
+
+  /**
+   * Ganti kata sandi sendiri (wajib untuk sandi bawaan/sementara).
+   * Perlu kata sandi lama → cookie yang dicuri tidak cukup untuk mengambil alih akun.
+   */
+  app.post('/api/auth/ganti-password', async (req: Request, res: Response) => {
+    const session = verifySession(parseSessionCookie(req));
+    if (!session) {
+      return res.status(401).json({ error: 'Sesi tidak valid atau telah berakhir. Silakan login ulang.' });
+    }
+    const lama = String(req.body?.lama || '');
+    const baru = String(req.body?.baru || '');
+    const ulangi = req.body?.ulangi === undefined ? baru : String(req.body.ulangi);
+
+    if (baru !== ulangi) {
+      return res.status(400).json({ error: 'Kata sandi baru dan ulangannya tidak sama.' });
+    }
+    const user = db.users.find((u) => u.id === session.userId);
+    const hash = user ? db.credentials[user.id] : undefined;
+    if (!user || !hash) return res.status(404).json({ error: 'Akun tidak ditemukan.' });
+    if (!verifyPassword(lama, hash)) {
+      return res.status(401).json({ error: 'Kata sandi lama tidak sesuai.' });
+    }
+    const masalah = masalahKataSandi(baru, user.email);
+    if (masalah) return res.status(400).json({ error: masalah });
+    if (lama === baru) {
+      return res.status(400).json({ error: 'Kata sandi baru harus berbeda dari yang lama.' });
+    }
+
+    db.setUserPassword(user.id, hashPassword(baru), false);
+    db.addAuditLog({
+      tenantId: user.tenantId,
+      userId: user.id,
+      userName: user.name,
+      action: 'Ganti Kata Sandi',
+      target: user.name,
+      details: 'Kata sandi akun diganti oleh pemiliknya.',
+    });
+
+    // Sesi ditandatangani ulang tanpa penanda wajib-ganti.
+    const token = signSession({
+      userId: user.id,
+      role: user.role,
+      tenantId: user.tenantId,
+      name: user.name,
+      mustChange: false,
+    });
+    res.setHeader('Set-Cookie', sessionCookieHeader(token));
+    res.json({ ok: true, user: safeUser(user) });
   });
 
   app.post('/api/auth/logout', (req: Request, res: Response) => {
@@ -1914,6 +2057,7 @@ async function startServer() {
       isActive: true,
     };
     db.alertRules.push(newRule);
+    db.simpanAturanAlert(newRule);
     db.persist();
     res.status(201).json(newRule);
   });
@@ -1979,6 +2123,7 @@ async function startServer() {
     const idx = db.alertRules.findIndex((r) => r.id === req.params.id && r.tenantId === tenantId);
     if (idx < 0) return res.status(404).json({ error: 'Aturan ambang batas tidak ditemukan.' });
     const [dihapus] = db.alertRules.splice(idx, 1);
+    db.hapusAturanAlert(dihapus.id);
     db.persist();
     db.addAuditLog({
       tenantId,
@@ -2026,6 +2171,7 @@ async function startServer() {
       const notif = buatNotifikasi(rule, tenantId, indikator);
 
       db.notifications.unshift(notif);
+      db.simpanNotifikasi(notif); // ponytail: per-baris, bukan snapshot
       triggered.push(notif);
       rule.lastTriggered = notif.timestamp;
 
@@ -2079,6 +2225,7 @@ async function startServer() {
       return res.status(404).json({ error: 'Notifikasi tidak ditemukan atau akses ditolak.' });
     }
     notif.isRead = true;
+    db.simpanNotifikasi(notif);
     db.persist();
     res.json({ success: true });
   });
@@ -4010,6 +4157,8 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       expiresAt,
       createdBy: session.name,
     } as any;
+    // ponytail: satu tautan = satu baris (`baris`), bukan snapshot penuh.
+    db.simpanTautanBagikan(token, db.shareTokens[token] as any);
     db.persist();
     db.addAuditLog({
       tenantId: dash.tenantId,
@@ -4058,6 +4207,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       return res.status(404).json({ error: 'Tautan tidak ditemukan.' });
     }
     delete db.shareTokens[token];
+    db.hapusTautanBagikan(token);
     db.persist();
     db.addAuditLog({
       tenantId: dash.tenantId,
@@ -4341,19 +4491,46 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       tenantId: req.body.tenantId || 'tenant-pdam',
       avatar: req.body.role === 'admin' ? '👨‍💼' : req.body.role === 'direksi' ? '👔' : '👩‍💼',
     };
-    // Password awal user baru = DEMO_PASSWORD dari env (default apexpulse2026).
-    // JANGAN menyalin hash password admin yang sedang login — itu membuat
-    // user baru bisa dibuka dengan kredensial admin.
-    db.createUser(newUser, hashPassword(process.env.DEMO_PASSWORD || 'apexpulse2026'));
+    // Sandi awal = kata sandi sementara acak per akun (bukan sandi bersama yang
+    // tertulis di dokumentasi). Admin menyalinnya sekali dari respons ini, dan
+    // pengguna WAJIB menggantinya saat login pertama.
+    const sandiAwal = kataSandiSementara();
+    db.createUser({ ...newUser, mustChangePassword: true }, hashPassword(sandiAwal));
     db.addAuditLog({
       tenantId: newUser.tenantId,
       userId: session.userId,
       userName: session.name,
       action: 'Tambah Pengguna Baru',
       target: newUser.name,
-      details: `Peran: ${newUser.role}, Email: ${newUser.email}`,
+      details: `Peran: ${newUser.role}, Email: ${newUser.email} (sandi sementara, wajib diganti)`,
     });
-    res.status(201).json(safeUser(newUser));
+    // Kata sandi sementara hanya muncul SEKALI di sini; tidak disimpan dalam bentuk terbaca.
+    res.status(201).json({ ...(safeUser(newUser) as any), sandiSementara: sandiAwal });
+  });
+
+  /**
+   * Reset kata sandi oleh admin (pengganti alur "lupa kata sandi" tanpa email):
+   * server membuat sandi sementara baru, mengembalikannya sekali, dan akun
+   * dipaksa menggantinya saat login. Tidak ada sandi bersama yang bisa ditebak.
+   */
+  app.post('/api/admin/users/:id/reset-password', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mereset kata sandi.')) return;
+    const target = db.users.find((u) => u.id === req.params.id);
+    if (!target) return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
+
+    const sandiBaru = kataSandiSementara();
+    db.setUserPassword(target.id, hashPassword(sandiBaru), true);
+    db.addAuditLog({
+      tenantId: target.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Reset Kata Sandi',
+      target: target.name,
+      details: 'Kata sandi direset admin; pengguna wajib menggantinya saat login.',
+    });
+    res.json({ ok: true, sandiSementara: sandiBaru, email: target.email });
   });
 
   app.patch('/api/admin/users/:id', (req: Request, res: Response) => {

@@ -22,6 +22,12 @@ export interface SessionPayload {
   role: string;
   tenantId: string;
   name: string;
+  /**
+   * Akun masih memakai kata sandi sementara/bawaan → wajib ganti dulu.
+   * Dibawa di token supaya pemeriksaannya tidak perlu query DB tiap request;
+   * setelah ganti sandi, token ditandatangani ulang tanpa flag ini.
+   */
+  mustChange?: boolean;
   exp: number;
 }
 
@@ -69,12 +75,23 @@ export function verifySession(token: string | undefined): SessionPayload | null 
 
 export const SESSION_COOKIE = 'aionesboard_session';
 
+/**
+ * ponytail: `Secure` ditambahkan di produksi supaya cookie sesi tidak pernah
+ * ikut terkirim lewat HTTP polos. Di lokal (http://127.0.0.1) tetap tanpa
+ * `Secure`, kalau tidak browser menolak menyimpan cookie-nya.
+ */
+function flagSecure(): string {
+  return process.env.NODE_ENV === 'production' ? '; Secure' : '';
+}
+
 export function sessionCookieHeader(token: string): string {
-  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(
+    SESSION_TTL_MS / 1000
+  )}${flagSecure()}`;
 }
 
 export function clearSessionCookieHeader(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${flagSecure()}`;
 }
 
 export function parseSessionCookie(req: { headers: { cookie?: string } }): string | undefined {

@@ -88,6 +88,11 @@ export interface User {
   requestedAt?: string;
   /** Identitas email sudah diverifikasi Google (klaim `email_verified`). */
   emailVerified?: boolean;
+  /**
+   * Akun memakai kata sandi sementara (dibuat admin / hasil reset) sehingga
+   * wajib mengganti kata sandi saat login berikutnya. Hilang setelah diganti.
+   */
+  mustChangePassword?: boolean;
 }
 
 /**

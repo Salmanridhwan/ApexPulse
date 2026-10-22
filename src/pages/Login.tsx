@@ -263,8 +263,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       setErrorMessage('Konfirmasi kata sandi tidak sama.');
       return;
     }
-    if (regPassword.length < 8) {
-      setErrorMessage('Kata sandi minimal 8 karakter.');
+    if (regPassword.length < 10) {
+      setErrorMessage('Kata sandi minimal 10 karakter, serta memuat huruf dan angka.');
       return;
     }
 

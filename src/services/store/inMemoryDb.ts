@@ -365,22 +365,20 @@ export class InMemoryDb {
   // ================= MySQL (Laragon) =================
   private mysql: MysqlStore | null = null;
 
-  /** Snapshot state penuh untuk mirror ke MySQL. */
+  /**
+   * Snapshot untuk mirror ke MySQL.
+   *
+   * ponytail: hanya koleksi yang BELUM punya tabel per-baris. alertRules,
+   * notifications, auditLogs, shareTokens, sharePins, systemConfig, users,
+   * credentials, deletedTenantIds ditulis satu-satu lewat `simpan*`/`addAuditLog`,
+   * karena snapshot penuh (DELETE + insert state instance ini) menghapus data
+   * yang dibuat instance backend lain.
+   */
   private snapshot(): DbSnapshot {
     return {
       dashboards: this.dashboards,
       chats: this.chats,
-      alertRules: this.alertRules,
-      notifications: this.notifications,
-      auditLogs: this.auditLogs.slice(0, 500),
-      shareTokens: this.shareTokens,
-      sharePins: this.sharePins,
-      systemConfig: this.systemConfig,
-      users: this.users,
-      credentials: this.credentials,
-      tenants: this.tenants,
       ketersediaanPreset: this.ketersediaanPreset,
-      deletedTenantIds: this.deletedTenantIds,
       kewajibanLapor: this.kewajibanLapor,
       laporanPeriodik: this.laporanPeriodik,
       alurVerifikasi: this.alurVerifikasi,
@@ -856,6 +854,7 @@ export class InMemoryDb {
    */
   public updateSystemConfig(partial: Record<string, unknown>) {
     this.systemConfig = { ...this.systemConfig, ...(partial as object) };
+    this.trackWrite(this.mysql?.upsertBaris('systemConfig', 'utama', this.systemConfig));
     this.persist();
     return this.systemConfig;
   }
@@ -905,7 +904,7 @@ export class InMemoryDb {
         chats: this.chats,
         alertRules: this.alertRules,
         notifications: this.notifications,
-        auditLogs: this.auditLogs.slice(0, 500),
+        auditLogs: this.auditLogs.slice(0, 5000),
         shareTokens: this.shareTokens,
         sharePins: this.sharePins,
         systemConfig: this.systemConfig,
@@ -1027,8 +1026,45 @@ export class InMemoryDb {
       timestamp: new Date().toISOString(),
     };
     this.auditLogs.unshift(log);
+    // ponytail: satu entri = satu baris di `audit_log`, jadi audit dari instance
+    // lain tidak terhapus. Memori dibatasi 5.000 entri (bukan 500) dan tabel
+    // dipangkas di atas 20.000 supaya tetap ringan.
+    this.trackWrite(this.mysql?.upsertAuditLog(log));
+    if (this.auditLogs.length > 5000) this.auditLogs.length = 5000;
+    if (this.auditLogs.length % 500 === 0) this.trackWrite(this.mysql?.trimAuditLogs(20000));
     this.persist();
     return log;
+  }
+
+  // ===== Koleksi kecil: tulis per-baris (tanpa snapshot penuh) =====
+
+  /** Simpan satu notifikasi milik instansi (dulu ikut snapshot → hilang antar instance). */
+  public simpanNotifikasi(n: NotificationItem): void {
+    this.trackWrite(this.mysql?.upsertBaris('notifications', n.id, n));
+  }
+
+  /** Simpan/perbarui satu aturan alert. */
+  public simpanAturanAlert(r: AlertRule): void {
+    this.trackWrite(this.mysql?.upsertBaris('alertRules', r.id, r));
+  }
+
+  public hapusAturanAlert(id: string): void {
+    this.trackWrite(this.mysql?.deleteBaris('alertRules', id));
+  }
+
+  /** Tautan bagikan (mode lihat/edit) — satu baris per token. */
+  public simpanTautanBagikan(token: string, meta: Record<string, unknown>): void {
+    this.trackWrite(this.mysql?.upsertBaris('shareTokens', token, { token, ...meta }));
+  }
+
+  public hapusTautanBagikan(token: string): void {
+    this.trackWrite(this.mysql?.deleteBaris('shareTokens', token));
+    this.trackWrite(this.mysql?.deleteBaris('sharePins', token));
+  }
+
+  /** Hash PIN mode edit tautan publik. */
+  public simpanPinBagikan(token: string, pin: string): void {
+    this.trackWrite(this.mysql?.upsertBaris('sharePins', token, { token, pin }));
   }
 
   // ================= Chat (riwayat per dashboard) =================
@@ -1183,6 +1219,24 @@ export class InMemoryDb {
     return this.users[idx];
   }
 
+  /**
+   * Ganti kata sandi satu akun. `mustChange` = akun masih memakai sandi
+   * sementara, jadi login berikutnya wajib menggantinya lagi.
+   * Hash ditulis ke tabel auth per-baris (bukan snapshot) agar langsung
+   * berlaku di instance backend lain.
+   */
+  setUserPassword(id: string, passwordHash: string, mustChange = false): SafeUser | undefined {
+    const idx = this.users.findIndex((u) => u.id === id);
+    if (idx === -1) return undefined;
+    this.credentials[id] = passwordHash;
+    this.users[idx] = { ...this.users[idx], mustChangePassword: mustChange };
+    this.mysql
+      ?.upsertAuthUser(id, this.users[idx], passwordHash)
+      .catch((err) => console.error('[AionesBoard DB] upsertAuthUser gagal:', err?.message || err));
+    this.persist();
+    return this.users[idx];
+  }
+
   deleteUser(id: string): boolean {
     const len = this.users.length;
     this.users = this.users.filter((u) => u.id !== id);
@@ -1276,7 +1330,11 @@ export class InMemoryDb {
 
     // Catat id instansi yang dihapus — agar user seed-nya tidak dibuat ulang
     // saat boot berikutnya (lihat ensureSeedUsers).
-    if (!this.deletedTenantIds.includes(id)) this.deletedTenantIds.push(id);
+    if (!this.deletedTenantIds.includes(id)) {
+      this.deletedTenantIds.push(id);
+      // Per-baris: tombstone tidak boleh hilang karena snapshot instance lain.
+      this.trackWrite(this.mysql?.upsertBaris('deletedTenantIds', id, id));
+    }
 
     // 1) Pengguna instansi + kredensialnya. Hapus juga di tabel auth MySQL,
     //    supaya sinkronisasi multi-instance / findUserForLogin tidak
@@ -1308,12 +1366,17 @@ export class InMemoryDb {
       if (dashIds.has(dashId)) {
         delete this.shareTokens[token];
         delete this.sharePins[token];
+        this.hapusTautanBagikan(token);
       }
     }
 
     // 3) Sisa data yang terikat tenantId.
+    const notifHapus = this.notifications.filter((n) => n.tenantId === id);
     this.notifications = this.notifications.filter((n) => n.tenantId !== id);
+    for (const n of notifHapus) this.trackWrite(this.mysql?.deleteBaris('notifications', n.id));
+    const aturanHapus = this.alertRules.filter((a) => a.tenantId === id);
     this.alertRules = this.alertRules.filter((a) => a.tenantId !== id);
+    for (const a of aturanHapus) this.hapusAturanAlert(a.id);
     this.auditLogs = this.auditLogs.filter((a) => a.tenantId !== id);
     this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => k.tenantId !== id);
 

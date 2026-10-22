@@ -22,19 +22,27 @@ export interface MysqlConfig {
 export interface DbSnapshot {
   dashboards: Dashboard[];
   chats: Chat[];
-  alertRules: AlertRule[];
-  notifications: NotificationItem[];
-  auditLogs: AuditLog[];
-  shareTokens: Record<string, string>;
+  /**
+   * ponytail: alertRules/notifications/auditLogs/shareTokens/sharePins/systemConfig/
+   * users/credentials/deletedTenantIds TIDAK lagi ikut snapshot. Dulu snapshot
+   * penuh (DELETE semua + insert state instance ini) menghapus notifikasi, aturan
+   * alert, tautan bagikan, dan audit log yang dibuat instance lain. Sekarang
+   * masing-masing ditulis per-baris (tabel `baris` / `audit_log` / `auth_users`).
+   * Field di bawah ini hanya sisa tipe untuk membaca data deployment lama.
+   */
+  alertRules?: AlertRule[];
+  notifications?: NotificationItem[];
+  auditLogs?: AuditLog[];
+  shareTokens?: Record<string, string>;
   /** token -> hash PIN (scrypt) untuk mode edit pada tautan publik. */
-  sharePins: Record<string, string>;
-  systemConfig: unknown;
-  users: SafeUser[];
-  credentials: Record<string, string>;
-  tenants: Tenant[];
+  sharePins?: Record<string, string>;
+  systemConfig?: unknown;
+  users?: SafeUser[];
+  credentials?: Record<string, string>;
+  tenants?: Tenant[];
   ketersediaanPreset: KetersediaanPreset[];
   /** id instansi yang sudah dihapus admin — agar user seed-nya tidak dibuat ulang. */
-  deletedTenantIds: string[];
+  deletedTenantIds?: string[];
   kewajibanLapor: KewajibanLapor[];
   laporanPeriodik: LaporanPeriodik[];
   alurVerifikasi: AlurVerifikasi[];
@@ -333,6 +341,40 @@ export class MysqlStore {
         INDEX idx_lkjip_tenant (tenant_id)
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel SERBA-GUNA per-baris untuk koleksi kecil yang dulu ikut snapshot:
+     * alertRules, notifications, shareTokens, sharePins, systemConfig,
+     * deletedTenantIds. `coll` = nama koleksi, `id` = kunci barisnya.
+     *
+     * Tanpa ini, `saveAll` (snapshot penuh) menghapus notifikasi/aturan/tautan
+     * yang dibuat instance backend lain — sudah pernah terjadi di produksi.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS baris (
+        coll VARCHAR(32) NOT NULL,
+        id VARCHAR(160) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (coll, id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel AUDIT LOG, append-only. Dulu audit log ikut snapshot dan dipotong
+     * `slice(0, 500)` → jejak audit hilang. Sekarang satu entri = satu baris,
+     * tidak pernah ditimpa instance lain; pemangkasan hanya lewat `trimAuditLogs`
+     * dengan batas atas yang jauh lebih besar (default 20.000 entri).
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        waktu BIGINT NOT NULL,
+        data JSON NOT NULL,
+        INDEX idx_audit_waktu (waktu)
+      ) ENGINE=InnoDB
+    `);
   }
 
   /** Tambah/perbarui SATU kewajiban lapor (upsert per-baris). */
@@ -524,6 +566,67 @@ export class MysqlStore {
     if (!this.pool) return;
     await this.pool.query('DELETE FROM lkjip WHERE id = ?', [id]);
   }
+
+  // ===== Koleksi kecil per-baris (tabel `baris`) =====
+
+  /** Tulis satu baris koleksi kecil (alertRules, notifications, share*, systemConfig). */
+  async upsertBaris(coll: string, id: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO baris (coll, id, data) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+      [coll, id, JSON.stringify(data)]
+    );
+  }
+
+  async deleteBaris(coll: string, id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM baris WHERE coll = ? AND id = ?', [coll, id]);
+  }
+
+  async loadBaris(coll: string): Promise<unknown[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM baris WHERE coll = ?', [coll]);
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  // ===== Audit log (append-only) =====
+
+  async upsertAuditLog(log: AuditLog): Promise<void> {
+    if (!this.pool) return;
+    const waktu = Date.parse(log.timestamp) || Date.now();
+    await this.pool.query(
+      `INSERT INTO audit_log (id, tenant_id, waktu, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+      [log.id, log.tenantId || '', waktu, JSON.stringify(log)]
+    );
+  }
+
+  /** Audit log terbaru dulu. `batas` mencegah memori membengkak saat boot. */
+  async loadAuditLogs(batas = 5000): Promise<AuditLog[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query(
+      'SELECT data FROM audit_log ORDER BY waktu DESC LIMIT ?',
+      [batas]
+    );
+    return (rows as Array<{ data: any }>).map((r) =>
+      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
+    );
+  }
+
+  /** Pangkas audit log paling lama di atas `simpan` entri (batas atas, bukan 500). */
+  async trimAuditLogs(simpan = 20000): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `DELETE FROM audit_log WHERE id NOT IN (
+         SELECT id FROM (SELECT id FROM audit_log ORDER BY waktu DESC LIMIT ?) t
+       )`,
+      [simpan]
+    );
+  }
+
 
   /** Tambah/perbarui SATU snapshot kesehatan keuangan (upsert per-baris). */
   async upsertSnapshotKeuangan(id: string, tenantId: string, data: unknown): Promise<void> {
@@ -740,6 +843,35 @@ export class MysqlStore {
       if (row.k === 'credentials') hasil.credentials = val;
       if (row.k === 'deletedTenantIds') hasil.deletedTenantIds = val;
     }
+
+    // Koleksi kecil: tabel `baris` menang atas sisa snapshot/kv (migrasi deployment
+    // lama). Tanpa ini notifikasi/aturan/tautan yang dibuat instance lain hilang.
+    const aturanBaris = await this.loadBaris('alertRules');
+    if (aturanBaris.length > 0) hasil.alertRules = aturanBaris as AlertRule[];
+    const notifBaris = await this.loadBaris('notifications');
+    if (notifBaris.length > 0) hasil.notifications = notifBaris as NotificationItem[];
+    const tautanBaris = await this.loadBaris('shareTokens');
+    if (tautanBaris.length > 0) {
+      hasil.shareTokens = Object.fromEntries(
+        (tautanBaris as Array<{ token: string }>).map((t) => [t.token, t as any])
+      );
+    }
+    const pinBaris = await this.loadBaris('sharePins');
+    if (pinBaris.length > 0) {
+      hasil.sharePins = Object.fromEntries(
+        (pinBaris as Array<{ token: string; pin: string }>).map((t) => [t.token, t.pin])
+      );
+    }
+    const konfigBaris = await this.loadBaris('systemConfig');
+    if (konfigBaris.length > 0) hasil.systemConfig = konfigBaris[0];
+    const hapusBaris = await this.loadBaris('deletedTenantIds');
+    if (hapusBaris.length > 0) hasil.deletedTenantIds = hapusBaris as string[];
+
+    // Audit log dari tabel khusus (append-only). Fallback ke snapshot lama hanya
+    // kalau tabelnya masih kosong.
+    const auditKhusus = await this.loadAuditLogs();
+    if (auditKhusus.length > 0) hasil.auditLogs = auditKhusus;
+
     return ada ? hasil : null;
   }
 
@@ -780,39 +912,14 @@ export class MysqlStore {
         );
       };
 
-      await masukkan(
-        'alertRules',
-        s.alertRules.map((a) => ({ id: a.id, data: a }))
-      );
-      await masukkan(
-        'notifications',
-        s.notifications.map((n) => ({ id: n.id, data: n }))
-      );
-      await masukkan(
-        'auditLogs',
-        s.auditLogs.map((a) => ({ id: a.id, data: a }))
-      );
-      await masukkan(
-        'users',
-        s.users.map((u) => ({ id: u.id, data: u }))
-      );
-      // CATATAN: tenant TIDAK ditulis ke snapshot `collections` — tenant dikelola
-      // per-baris di tabel `tenants` (upsertTenant/deleteTenantRow). Kalau ikut
-      // snapshot, tenant yang baru dihapus bisa "balik lagi" karena ditimpa
-      // snapshot instance lain.
+      // Koleksi kecil (alertRules, notifications, auditLogs, shareTokens,
+      // sharePins, systemConfig, users, deletedTenantIds) TIDAK lagi ditulis di
+      // sini: masing-masing punya tabel per-baris sendiri. Snapshot penuh di sini
+      // dulu menghapus data instance lain.
       await masukkan(
         'ketersediaanPreset',
         (s.ketersediaanPreset || []).map((k) => ({ id: k.id, data: k }))
       );
-
-      const kv: Array<[string, string]> = [
-        ['shareTokens', JSON.stringify(s.shareTokens)],
-        ['sharePins', JSON.stringify(s.sharePins)],
-        ['systemConfig', JSON.stringify(s.systemConfig)],
-        ['credentials', JSON.stringify(s.credentials)],
-        ['deletedTenantIds', JSON.stringify(s.deletedTenantIds || [])],
-      ];
-      await conn.query('INSERT INTO kv (k, data) VALUES ?', [kv]);
 
       await conn.commit();
     } catch (err) {

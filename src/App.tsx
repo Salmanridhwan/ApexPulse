@@ -48,6 +48,7 @@ import { GlobalStyleModal } from './components/GlobalStyleModal';
 import { tipePunyaGaya } from './components/widgets/widgetStyle';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Login } from './pages/Login';
+import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 
 // Halaman sekunder di-code-split: tidak membebani bundle awal.
 const Admin = React.lazy(() =>
@@ -670,6 +671,20 @@ export default function App() {
 
   if (!currentUser || !authToken) {
     return <Login onLoginSuccess={handleLoginSuccess} tenants={tenants} />;
+  }
+
+  // Akun dengan kata sandi sementara/bawaan wajib menggantinya dulu. Server juga
+  // menolak endpoint lain (403 MUST_CHANGE_PASSWORD), ini hanya tampilannya.
+  if (currentUser.mustChangePassword) {
+    return (
+      <GantiPasswordWajib
+        namaPengguna={currentUser.name}
+        onSelesai={() => setCurrentUser({ ...currentUser, mustChangePassword: false })}
+        onKeluar={() => {
+          void handleLogout();
+        }}
+      />
+    );
   }
 
   // Fallback untuk halaman yang di-lazy-load di bawah.

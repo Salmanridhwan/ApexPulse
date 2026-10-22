@@ -1,0 +1,32 @@
+name: CI
+
+# Pemeriksaan dasar setiap push/PR: tipe, unit test, dan build produksi.
+# Tanpa ini, kesalahan tipe/regresi baru ketahuan setelah deploy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  periksa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Periksa tipe
+        run: npx tsc --noEmit
+
+      - name: Unit test
+        run: npm test
+
+      - name: Build produksi
+        run: npm run build

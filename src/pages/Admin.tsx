@@ -8,6 +8,7 @@ import {
   EyeOff,
   FolderOpen,
   Key,
+  KeyRound,
   LogOut,
   Menu,
   Pencil,
@@ -168,6 +169,11 @@ export const Admin: React.FC<AdminProps> = ({
   /** Pesan kegagalan aksi admin (simpan config, buat/nonaktifkan pengguna).
    *  Dulu kegagalan hanya masuk console sehingga UI tetap terlihat berhasil. */
   const [galatAksi, setGalatAksi] = useState<string | null>(null);
+  /**
+   * Kata sandi sementara hasil pembuatan akun / reset admin. Server hanya
+   * mengirimnya SEKALI, jadi ditampilkan sampai admin menutup kotaknya.
+   */
+  const [sandiSementara, setSandiSementara] = useState<{ email: string; sandi: string } | null>(null);
 
   // RAG Probe State (uji koneksi RAG)
   const [probeLoading, setProbeLoading] = useState(false);
@@ -445,13 +451,39 @@ export const Admin: React.FC<AdminProps> = ({
         return;
       }
       setGalatAksi(null);
-      setUsers((prev) => [...prev, newUser]);
+      // `sandiSementara` hanya dikirim sekali oleh server — tampilkan supaya
+      // admin bisa menyalinnya, bukan menebak sandi bawaan.
+      if (newUser?.sandiSementara) {
+        setSandiSementara({ email: newUser.email, sandi: newUser.sandiSementara });
+        const { sandiSementara: _x, ...tanpaSandi } = newUser;
+        setUsers((prev) => [...prev, tanpaSandi]);
+      } else {
+        setUsers((prev) => [...prev, newUser]);
+      }
       setIsAddUserOpen(false);
       setUserName('');
       setUserEmail('');
       loadData();
     } catch (err) {
       console.error('Create user failed:', err);
+    }
+  };
+
+  /** Reset kata sandi: server membuat sandi sementara baru (tidak ada sandi bersama). */
+  const handleResetPassword = async (u: { id: string; email: string; name: string }) => {
+    if (!confirm(`Reset kata sandi untuk ${u.name}? Pengguna wajib menggantinya saat login.`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/reset-password`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGalatAksi(data?.error || 'Kata sandi gagal direset.');
+        return;
+      }
+      setGalatAksi(null);
+      setSandiSementara({ email: u.email, sandi: data.sandiSementara });
+    } catch (err) {
+      console.error('Reset password failed:', err);
+      setGalatAksi('Kata sandi gagal direset.');
     }
   };
 
@@ -1170,6 +1202,27 @@ export const Admin: React.FC<AdminProps> = ({
               </button>
             </div>
           )}
+          {sandiSementara && (
+            <div className="p-3 bg-warn/10 border border-warn/30 rounded-card text-xs flex items-start gap-2">
+              <KeyRound className="w-4 h-4 text-warn shrink-0 mt-0.5" />
+              <span className="flex-1 text-ink">
+                Kata sandi sementara untuk <strong>{sandiSementara.email}</strong>:{' '}
+                <code className="font-mono font-bold text-ink bg-surface-2 px-1.5 py-0.5 rounded">
+                  {sandiSementara.sandi}
+                </code>
+                <span className="block text-ink-2 mt-1">
+                  Sampaikan lewat saluran aman. Pengguna wajib menggantinya saat login pertama.
+                </span>
+              </span>
+              <button
+                onClick={() => setSandiSementara(null)}
+                className="text-ink-2 hover:text-ink"
+                aria-label="Tutup kata sandi sementara"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {/* ================= TAB 1: OVERVIEW ================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
@@ -1448,15 +1501,24 @@ export const Admin: React.FC<AdminProps> = ({
                             )}
                           </td>
                           <td className="p-3 text-right">
-                            {u.id !== 'user-admin' && (
+                            <div className="inline-flex items-center gap-1">
                               <button
-                                onClick={() => handleDeleteUser(u.id)}
-                                className="p-1 rounded text-neg hover:text-neg hover:bg-neg/10 transition-colors"
-                                title="Hapus Pengguna"
+                                onClick={() => handleResetPassword(u)}
+                                className="p-1 rounded text-ink-2 hover:text-brand hover:bg-brand/10 transition-colors"
+                                title="Reset kata sandi"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <KeyRound className="w-3.5 h-3.5" />
                               </button>
-                            )}
+                              {u.id !== 'user-admin' && (
+                                <button
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  className="p-1 rounded text-neg hover:text-neg hover:bg-neg/10 transition-colors"
+                                  title="Hapus Pengguna"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
