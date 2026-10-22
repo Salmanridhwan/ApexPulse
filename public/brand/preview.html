@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Logo Aiones Boards — Set Final</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; background:#f4f6fa; color:#0f172a; padding:32px; }
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#64748b; font-weight:800; margin:0 0 12px; }
+  .baris { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:28px; align-items:stretch; }
+  .kartu { background:#fff; border:1px solid #e3e7ef; border-radius:14px; padding:20px 22px; display:flex; flex-direction:column; gap:14px; align-items:flex-start; }
+  .kartu.gelap { background:#0a1b33; border-color:#1b3255; }
+  .label { font-size:11px; font-weight:700; color:#8b97a8; }
+  .kartu.gelap .label { color:#8fa2bf; }
+  .deret { display:flex; gap:14px; align-items:center; }
+  .sidebar { display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #e3e7ef; border-radius:10px; padding:12px 16px; }
+  .sidebar b { font-size:13px; letter-spacing:-.2px; }
+</style>
+</head>
+<body>
+  <h2>Mark</h2>
+  <div class="baris">
+    <div class="kartu"><div class="deret"><img src="logo-mark.svg" width="128" height="128"><img src="logo-mark.svg" width="64" height="64"><img src="favicon.svg" width="32" height="32"><img src="favicon.svg" width="16" height="16"></div><div class="label">128 · 64 · 32 · 16 px</div></div>
+    <div class="kartu gelap"><div class="deret"><img src="logo-mark.svg" width="64" height="64"><img src="logo-mark-ringan.svg" width="64" height="64"><img src="logo-mark-gelap.svg" width="64" height="64"><img src="favicon.svg" width="32" height="32"><img src="favicon.svg" width="16" height="16"></div><div class="label">latar gelap · mark · favicon</div></div>
+  </div>
+
+  <h2>Lockup</h2>
+  <div class="baris">
+    <div class="kartu"><img src="logo-lockup.svg" width="330"><div class="label">latar terang</div></div>
+    <div class="kartu gelap"><img src="logo-lockup-gelap.svg" width="330"><div class="label">latar gelap</div></div>
+  </div>
+
+  <h2>Pemakaian di sidebar</h2>
+  <div class="baris">
+    <div class="sidebar"><img src="logo-mark.svg" width="28" height="28"><b>Aiones Boards</b></div>
+    <div class="sidebar" style="background:#0a1b33;border-color:#1b3255;color:#fff"><img src="logo-mark-gelap.svg" width="26" height="26"><b>Aiones Boards</b></div>
+  </div>
+</body>
+</html>
