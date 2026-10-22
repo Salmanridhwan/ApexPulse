@@ -15,3 +15,6 @@ tmp-*
 .tmp-*
 apex-analitik-render.html
 package-lock.json
+
+# Cadangan database lokal (berisi data instansi — jangan di-commit)
+backups/

@@ -28,6 +28,7 @@ import {
   WidgetSpec,
 } from '../../types';
 import { hashPassword, verifyPassword } from '../auth/session';
+import { enkripsiNilai, terenkripsi } from '../config/rahasia';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
@@ -471,6 +472,18 @@ export class InMemoryDb {
       await this.sinkronDashboardChatKeMysql();
       // Migrasi kewajiban & laporan pelaporan ke tabel khusus (per-baris).
       await this.sinkronPelaporanKeMysql();
+      // Kunci API lama masih tersimpan polos — enkripsi sekali di sini supaya
+      // deployment yang sudah berjalan ikut terlindungi tanpa langkah manual.
+      const kunciPolos: Record<string, unknown> = {};
+      for (const k of ['ragApiKey', 'kmsApiKey']) {
+        const v = (this.systemConfig as any)?.[k];
+        if (typeof v === 'string' && v && !terenkripsi(v)) kunciPolos[k] = v;
+      }
+      if (Object.keys(kunciPolos).length > 0) {
+        this.updateSystemConfig(kunciPolos);
+        console.log('[AionesBoard DB] Kunci API tersimpan polos — sudah dienkripsi ulang.');
+      }
+
     } catch (err: any) {
       console.error(
         '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
@@ -853,7 +866,14 @@ export class InMemoryDb {
    * hidup di memori sampai server di-restart.
    */
   public updateSystemConfig(partial: Record<string, unknown>) {
-    this.systemConfig = { ...this.systemConfig, ...(partial as object) };
+    // Kunci API disimpan dalam bentuk terenkripsi (AES-256-GCM). Tanpa ini,
+    // siapa pun yang bisa membaca tabel/berkas database langsung memegang
+    // kredensial RAG & KMS.
+    const aman: Record<string, unknown> = { ...partial };
+    for (const k of ['ragApiKey', 'kmsApiKey']) {
+      if (typeof aman[k] === 'string') aman[k] = enkripsiNilai(aman[k]);
+    }
+    this.systemConfig = { ...this.systemConfig, ...(aman as object) };
     this.trackWrite(this.mysql?.upsertBaris('systemConfig', 'utama', this.systemConfig));
     this.persist();
     return this.systemConfig;

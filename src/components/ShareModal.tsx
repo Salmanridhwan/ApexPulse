@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Check, Clock, Code2, Copy, ExternalLink, Globe, Lock, Pencil, Share2, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Code2, Copy, ExternalLink, Globe, KeyRound, Lock, Pencil, Share2, Trash2, X } from 'lucide-react';
 import { Dashboard } from '../types';
 
 interface ShareModalProps {
@@ -30,6 +30,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   /** Masa berlaku tautan baru (hari). 0 = tanpa kedaluwarsa. */
   const [expiresInDays, setExpiresInDays] = useState(30);
+  /** PIN tautan edit — hanya muncul sekali saat tautan dibuat (server simpan hash). */
+  const [pinEdit, setPinEdit] = useState<string | null>(null);
   /** Tautan yang masih aktif untuk dashboard ini (bisa dicabut). */
   const [daftarTautan, setDaftarTautan] = useState<
     { token: string; mode: string; createdAt: string | null; expiresAt: string | null; kedaluwarsa: boolean }[]
@@ -104,6 +106,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       }
       if (!data?.token) throw new Error('Server tidak mengirim token tautan.');
       setShareToken(data.token);
+      setPinEdit(typeof data.pin === 'string' ? data.pin : null);
       await muatDaftarTautan();
     } catch (err) {
       const pesan = err instanceof Error ? err.message : 'Gagal membuat tautan berbagi.';
@@ -113,6 +116,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       setIsLoading(false);
     }
   };
+
+  const pinBanner = pinEdit ? (
+    <div className="p-3 bg-warn/10 border border-warn/30 rounded-card text-ink space-y-1">
+      <div className="flex items-center gap-1.5 font-semibold">
+        <KeyRound className="w-4 h-4 text-warn" />
+        <span>PIN untuk mengedit</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <code className="font-mono text-lg font-bold tracking-[0.3em]">{pinEdit}</code>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(pinEdit)}
+          className="px-2 py-1 rounded-chip border border-line text-[11px] font-semibold text-ink-2 hover:bg-line/50"
+        >
+          Salin PIN
+        </button>
+      </div>
+      <p className="text-[11px] text-ink-2">
+        Kirim PIN lewat saluran berbeda dari tautannya. PIN tidak dapat dilihat lagi setelah jendela ini
+        ditutup — bila hilang, buat tautan baru.
+      </p>
+    </div>
+  ) : null;
 
   const fullShareUrl = shareToken
     ? `${window.location.origin}/share/${shareToken}`
@@ -166,11 +192,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <div className="p-3.5 bg-surface-2 border border-line rounded-card text-ink space-y-1">
             <div className="flex items-center gap-1.5 font-semibold">
               <Globe className="w-4 h-4 text-brand" />
-              <span>{accessMode === 'editable' ? 'Akses Edit Tanpa PIN' : 'Akses Tampilan Publik Aman'}</span>
+              <span>{accessMode === 'editable' ? 'Akses Edit dengan PIN' : 'Akses Tampilan Publik Aman'}</span>
             </div>
             <p className="text-[11px] text-ink leading-relaxed">
               {accessMode === 'editable'
-                ? 'Penerima tautan dapat mengedit widget langsung dari halaman publik tanpa kredensial login. Setiap perubahan tersimpan permanen pada dashboard asli dan tercatat di jejak audit instansi.'
+                ? 'Penerima tautan dapat mengedit widget dari halaman publik setelah memasukkan PIN yang dibuat server. Setiap perubahan tersimpan permanen pada dashboard asli dan tercatat di jejak audit instansi.'
                 : 'Tautan ini memungkinkan Dewan Pengawas, Kepala Daerah, atau auditor eksternal melihat dashboard tanpa perlu kredensial login atau hak akses edit.'}
             </p>
           </div>
@@ -275,6 +301,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               )}
             </div>
           )}
+
+          {pinBanner}
 
           {!shareToken ? (
             <div className="text-center py-3 space-y-2">

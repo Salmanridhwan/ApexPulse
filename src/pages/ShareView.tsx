@@ -35,6 +35,17 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   const [editingWidget, setEditingWidget] = useState<WidgetSpec | null>(null);
   const [editorTab, setEditorTab] = useState<'config' | 'correction'>('config');
   const [savingEdit, setSavingEdit] = useState(false);
+  /**
+   * PIN tautan edit. Disimpan di memori saja (bukan localStorage): setiap
+   * pemuatan halaman meminta PIN lagi, sehingga tautan yang bocor tidak
+   * otomatis memberi hak edit.
+   */
+  const [pin, setPin] = useState('');
+  const [pinIsian, setPinIsian] = useState('');
+  const [pinGalat, setPinGalat] = useState<string | null>(null);
+  const [pinMemeriksa, setPinMemeriksa] = useState(false);
+  /** Pengguna memilih melihat saja tanpa membuka PIN. */
+  const [lihatSaja, setLihatSaja] = useState(false);
 
   useEffect(() => {
     // Judul di navbar atas muncul begitu judul besar (headerTitleRef) tergeser
@@ -131,11 +142,16 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
     try {
       const res = await fetch(`/api/share/${token}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-share-pin': pin },
         body: JSON.stringify({ widgets: widgetsBaru }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // PIN ditolak → minta ulang, jangan biarkan pengguna mengira tersimpan.
+        if (res.status === 401) {
+          setPin('');
+          setPinGalat(data.error || 'PIN tautan tidak berlaku lagi. Masukkan PIN kembali.');
+        }
         throw new Error(data.error || pesanGagal);
       }
       const saved: Dashboard = await res.json();
@@ -251,6 +267,73 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
             </p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ---------- GERBANG PIN (tautan mode edit) ----------
+  if (accessMode === 'editable' && !pin && !lihatSaja) {
+    const bukaDenganPin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setPinGalat(null);
+      setPinMemeriksa(true);
+      try {
+        const res = await fetch(`/api/share/${token}/verifikasi-pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pinIsian }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'PIN tidak dapat diverifikasi.');
+        setPin(pinIsian);
+      } catch (err: any) {
+        setPinGalat(err?.message || 'PIN salah.');
+      } finally {
+        setPinMemeriksa(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center p-6 text-ink">
+        <form
+          onSubmit={bukaDenganPin}
+          className="w-full max-w-sm bg-surface rounded-card border border-line shadow-xl p-6 space-y-4"
+        >
+          <div className="w-12 h-12 rounded-card bg-brand/15 text-brand flex items-center justify-center">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-base font-extrabold">Tautan ini bisa diedit</h1>
+            <p className="text-xs text-ink-2 leading-relaxed">
+              Masukkan PIN yang diberikan pembuat dashboard untuk membuka mode edit. Tanpa PIN, dashboard tetap
+              bisa dilihat tanpa perubahan.
+            </p>
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={pinIsian}
+            onChange={(e) => setPinIsian(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            placeholder="PIN 6 angka"
+            className="w-full rounded-control border border-line bg-surface-2 px-3 py-2 text-center font-mono text-lg tracking-[0.4em] focus:outline-none focus:ring-1 focus:ring-brand"
+          />
+          {pinGalat && <p className="text-[11px] text-neg">{pinGalat}</p>}
+          <button
+            type="submit"
+            disabled={pinMemeriksa || pinIsian.length < 4}
+            className="w-full rounded-control bg-brand px-3 py-2 text-sm font-bold text-on-brand disabled:opacity-60"
+          >
+            {pinMemeriksa ? 'Memeriksa…' : 'Buka mode edit'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLihatSaja(true)}
+            className="w-full text-xs font-semibold text-ink-2 hover:text-ink"
+          >
+            Lihat saja tanpa mengedit
+          </button>
+        </form>
       </div>
     );
   }

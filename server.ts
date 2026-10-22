@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 // Untuk skrip QA lokal yang butuh port lain: set HONOR_SHELL_ENV=1 agar PORT dari shell menang.
 dotenv.config({ override: process.env.HONOR_SHELL_ENV !== '1' });
 import express, { NextFunction, Request, Response } from 'express';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -48,6 +48,7 @@ import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
+import { dekripsiNilai } from './src/services/config/rahasia';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
@@ -257,12 +258,68 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
+  // Sembunyikan versi framework dari header respons (memudahkan penyerang
+  // mencocokkan eksploit ke versi Express yang dipakai).
+  app.disable('x-powered-by');
+
+  /**
+   * Header keamanan dasar. Tanpa ini browser bebas menyisipkan halaman kita di
+   * iframe pihak lain, dan tidak ada batasan dari mana skrip/gaya dimuat.
+   *
+   * CSP sengaja masih mengizinkan gaya inline (React + ECharts memakai style
+   * atribut) dan Google Sign-In (accounts.google.com). `object-src 'none'`
+   * mematikan plugin lama yang tidak dipakai aplikasi ini.
+   */
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data:",
+        "connect-src 'self' https:",
+        "frame-src https://accounts.google.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; ')
+    );
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+    }
+    next();
+  });
+
+  /**
+   * Log satu baris per permintaan API: metode, jalur, status, durasi.
+   * Tanpa ini, gangguan di produksi tidak meninggalkan jejak apa pun selain
+   * console.log yang tersebar. /health dilewati agar tidak membanjiri log.
+   */
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    const mulai = Date.now();
+    res.on('finish', () => {
+      if (req.path === '/health') return;
+      const sesi = verifySession(parseSessionCookie(req));
+      const siapa = sesi ? ` user=${sesi.userId}` : '';
+      console.log(
+        `[api] ${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} ${Date.now() - mulai}ms${siapa}`
+      );
+    });
+    next();
+  });
+
   // RAG client: baca konfigurasi dari panel admin (systemConfig) secara live.
   // Default provider/url/key diambil dari env, lalu bisa dioverride admin via UI.
   const ragClient = new ConfigurableRagClient(() => ({
     provider: db.systemConfig.ragProvider,
     baseUrl: db.systemConfig.ragApiUrl,
-    apiKey: db.systemConfig.ragApiKey,
+    apiKey: dekripsiNilai(db.systemConfig.ragApiKey),
     // Batas tunggu & jalur pengambilan sengaja TIDAK lagi jadi setelan admin:
     // aplikasi selalu mencoba /extract lebih dulu (angka nyata + halaman sumber)
     // dan otomatis jatuh ke retrieval biasa kalau layanan tidak punya /extract.
@@ -282,7 +339,7 @@ async function startServer() {
   const klienKms = () =>
     new KmsClient({
       baseUrl: (db.systemConfig as any).kmsApiUrl || 'https://ragkms.aiones.app',
-      apiKey: (db.systemConfig as any).kmsApiKey || '',
+      apiKey: dekripsiNilai((db.systemConfig as any).kmsApiKey),
       timeoutMs: (db.systemConfig as any).kmsTimeoutSeconds || 120,
     });
 
@@ -324,11 +381,20 @@ async function startServer() {
     }
   }
 
-  // Batas payload dinaikkan: impor Excel/CSV mengirim berkas (base64) dan
-  // dashboard berisi banyak widget. Tanpa ini berkas sedang pun akan ditolak 413.
-  // Dinaikkan ke 70 MB agar unggah Manajemen Berkas sampai batas KMS (50 MB per
-  // berkas) tetap lolos — base64 membengkak ~33%, jadi 50 MB jadi ~67 MB.
-  app.use(express.json({ limit: '70mb' }));
+  /**
+   * Batas payload: 2 MB untuk JSON biasa, 70 MB HANYA untuk unggah berkas
+   * (base64 50 MB membengkak ~33% jadi ~67 MB).
+   *
+   * ponytail: dulu semua endpoint menerima 70 MB, sehingga satu permintaan
+   * besar dari klien mana pun bisa menghabiskan memori server tanpa perlu
+   * login sekali pun.
+   */
+  const jsonKecil = express.json({ limit: '2mb' });
+  const jsonBesar = express.json({ limit: '70mb' });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/api/berkas/unggah') return jsonBesar(req, res, next);
+    return jsonKecil(req, res, next);
+  });
 
   /**
    * Tolak permintaan pengubah data yang datang dari domain lain (CSRF).
@@ -361,10 +427,13 @@ async function startServer() {
   const pembatasIp = buatPembatas(30, 15 * 60 * 1000);
   const pembatasAkun = buatPembatas(10, 15 * 60 * 1000);
   const pembatasDaftar = buatPembatas(5, 60 * 60 * 1000);
+  // Unggah berkas memakan memori + kuota penyimpanan: 20 berkas/jam per akun.
+  const pembatasUnggah = buatPembatas(20, 60 * 60 * 1000);
   setInterval(() => {
     pembatasIp.sapu();
     pembatasAkun.sapu();
     pembatasDaftar.sapu();
+    pembatasUnggah.sapu();
   }, 10 * 60 * 1000).unref();
 
   /**
@@ -3601,6 +3670,15 @@ async function startServer() {
   app.post('/api/berkas/unggah', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
+    // Batas per akun: unggah memakan memori server + kuota penyimpanan KMS.
+    const cekUnggah = pembatasUnggah.cek(`unggah:${session.userId}`);
+    if (!cekUnggah.boleh) {
+      res.setHeader('Retry-After', String(cekUnggah.tungguDetik));
+      return res.status(429).json({
+        error: 'Terlalu banyak unggahan dalam satu jam. Coba lagi nanti.',
+        kode: 'TERLALU_BANYAK_PERCOBAAN',
+      });
+    }
     const { tenant, organizationId } = await konteksBerkas(req, session);
     // Cek pemetaan lebih dulu supaya balasannya berisi daftar project KMS, bukan
     // "metadata tidak sah" yang menyesatkan dari validasi metadata.
@@ -3734,7 +3812,7 @@ async function startServer() {
 
     const cfg: any = db.systemConfig || {};
     const base = String(cfg.ragApiUrl || '').replace(/\/+$/, '');
-    const kunci = String(cfg.ragApiKey || '');
+    const kunci = dekripsiNilai(cfg.ragApiKey);
     const daftar = await ragClient.daftarDokumen(kb).catch(() => null);
     const dok = daftar?.dokumen.find((d) => d.id === docId);
     const nama = dok?.nama || docId;
@@ -4159,6 +4237,17 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     } as any;
     // ponytail: satu tautan = satu baris (`baris`), bukan snapshot penuh.
     db.simpanTautanBagikan(token, db.shareTokens[token] as any);
+
+    // Tautan mode edit WAJIB ber-PIN: tanpa ini, siapa pun yang memegang URL
+    // bisa mengubah widget dashboard instansi. PIN hanya dikirim sekali di sini;
+    // yang disimpan hanya hash-nya.
+    let pin: string | null = null;
+    if (mode === 'editable') {
+      pin = String(randomInt(100000, 1000000));
+      const hashPin = hashPassword(pin);
+      db.sharePins[token] = hashPin;
+      db.simpanPinBagikan(token, hashPin);
+    }
     db.persist();
     db.addAuditLog({
       tenantId: dash.tenantId,
@@ -4168,7 +4257,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       target: dash.title,
       details: `Mode ${mode}, berlaku ${hari === 0 ? 'tanpa batas' : `${hari} hari`} (${expiresAt || '-'}).`,
     });
-    res.json({ token, shareUrl: `/share/${token}`, mode, expiresAt });
+    res.json({ token, shareUrl: `/share/${token}`, mode, expiresAt, pin });
   });
 
   /** Daftar tautan aktif untuk satu dashboard (dipakai panel Bagikan untuk mencabut). */
@@ -4220,6 +4309,30 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     res.json({ ok: true, token });
   });
 
+  /**
+   * Verifikasi PIN tautan edit tanpa mengubah apa pun. Dipakai halaman tautan
+   * publik untuk membuka mode edit sebelum pengguna mulai menggeser widget.
+   */
+  app.post('/api/share/:token/verifikasi-pin', (req: Request, res: Response) => {
+    const token = req.params.token;
+    const shareMeta = db.shareTokens[token] as any;
+    if (!shareMeta) return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
+    if (tautanKedaluwarsa(shareMeta)) {
+      return res.status(410).json({ error: 'Tautan berbagi sudah kedaluwarsa.' });
+    }
+    const hashPin = db.sharePins[token];
+    if (!hashPin) {
+      return res.status(400).json({
+        error: 'Tautan ini tidak memakai PIN. Minta pembuat dashboard membuat tautan edit baru.',
+        kode: 'PIN_BELUM_DIATUR',
+      });
+    }
+    if (!verifyPassword(String(req.body?.pin || ''), hashPin)) {
+      return res.status(401).json({ error: 'PIN salah.', kode: 'PIN_SALAH' });
+    }
+    res.json({ ok: true });
+  });
+
   app.get('/api/share/:token', (req: Request, res: Response) => {
     const shareMeta = db.shareTokens[req.params.token] as any;
     const dashId = typeof shareMeta === 'object' && shareMeta ? shareMeta.dashboardId : shareMeta;
@@ -4256,6 +4369,18 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     }
     if (tautanKedaluwarsa(shareMeta)) {
       return res.status(410).json({ error: 'Tautan berbagi sudah kedaluwarsa.' });
+    }
+    // PIN wajib untuk mengubah: tautan bocor saja tidak cukup untuk mengedit.
+    const pinDikirim = String(req.headers['x-share-pin'] || req.body?.pin || '');
+    const hashPin = db.sharePins[token];
+    if (!hashPin) {
+      return res.status(401).json({
+        error: 'Tautan ini dibuat sebelum PIN diwajibkan. Minta pembuat dashboard membuat tautan edit baru.',
+        kode: 'PIN_BELUM_DIATUR',
+      });
+    }
+    if (!pinDikirim || !verifyPassword(pinDikirim, hashPin)) {
+      return res.status(401).json({ error: 'PIN tautan salah atau belum diisi.', kode: 'PIN_SALAH' });
     }
     if (mode !== 'editable') {
       return res.status(403).json({ error: 'Tautan ini bersifat Read-Only dan tidak dapat diedit.' });
@@ -5002,6 +5127,23 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     app.use(vite.middlewares);
   }
 
+  /**
+   * Penangan galat terakhir. Tanpa ini, error yang dilempar route menjadi
+   * koneksi menggantung tanpa pesan di log, dan pengguna melihat layar kosong.
+   * Detail teknis hanya masuk log; klien menerima pesan umum untuk galat 5xx.
+   */
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+    const status = Number(err?.status || err?.statusCode) || 500;
+    console.error(`[AionesBoard] Galat ${req.method} ${req.originalUrl}:`, err?.stack || err);
+    if (res.headersSent) return;
+    res.status(status >= 400 && status <= 599 ? status : 500).json({
+      error:
+        status < 500
+          ? err?.message || 'Permintaan tidak dapat diproses.'
+          : 'Terjadi kesalahan pada server. Coba lagi beberapa saat lagi.',
+    });
+  });
+
   // Persistence MySQL (Laragon) — muat state sebelum server menerima request.
   await db.initMysql();
 
@@ -5035,6 +5177,17 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
   };
   process.on('SIGINT', () => void tutup('SIGINT'));
   process.on('SIGTERM', () => void tutup('SIGTERM'));
+
+  // Jangan biarkan proses mati tanpa jejak: promise yang ditolak tanpa
+  // penangan dulu hilang begitu saja, sehingga penyebab gangguan tidak
+  // pernah terlihat di log.
+  process.on('unhandledRejection', (alasan) => {
+    console.error('[AionesBoard] Promise ditolak tanpa penangan:', alasan);
+  });
+  process.on('uncaughtException', (err) => {
+    console.error('[AionesBoard] Eksepsi tak tertangkap — proses dihentikan:', err);
+    process.exit(1);
+  });
 }
 
 startServer().catch((err) => {

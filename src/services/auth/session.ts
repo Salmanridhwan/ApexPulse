@@ -5,17 +5,34 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
  * tanpa dependensi eksternal. Token sesi dikirim via cookie HttpOnly.
  */
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'aionesboard-dev-secret-ganti-di-produksi';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 hari
 
-// Di produksi, secret default berarti siapa pun yang tahu kode bisa memalsukan
-// token sesi. Peringatkan dengan keras (jangan diam-diam aman-palsu).
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-  console.warn(
-    '[AionesBoard Auth] SESSION_SECRET belum diisi — memakai secret default. ' +
-      'Set SESSION_SECRET di .env sebelum dipakai produksi!'
+/**
+ * Secret sesi.
+ *
+ * ponytail: di produksi TIDAK BOLEH ada nilai cadangan yang tertulis di kode —
+ * siapa pun yang membaca repo bisa memalsukan token admin. Produksi juga
+ * berjalan di lebih dari satu instance: secret acak per-proses membuat cookie
+ * dari instance A ditolak instance B (pengguna terlempar-login acak). Karena
+ * itu produksi WAJIB mengisi `SESSION_SECRET`; kalau kosong server menolak
+ * start dengan pesan yang jelas, bukan diam-diam memakai secret lemah.
+ */
+function secretSesi(): string {
+  const dariEnv = (process.env.SESSION_SECRET || '').trim();
+  if (dariEnv.length >= 32) return dariEnv;
+  if (process.env.NODE_ENV !== 'production') {
+    // Lingkungan pengembangan: boleh memakai nilai tetap agar sesi tidak
+    // putus setiap restart.
+    return dariEnv || 'aionesboard-dev-secret-ganti-di-produksi';
+  }
+  throw new Error(
+    'SESSION_SECRET wajib diisi (minimal 32 karakter acak) saat NODE_ENV=production. ' +
+      'Contoh membuat nilai: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))". ' +
+      'Pakai nilai yang SAMA di semua instance, lalu restart server.'
   );
 }
+
+const SESSION_SECRET = secretSesi();
 
 export interface SessionPayload {
   userId: string;
