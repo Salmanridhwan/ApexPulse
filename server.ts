@@ -51,6 +51,7 @@ import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/s
 import { dekripsiNilai } from './src/services/config/rahasia';
 import { mulaiBackupTerjadwal } from './src/services/ops/backupTerjadwal';
 import { potongHalaman } from './src/services/http/halaman';
+import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
@@ -4479,6 +4480,24 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     const session = requireAuth(req, res);
     if (!session) return;
     const logs = db.auditLogs.filter((l) => l.tenantId === effectiveTenantId(req, session));
+
+    // Ekspor CSV untuk kebutuhan audit eksternal (dibuka di Excel).
+    if (String(req.query.format || '').toLowerCase() === 'csv') {
+      const terbaruDulu = [...logs].reverse();
+      const csv = keCsv(terbaruDulu, [
+        { kunci: 'timestamp', judul: 'Waktu' },
+        { kunci: 'action', judul: 'Aksi' },
+        { kunci: 'target', judul: 'Target' },
+        { kunci: 'userName', judul: 'Pengguna' },
+        { kunci: 'details', judul: 'Detail' },
+      ]);
+      const tanggal = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="log-audit-${tanggal}.csv"`);
+      res.send(csv);
+      return;
+    }
+
     // Tanpa `limit` tetap balas array seperti sebelumnya (klien lama aman).
     if (req.query.limit === undefined) {
       res.json(logs);
