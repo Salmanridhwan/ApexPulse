@@ -501,7 +501,7 @@ async function startServer() {
       uptimeDetik: Math.round(process.uptime()),
       memoriMB: Math.round((process.memoryUsage().rss / 1024 / 1024) * 10) / 10,
       dbMs: await db.pingMysql(),
-      cadangan: statusCadangan(daftarCadangan, Date.now()),
+      cadangan: statusCadangan(daftarCadangan, Date.now(), 26, process.uptime() / 3600),
       timestamp: Date.now(),
     });
   });
@@ -5194,6 +5194,12 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       ragApiKey: maskKey(db.systemConfig.ragApiKey),
       kmsApiKey: maskKey((db.systemConfig as any).kmsApiKey || ''),
     });
+  });
+
+  // ponytail: tanpa ini alamat /api yang salah dibalas index.html 200 — klien
+  // yang mengharapkan JSON malah menerima HTML dan pesan galatnya menyesatkan.
+  app.use('/api', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Endpoint tidak ditemukan.', kode: 'TIDAK_DITEMUKAN' });
   });
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================

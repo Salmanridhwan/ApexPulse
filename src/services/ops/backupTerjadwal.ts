@@ -43,12 +43,18 @@ export interface StatusCadangan {
 export function statusCadangan(
   daftar: { nama: string; waktu: number }[],
   sekarang: number,
-  jamMaks = 26
+  jamMaks = 26,
+  uptimeJam = 0
 ): StatusCadangan {
   const cadangan = daftar
     .filter((b) => /^aionesboard-.*\.json\.gz$/.test(b.nama))
     .sort((a, b) => b.waktu - a.waktu);
-  if (cadangan.length === 0) return { terakhir: null, umurJam: null, terlambat: true };
+  if (cadangan.length === 0) {
+    // Instalasi baru belum punya cadangan — bukan tanda kegagalan. Baru
+    // dianggap terlambat kalau server sudah hidup lebih lama dari `jamMaks`
+    // tanpa satu pun cadangan muncul.
+    return { terakhir: null, umurJam: null, terlambat: uptimeJam > jamMaks };
+  }
   const umurJam = Math.round(((sekarang - cadangan[0].waktu) / (60 * 60 * 1000)) * 10) / 10;
   return { terakhir: cadangan[0].nama, umurJam, terlambat: umurJam > jamMaks };
 }
@@ -130,8 +136,28 @@ export function mulaiBackupTerjadwal(): () => void {
       `disimpan ${simpanHari} hari di ${dir}.`
   );
   jadwalkan();
+
+  // ponytail: rilis baru langsung punya titik pulih tanpa menunggu pukul 02:00 —
+  // kalau folder masih kosong, cadangan pertama dibuat beberapa menit setelah start.
+  const adaCadangan = () => {
+    try {
+      return readdirSync(dir).some((n) => /^aionesboard-.*\.json\.gz$/.test(n));
+    } catch {
+      return false;
+    }
+  };
+  const menitAwal = Math.max(1, parseInt(process.env.BACKUP_AWAL_MENIT || '5', 10) || 5);
+  const cadanganAwal = setTimeout(async () => {
+    if (berhenti || adaCadangan()) return;
+    console.log('[AionesBoard Backup] Belum ada cadangan — membuat cadangan pertama.');
+    await jalankanCadangan();
+    bersihkanCadanganLama(dir, simpanHari);
+  }, menitAwal * 60 * 1000);
+  cadanganAwal.unref?.();
+
   return () => {
     berhenti = true;
     if (timer) clearTimeout(timer);
+    clearTimeout(cadanganAwal);
   };
 }

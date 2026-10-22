@@ -16,7 +16,6 @@ Bearer.
 | `POST` | `/api/auth/logout` | Menghapus cookie sesi. |
 | `POST` | `/api/auth/ganti-password` | Body `{ lama, baru }`. Wajib memakai sesi aktif. Kata sandi baru minimal 10 karakter, harus ada huruf & angka, dan berbeda dari yang lama. |
 | `POST` | `/api/auth/register` | Pendaftaran mandiri (bisa ditutup lewat `ALLOW_REGISTRATION=false`). |
-| `GET` | `/api/auth/me` | Data pengguna dari sesi aktif. |
 
 Pembatas percobaan (per instance, jendela 15 menit kecuali disebut lain):
 
@@ -29,7 +28,10 @@ Pembatas percobaan (per instance, jendela 15 menit kecuali disebut lain):
 
 Saat batas terlampaui, balasan **429** dengan header `Retry-After` (detik).
 
-## Format galat
+Alamat `/api/...` yang tidak dikenal dibalas `404` JSON
+`{ error, kode: 'TIDAK_DITEMUKAN' }` — tidak pernah HTML halaman aplikasi.
+
+Format galat:
 
 ```json
 { "error": "Pesan yang aman ditampilkan ke pengguna", "kode": "2d99da77" }

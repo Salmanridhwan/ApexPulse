@@ -5,8 +5,12 @@ import { statusCadangan } from '../src/services/ops/backupTerjadwal';
 const JAM = 60 * 60 * 1000;
 const sekarang = Date.UTC(2026, 9, 22, 12, 0, 0);
 
-test('status cadangan: tidak ada berkas → terlambat', () => {
-  assert.deepEqual(statusCadangan([], sekarang), { terakhir: null, umurJam: null, terlambat: true });
+test('status cadangan: belum ada berkas & server baru hidup → belum terlambat', () => {
+  assert.deepEqual(statusCadangan([], sekarang), { terakhir: null, umurJam: null, terlambat: false });
+});
+
+test('status cadangan: belum ada berkas & server hidup 30 jam → terlambat', () => {
+  assert.equal(statusCadangan([], sekarang, 26, 30).terlambat, true);
 });
 
 test('status cadangan: cadangan baru (2 jam) tidak terlambat', () => {
@@ -35,7 +39,7 @@ test('status cadangan: lebih dari 26 jam → terlambat (penjadwal berhenti)', ()
 });
 
 test('status cadangan: berkas sha256 tidak dianggap cadangan', () => {
-  const s = statusCadangan([{ nama: 'aionesboard-x.json.gz.sha256', waktu: sekarang - 1 * JAM }], sekarang);
+  const s = statusCadangan([{ nama: 'aionesboard-x.json.gz.sha256', waktu: sekarang - 1 * JAM }], sekarang, 26, 30);
   assert.equal(s.terakhir, null);
   assert.equal(s.terlambat, true);
 });

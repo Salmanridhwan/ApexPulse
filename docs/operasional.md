@@ -135,6 +135,9 @@ insiden untuk mengetahui prosedurnya bekerja.
 
 ## 7. Pemantauan
 
+- Cadangan pertama dibuat otomatis ±5 menit setelah start bila folder cadangan masih
+  kosong (`BACKUP_AWAL_MENIT`), jadi rilis baru langsung punya titik pulih tanpa
+  menunggu jadwal harian.
 - `GET /health` → status server, `dbMs` (latensi MySQL), `uptimeDetik`, `memoriMB`,
   dan `cadangan: { terakhir, umurJam, terlambat }`. Arahkan pemantauan uptime ke
   sini dan beri peringatan bila `terlambat: true` (cadangan terakhir > 26 jam)
