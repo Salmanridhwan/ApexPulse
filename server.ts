@@ -3347,7 +3347,15 @@ async function startServer() {
     if (!kb) return berkas;
     try {
       const hasil = await ragClient.daftarDokumen(kb);
-      const sudahAda = new Set(berkas.map((b) => String(b.title || '').trim().toLowerCase()));
+      // Nama di repositori = judul unggahan, sedangkan di basis = nama berkas asli.
+      // Cocokkan keduanya supaya berkas yang sama tidak tampil dua kali.
+      const namaDikenal = (b: BerkasKMS) => {
+        const dasar = String(b.fileUrl || '').split('/').pop() || '';
+        return [b.title, dasar, dasar.replace(/^doc-\d+-/, '')]
+          .map((x) => String(x || '').trim().toLowerCase())
+          .filter(Boolean);
+      };
+      const sudahAda = new Set(berkas.flatMap(namaDikenal));
       const tambahan = hasil.dokumen
         .filter((d) => !sudahAda.has(String(d.nama || '').trim().toLowerCase()))
         // Dokumen sambutan repositori juga ikut terindeks ke basis — bukan dokumen instansi.
