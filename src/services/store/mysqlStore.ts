@@ -884,7 +884,12 @@ export class MysqlStore {
     const auditKhusus = await this.loadAuditLogs();
     if (auditKhusus.length > 0) hasil.auditLogs = auditKhusus;
 
-    return ada ? hasil : null;
+    // ponytail: `ada` hanya menandai tabel snapshot lama (`collections`/`kv`).
+    // Di deployment yang seluruh datanya sudah pindah ke tabel per-baris
+    // (`baris`, `audit_log`, tabel tenant/dashboard/…), dua tabel itu kosong —
+    // tanpa pemeriksaan `hasil`, state dianggap kosong lalu ditimpa seed dari
+    // berkas dan pesan "seed awal" muncul di setiap start.
+    return ada || Object.keys(hasil).length > 0 ? hasil : null;
   }
 
   /** Simpan snapshot penuh dalam satu transaksi. */
