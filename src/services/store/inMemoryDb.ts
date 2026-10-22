@@ -28,7 +28,7 @@ import {
   WidgetSpec,
 } from '../../types';
 import { hashPassword, verifyPassword } from '../auth/session';
-import { enkripsiNilai, terenkripsi } from '../config/rahasia';
+import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
@@ -307,6 +307,12 @@ export class InMemoryDb {
     ragApiKey: 'rag_live_sec_*********',
     ragModel: 'gpt-4o-mini',
     ragKnowledgeBaseId: '',
+    /**
+     * Secret penandatangan cookie sesi yang dipakai BERSAMA semua instance.
+     * Disimpan di database supaya dua host memakai kunci yang sama; diisi
+     * otomatis saat start bila masih kosong.
+     */
+    sessionSecret: '',
     smtpHost: 'smtp.mailgun.org',
     smtpPort: 587,
     smtpUser: 'alert@bumd-pemda.go.id',
@@ -482,7 +488,12 @@ export class InMemoryDb {
       const kunciPolos: Record<string, unknown> = {};
       for (const k of ['ragApiKey', 'kmsApiKey']) {
         const v = (this.systemConfig as any)?.[k];
-        if (typeof v === 'string' && v && !terenkripsi(v)) kunciPolos[k] = v;
+        // Polos (deployment lama) atau masih terkunci dengan kunci enkripsi versi
+        // lama — dua-duanya harus ditulis ulang dengan kunci sekarang, kalau
+        // tidak host lain tidak bisa membukanya.
+        if (typeof v === 'string' && v && (!terenkripsi(v) || pakaiKunciLama(v))) {
+          kunciPolos[k] = terenkripsi(v) ? dekripsiNilai(v) : v;
+        }
       }
       if (Object.keys(kunciPolos).length > 0) {
         this.updateSystemConfig(kunciPolos);

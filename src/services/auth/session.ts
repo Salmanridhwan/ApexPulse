@@ -34,20 +34,41 @@ function bacaBerkasSecret(): string {
  * yang berbagi folder kerja membaca berkas yang sama sehingga cookie tetap sah
  * di keduanya.
  */
+let secretDariDatabase = '';
+
+/**
+ * Set secret dari sumber bersama (database). Dipanggil setelah koneksi DB siap:
+ * produksi bisa berjalan di beberapa host, dan secret yang berbeda per host
+ * membuat cookie dari host A ditolak host B sekaligus membuat kunci API yang
+ * tersimpan tidak bisa dibuka di host lain.
+ */
+export function setSecretSesi(nilai: string | null | undefined) {
+  const v = (nilai || '').trim();
+  if (v.length >= 32) secretDariDatabase = v;
+}
+
+let cacheDariBerkas = '';
+
 function secretSesi(): string {
   const dariEnv = (process.env.SESSION_SECRET || '').trim();
   if (dariEnv.length >= 32) return dariEnv;
+  if (secretDariDatabase) return secretDariDatabase;
   if (process.env.NODE_ENV !== 'production') {
     // Lingkungan pengembangan: boleh memakai nilai tetap agar sesi tidak
     // putus setiap restart.
     return dariEnv || 'aionesboard-dev-secret-ganti-di-produksi';
   }
+  if (cacheDariBerkas) return cacheDariBerkas;
   const tersimpan = bacaBerkasSecret();
-  if (tersimpan) return tersimpan;
+  if (tersimpan) {
+    cacheDariBerkas = tersimpan;
+    return tersimpan;
+  }
   const baru = randomBytes(32).toString('hex');
   try {
     // flag 'wx': kalau dua instance start bersamaan, hanya satu yang menulis.
     writeFileSync(BERKAS_SECRET, baru + '\n', { mode: 0o600, flag: 'wx' });
+    cacheDariBerkas = baru;
     console.warn(
       '[sesi] SESSION_SECRET tidak diset — dibuat di .session-secret. ' +
         'Jangan hapus berkas ini dan simpan salinannya (dipakai juga untuk enkripsi kunci API).'
@@ -55,7 +76,10 @@ function secretSesi(): string {
     return baru;
   } catch {
     const milikProsesLain = bacaBerkasSecret();
-    if (milikProsesLain) return milikProsesLain;
+    if (milikProsesLain) {
+      cacheDariBerkas = milikProsesLain;
+      return milikProsesLain;
+    }
     throw new Error(
       'SESSION_SECRET wajib diisi (minimal 32 karakter acak) saat NODE_ENV=production, ' +
         'atau pastikan folder kerja dapat ditulisi agar .session-secret bisa dibuat.'
@@ -63,7 +87,11 @@ function secretSesi(): string {
   }
 }
 
-const SESSION_SECRET = secretSesi();
+/** Secret yang sedang dipakai (env → database → berkas). Juga jadi kunci enkripsi kunci API. */
+export function secretSesiAktif(): string {
+  return secretSesi();
+}
+
 
 export interface SessionPayload {
   userId: string;
@@ -94,7 +122,9 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 function sign(data: string): string {
-  return createHmac('sha256', SESSION_SECRET).update(data).digest('base64url');
+  // ponytail: dibaca saat dipakai, bukan saat import — secret dari database baru
+  // tersedia setelah koneksi DB siap, dan semua token harus memakai nilai itu.
+  return createHmac('sha256', secretSesi()).update(data).digest('base64url');
 }
 
 export function signSession(payload: Omit<SessionPayload, 'exp'>): string {

@@ -41,6 +41,7 @@ import {
   signSession,
   verifyPassword,
   verifySession,
+  setSecretSesi,
   SessionPayload,
 } from './src/services/auth/session';
 import { AlertRule, BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
@@ -5240,6 +5241,22 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
 
   // Persistence MySQL (Laragon) — muat state sebelum server menerima request.
   await db.initMysql();
+
+  // ponytail: secret sesi harus SAMA di semua host. Database sudah dipakai
+  // bersama, jadi di situlah kuncinya disimpan: host pertama membuat, host lain
+  // membaca. Tanpa ini, failover membuat semua pengguna terlempar-login dan
+  // kunci API yang tersimpan tidak bisa dibuka di host lain.
+  {
+    const tersimpan = String((db.systemConfig as any)?.sessionSecret || '').trim();
+    if (tersimpan.length >= 32) {
+      setSecretSesi(tersimpan);
+    } else {
+      const baru = randomBytes(32).toString('hex');
+      setSecretSesi(baru);
+      db.updateSystemConfig({ sessionSecret: baru });
+      console.log('[sesi] Secret sesi bersama dibuat dan disimpan ke database.');
+    }
+  }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Aiones Boards Server] Berjalan pada port ${PORT}`);
