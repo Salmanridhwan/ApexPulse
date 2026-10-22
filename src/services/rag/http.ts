@@ -1214,52 +1214,61 @@ export class ConfigurableRagClient implements RagClient {
 
       // Mode percakapan (chatbot): rangkai persona + riwayat + pertanyaan jadi satu
       // query supaya jawaban sadar konteks (multi-turn) dan tetap dari dokumen.
+      // ponytail: persona+riwayat ikut jadi teks pencarian dan kadang membuat hasil
+      // retrieval kosong (dokumen ada tapi tidak terambil) — kalau kosong, ulangi
+      // dengan pertanyaan saja sebelum menjawab "tidak ditemukan".
       const teksQuery = options.mode === 'prose'
         ? [options.persona?.trim(), options.riwayat?.trim(), options.prompt]
             .filter(Boolean)
             .join('\n\n')
         : options.prompt;
+      const daftarKueri = [teksQuery, options.prompt];
 
-      const res = await fetch(`${dipakai}/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.apiKey}`,
-        },
-        body: JSON.stringify({
-          // Kontrak ragjev: field bernama `query`, retrieval selalu scoped KB.
-          query: teksQuery,
-          // KB per-instansi menimpa KB global — inilah yang mencegah dashboard
-          // instansi A dijawab dokumen instansi B. KB campur dilewati (kbAman).
-          ...(() => {
-            const kb = kbAman(options.kbId, cfg.kbId);
-            return kb ? { knowledge_base_id: kb } : {};
-          })(),
-          options: {
-            top_k: 8,
-            include_sources: true,
-            // strict_grounding=false HANYA untuk obrolan ringan (sapaan) — jawaban
-            // tetap dilarang mengarang fakta instansi lewat persona di prompt.
-            ...(options.strictGrounding === false ? { strict_grounding: false } : {}),
+      let payload: any = null;
+      let sources: any[] = [];
+      for (let k = 0; k < daftarKueri.length; k++) {
+        const res = await fetch(`${dipakai}/query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cfg.apiKey}`,
           },
-        }),
-        signal: ac.signal,
-      });
-      if (!res.ok) {
-        throw new RagServiceError(
-          `Layanan RAG menolak permintaan (HTTP ${res.status}).`,
-          res.status === 401 || res.status === 403
-            ? 'API Key RAG ditolak. Periksa Base URL & API Key di Admin → Konfigurasi RAG.'
-            : `Endpoint /query membalas ${res.status}.`,
-          res.status
-        );
-      }
-      const raw = await res.json();
+          body: JSON.stringify({
+            // Kontrak ragjev: field bernama `query`, retrieval selalu scoped KB.
+            query: daftarKueri[k],
+            // KB per-instansi menimpa KB global — inilah yang mencegah dashboard
+            // instansi A dijawab dokumen instansi B. KB campur dilewati (kbAman).
+            ...(() => {
+              const kb = kbAman(options.kbId, cfg.kbId);
+              return kb ? { knowledge_base_id: kb } : {};
+            })(),
+            options: {
+              top_k: 8,
+              include_sources: true,
+              // strict_grounding=false HANYA untuk obrolan ringan (sapaan) — jawaban
+              // tetap dilarang mengarang fakta instansi lewat persona di prompt.
+              ...(options.strictGrounding === false ? { strict_grounding: false } : {}),
+            },
+          }),
+          signal: ac.signal,
+        });
+        if (!res.ok) {
+          throw new RagServiceError(
+            `Layanan RAG menolak permintaan (HTTP ${res.status}).`,
+            res.status === 401 || res.status === 403
+              ? 'API Key RAG ditolak. Periksa Base URL & API Key di Admin → Konfigurasi RAG.'
+              : `Endpoint /query membalas ${res.status}.`,
+            res.status
+          );
+        }
+        const raw = await res.json();
 
-      // Kontrak ragjev: { success, data: { answer, grounded, sources: [...], usage } }
-      // Kontrak generik lama (tetap didukung): { answer?, structuredJson?, chunks: [...] }
-      const payload = raw?.data && raw.success !== undefined ? raw.data : raw;
-      const sources: any[] = Array.isArray(payload?.sources) ? payload.sources : [];
+        // Kontrak ragjev: { success, data: { answer, grounded, sources: [...], usage } }
+        // Kontrak generik lama (tetap didukung): { answer?, structuredJson?, chunks: [...] }
+        payload = raw?.data && raw.success !== undefined ? raw.data : raw;
+        sources = Array.isArray(payload?.sources) ? payload.sources : [];
+        if (sources.length > 0) break;
+      }
       const chunks: SectorDocumentChunk[] = Array.isArray(payload?.chunks)
         ? payload.chunks
         : sources.map((s: any, i: number) => ({
@@ -1290,7 +1299,7 @@ export class ConfigurableRagClient implements RagClient {
         provider: 'http',
         mode,
         latencyMs: Date.now() - start,
-        answer: payload?.answer ?? raw?.answer,
+        answer: payload?.answer,
         structuredJson,
         chunks,
         citations,
