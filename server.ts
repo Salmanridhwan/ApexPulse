@@ -262,6 +262,12 @@ async function startServer() {
   // Sembunyikan versi framework dari header respons (memudahkan penyerang
   // mencocokkan eksploit ke versi Express yang dipakai).
   app.disable('x-powered-by');
+  // ponytail: di produksi aplikasi berada di balik reverse proxy Kroombox.
+  // Tanpa ini `req.ip` selalu alamat proxy, sehingga pembatas percobaan login
+  // per-IP menghitung SEMUA pengguna sebagai satu orang (satu salah sandi
+  // memblokir seluruh instansi). Satu lapis proxy saja — jangan lebih, supaya
+  // header X-Forwarded-For tidak bisa dipalsukan bebas.
+  if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
   /**
    * Header keamanan dasar. Tanpa ini browser bebas menyisipkan halaman kita di
@@ -5153,6 +5159,12 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     // Cadangan harian otomatis (produksi) — lihat docs/operasional.md.
     hentikanBackup = mulaiBackupTerjadwal();
   });
+
+  // Batas waktu koneksi: header harus selesai 20 dtk, satu permintaan 2 mnt.
+  // Tanpa ini koneksi lambat (slow-loris) menahan slot server tanpa batas.
+  server.headersTimeout = 20_000;
+  server.requestTimeout = 120_000;
+  server.keepAliveTimeout = 65_000;
   let hentikanBackup: () => void = () => {};
 
   // Graceful shutdown: tutup server & pool MySQL saat menerima SIGINT/SIGTERM.
