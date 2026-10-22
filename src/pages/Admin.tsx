@@ -1644,7 +1644,9 @@ export const Admin: React.FC<AdminProps> = ({
                 <p className="text-xs text-ink-2 mt-1">
                   Pilih menu grup <span className="font-semibold">Kinerja &amp; Kepatuhan</span> yang tampil
                   untuk setiap instansi. Menu yang dimatikan hilang dari sidebar dan halamannya tidak bisa
-                  dibuka lagi. Perubahan tersimpan begitu switch ditekan.
+                  dibuka lagi. Perubahan tersimpan begitu switch ditekan.{' '}
+                  <span className="font-semibold">Instansi baru otomatis masuk dengan semua menu mati</span> —
+                  nyalakan satu per satu setelah instansi itu siap dipakai.
                 </p>
               </div>
 

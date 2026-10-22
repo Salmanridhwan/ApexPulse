@@ -4398,11 +4398,19 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     res.json({ success: true });
   });
 
+  // Menu grup "Kinerja & Kepatuhan" yang boleh diatur per instansi (sama dengan
+  // `MENU_KINERJA` di frontend; 'berkas' hanya bisa dimatikan, tidak dipakai default).
+  const MENU_KINERJA_SAH = ['pelaporan', 'auditTl', 'keuangan', 'risiko', 'aset', 'pk', 'lkjip'];
+
   app.post('/api/admin/tenants', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
     const newTenant = {
+      // ponytail: instansi baru masuk dengan SELURUH menu Kinerja & Kepatuhan mati.
+      // Admin menyalakan satu per satu di tab "Tampilan Menu Instansi", jadi tidak
+      // ada instansi baru yang langsung membuka semua halaman ke penggunanya.
+      menuSembunyi: [...MENU_KINERJA_SAH],
       id: `tenant-${Date.now()}`,
       name: req.body.name || 'BUMD Baru',
       shortName: req.body.shortName || 'BUMD',
@@ -4441,7 +4449,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     // Hanya key menu yang dikenal yang disimpan; sisanya dibuang supaya salah
     // ketik/tambahan dari versi frontend lain tidak ikut masuk ke data tenant.
     if ('menuSembunyi' in (req.body || {})) {
-      const sah = ['pelaporan', 'auditTl', 'keuangan', 'risiko', 'aset', 'pk', 'lkjip', 'berkas'];
+      const sah = [...MENU_KINERJA_SAH, 'berkas'];
       const masuk = Array.isArray(req.body.menuSembunyi) ? req.body.menuSembunyi : [];
       req.body.menuSembunyi = [...new Set(masuk.filter((k: unknown) => typeof k === 'string' && sah.includes(k)))];
     }
