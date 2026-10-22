@@ -402,6 +402,11 @@ export class InMemoryDb {
    * sebelum listen. Kalau MySQL mati, aplikasi tetap jalan — persistence
    * fallback ke data/db.json (sudah ditulis sejak awal).
    */
+  /** Latensi MySQL (ms) untuk pemeriksaan kesehatan; null bila tidak aktif. */
+  public pingMysql(): Promise<number | null> {
+    return this.mysql ? this.mysql.ping() : Promise.resolve(null);
+  }
+
   public async initMysql(): Promise<void> {
     try {
       this.mysql = new MysqlStore({

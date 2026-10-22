@@ -96,7 +96,7 @@ Semua jalur ini memerlukan peran `admin`.
 
 | Metode | Jalur | Keterangan |
 |---|---|---|
-| `GET` | `/health` | `{ status: 'ok', db: true, persistence: 'mysql', timestamp }` — dipakai pemantauan. |
+| `GET` | `/health` | Status server + `uptimeDetik`, `memoriMB`, `dbMs` (latensi MySQL), dan `cadangan: { terakhir, umurJam, terlambat }`. `terlambat: true` berarti cadangan terakhir lebih dari 26 jam — penjadwal berhenti atau disk bermasalah. Dipakai pemantauan luar. |
 
 ## Catatan umum
 

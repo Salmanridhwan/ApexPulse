@@ -27,6 +27,32 @@ export function berkasKedaluwarsa(
   return daftar.filter((b) => POLA.test(b.nama) && b.waktu < batas).map((b) => b.nama);
 }
 
+export interface StatusCadangan {
+  terakhir: string | null;
+  umurJam: number | null;
+  terlambat: boolean;
+}
+
+/**
+ * Ringkas keadaan cadangan untuk /health.
+ *
+ * `terlambat` dipakai pemantauan luar: cadangan harian yang tidak muncul lebih
+ * dari `jamMaks` jam berarti penjadwal berhenti atau disk bermasalah — itu
+ * kondisi yang harus diketahui sebelum ada insiden kehilangan data.
+ */
+export function statusCadangan(
+  daftar: { nama: string; waktu: number }[],
+  sekarang: number,
+  jamMaks = 26
+): StatusCadangan {
+  const cadangan = daftar
+    .filter((b) => /^aionesboard-.*\.json\.gz$/.test(b.nama))
+    .sort((a, b) => b.waktu - a.waktu);
+  if (cadangan.length === 0) return { terakhir: null, umurJam: null, terlambat: true };
+  const umurJam = Math.round(((sekarang - cadangan[0].waktu) / (60 * 60 * 1000)) * 10) / 10;
+  return { terakhir: cadangan[0].nama, umurJam, terlambat: umurJam > jamMaks };
+}
+
 export function bersihkanCadanganLama(dir: string, hari: number): number {
   let daftar: { nama: string; waktu: number }[] = [];
   try {

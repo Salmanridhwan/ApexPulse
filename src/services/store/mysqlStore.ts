@@ -88,6 +88,18 @@ export class MysqlStore {
   }
 
   /** Koneksi + buat database & tabel bila belum ada. */
+  /** Uji cepat koneksi (SELECT 1) — dipakai /health untuk mengukur latensi DB. */
+  async ping(): Promise<number | null> {
+    if (!this.pool) return null;
+    const mulai = Date.now();
+    try {
+      await this.pool.query('SELECT 1');
+      return Date.now() - mulai;
+    } catch {
+      return null;
+    }
+  }
+
   async init(): Promise<void> {
     // 1) Koneksi tanpa database untuk CREATE DATABASE
     const server = await mysql.createConnection({

@@ -132,7 +132,10 @@ insiden untuk mengetahui prosedurnya bekerja.
 
 ## 7. Pemantauan
 
-- `GET /health` → status server + apakah MySQL aktif.
+- `GET /health` → status server, `dbMs` (latensi MySQL), `uptimeDetik`, `memoriMB`,
+  dan `cadangan: { terakhir, umurJam, terlambat }`. Arahkan pemantauan uptime ke
+  sini dan beri peringatan bila `terlambat: true` (cadangan terakhir > 26 jam)
+  atau `db: false`.
 - Log server mencatat satu baris per permintaan API:
   `[api] POST /api/auth/login 200 84ms user=user-123` — pakai ini untuk menelusuri
   keluhan pengguna (jam kejadian, status, durasi).

@@ -48,8 +48,10 @@ import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
+import { readdirSync, statSync } from 'fs';
+import { join } from 'path';
 import { dekripsiNilai } from './src/services/config/rahasia';
-import { mulaiBackupTerjadwal } from './src/services/ops/backupTerjadwal';
+import { mulaiBackupTerjadwal, statusCadangan } from './src/services/ops/backupTerjadwal';
 import { potongHalaman } from './src/services/http/halaman';
 import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -475,11 +477,26 @@ async function startServer() {
   });
 
   // Health Check
-  app.get('/health', (_req: Request, res: Response) => {
+  app.get('/health', async (_req: Request, res: Response) => {
+    // Cadangan terakhir dibaca dari folder (murah: hanya stat berkas).
+    let daftarCadangan: { nama: string; waktu: number }[] = [];
+    try {
+      const dir = process.env.BACKUP_DIR || 'backups';
+      daftarCadangan = readdirSync(dir).map((nama) => ({
+        nama,
+        waktu: statSync(join(dir, nama)).mtimeMs,
+      }));
+    } catch {
+      daftarCadangan = [];
+    }
     res.json({
       status: 'ok',
       db: db.persistenceActive,
       persistence: db.persistenceActive ? 'mysql' : 'file',
+      uptimeDetik: Math.round(process.uptime()),
+      memoriMB: Math.round((process.memoryUsage().rss / 1024 / 1024) * 10) / 10,
+      dbMs: await db.pingMysql(),
+      cadangan: statusCadangan(daftarCadangan, Date.now()),
       timestamp: Date.now(),
     });
   });
