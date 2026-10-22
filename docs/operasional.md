@@ -11,7 +11,7 @@ Buat `.env` di akar repo. Nilai rahasia **tidak boleh** di-commit.
 
 | Variabel | Wajib | Keterangan |
 |---|---|---|
-| `SESSION_SECRET` | ya (produksi) | Minimal 32 karakter acak. Dipakai menandatangani cookie sesi. **Semua instance harus memakai nilai sama.** Bila kosong saat `NODE_ENV=production`, server **menolak start** dengan pesan jelas — sengaja, supaya tidak diam-diam memakai secret lemah dan supaya sesi tidak acak-acakan antar instance. |
+| `SESSION_SECRET` | disarankan | Minimal 32 karakter acak. Dipakai menandatangani cookie sesi. **Semua instance harus memakai nilai sama.** Bila kosong saat `NODE_ENV=production`, server membuat secret acak sekali dan menyimpannya di berkas `.session-secret` (mode 600, tidak masuk repo) di folder kerja — jadi dua instance yang berbagi folder tetap memakai nilai sama. Berkas itu **wajib dicadangkan**: menghapusnya membuat semua pengguna terlempar-login, dan kunci API yang tersimpan tidak bisa dibuka. Tidak pernah ada nilai cadangan yang tertulis di kode. |
 | `DATA_ENCRYPTION_KEY` | disarankan | Kunci enkripsi kunci API RAG/KMS yang disimpan di database (AES-256-GCM). Bila kosong, memakai `SESSION_SECRET`. **Jangan diganti setelah dipakai** — nilai lama tidak bisa dibuka dan admin perlu memasukkan ulang kunci API. |
 | `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` | ya | Koneksi MySQL. Default: `127.0.0.1:3306`, user `root`, database `bumd_aionesboard`. |
 | `PORT` | tidak | Default `3000`. |

@@ -1,4 +1,6 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Autentikasi AionesBoard — memakai crypto bawaan Node (scrypt + HMAC),
@@ -7,15 +9,30 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 hari
 
+const BERKAS_SECRET = join(process.cwd(), '.session-secret');
+
+function bacaBerkasSecret(): string {
+  try {
+    const isi = readFileSync(BERKAS_SECRET, 'utf8').trim();
+    return isi.length >= 32 ? isi : '';
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Secret sesi.
  *
  * ponytail: di produksi TIDAK BOLEH ada nilai cadangan yang tertulis di kode —
  * siapa pun yang membaca repo bisa memalsukan token admin. Produksi juga
  * berjalan di lebih dari satu instance: secret acak per-proses membuat cookie
- * dari instance A ditolak instance B (pengguna terlempar-login acak). Karena
- * itu produksi WAJIB mengisi `SESSION_SECRET`; kalau kosong server menolak
- * start dengan pesan yang jelas, bukan diam-diam memakai secret lemah.
+ * dari instance A ditolak instance B (pengguna terlempar-login acak).
+ *
+ * Urutan: `SESSION_SECRET` dari environment → berkas `.session-secret` (dibuat
+ * sekali, mode 600, bukan bagian repo) → menolak start. Berkas dipakai karena
+ * panel hosting tidak selalu bisa menyuntik environment variable; dua instance
+ * yang berbagi folder kerja membaca berkas yang sama sehingga cookie tetap sah
+ * di keduanya.
  */
 function secretSesi(): string {
   const dariEnv = (process.env.SESSION_SECRET || '').trim();
@@ -25,11 +42,25 @@ function secretSesi(): string {
     // putus setiap restart.
     return dariEnv || 'aionesboard-dev-secret-ganti-di-produksi';
   }
-  throw new Error(
-    'SESSION_SECRET wajib diisi (minimal 32 karakter acak) saat NODE_ENV=production. ' +
-      'Contoh membuat nilai: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))". ' +
-      'Pakai nilai yang SAMA di semua instance, lalu restart server.'
-  );
+  const tersimpan = bacaBerkasSecret();
+  if (tersimpan) return tersimpan;
+  const baru = randomBytes(32).toString('hex');
+  try {
+    // flag 'wx': kalau dua instance start bersamaan, hanya satu yang menulis.
+    writeFileSync(BERKAS_SECRET, baru + '\n', { mode: 0o600, flag: 'wx' });
+    console.warn(
+      '[sesi] SESSION_SECRET tidak diset — dibuat di .session-secret. ' +
+        'Jangan hapus berkas ini dan simpan salinannya (dipakai juga untuk enkripsi kunci API).'
+    );
+    return baru;
+  } catch {
+    const milikProsesLain = bacaBerkasSecret();
+    if (milikProsesLain) return milikProsesLain;
+    throw new Error(
+      'SESSION_SECRET wajib diisi (minimal 32 karakter acak) saat NODE_ENV=production, ' +
+        'atau pastikan folder kerja dapat ditulisi agar .session-secret bisa dibuat.'
+    );
+  }
 }
 
 const SESSION_SECRET = secretSesi();
