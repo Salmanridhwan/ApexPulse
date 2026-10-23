@@ -176,6 +176,55 @@ async function main() {
       `terpetakan=${jBerkas.terpetakan} total=${jBerkas.total} adaLagi=${jBerkas.adaLagi}`
     );
 
+    // Kontrak saran chart: permintaan rekomendasi tampilan harus dijawab daftar
+    // pilihan (bukan langsung memasang kartu), supaya pengguna bisa mempratinjau
+    // dulu lalu menekan Oke.
+    const rSaran = await fetch(`${BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({
+        prompt: 'rekomendasikan chart yang bisa digunakan untuk pendapatan air',
+        sector: 'pdam',
+        dashboardId: dash.id,
+      }),
+    });
+    assert(rSaran.ok, `permintaan saran gagal: HTTP ${rSaran.status}`);
+    const aliran = await rSaran.text();
+    assert(/saran_chart/.test(aliran), 'balasan tidak menandai actionTaken=saran_chart');
+    const barisData = aliran.split('\n').filter((b) => b.startsWith('data:'));
+    const peristiwa = barisData
+      .map((b) => {
+        try {
+          return JSON.parse(b.slice('data:'.length).trim());
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    const hasilSaran = peristiwa.find((p) => p.actionTaken === 'saran_chart');
+    assert(hasilSaran, 'tidak ada peristiwa saran_chart di aliran');
+    assert(Array.isArray(hasilSaran.saran) && hasilSaran.saran.length >= 3, 'daftar saran kosong');
+    assert(
+      hasilSaran.saran.every((x) => x.tipe && x.judul && x.alasan),
+      'saran tidak lengkap (tipe/judul/alasan wajib ada)'
+    );
+    assert(!/\brag\b/i.test(hasilSaran.message || ''), 'pesan saran memuat istilah teknis RAG');
+    catat('saran chart lewat chat', true, `${hasilSaran.saran.length} pilihan`);
+
+    // Endpoint "Oke, tambahkan" harus menolak dengan kalimat biasa saat dokumen
+    // belum bisa menjawab — bukan 500 dan bukan istilah teknis.
+    const rTambah = await fetch(`${BASE}/api/dashboards/${dash.id}/widget-dari-saran`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ indikator: 'pendapatan air', tipe: 'bar' }),
+    });
+    const jTambah = await rTambah.json().catch(() => ({}));
+    assert(rTambah.status !== 500, 'endpoint saran membalas 500');
+    assert([201, 409, 422, 503].includes(rTambah.status), `status tak terduga: ${rTambah.status}`);
+    assert(typeof jTambah.error === 'string' && jTambah.error.length > 0, 'tidak ada pesan galat');
+    assert(!/\brag\b|\bhttp\b|\bfetch\b/i.test(jTambah.error), `pesan teknis: ${jTambah.error}`);
+    catat('endpoint tambah dari saran', true, `HTTP ${rTambah.status}`);
+
     // ---- Bagian browser ----
     const execPath = cariChrome();
     browser = await puppeteer.launch({
@@ -236,6 +285,32 @@ async function main() {
     const sudahMasuk = await page.evaluate(() => !!localStorage.getItem('aionesboard_user'));
     assert(sudahMasuk, 'sesi tidak tercatat di browser setelah masuk');
     catat('masuk ke aplikasi', true, 'sidebar tampil');
+
+    // 3a. Asisten: minta rekomendasi tampilan → kartu saran muncul → pratinjau
+    //     memperlihatkan bentuknya di kanvas, lengkap dengan tombol Oke.
+    await page.click('[data-testid="buka-asisten"]');
+    await page.waitForSelector('[data-testid="input-asisten"]', { timeout: 20_000 });
+    await page.type('[data-testid="input-asisten"]', 'rekomendasikan chart untuk pendapatan air');
+    await page.evaluate(() => {
+      const input = document.querySelector('[data-testid="input-asisten"]');
+      input?.closest('form')?.requestSubmit();
+    });
+    await page.waitForSelector('[data-testid="saran-chart"]', { timeout: 40_000 });
+    const jumlahSaran = await page.$$eval('[data-testid="saran-chart"] > div', (n) => n.length);
+    assert(jumlahSaran >= 3, `kartu saran kurang: ${jumlahSaran}`);
+    await page.click('[data-testid="pratinjau-bar"]');
+    await page.waitForSelector('[data-testid="pratinjau-saran"]', { timeout: 20_000 });
+    const isiPratinjau = await page.$eval('[data-testid="pratinjau-saran"]', (e) => e.innerText);
+    assert(/Grafik batang/i.test(isiPratinjau), 'label tipe tampilan tidak muncul di pratinjau');
+    assert(/Oke, tambahkan ke kanvas/i.test(isiPratinjau), 'tombol Oke tidak ada di pratinjau');
+    assert(/contoh bentuk tampilan/i.test(isiPratinjau), 'pratinjau tidak menandai angkanya contoh');
+    await page.evaluate(() => {
+      const tutup = Array.from(document.querySelectorAll('button')).find(
+        (b) => b.getAttribute('aria-label') === 'Tutup pratinjau'
+      );
+      tutup?.click();
+    });
+    catat('pratinjau saran chart', true, `${jumlahSaran} pilihan, tombol Oke ada`);
 
     // 3b. Halaman Manajemen Berkas: memakai pemuatan berpaginasi (limit/offset).
     //     Isi daftar bisa kosong bila repositori dokumen belum dipetakan di

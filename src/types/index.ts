@@ -471,12 +471,31 @@ export interface ProgressStep {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
+/** Satu pilihan tampilan chart yang ditawarkan asisten di percakapan. */
+export interface SaranChart {
+  id: string;
+  tipe: WidgetType;
+  judul: string;
+  /** Kenapa tipe ini cocok untuk indikator tersebut. */
+  alasan: string;
+  /** Kapan sebaiknya dipakai — membantu pengguna memilih. */
+  kapan: string;
+  /** Indikator yang diminta pengguna; dipakai saat mengambil angka dari dokumen. */
+  indikator: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error' | 'saran_chart';
+  /**
+   * Pilihan tampilan chart yang ditawarkan asisten. Pengguna melihat pratinjau
+   * bentuknya, lalu menekan Oke untuk menambahkannya ke kanvas (angkanya baru
+   * diambil dari dokumen saat ditambahkan).
+   */
+  saran?: SaranChart[];
   affectedWidgetId?: string;
   modeUsed?: 'Jalur A (LLM JSON)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;

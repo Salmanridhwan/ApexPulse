@@ -2,17 +2,41 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
+  BarChart3,
   Bot,
   Building2,
   CheckCircle2,
   Clock,
+  Eye,
+  Hash,
+  LineChart,
   Loader2,
+  PieChart,
   Send,
   Sparkles,
+  Table2,
   Trash2,
   X,
 } from 'lucide-react';
-import { BumdSector, ChatMessage, Dashboard, ProgressStep } from '../types';
+import { BumdSector, ChatMessage, Dashboard, ProgressStep, SaranChart } from '../types';
+import { PratinjauSaranChart } from './PratinjauSaranChart';
+
+/** Ikon per jenis tampilan pada kartu saran chart. */
+const ikonSaran = (tipe: string) => {
+  switch (tipe) {
+    case 'bar':
+      return <BarChart3 className="w-3.5 h-3.5" />;
+    case 'line':
+    case 'area':
+      return <LineChart className="w-3.5 h-3.5" />;
+    case 'donut':
+      return <PieChart className="w-3.5 h-3.5" />;
+    case 'table':
+      return <Table2 className="w-3.5 h-3.5" />;
+    default:
+      return <Hash className="w-3.5 h-3.5" />;
+  }
+};
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -75,6 +99,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    * meski sedang menunggu RAG puluhan detik.
    */
   const [detik, setDetik] = useState(0);
+  /** Saran chart yang sedang dipratinjau (null = tidak ada pratinjau terbuka). */
+  const [pratinjau, setPratinjau] = useState<SaranChart | null>(null);
 
   useEffect(() => {
     if (!isStreaming) {
@@ -263,6 +289,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   actionTaken: data.actionTaken,
                   modeUsed: data.modeUsed,
                   citationsCount: data.citationsCount,
+                  saran: Array.isArray(data.saran) ? data.saran : undefined,
                 };
               } else if (eventName === 'error') {
                 pendingBotMsg = {
@@ -480,8 +507,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 })}
               </div>
 
-              {/* Kartu rekomendasi DIHAPUS: rekomendasi chart kini datang dari
-                  jawaban RAG (chatbot), bukan dari katalog aplikasi. */}
+              {/* Pilihan tampilan chart dari asisten: pengguna melihat pratinjau
+                  bentuknya di kanvas dulu, lalu menekan Oke untuk menambahkan. */}
+              {msg.saran && msg.saran.length > 0 && (
+                <div className="mt-3 space-y-2" data-testid="saran-chart">
+                  {msg.saran.map((s) => (
+                    <div
+                      key={s.id}
+                      className="border border-line rounded-card bg-surface p-2.5 flex items-start gap-2.5"
+                    >
+                      <div className="w-7 h-7 rounded-control bg-surface-2 border border-line flex items-center justify-center text-brand-ink shrink-0">
+                        {ikonSaran(s.tipe)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11.5px] font-bold text-ink leading-snug">{s.judul}</p>
+                        <p className="text-[10.5px] text-ink-2 leading-relaxed mt-0.5">{s.alasan}</p>
+                        <p className="text-[10px] text-ink-3 leading-relaxed mt-0.5">{s.kapan}</p>
+                      </div>
+                      <button
+                        onClick={() => setPratinjau(s)}
+                        data-testid={`pratinjau-${s.tipe}`}
+                        className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[10.5px] font-bold text-brand-ink bg-brand/10 hover:bg-brand/20 border border-brand/30 rounded-control transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Pratinjau
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Peringatan status dashboard. Label teknis internal ("Jalur A
                   (LLM JSON)", jumlah sitasi) sengaja TIDAK ditampilkan — itu
@@ -643,6 +697,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             }
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
+            data-testid="input-asisten"
             disabled={isStreaming}
             className="w-full text-xs pl-3.5 pr-12 py-2.5 bg-surface-2 border border-line rounded-card focus:outline-none focus:ring-2 focus:ring-brand focus:bg-surface transition-all disabled:bg-surface-2 disabled:text-ink-3 disabled:cursor-not-allowed"
           />
@@ -662,6 +717,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           Jawaban & angka bersumber dari dokumen instansi
         </p>
       </div>
+
+      {pratinjau && (
+        <PratinjauSaranChart
+          saran={pratinjau}
+          dashboardId={dashboardId}
+          onClose={() => setPratinjau(null)}
+          onDitambahkan={(dash) => onDashboardUpdated(dash)}
+        />
+      )}
     </div>
   );
 };

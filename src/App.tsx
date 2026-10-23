@@ -1320,6 +1320,7 @@ export default function App() {
       {!isPresentationMode && !isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
+          data-testid="buka-asisten"
           className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
           title="Buka asisten"
         >

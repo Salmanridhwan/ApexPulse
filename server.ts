@@ -72,6 +72,7 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
+import { adalahPermintaanSaran, indikatorDariPrompt, susunSaranChart } from './src/services/chat/saranChart';
 import { generateInsightPresentasi } from './src/services/presentasi/generateInsight';
 import { susunSlide, VERSI_PRESENTASI } from './src/services/presentasi/slide';
 import { GoogleAuthError, verifikasiIdTokenGoogle } from './src/services/auth/google';
@@ -1231,6 +1232,103 @@ const app = express();
     }
   });
 
+  /**
+   * Tambahkan kartu ke kanvas dari salah satu saran chart di percakapan.
+   *
+   * Pratinjau di klien hanya memperlihatkan BENTUK; angka baru diambil dari
+   * dokumen instansi di sini, saat pengguna menekan "Oke, tambahkan". Kalau
+   * dokumen tidak memuat indikatornya, kartu tidak dipasang dan pengguna diberi
+   * tahu dengan kalimat biasa (tanpa istilah teknis).
+   */
+  app.post('/api/dashboards/:id/widget-dari-saran', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const dash = db.getDashboardById(req.params.id, tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
+
+    const indikator = String(req.body?.indikator || '').trim();
+    const tipe = String(req.body?.tipe || 'bar').trim();
+    if (!indikator) return res.status(400).json({ error: 'Sebutkan dulu indikator yang ingin ditampilkan.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    if (db.systemConfig.ragProvider === 'http' && !kbId) {
+      return res.status(409).json({
+        error: `Instansi "${tenant.name}" belum punya basis dokumen sendiri, jadi angkanya belum bisa diambil. Hubungi admin untuk menautkannya.`,
+      });
+    }
+
+    try {
+      const hasil = await ragClient.ambilDataWidget(
+        `Ambil angka indikator "${indikator}" dari dokumen resmi instansi ini. ` +
+          `Gunakan angka yang BENAR-BENAR ada di dokumen beserta sumbernya (nama dokumen & halaman). ` +
+          `Kalau indikator ini tidak ada di dokumen, katakan tidak ada — jangan mengarang.`,
+        tenant.sector,
+        tipe,
+        tenant.name,
+        kbId
+      );
+
+      if (!hasil || !hasil.data) {
+        return res.status(422).json({
+          error: `Dokumen instansi ini belum memuat angka untuk "${indikator}".`,
+          alasan: hasil?.alasan || null,
+        });
+      }
+
+      const d = hasil.data as any;
+      const widgetBaru: WidgetSpec = {
+        id: `w-saran-${Date.now()}`,
+        type: d.type || tipe,
+        title: d.title || hasil.judul || indikator,
+        subtitle: d.subtitle,
+        category: d.category || 'Operasional',
+        confidence: 'sumber',
+        grid: d.grid || { x: 0, y: 0, w: 6, h: 4 },
+        kpi: d.kpi,
+        chart: d.chart,
+        table: d.table,
+        narasi: d.narasi,
+        citations: d.citations || [],
+        unitKerja: d.unitKerja,
+        periode: d.periode,
+        lastUpdated: new Date().toISOString(),
+      } as WidgetSpec;
+
+      // Jangan pasang kartu kembar: kalau isinya sudah ada di kanvas, beri tahu.
+      const kembar =
+        dash.widgets.find((w) => kunciKembarWidget(w) === kunciKembarWidget(widgetBaru)) ||
+        dash.widgets.find((w) => judulWidgetMirip(w.title, widgetBaru.title));
+      if (kembar) {
+        return res.status(409).json({
+          error: `Kartu "${kembar.title}" sudah ada di kanvas dengan isi yang sama.`,
+        });
+      }
+
+      const widgets = [widgetBaru, ...dash.widgets];
+      db.updateDashboard(dash.id, { widgets }, tenantId);
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Tambah Widget dari Saran Asisten',
+        target: widgetBaru.title,
+        details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
+      });
+
+      return res.status(201).json({ dashboard: { ...dash, widgets }, widget: widgetBaru });
+    } catch (err) {
+      console.error('[saran] gagal menambah kartu dari dokumen:', jelaskanError(err));
+      return res.status(503).json({
+        error: 'Layanan dokumen sedang tidak tersedia. Coba lagi beberapa saat lagi.',
+      });
+    }
+  });
+
   app.delete('/api/dashboards/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1506,6 +1604,22 @@ const app = express();
         catatPesanUser();
         pesanBaru(msg);
       };
+
+      // Case 0a: pengguna minta REKOMENDASI tampilan chart → tawarkan pilihan
+      // beserta pratinjau. Kartu TIDAK langsung dipasang: pengguna melihat
+      // bentuknya di kanvas dulu, lalu menekan "Oke, tambahkan".
+      if (adalahPermintaanSaran(prompt)) {
+        const indikator = indikatorDariPrompt(prompt);
+        const saran = susunSaranChart(indikator);
+        const pesan =
+          `Berikut ${saran.length} pilihan tampilan${indikator ? ` untuk **${indikator}**` : ''}. ` +
+          `Tekan **Pratinjau** untuk melihat bentuknya seperti di kanvas, lalu **Oke, tambahkan ke kanvas** kalau sudah cocok. ` +
+          `Angka di pratinjau hanya contoh bentuk tampilan; angka sebenarnya diambil dari dokumen instansi saat kartunya ditambahkan.`;
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'saran_chart', saran });
+        sendEvent('result', { actionTaken: 'saran_chart', message: pesan, saran });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
 
       // Check if this is a conversational EDIT instruction
 
