@@ -1,0 +1,49 @@
+Copyright (c) 2026 Aiones. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its source code, documentation, database schema, user
+interface designs, and all related materials (collectively, "the Software")
+are the proprietary property of Aiones ("the Owner") and are protected by
+copyright law and international treaties.
+
+1. NO LICENSE GRANTED
+   No right or license, express or implied, is granted to any person or entity
+   to use, copy, modify, merge, publish, distribute, sublicense, sell, rent,
+   lease, host, or otherwise make the Software available, in whole or in part,
+   without the prior written permission of the Owner.
+
+2. PERMITTED ACCESS
+   Access to the Software is granted only under a separate written agreement
+   with the Owner (for example a subscription, implementation, or hosting
+   agreement). Such an agreement governs the scope of use. Where it is silent,
+   this notice applies.
+
+3. RESTRICTIONS
+   You may not, and may not permit any third party to:
+   a. reverse engineer, decompile, or disassemble the Software, except to the
+      extent such restriction is prohibited by applicable law;
+   b. remove, alter, or obscure any copyright, trademark, or other proprietary
+      notice contained in the Software;
+   c. use the Software to build a competing product or service;
+   d. disclose the Software or any part of it to a third party without the
+      Owner's prior written consent.
+
+4. THIRD-PARTY COMPONENTS
+   The Software depends on third-party open-source packages. Those packages
+   remain governed by their own licenses, as listed in package.json and the
+   respective package metadata. Nothing in this notice restricts rights you
+   may have under those licenses with respect to those components.
+
+5. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF THE SOFTWARE.
+
+7. CONTACT
+   Licensing and commercial enquiries: https://aiones.app

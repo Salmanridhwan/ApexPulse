@@ -80,5 +80,9 @@ docs/operasional.md           Panduan operator
 
 ## Lisensi
 
-Belum ditetapkan — hubungi pemilik repositori sebelum menggunakan atau
-mendistribusikan kode ini.
+**Proprietary — All rights reserved.** Kode ini milik Aiones dan tidak boleh
+dipakai, disalin, dimodifikasi, atau didistribusikan tanpa izin tertulis.
+Penggunaan hanya berdasarkan perjanjian tertulis terpisah (langganan,
+implementasi, atau hosting). Lihat berkas [`LICENSE`](LICENSE) untuk teks
+lengkap, termasuk pengecualian untuk paket pihak ketiga (open source) yang
+tetap tunduk pada lisensi masing-masing.
