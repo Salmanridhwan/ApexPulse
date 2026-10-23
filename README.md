@@ -40,6 +40,7 @@ NODE_ENV=production npm start
 | `npm run build` | Build aset produksi ke `dist/` |
 | `npm test` | Uji unit (aturan sandi, pembatas percobaan, enkripsi, menu, backup) |
 | `npx tsc --noEmit` | Pemeriksaan tipe |
+| `npm run test:e2e` | Uji end-to-end di browser nyata (Chrome/Edge terpasang; set `CHROME_PATH` bila lokasinya tidak standar) |
 | `npm run backup` | Cadangan seluruh database ke `backups/*.json.gz` + SHA-256 |
 | `npm run restore -- <berkas> [--dry-run]` | Pulihkan dari berkas cadangan |
 

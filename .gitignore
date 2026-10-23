@@ -19,3 +19,6 @@ package-lock.json
 # Cadangan database lokal (berisi data instansi — jangan di-commit)
 backups/
 .session-secret
+
+# artefak uji E2E (tangkapan layar kegagalan)
+e2e-artifacts/
