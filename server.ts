@@ -286,6 +286,24 @@ async function startServer() {
  */
 const BATAS_ISI_TEMPLATE_MS = 35_000;
 
+/**
+ * ponytail: tab yang dibiarkan terbuka terus menjalankan bundel JS lama, jadi
+ * fitur baru (mis. tombol Pratinjau saran chart) tidak muncul walau server sudah
+ * diperbarui — pengguna mengira fiturnya tidak ada sama sekali. Versi bundel di
+ * bawah dipakai klien untuk mendeteksi tab seperti itu dan menawarkan muat ulang.
+ */
+function versiBundelSaatIni(): string {
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'dist', 'index.html'), 'utf8');
+    const cocok = html.match(/assets\/index-([A-Za-z0-9_-]+)\.js/);
+    if (cocok) return cocok[1];
+  } catch {
+    /* saat dev dist belum ada */
+  }
+  return 'dev';
+}
+const VERSI_BUNDEL = versiBundelSaatIni();
+
 const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -542,6 +560,16 @@ const app = express();
   });
 
   // Health Check
+  /**
+   * Penanda versi bundel frontend. Klien membandingkannya dengan versi saat
+   * halaman dimuat; kalau berbeda, tab itu masih menjalankan JS lama dan diberi
+   * tawaran muat ulang. Tidak rahasia, jadi tanpa login.
+   */
+  app.get('/api/versi', (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ versi: VERSI_BUNDEL });
+  });
+
   app.get('/health', async (_req: Request, res: Response) => {
     // Cadangan terakhir dibaca dari folder (murah: hanya stat berkas).
     let daftarCadangan: { nama: string; waktu: number }[] = [];
@@ -5550,8 +5578,19 @@ ${navigasi}
   // ================= VITE DEV MIDDLEWARE / STATIC =================
   const distExists = fs.existsSync(path.join(__dirname, 'dist', 'index.html'));
   if (process.env.NODE_ENV === 'production' || distExists) {
-    app.use(express.static(path.join(__dirname, 'dist')));
+    app.use(
+      express.static(path.join(__dirname, 'dist'), {
+        // index.html TIDAK boleh di-cache: kalau di-cache, pengguna yang membuka
+        // ulang halaman masih memakai bundel lama dan mengira fitur baru hilang.
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          }
+        },
+      })
+    );
     app.get('*', (_req: Request, res: Response) => {
+      res.setHeader('Cache-Control', 'no-store, must-revalidate');
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   } else {

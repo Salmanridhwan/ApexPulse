@@ -31,6 +31,7 @@ import {
 import { AlertsModal } from './components/AlertsModal';
 import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
+import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
@@ -1315,6 +1316,10 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Tab yang masih menjalankan versi lama diberi tahu agar memuat ulang,
+          supaya fitur baru tidak terlihat "hilang". */}
+      <PemberitahuanVersi />
 
       {/* Tombol buka asisten (hanya tampil saat panel chat tertutup) */}
       {!isPresentationMode && !isChatOpen && (

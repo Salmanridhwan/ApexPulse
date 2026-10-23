@@ -176,6 +176,23 @@ async function main() {
       `terpetakan=${jBerkas.terpetakan} total=${jBerkas.total} adaLagi=${jBerkas.adaLagi}`
     );
 
+    // Penanda versi: dipakai klien untuk mendeteksi tab yang masih memakai
+    // bundel lama, dan index.html tidak boleh di-cache.
+    const rVersi = await fetch(`${BASE}/api/versi`);
+    assert(rVersi.ok, `penanda versi gagal: HTTP ${rVersi.status}`);
+    const jVersi = await rVersi.json();
+    assert(typeof jVersi.versi === 'string' && jVersi.versi.length > 0, 'versi kosong');
+    assert(
+      /no-store/.test(rVersi.headers.get('cache-control') || ''),
+      'penanda versi tidak boleh di-cache'
+    );
+    const rHtml = await fetch(`${BASE}/`);
+    assert(
+      /no-store/.test(rHtml.headers.get('cache-control') || ''),
+      'index.html di-cache — pembaruan tidak akan terlihat di tab yang sudah terbuka'
+    );
+    catat('penanda versi & index tidak di-cache', true, `versi=${jVersi.versi}`);
+
     // Kontrak saran chart: permintaan rekomendasi tampilan harus dijawab daftar
     // pilihan (bukan langsung memasang kartu), supaya pengguna bisa mempratinjau
     // dulu lalu menekan Oke.
