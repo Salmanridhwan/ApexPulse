@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { antreEmail } from '../mailer';
+import { konfigS3DariEnv, unggahCadanganDariDisk } from './s3';
 
 /**
  * Cadangan harian otomatis.
@@ -107,6 +108,93 @@ export function pesanCadanganGagal(keluaran: string, waktu: Date) {
   };
 }
 
+/**
+ * Keadaan unggahan off-site terakhir — ditampilkan di `/health` supaya operator
+ * tahu salinan luar benar-benar jalan, bukan hanya dikonfigurasi.
+ */
+export interface StatusOffsite {
+  aktif: boolean;
+  terakhir: string | null;
+  waktu: string | null;
+  ok: boolean | null;
+  galat?: string;
+}
+
+let statusOffsite: StatusOffsite = { aktif: false, terakhir: null, waktu: null, ok: null };
+
+export function statusUnggahanOffsite(): StatusOffsite {
+  return { ...statusOffsite, aktif: konfigS3DariEnv() !== null };
+}
+
+/** Isi email peringatan saat salinan off-site gagal. */
+export function pesanCadanganOffsiteGagal(galat: string, namaBerkas: string, waktu: Date) {
+  const kapan = waktu.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  const aman = (galat || '').slice(0, 800);
+  return {
+    subject: '[Aiones Boards] Salinan cadangan off-site GAGAL',
+    text:
+      `Unggahan cadangan ${namaBerkas} ke penyimpanan objek gagal pada ${kapan}.\n\n` +
+      `Cadangan LOKAL tetap ada di server, tetapi belum ada salinan di luar server — ` +
+      `selama ini berlangsung, kehilangan disk/server berarti kehilangan titik pulih.\n\n` +
+      `Periksa S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT, dan izin tulis bucket.\n\n` +
+      `Galat: ${aman || '(kosong)'}`,
+    html:
+      `<p>Unggahan cadangan <code>${namaBerkas}</code> ke penyimpanan objek <b>gagal</b> pada ${kapan}.</p>` +
+      `<p>Cadangan lokal tetap ada, tetapi belum ada salinan di luar server.</p>` +
+      `<pre style="white-space:pre-wrap;font-size:12px">${aman
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</pre>`,
+  };
+}
+
+/** Berkas cadangan terbaru di folder (null bila belum ada). */
+export function cadanganTerbaru(dir: string): string | null {
+  try {
+    const daftar = readdirSync(dir)
+      .filter((n) => /^aionesboard-.*\.json\.gz$/.test(n))
+      .map((nama) => ({ nama, waktu: statSync(join(dir, nama)).mtimeMs }))
+      .sort((a, b) => b.waktu - a.waktu);
+    return daftar.length > 0 ? join(dir, daftar[0].nama) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Unggah cadangan terbaru ke penyimpanan objek. Tidak melempar galat: kegagalan
+ * dilaporkan lewat log + email, karena cadangan lokal tetap sah.
+ */
+export async function unggahCadanganOffsite(dir: string): Promise<StatusOffsite> {
+  const cfg = konfigS3DariEnv();
+  if (!cfg) {
+    statusOffsite = {
+      aktif: false,
+      terakhir: statusOffsite.terakhir,
+      waktu: statusOffsite.waktu,
+      ok: statusOffsite.ok,
+    };
+    return statusUnggahanOffsite();
+  }
+  const berkas = cadanganTerbaru(dir);
+  if (!berkas) {
+    console.warn('[AionesBoard Backup] Tidak ada berkas cadangan untuk diunggah ke penyimpanan objek.');
+    return statusUnggahanOffsite();
+  }
+  const hasil = await unggahCadanganDariDisk(cfg, berkas);
+  const nama = berkas.replace(/\\/g, '/').split('/').pop() || berkas;
+  const waktu = new Date().toISOString();
+  if (hasil.ok) {
+    console.log(`[AionesBoard Backup] Cadangan disalin ke penyimpanan objek: ${hasil.kunci}`);
+    statusOffsite = { aktif: true, terakhir: hasil.kunci, waktu, ok: true };
+  } else {
+    console.error('[AionesBoard Backup] Unggah off-site gagal:', hasil.galat);
+    antreEmail(pesanCadanganOffsiteGagal(String(hasil.galat || ''), nama, new Date()));
+    statusOffsite = { aktif: true, terakhir: statusOffsite.terakhir, waktu, ok: false, galat: hasil.galat };
+  }
+  return statusUnggahanOffsite();
+}
+
 function jalankanCadangan(): Promise<boolean> {
   return new Promise((resolve) => {
     const anak = spawn(process.execPath, ['scripts/backup-db.mjs'], {
@@ -126,6 +214,8 @@ function jalankanCadangan(): Promise<boolean> {
       if (kode === 0) {
         const baris = keluaran.split('\n').find((b) => b.includes('berkas')) || '';
         console.log('[AionesBoard Backup] Cadangan harian selesai.', baris.trim());
+        // Salinan di luar server: tanpa ini, disk/server rusak = semua titik pulih hilang.
+        void unggahCadanganOffsite(process.env.BACKUP_DIR || 'backups');
         resolve(true);
       } else {
         console.error('[AionesBoard Backup] Cadangan harian gagal (kode', kode, '):', keluaran.trim());

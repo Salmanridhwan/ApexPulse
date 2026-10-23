@@ -54,7 +54,11 @@ import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/s
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { dekripsiNilai } from './src/services/config/rahasia';
-import { mulaiBackupTerjadwal, statusCadangan } from './src/services/ops/backupTerjadwal';
+import {
+  mulaiBackupTerjadwal,
+  statusCadangan,
+  statusUnggahanOffsite,
+} from './src/services/ops/backupTerjadwal';
 import { potongHalaman } from './src/services/http/halaman';
 import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
@@ -536,6 +540,7 @@ async function startServer() {
       dbMs: await db.pingMysql(),
       cadangan: statusCadangan(daftarCadangan, Date.now(), 26, process.uptime() / 3600),
       sinkronKonfigDetik: Number(process.env.CONFIG_REFRESH_SECONDS ?? 30),
+      cadanganOffsite: statusUnggahanOffsite(),
       timestamp: Date.now(),
     });
   });
