@@ -35,6 +35,7 @@ import {
   hanyaKeteranganPeriode,
 } from './src/services/chat/niat';
 import { putusanJawaban } from './src/services/chat/jawaban';
+import { adalahSapaan } from './src/services/chat/sapaan';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -1841,19 +1842,12 @@ async function startServer() {
 
       // Deteksi obrolan ringan (sapaan/terima kasih) → persona boleh membalas
       // natural tanpa strict grounding. Pertanyaan data tetap grounded.
-      const isSapaan =
-        /^(halo|hai|hi|hello|helo|hey|test|tes|pagi|siang|sore|malam|assalamualaikum|salam)\b/i.test(
-          lower.trim()
-        ) ||
-        lower.includes('apa kabar') ||
-        lower.includes('terima kasih') ||
-        lower.includes('makasih') ||
-        lower.includes('thanks') ||
-        lower.includes('thank you') ||
-        lower.includes('siapa kamu') ||
-        lower.includes('kamu siapa') ||
-        lower.includes('apa ini') ||
-        lower.includes('bisa apa');
+      // Sapaan dihitung oleh fungsi murni `adalahSapaan` (teruji). Versi lama
+      // memakai `lower.includes('apa ini')` sehingga pertanyaan data seperti
+      // "berapa nilai aset dan apa ini sudah diaudit?" ikut dianggap sapaan —
+      // dan sapaan melewati strict grounding, jadi model bebas menjawab tanpa
+      // dokumen. Persis kebocoran yang ingin ditutup.
+      const isSapaan = adalahSapaan(prompt);
 
       if (!isGenerateDash) {
         // ---- CHATBOT LLM (multi-turn, grounded ke dokumen instansi) ----
