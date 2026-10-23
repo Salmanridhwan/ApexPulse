@@ -300,9 +300,13 @@ async function startServer() {
       [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com",
-        "style-src 'self' 'unsafe-inline'",
+        // index.html memuat Inter/JetBrains Mono dari Google Fonts. Tanpa izin
+        // di sini, CSP memblokir stylesheet DAN berkas font-nya, sehingga font
+        // bermerek tidak pernah terpakai dan browser diam-diam jatuh ke font
+        // sistem. Dua origin ini saja; sisanya tetap terkunci.
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob: https:",
-        "font-src 'self' data:",
+        "font-src 'self' data: https://fonts.gstatic.com",
         "connect-src 'self' https:",
         "frame-src https://accounts.google.com",
         "object-src 'none'",
