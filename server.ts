@@ -27,6 +27,7 @@ import {
 } from './src/services/rag/kbKatalog';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { ambilHalaman, kumpulkanPotongan } from './src/services/rag/potonganDokumen';
+import { halamanPaket, halamanSyarat } from './src/services/http/halamanPublik';
 import {
   niatBuatDashboard,
   niatTambahWidget,
@@ -5347,6 +5348,27 @@ ${navigasi}
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'Endpoint tidak ditemukan.', kode: 'TIDAK_DITEMUKAN' });
   });
+
+  /**
+   * Halaman publik tanpa login: paket & harga, syarat-ketentuan.
+   *
+   * Didaftarkan SEBELUM penanganan aset/SPA supaya tidak tertelan catch-all
+   * `app.get('*')` yang mengirim index.html.
+   */
+  app.get('/paket', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=600');
+    res.send(halamanPaket());
+  });
+  app.get('/syarat-ketentuan', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=600');
+    res.send(halamanSyarat());
+  });
+  // Alias yang sering diketik orang.
+  app.get('/harga', (_req: Request, res: Response) => res.redirect(301, '/paket'));
+  app.get('/syarat', (_req: Request, res: Response) => res.redirect(301, '/syarat-ketentuan'));
+  app.get('/terms', (_req: Request, res: Response) => res.redirect(301, '/syarat-ketentuan'));
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================
   const distExists = fs.existsSync(path.join(__dirname, 'dist', 'index.html'));

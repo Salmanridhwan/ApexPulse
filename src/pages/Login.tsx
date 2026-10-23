@@ -698,8 +698,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
 
       {/* Footer */}
       <footer className="relative z-10 bg-surface/70 backdrop-blur-md border-t border-line px-6 py-4 text-xs text-ink-3">
-        <div className="max-w-6xl mx-auto">
-          © 2026 Aiones Boards. Portal Dashboard BUMD
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <span>© 2026 Aiones Boards. Portal Dashboard BUMD</span>
+          <span className="flex items-center gap-4">
+            <a href="/paket" className="hover:text-ink hover:underline">Paket &amp; harga</a>
+            <a href="/syarat-ketentuan" className="hover:text-ink hover:underline">Syarat &amp; ketentuan</a>
+          </span>
         </div>
       </footer>
     </div>
