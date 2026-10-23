@@ -11,6 +11,57 @@ import mysql from 'mysql2/promise';
 import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
+/**
+ * Baris yang gagal diurai dari kolom `data`.
+ *
+ * ponytail: dulu satu nilai bukan-JSON (mis. kolom berisi id mentah) membuat
+ * SELURUH pemuatan state gagal, lalu server diam-diam pindah ke data/db.json —
+ * dua instance pun menulis ke dua tempat berbeda. Sekarang baris rusak dilewati,
+ * dicatat, dan dilaporkan di /health supaya bisa dibersihkan, bukan disembunyikan.
+ */
+export interface BarisRusak {
+  tabel: string;
+  cuplikan: string;
+  galat: string;
+  waktu: string;
+}
+
+const barisRusak: BarisRusak[] = [];
+const BATAS_CATAT_RUSAK = 20;
+
+export function daftarBarisRusak(): BarisRusak[] {
+  return barisRusak.slice();
+}
+
+function catatBarisRusak(tabel: string, cuplikan: string, galat: string): void {
+  if (barisRusak.some((b) => b.tabel === tabel && b.cuplikan === cuplikan)) return;
+  if (barisRusak.length < BATAS_CATAT_RUSAK) {
+    barisRusak.push({ tabel, cuplikan, galat, waktu: new Date().toISOString() });
+  }
+  console.error(`[AionesBoard DB] baris ${tabel} tidak bisa diurai — dilewati: ${cuplikan}`);
+}
+
+/** Urai satu kolom `data`; nilai rusak menghasilkan null, bukan melempar galat. */
+export function uraiData<T>(raw: any, tabel: string): T | null {
+  if (typeof raw !== 'string') return (raw as T) ?? null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err: any) {
+    catatBarisRusak(tabel, raw.slice(0, 60), err?.message || String(err));
+    return null;
+  }
+}
+
+/** Urai banyak baris sekaligus, lewati yang rusak. */
+export function uraiDaftar<T>(rows: Array<{ data: any }>, tabel: string): T[] {
+  const hasil: T[] = [];
+  for (const r of rows) {
+    const v = uraiData<T>(r.data, tabel);
+    if (v !== null && v !== undefined) hasil.push(v);
+  }
+  return hasil;
+}
+
 export interface MysqlConfig {
   host: string;
   port: number;
@@ -463,9 +514,7 @@ export class MysqlStore {
   async loadKewajiban(): Promise<KewajibanLapor[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM kewajiban_lapor');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<KewajibanLapor>(rows as Array<{ data: any }>, 'kewajiban_lapor');
   }
 
   async deleteKewajibanRow(id: string): Promise<void> {
@@ -486,9 +535,7 @@ export class MysqlStore {
   async loadLaporan(): Promise<LaporanPeriodik[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM laporan_periodik');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<LaporanPeriodik>(rows as Array<{ data: any }>, 'laporan_periodik');
   }
 
   async deleteLaporanRow(id: string): Promise<void> {
@@ -515,9 +562,7 @@ export class MysqlStore {
   async loadAlurVerifikasi(): Promise<AlurVerifikasi[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM alur_verifikasi');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<AlurVerifikasi>(rows as Array<{ data: any }>, 'alur_verifikasi');
   }
 
   async deleteAlurVerifikasiRow(id: string): Promise<void> {
@@ -538,9 +583,7 @@ export class MysqlStore {
   async loadTemuanAudit(): Promise<TemuanAudit[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM temuan_audit');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<TemuanAudit>(rows as Array<{ data: any }>, 'temuan_audit');
   }
 
   async deleteTemuanAuditRow(id: string): Promise<void> {
@@ -561,9 +604,7 @@ export class MysqlStore {
   async loadRisiko(): Promise<Risiko[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM risiko');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<Risiko>(rows as Array<{ data: any }>, 'risiko');
   }
 
   async deleteRisikoRow(id: string): Promise<void> {
@@ -584,9 +625,7 @@ export class MysqlStore {
   async loadAset(): Promise<Aset[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM aset');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<Aset>(rows as Array<{ data: any }>, 'aset');
   }
 
   async deleteAsetRow(id: string): Promise<void> {
@@ -607,9 +646,7 @@ export class MysqlStore {
   async loadPerjanjianKinerja(): Promise<PerjanjianKinerja[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM perjanjian_kinerja');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<PerjanjianKinerja>(rows as Array<{ data: any }>, 'perjanjian_kinerja');
   }
 
   async deletePerjanjianKinerjaRow(id: string): Promise<void> {
@@ -630,9 +667,7 @@ export class MysqlStore {
   async loadLKjIP(): Promise<LKjIP[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM lkjip');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<LKjIP>(rows as Array<{ data: any }>, 'lkjip');
   }
 
   async deleteLKjIPRow(id: string): Promise<void> {
@@ -660,9 +695,7 @@ export class MysqlStore {
   async loadBaris(coll: string): Promise<unknown[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM baris WHERE coll = ?', [coll]);
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<unknown>(rows as Array<{ data: any }>, 'baris:' + coll);
   }
 
   // ===== Audit log (append-only) =====
@@ -684,9 +717,7 @@ export class MysqlStore {
       'SELECT data FROM audit_log ORDER BY waktu DESC LIMIT ?',
       [batas]
     );
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<AuditLog>(rows as Array<{ data: any }>, 'audit_log');
   }
 
   /** Pangkas audit log paling lama di atas `simpan` entri (batas atas, bukan 500). */
@@ -715,9 +746,7 @@ export class MysqlStore {
   async loadSnapshotKeuangan(): Promise<SnapshotKeuangan[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM snapshot_keuangan');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<SnapshotKeuangan>(rows as Array<{ data: any }>, 'snapshot_keuangan');
   }
 
   async deleteSnapshotKeuanganRow(id: string): Promise<void> {
@@ -739,9 +768,7 @@ export class MysqlStore {
   async loadDashboards(): Promise<Dashboard[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM dashboards ORDER BY seq DESC');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<Dashboard>(rows as Array<{ data: any }>, 'dashboards');
   }
 
   async deleteDashboardRow(id: string): Promise<void> {
@@ -764,9 +791,7 @@ export class MysqlStore {
   async loadChats(): Promise<Chat[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM chats ORDER BY updated_at DESC');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<Chat>(rows as Array<{ data: any }>, 'chats');
   }
 
   async deleteChatRow(id: string): Promise<void> {
@@ -788,9 +813,7 @@ export class MysqlStore {
   async loadTenants(): Promise<Tenant[]> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT data FROM tenants');
-    return (rows as Array<{ data: any }>).map((r) =>
-      typeof r.data === 'string' ? JSON.parse(r.data) : r.data
-    );
+    return uraiDaftar<Tenant>(rows as Array<{ data: any }>, 'tenants');
   }
 
   /** Hapus satu tenant dari tabel tenant khusus. */
@@ -815,11 +838,13 @@ export class MysqlStore {
   async loadAuthUsers(): Promise<Array<{ id: string; data: SafeUser; passHash: string | null }>> {
     if (!this.pool) return [];
     const [rows] = await this.pool.query('SELECT id, data, pass_hash FROM auth_users');
-    return (rows as Array<{ id: string; data: any; pass_hash: string | null }>).map((r) => ({
-      id: r.id,
-      data: typeof r.data === 'string' ? JSON.parse(r.data) : r.data,
-      passHash: r.pass_hash ?? null,
-    }));
+    const hasil: Array<{ id: string; data: SafeUser; passHash: string | null }> = [];
+    for (const r of rows as Array<{ id: string; data: any; pass_hash: string | null }>) {
+      const data = uraiData<SafeUser>(r.data, 'auth_users');
+      if (!data) continue;
+      hasil.push({ id: r.id, data, passHash: r.pass_hash ?? null });
+    }
+    return hasil;
   }
 
   /** Hapus satu user dari tabel auth khusus. */
@@ -907,9 +932,14 @@ export class MysqlStore {
     else if (arrays.lkjip) hasil.lkjip = arrays.lkjip as LKjIP[];
 
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
+    const kunciKv = ['shareTokens', 'sharePins', 'systemConfig', 'credentials', 'deletedTenantIds'];
     for (const row of kvRows as Array<{ k: string; data: any }>) {
+      // Hanya kunci yang dikenal yang diurai; baris lain (sisa versi lama) tidak
+      // boleh ikut menentukan hidup-matinya pemuatan state.
+      if (!kunciKv.includes(row.k)) continue;
       ada = true;
-      const val = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      const val = uraiData<any>(row.data, `kv:${row.k}`);
+      if (val === null) continue;
       if (row.k === 'shareTokens') hasil.shareTokens = val;
       if (row.k === 'sharePins') hasil.sharePins = val;
       if (row.k === 'systemConfig') hasil.systemConfig = val;

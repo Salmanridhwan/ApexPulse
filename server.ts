@@ -38,6 +38,7 @@ import { putusanJawaban } from './src/services/chat/jawaban';
 import { adalahSapaan } from './src/services/chat/sapaan';
 import { angkaTakBersumber, pesanAngkaTakBersumber } from './src/services/chat/angka';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
+import { daftarBarisRusak } from './src/services/store/mysqlStore';
 import {
   clearSessionCookieHeader,
   hashPassword,
@@ -545,6 +546,9 @@ async function startServer() {
       status: 'ok',
       db: db.persistenceActive,
       persistence: db.persistenceActive ? 'mysql' : 'file',
+      persistenceGalat: db.galatPersistence,
+      // Baris database yang gagal diurai — supaya kerusakan data tidak senyap.
+      barisRusak: daftarBarisRusak().map((b) => ({ ...b, cuplikan: b.cuplikan.slice(0, 16) })),
       uptimeDetik: Math.round(process.uptime()),
       memoriMB: Math.round((process.memoryUsage().rss / 1024 / 1024) * 10) / 10,
       dbMs: await db.pingMysql(),

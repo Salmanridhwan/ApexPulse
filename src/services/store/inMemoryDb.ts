@@ -373,6 +373,9 @@ export class InMemoryDb {
   // ================= MySQL (Laragon) =================
   private mysql: MysqlStore | null = null;
 
+  /** Alasan MySQL tidak dipakai saat boot — ditampilkan di /health. */
+  private galatMuat: string | null = null;
+
   /**
    * Snapshot untuk mirror ke MySQL.
    *
@@ -402,6 +405,11 @@ export class InMemoryDb {
   /** true bila mirror MySQL aktif — dipakai endpoint /health agar tidak hardcode. */
   public get persistenceActive(): boolean {
     return this.mysql !== null;
+  }
+
+  /** Pesan galat saat memuat state dari MySQL (null bila tidak ada masalah). */
+  public get galatPersistence(): string | null {
+    return this.galatMuat;
   }
 
   /**
@@ -506,6 +514,8 @@ export class InMemoryDb {
         '[AionesBoard DB] MySQL tidak tersedia — persistence fallback ke data/db.json:',
         err?.message || err
       );
+      // Disimpan supaya /health menyebut alasannya, bukan cuma "file".
+      this.galatMuat = String(err?.message || err);
       this.mysql = null;
     }
   }
