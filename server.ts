@@ -36,6 +36,7 @@ import {
 } from './src/services/chat/niat';
 import { putusanJawaban } from './src/services/chat/jawaban';
 import { adalahSapaan } from './src/services/chat/sapaan';
+import { angkaTakBersumber, pesanAngkaTakBersumber } from './src/services/chat/angka';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -1900,7 +1901,19 @@ async function startServer() {
 
           // Daftar sitasi TIDAK ditempel ke balasan: pengguna hanya butuh jawabannya.
           // Jumlah sitasi tetap dihitung dan dikirim sebagai metadata untuk log.
-          const replyText = answerBersih;
+
+          // Pemeriksaan angka: penjaga sumber memastikan ADA potongan dokumen,
+          // bukan bahwa angka di jawaban berasal dari potongan itu. Angka yang tak
+          // tertelusur diberi catatan jujur — tidak diblokir, karena sebagian angka
+          // sah hasil hitungan model (selisih/persentase) yang tak muncul apa adanya.
+          const angkaLepas = isSapaan
+            ? []
+            : angkaTakBersumber({
+                jawaban: answerBersih,
+                potongan: (ragResult.chunks || []).map((c: any) => c?.snippet || c?.text || c?.content || ''),
+                pertanyaan: prompt,
+              });
+          const replyText = answerBersih + pesanAngkaTakBersumber(angkaLepas);
 
           // Penjaga sumber: jawaban TANPA rujukan dokumen tidak ditampilkan untuk
           // pertanyaan data. Tanpa ini, model tetap bisa membalas kalimat umum saat
@@ -1938,6 +1951,7 @@ async function startServer() {
             actionTaken: 'qa_answer',
             modeUsed: 'Chatbot RAG',
             citationsCount,
+            angkaTanpaSumber: angkaLepas.map((a) => a.teks),
           } as any);
 
           sendEvent('result', {
@@ -1945,6 +1959,7 @@ async function startServer() {
             message: replyText,
             modeUsed: 'Chatbot RAG',
             citationsCount,
+            angkaTanpaSumber: angkaLepas.map((a) => a.teks),
             latencyMs: ragResult.latencyMs,
           });
           sendEvent('done', { ok: true });
