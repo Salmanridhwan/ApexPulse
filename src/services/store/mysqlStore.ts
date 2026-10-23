@@ -52,6 +52,19 @@ export function uraiData<T>(raw: any, tabel: string): T | null {
   }
 }
 
+/**
+ * Nilai mentah yang bisa dipulihkan tanpa menebak: teks polos tanpa sisa
+ * tanda JSON. Contoh nyata: kolom `data` berisi "tenant-1792583458105" —
+ * maksudnya jelas teks itu sendiri, hanya lupa di-JSON-kan.
+ */
+export function nilaiMentah(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const teks = raw.trim();
+  if (!teks) return null;
+  if (/[{["]/.test(teks)) return null;
+  return teks;
+}
+
 /** Urai banyak baris sekaligus, lewati yang rusak. */
 export function uraiDaftar<T>(rows: Array<{ data: any }>, tabel: string): T[] {
   const hasil: T[] = [];
@@ -694,8 +707,30 @@ export class MysqlStore {
 
   async loadBaris(coll: string): Promise<unknown[]> {
     if (!this.pool) return [];
-    const [rows] = await this.pool.query('SELECT data FROM baris WHERE coll = ?', [coll]);
-    return uraiDaftar<unknown>(rows as Array<{ data: any }>, 'baris:' + coll);
+    const [rows] = await this.pool.query('SELECT id, data FROM baris WHERE coll = ?', [coll]);
+    const hasil: unknown[] = [];
+    for (const r of rows as Array<{ id: string; data: any }>) {
+      if (typeof r.data !== 'string') {
+        if (r.data !== null && r.data !== undefined) hasil.push(r.data);
+        continue;
+      }
+      try {
+        hasil.push(JSON.parse(r.data));
+        continue;
+      } catch {
+        // jatuh ke pemulihan di bawah
+      }
+      const teks = nilaiMentah(r.data);
+      if (teks === null) {
+        catatBarisRusak('baris:' + coll, r.data.slice(0, 60), 'bukan JSON');
+        continue;
+      }
+      // Tulis ulang sebagai JSON sah supaya kerusakan tidak berulang tiap boot.
+      await this.upsertBaris(coll, r.id, teks);
+      hasil.push(teks);
+      console.log(`[AionesBoard DB] baris ${coll} (${r.id}) dipulihkan dari nilai mentah.`);
+    }
+    return hasil;
   }
 
   // ===== Audit log (append-only) =====

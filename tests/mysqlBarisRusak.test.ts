@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { daftarBarisRusak, uraiData, uraiDaftar } from '../src/services/store/mysqlStore';
+import { daftarBarisRusak, nilaiMentah, uraiData, uraiDaftar } from '../src/services/store/mysqlStore';
 
 /**
  * Kasus nyata di produksi: satu baris tabel berisi id mentah
@@ -46,4 +46,14 @@ test('JSON sah tetap diurai apa adanya', () => {
 test('nilai yang sudah berupa objek (kolom JSON mysql2) diteruskan', () => {
   const obj = { a: 1 };
   assert.equal(uraiData(obj, 'x'), obj);
+});
+
+test('teks polos dikenali sebagai nilai yang bisa dipulihkan', () => {
+  // Kasus nyata: kolom `data` tabel baris berisi id tanpa tanda kutip.
+  assert.equal(nilaiMentah('tenant-1792583458105'), 'tenant-1792583458105');
+  assert.equal(nilaiMentah('  token-abc  '), 'token-abc');
+  assert.equal(nilaiMentah('{"a":1'), null, 'sisa JSON rusak tidak ditebak');
+  assert.equal(nilaiMentah('[1,2'), null);
+  assert.equal(nilaiMentah('   '), null);
+  assert.equal(nilaiMentah(123), null);
 });
