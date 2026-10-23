@@ -38,7 +38,7 @@ const GAYA = `
   a{color:var(--biru);text-decoration:none}a:hover{text-decoration:underline}
   header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 28px;background:#fff;border-bottom:1px solid var(--garis)}
   header .merek{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em}
-  header .merek span.tanda{width:26px;height:26px;border-radius:8px;background:var(--biru);display:inline-block}
+  header .merek img{height:28px;width:auto;display:block}
   header nav{display:flex;gap:18px;font-size:14px;font-weight:600}
   main{max-width:1060px;margin:0 auto;padding:44px 24px 72px}
   h1{font-size:clamp(26px,4vw,38px);line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
@@ -75,7 +75,7 @@ function kerangka(judul: string, isi: string, kontak: Kontak): string {
 <title>${esc(judul)} — Aiones Boards</title>
 <style>${GAYA}</style></head><body>
 <header>
-  <div class="merek"><span class="tanda"></span> Aiones Boards</div>
+  <div class="merek"><img src="/brand/logo-lockup.png" alt="Aiones Boards" width="109" height="28"></div>
   <nav>
     <a href="/paket">Paket</a>
     <a href="/syarat-ketentuan">Syarat &amp; ketentuan</a>

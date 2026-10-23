@@ -321,14 +321,23 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       <header className="relative z-10 bg-surface/70 backdrop-blur-md border-b border-line px-6 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="auth-logo-pulse w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center font-bold text-sm tracking-wider">
-              AB
-            </div>
-            <span className="font-bold text-ink text-sm tracking-tight flex items-center gap-2">
-              Aiones Boards
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-chip bg-surface-2 text-ink-2 border border-line">
-                PORTAL BUMD
-              </span>
+            {/* Logo resmi: lockup navy untuk latar terang, versi putih untuk mode gelap. */}
+            <img
+              src="/brand/logo-lockup.png"
+              alt="Aiones Boards"
+              width={186}
+              height={48}
+              className="auth-logo-pulse h-8 w-auto dark:hidden"
+            />
+            <img
+              src="/brand/logo-lockup-terang.png"
+              alt="Aiones Boards"
+              width={186}
+              height={48}
+              className="auth-logo-pulse h-8 w-auto hidden dark:block"
+            />
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-chip bg-surface-2 text-ink-2 border border-line">
+              PORTAL BUMD
             </span>
           </div>
 

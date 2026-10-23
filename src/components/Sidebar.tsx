@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Activity,
   BarChart3,
   ClipboardCheck,
   Gauge,
@@ -143,21 +142,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={`h-14 border-b border-shell-line flex items-center shrink-0 ${isCollapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
         {!isCollapsed ? (
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center shrink-0">
-              <Activity className="w-4 h-4" />
-            </div>
+            {/* Sidebar selalu berlatar navy, jadi dipakai lockup versi putih. */}
+            <img
+              src="/brand/logo-lockup-terang.png"
+              alt="Aiones Boards"
+              width={140}
+              height={36}
+              className="h-6 w-auto shrink-0"
+            />
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm tracking-tight text-shell-ink leading-none">Aiones Boards</span>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-chip text-[9px] font-semibold bg-brand/25 text-brand-ink">Studio</span>
-              </div>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-chip text-[9px] font-semibold bg-brand/25 text-brand-ink">Studio</span>
               <p className="text-[10px] text-shell-ink-2 font-medium truncate mt-0.5">Dashboard Generator BUMD</p>
             </div>
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-control bg-brand text-on-brand flex items-center justify-center" title="Aiones Boards Studio">
-            <Activity className="w-4 h-4" />
-          </div>
+          <img
+            src="/brand/logo-mark-terang.png"
+            alt="Aiones Boards Studio"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+            title="Aiones Boards Studio"
+          />
         )}
       </div>
 

@@ -22,3 +22,6 @@ backups/
 
 # artefak uji E2E (tangkapan layar kegagalan)
 e2e-artifacts/
+# Logo resmi & favicon WAJIB ikut ter-commit: dipakai src/ dan index.html.
+!brand-src/*.png
+!public/brand/*.png

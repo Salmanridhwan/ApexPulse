@@ -470,7 +470,11 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
           <p className="font-semibold text-ink-2">{namaInstansi}</p>
           <p className="text-[11px] text-ink-3 mt-1">
             Setiap angka terikat sitasi dokumen resmi. Dibuat &amp; dikelola dengan{' '}
-            <span className="text-ink-3 font-medium">Aiones Boards</span>.
+            <span className="inline-flex items-center gap-1.5 align-middle">
+              <img src="/brand/logo-mark.png" alt="" width={14} height={14} className="h-3.5 w-3.5 dark:hidden" />
+              <img src="/brand/logo-mark-terang.png" alt="" width={14} height={14} className="h-3.5 w-3.5 hidden dark:block" />
+              <span className="text-ink-3 font-medium">Aiones Boards</span>
+            </span>.
           </p>
         </footer>
 
