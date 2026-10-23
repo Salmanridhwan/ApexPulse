@@ -37,7 +37,17 @@ type BalasanBerkas = {
   projectKms?: string | null;
   instansi?: string | null;
   catatan?: string;
+  /** Jumlah baris setelah saringan (bila paginasi aktif). */
+  total?: number;
+  /** Jumlah seluruh berkas sebelum saringan. */
+  totalSemua?: number;
+  limit?: number | null;
+  offset?: number;
+  adaLagi?: boolean;
 };
+
+/** Banyak baris per halaman daftar berkas. */
+const UKURAN_HALAMAN = 50;
 
 const LABEL_STATUS_RAG: Record<string, string> = {
   Terindeks: 'bg-pos/15 text-pos border-pos/30',
@@ -80,6 +90,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   const [pesan, setPesan] = useState<{ tipe: 'ok' | 'err'; teks: string } | null>(null);
   const [cari, setCari] = useState('');
   const [filterTipe, setFilterTipe] = useState('');
+  /** Nilai `cari` yang sudah tenang 300 ms — supaya tidak meminta server tiap ketukan. */
+  const [cariTertunda, setCariTertunda] = useState('');
+  const [memuatLagi, setMemuatLagi] = useState(false);
 
   // Form unggah
   const [panelUnggah, setPanelUnggah] = useState(false);
@@ -94,29 +107,53 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   const [seretAktif, setSeretAktif] = useState(false);
   const inputBerkas = useRef<HTMLInputElement | null>(null);
 
-  const muat = async () => {
-    setIsLoading(true);
+  /**
+   * Muat satu halaman berkas.
+   *
+   * `offset > 0` berarti "muat lebih banyak": hasilnya DIGABUNG ke daftar yang
+   * sudah ada, bukan menimpa. Saringan (`cari`/`tipe`) dikirim ke server supaya
+   * pencarian mencakup SELURUH berkas instansi, bukan hanya yang sudah dimuat.
+   */
+  const muat = async (offset = 0) => {
+    const halamanPertama = offset === 0;
+    if (halamanPertama) setIsLoading(true);
+    else setMemuatLagi(true);
     try {
       const qs = new URLSearchParams();
       // Instansi aktif dari sidebar. WAJIB dikirim: untuk admin, server memakai
       // tenantId ini; tanpa itu admin selalu melihat instansi miliknya sendiri.
       if (tenantId) qs.set('tenantId', tenantId);
-      const res = await fetch(`/api/berkas${qs.toString() ? `?${qs}` : ''}`);
+      if (cariTertunda.trim()) qs.set('cari', cariTertunda.trim());
+      if (filterTipe) qs.set('tipe', filterTipe);
+      qs.set('limit', String(UKURAN_HALAMAN));
+      qs.set('offset', String(offset));
+      const res = await fetch(`/api/berkas?${qs.toString()}`);
       const isi = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(isi?.error || 'Gagal memuat daftar berkas.');
-      setData(isi);
+      setData((sebelum) =>
+        !halamanPertama && sebelum
+          ? { ...isi, berkas: [...sebelum.berkas, ...(isi.berkas || [])] }
+          : isi
+      );
     } catch (err: any) {
-      setData(null);
+      if (halamanPertama) setData(null);
       setPesan({ tipe: 'err', teks: err.message || 'Gagal memuat daftar berkas.' });
     } finally {
       setIsLoading(false);
+      setMemuatLagi(false);
     }
   };
 
+  // Ketikan ditahan sebentar: satu permintaan per jeda, bukan per huruf.
   useEffect(() => {
-    void muat();
+    const t = setTimeout(() => setCariTertunda(cari), 300);
+    return () => clearTimeout(t);
+  }, [cari]);
+
+  useEffect(() => {
+    void muat(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, cariTertunda, filterTipe]);
 
   // Admin: buat/hubungkan project Ragkms untuk instansi aktif (KB RAG ikut dibuat KMS).
   const [sedangHubung, setSedangHubung] = useState(false);
@@ -663,6 +700,29 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Paginasi: sebutkan cakupan yang sedang dilihat supaya daftar tidak
+                tampak "hilang" padahal hanya belum dimuat. */}
+            {data && (data.total ?? 0) > 0 && (
+              <div className="mt-3 flex items-center justify-between gap-3 flex-wrap" data-testid="paginasi-berkas">
+                <p className="text-xs text-ink-3">
+                  Menampilkan {semuaBerkas.length} dari {data.total} berkas
+                  {typeof data.totalSemua === 'number' && data.totalSemua !== data.total
+                    ? ` (disaring dari ${data.totalSemua})`
+                    : ''}
+                </p>
+                {data.adaLagi && (
+                  <button
+                    onClick={() => void muat(semuaBerkas.length)}
+                    disabled={memuatLagi}
+                    className="text-xs font-medium px-3 py-1.5 rounded-control border border-line bg-surface-2 hover:bg-line text-ink-2 disabled:opacity-60 transition-colors"
+                    data-testid="muat-lagi-berkas"
+                  >
+                    {memuatLagi ? 'Memuat…' : `Muat ${UKURAN_HALAMAN} lagi`}
+                  </button>
+                )}
               </div>
             )}
 

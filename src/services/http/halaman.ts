@@ -43,3 +43,29 @@ export function potongHalaman<T>(
     offset,
   };
 }
+/**
+ * Sama seperti `potongHalaman`, tetapi URUTAN dipertahankan.
+ *
+ * `potongHalaman` membalik daftar karena dipakai log audit yang tersusun lama→baru.
+ * Daftar berkas sudah datang dalam urutan yang bermakna dari repositori dokumen;
+ * membaliknya akan mengacak urutan yang dilihat pengguna.
+ */
+export function potongUrut<T>(
+  semua: readonly T[],
+  limitMentah: unknown,
+  offsetMentah: unknown
+): HasilHalaman<T> {
+  const limit = Math.min(MAKS_LIMIT, Math.max(1, keAngka(limitMentah, 50)));
+  const offset = Math.max(0, keAngka(offsetMentah, 0));
+  return {
+    baris: semua.slice(offset, offset + limit),
+    total: semua.length,
+    limit,
+    offset,
+  };
+}
+
+/** Jumlah halaman yang masih tersisa setelah `offset + limit`. */
+export function adaLagiHalaman(total: number, offset: number, limit: number): boolean {
+  return offset + limit < total;
+}

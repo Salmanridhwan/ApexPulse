@@ -62,7 +62,7 @@ import {
   statusCadangan,
   statusUnggahanOffsite,
 } from './src/services/ops/backupTerjadwal';
-import { potongHalaman } from './src/services/http/halaman';
+import { adaLagiHalaman, potongHalaman, potongUrut } from './src/services/http/halaman';
 import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
@@ -3722,6 +3722,11 @@ async function startServer() {
       // Jujur: belum dipetakan. Jangan mengaku "0 berkas" seolah repo memang kosong.
       return res.json({
         berkas: [],
+        total: 0,
+        totalSemua: 0,
+        limit: null,
+        offset: 0,
+        adaLagi: false,
         ringkasan: berkasKosong(),
         terpetakan: false,
         organizationId: null,
@@ -3737,8 +3742,22 @@ async function startServer() {
       const cari = typeof req.query.cari === 'string' ? req.query.cari : '';
       const tipe = typeof req.query.tipe === 'string' ? req.query.tipe : '';
       const tersaring = cari || tipe ? saringBerkas(berkas, { cari, tipe }) : berkas;
+
+      // Paginasi hanya aktif bila klien meminta `limit`. Klien lama yang tidak
+      // mengirimnya tetap menerima seluruh daftar (perilaku lama), tetapi tetap
+      // diberi `total` supaya bisa menampilkan "x dari y".
+      // ponytail: instansi dengan ratusan dokumen membuat satu respons berisi
+      // seluruh baris — halaman jadi berat dan memori server naik tanpa guna.
+      const adaLimit = req.query.limit !== undefined && String(req.query.limit).trim() !== '';
+      const halaman = adaLimit ? potongUrut(tersaring, req.query.limit, req.query.offset) : null;
+
       res.json({
-        berkas: tersaring,
+        berkas: halaman ? halaman.baris : tersaring,
+        total: tersaring.length,
+        totalSemua: berkas.length,
+        limit: halaman ? halaman.limit : null,
+        offset: halaman ? halaman.offset : 0,
+        adaLagi: halaman ? adaLagiHalaman(halaman.total, halaman.offset, halaman.limit) : false,
         ringkasan: hitungRingkasanBerkas(berkas),
         terpetakan: true,
         cakupan: org,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { potongHalaman } from '../src/services/http/halaman';
+import { adaLagiHalaman, potongHalaman, potongUrut } from '../src/services/http/halaman';
 
 const data = Array.from({ length: 120 }, (_, i) => i + 1); // 1..120, terlama dulu
 
@@ -39,4 +39,29 @@ test('halaman: daftar kosong tetap aman', () => {
   const h = potongHalaman([], 20, 0);
   assert.deepEqual(h.baris, []);
   assert.equal(h.total, 0);
+});
+test('potongUrut: urutan asli dipertahankan (daftar berkas)', () => {
+  const berkas = ['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf', 'e.pdf'];
+  const h = potongUrut(berkas, 2, 0);
+  assert.deepEqual(h.baris, ['a.pdf', 'b.pdf']);
+  const lanjut = potongUrut(berkas, 2, 2);
+  assert.deepEqual(lanjut.baris, ['c.pdf', 'd.pdf']);
+  assert.equal(lanjut.total, 5);
+});
+
+test('potongUrut: halaman terakhir tidak mengulang baris sebelumnya', () => {
+  const berkas = Array.from({ length: 7 }, (_, i) => `berkas-${i}`);
+  const kumpulan: string[] = [];
+  for (let offset = 0; offset < 7; offset += 3) {
+    kumpulan.push(...potongUrut(berkas, 3, offset).baris);
+  }
+  assert.deepEqual(kumpulan, berkas, 'gabungan halaman = daftar utuh, tanpa duplikat');
+});
+
+test('adaLagiHalaman: hanya benar bila masih ada sisa', () => {
+  assert.equal(adaLagiHalaman(120, 0, 50), true);
+  assert.equal(adaLagiHalaman(120, 100, 50), false, 'offset+limit tepat di total');
+  assert.equal(adaLagiHalaman(120, 50, 50), true);
+  assert.equal(adaLagiHalaman(10, 0, 50), false, 'total lebih kecil dari satu halaman');
+  assert.equal(adaLagiHalaman(0, 0, 50), false);
 });
