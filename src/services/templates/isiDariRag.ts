@@ -30,8 +30,14 @@ export interface OpsiIsiTemplate {
   /** Knowledge base milik instansi aktif. */
   kbId?: string;
   rag: RagPengambilData;
-  /** Jumlah panggilan RAG serentak (default 6). */
+  /** Jumlah panggilan RAG serentak (default 8). */
   konkurensi?: number;
+  /**
+   * Anggaran waktu total (ms) untuk seluruh pengisian. Lewat dari ini, kartu
+   * yang belum sempat diproses ditandai kosong — bukan menggantung sampai
+   * proxy memutus koneksi (gejala "Failed to fetch" di browser).
+   */
+  batasMs?: number;
   /** Dipanggil setiap satu kartu selesai — untuk progres di UI. */
   onProgres?: (info: { selesai: number; total: number; judul: string; terisi: boolean }) => void;
 }
@@ -41,6 +47,8 @@ export interface HasilIsiTemplate {
   terisi: number;
   kosong: number;
   catatan: string[];
+  /** true bila anggaran waktu habis sebelum semua kartu selesai. */
+  kedaluwarsa: boolean;
 }
 
 /** Kueri per kartu: minta indikator persis kartu itu, jujur bila tidak ada. */
@@ -123,6 +131,29 @@ function kosongkan(w: WidgetSpec, alasan: string): WidgetSpec {
   return { ...kerangka(w), dataKosong: true, catatanData: alasan, citations: [] };
 }
 
+/** Penanda: panggilan dihentikan karena anggaran waktu habis. */
+const LEWAT = Symbol('lewat');
+
+/**
+ * Jalankan promise dengan batas waktu. Mengembalikan LEWAT (bukan melempar)
+ * supaya pemanggil bisa membedakan "tidak ada di dokumen" dari "kehabisan waktu".
+ */
+async function denganBatas<T>(kerja: Promise<T>, ms: number): Promise<T | typeof LEWAT> {
+  if (!Number.isFinite(ms)) return kerja;
+  if (ms <= 0) return LEWAT;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      kerja,
+      new Promise<typeof LEWAT>((selesai) => {
+        timer = setTimeout(() => selesai(LEWAT), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Jalankan tugas secara terbatas serentak, mempertahankan urutan hasil. */
 async function kumpulan<T, R>(
   item: T[],
@@ -156,14 +187,36 @@ export async function isiTemplateDariRag(
   const { sector, instansi, kbId, rag, konkurensi = 8, onProgres } = opsi;
   const total = template.widgets.length;
   let selesai = 0;
+  let kedaluwarsa = false;
   const catatan: string[] = [];
+  const mulai = Date.now();
+  const sisaMs = () =>
+    typeof opsi.batasMs === 'number' && opsi.batasMs > 0
+      ? opsi.batasMs - (Date.now() - mulai)
+      : Number.POSITIVE_INFINITY;
 
   const widgets = await kumpulan(template.widgets, konkurensi, async (w) => {
     let hasil: Awaited<ReturnType<RagPengambilData['ambilDataWidget']>> = null;
-    try {
-      hasil = await rag.ambilDataWidget(kueriWidget(w), sector, w.type, instansi, kbId);
-    } catch (err) {
-      catatan.push(`"${w.title}": ${err instanceof Error ? err.message : 'gagal mengambil data'}`);
+    let lewat = false;
+    const sisa = sisaMs();
+    if (sisa <= 0) {
+      lewat = true;
+      kedaluwarsa = true;
+    } else {
+      try {
+        const jawab = await denganBatas(
+          rag.ambilDataWidget(kueriWidget(w), sector, w.type, instansi, kbId),
+          sisa
+        );
+        if (jawab === LEWAT) {
+          lewat = true;
+          kedaluwarsa = true;
+        } else {
+          hasil = jawab;
+        }
+      } catch (err) {
+        catatan.push(`"${w.title}": ${err instanceof Error ? err.message : 'gagal mengambil data'}`);
+      }
     }
 
     selesai += 1;
@@ -201,8 +254,10 @@ export async function isiTemplateDariRag(
         dataKosong: false,
       };
     } else {
-      const alasan =
-        hasil?.alasan || 'Indikator ini tidak ditemukan di dokumen instansi.';
+      const alasan = lewat
+        ? 'Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.'
+        : hasil?.alasan || 'Indikator ini tidak ditemukan di dokumen instansi.';
+      if (lewat) catatan.push(`"${w.title}": waktu habis`);
       keluar = kosongkan(w, alasan);
     }
 
@@ -211,5 +266,5 @@ export async function isiTemplateDariRag(
   });
 
   const terisi = widgets.filter((w) => !w.dataKosong).length;
-  return { widgets, terisi, kosong: total - terisi, catatan };
+  return { widgets, terisi, kosong: total - terisi, catatan, kedaluwarsa };
 }

@@ -145,7 +145,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <p className="text-xs text-ink-2 mb-6 leading-relaxed">
               {searchQuery
                 ? 'Tidak ditemukan dashboard dengan kata kunci pencarian tersebut. Coba periksa kembali ejaan Anda.'
-                : 'Belum ada dashboard di kategori ini. Anda dapat membuat dashboard baru atau meminta bantuan AI RAG Copilot.'}
+                : 'Belum ada dashboard di kategori ini. Anda dapat membuat dashboard baru atau meminta bantuan asisten AI.'}
             </p>
             <div className="flex items-center justify-center gap-3">
               <button
@@ -158,7 +158,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                 onClick={onOpenChat}
                 className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
               >
-                Gunakan AI RAG
+                Gunakan Asisten AI
               </button>
             </div>
           </div>
@@ -207,7 +207,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       </h3>
                       <p className="text-xs text-ink-2 mt-1 line-clamp-2 leading-relaxed font-medium">
                         {dash.description ||
-                          'Dashboard intelijensi dan monitoring kinerja berbasis dokumen RAG BUMD.'}
+                          'Dashboard intelijensi dan monitoring kinerja berbasis dokumen resmi instansi.'}
                       </p>
                     </div>
 

@@ -16,6 +16,7 @@ import { BumdSector, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
+import { pesanGalatRamah } from '../services/ui/pesanGalat';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
@@ -84,6 +85,11 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
   /** Status pengambilan angka dari dokumen saat tombol "Pakai Template Ini" ditekan. */
   const [memuat, setMemuat] = useState(false);
+  /**
+   * Pesan galat untuk pengguna. Bahasa awam: tanpa istilah teknis (RAG, HTTP,
+   * timeout) — pengguna hanya perlu tahu apa yang terjadi dan apa yang bisa
+   * dilakukan.
+   */
   const [galat, setGalat] = useState<string | null>(null);
 
   const aktif = useMemo(
@@ -104,7 +110,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     try {
       await onUseTemplate(aktif);
     } catch (err) {
-      setGalat(err instanceof Error ? err.message : 'Gagal mengambil angka dari dokumen.');
+      setGalat(pesanGalatRamah(err));
+    } finally {
       setMemuat(false);
     }
   };
@@ -133,7 +140,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
               <span>
                 Pratinjau di bawah memakai <strong>angka contoh</strong> untuk memperlihatkan susunan
-                kartu. Setelah tombol ditekan, angka diganti dari dokumen RAG; kartu yang indikatornya
+                kartu. Setelah tombol ditekan, angka diambil dari dokumen resmi instansi; kartu yang indikatornya
                 belum ada di dokumen ditandai <strong>kosong</strong> (tanpa angka contoh).
               </span>
             </p>
@@ -241,17 +248,14 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             </button>
           </div>
 
-          {/* Galat jujur: layanan RAG tidak terhubung / dokumen tidak menjawab. */}
+          {/* Galat tetap ditampilkan, tetapi dengan bahasa awam — tanpa istilah
+              teknis yang tidak dipahami pengguna. */}
           {galat && (
             <div className="border-t border-neg/30 bg-neg/10 px-4 sm:px-5 py-3 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <p className="text-[11.5px] font-semibold text-neg">Gagal mengambil angka dari dokumen</p>
+                <p className="text-[11.5px] font-semibold text-neg">Dashboard belum bisa dibuat</p>
                 <p className="text-[11px] text-ink-2 mt-0.5 leading-relaxed">{galat}</p>
-                <p className="text-[10.5px] text-ink-3 mt-1 leading-relaxed">
-                  Tidak ada angka contoh yang ditampilkan. Periksa konfigurasi RAG (Admin → Konfigurasi RAG)
-                  lalu coba lagi.
-                </p>
               </div>
             </div>
           )}

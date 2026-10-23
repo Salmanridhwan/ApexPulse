@@ -358,7 +358,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
             <p className="text-sm font-semibold text-ink mb-1">Belum ada data kesehatan keuangan</p>
             <p className="text-xs text-ink-3 max-w-md mx-auto mb-5">
               {bisaTarikRag
-                ? 'Tarik komponen neraca & laba rugi dari dokumen (RAG) atau isi manual. Rasio dihitung otomatis.'
+                ? 'Tarik komponen neraca & laba rugi dari dokumen resmi instansi, atau isi manual. Rasio dihitung otomatis.'
                 : 'Isi komponen neraca & laba rugi untuk satu periode; rasio dihitung otomatis.'}
             </p>
             <button
@@ -606,7 +606,7 @@ export const KesehatanKeuanganPage: React.FC<KesehatanKeuanganPageProps> = ({
                     onClick={() => void tarikDariDokumen()}
                     disabled={sedangTarik}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-brand/40 text-brand-ink bg-brand/5 hover:bg-brand/10 rounded-control font-medium transition-colors disabled:opacity-50"
-                    title="Tarik angka dari dokumen lewat RAG (butuh provider HTTP aktif)"
+                    title="Tarik angka dari dokumen resmi instansi"
                   >
                     <Database className="w-3.5 h-3.5" />
                     {sedangTarik ? 'Menarik…' : 'Tarik dari Dokumen'}

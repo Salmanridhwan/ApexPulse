@@ -274,7 +274,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
+  /**
+ * Anggaran waktu pengisian angka template dari dokumen.
+ *
+ * ponytail: tiap kartu bisa memakan 30-60 detik (dokumen laporan tahunan ribuan
+ * halaman), dan dulu seluruh endpoint menunggu semuanya selesai. Proxy memutus
+ * koneksi lebih dulu, jadi browser hanya melihat "Failed to fetch" dan pengguna
+ * disuruh memeriksa konfigurasi RAG padahal RAG baik-baik saja. Sekarang total
+ * dibatasi di bawah ambang proxy, dan sisa kartu ditandai kosong.
+ */
+const BATAS_ISI_TEMPLATE_MS = 35_000;
+
+const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
   // Sembunyikan versi framework dari header respons (memudahkan penyerang
@@ -1165,7 +1176,15 @@ async function startServer() {
       const dasar = widgetDariTemplate(template, seed);
       const hasil = await isiTemplateDariRag(
         { ...template, widgets: dasar },
-        { sector: (req.body?.sector || tenant.sector || template.sektor) as BumdSector, instansi: tenant.name, kbId, rag: ragClient }
+        {
+          sector: (req.body?.sector || tenant.sector || template.sektor) as BumdSector,
+          instansi: tenant.name,
+          kbId,
+          rag: ragClient,
+          // Batas total: kartu yang belum sempat selesai ditandai kosong, jadi
+          // permintaan tidak menggantung sampai koneksi diputus proxy.
+          batasMs: BATAS_ISI_TEMPLATE_MS,
+        }
       );
 
       // Judul dashboard: buang penanda "(Contoh)" karena kini angkanya dari dokumen.
@@ -1201,16 +1220,14 @@ async function startServer() {
         kosong: hasil.kosong,
         total: template.widgets.length,
         catatan: hasil.catatan,
+        kedaluwarsa: hasil.kedaluwarsa,
       });
     } catch (err) {
-      // Layanan RAG tidak terhubung → jujur, tanpa angka contoh.
-      if (err instanceof RagServiceError) {
-        return res.status(502).json({
-          error: `Layanan dokumen tidak dapat dihubungi: ${err.message}`,
-          petunjuk: err.detail,
-        });
-      }
-      return res.status(500).json({ error: jelaskanError(err) });
+      // Rincian teknis hanya untuk log; pengguna menerima kalimat yang jelas.
+      console.error('[template] gagal membuat dashboard dari template:', jelaskanError(err));
+      return res.status(500).json({
+        error: 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.',
+      });
     }
   });
 
@@ -3688,7 +3705,6 @@ async function startServer() {
    */
   /** Batas tunggu daftar dokumen basis di halaman berkas (ms). */
   const BATAS_DAFTAR_BASIS_MS = 10_000;
-
   /**
    * Ambil daftar dokumen basis sekali jalan.
    *

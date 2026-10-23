@@ -569,7 +569,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
           <Info className="w-3.5 h-3.5 text-ink-3 shrink-0" />
           <span className="text-[11px] text-ink-2">
             Angka pada pratinjau hanya contoh bentuk tampilan. Saat ditekan Tambah, angkanya diambil
-            dari dokumen resmi instansi lewat RAG — tidak ada angka contoh yang ikut disimpan.
+            dari dokumen resmi instansi — tanpa angka contoh yang ikut disimpan.
           </span>
         </span>
 
@@ -589,7 +589,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
 
         {tanpaPenyaringan && (
           <span className="text-[11px] text-ink-3">
-            Ketersediaan per dokumen belum bisa dinilai karena RAG belum aktif — semua preset ditampilkan.
+            Ketersediaan per dokumen belum bisa dinilai karena layanan dokumen belum aktif — semua preset ditampilkan.
           </span>
         )}
 
@@ -601,7 +601,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
 
         {!tanpaPenyaringan && (ringkasan?.gagalDiperiksa ?? 0) > 0 && (
           <span className="text-[11px] text-warn" data-testid="peringatan-layanan-rag">
-            {ringkasan?.gagalDiperiksa} preset belum bisa dipastikan karena layanan RAG tidak menjawab
+            {ringkasan?.gagalDiperiksa} preset belum bisa dipastikan karena layanan dokumen tidak menjawab
             — akan diperiksa ulang otomatis.
           </span>
         )}
@@ -644,7 +644,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
                   Belum ada preset yang bisa dipastikan tersedia.
                 </p>
                 <p>
-                  Layanan RAG tidak menjawab (bukan berarti dokumennya kosong). Pemeriksaan akan
+                  Layanan dokumen tidak menjawab (bukan berarti dokumennya kosong). Pemeriksaan akan
                   dicoba lagi otomatis — tutup lalu buka katalog ini beberapa saat lagi.
                 </p>
               </>

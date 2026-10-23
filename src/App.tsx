@@ -456,7 +456,7 @@ export default function App() {
     });
     const isi = await res.json().catch(() => null);
     if (!res.ok || !isi?.dashboard) {
-      throw new Error(isi?.error || 'Gagal memuat angka dari dokumen instansi.');
+      throw new Error(isi?.error || 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.');
     }
     const newDash: Dashboard = isi.dashboard;
     setDashboards((prev) => [newDash, ...prev]);
