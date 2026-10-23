@@ -32,6 +32,7 @@ import {
   indikatorTambahWidget,
   hanyaKeteranganPeriode,
 } from './src/services/chat/niat';
+import { putusanJawaban } from './src/services/chat/jawaban';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import {
   clearSessionCookieHeader,
@@ -1863,6 +1864,36 @@ async function startServer() {
           // Daftar sitasi TIDAK ditempel ke balasan: pengguna hanya butuh jawabannya.
           // Jumlah sitasi tetap dihitung dan dikirim sebagai metadata untuk log.
           const replyText = answerBersih;
+
+          // Penjaga sumber: jawaban TANPA rujukan dokumen tidak ditampilkan untuk
+          // pertanyaan data. Tanpa ini, model tetap bisa membalas kalimat umum saat
+          // retrieval kosong (`sources: []`) dan pengguna mengira itu fakta instansi.
+          const putusan = putusanJawaban({
+            citationsCount,
+            jumlahPotongan: ragResult.chunks?.length || 0,
+            grounded: ragResult.grounded,
+            sapaan: isSapaan,
+            instansi: tenantChat?.name,
+          });
+          if (!putusan.tampilkan) {
+            const pesan = putusan.pesan || 'Dokumen instansi ini tidak memuat jawabannya.';
+            catatAsisten({
+              sender: 'system',
+              text: pesan,
+              actionTaken: 'no_source',
+              modeUsed: 'Chatbot RAG',
+              citationsCount: 0,
+            } as any);
+            sendEvent('result', {
+              actionTaken: 'no_source',
+              message: pesan,
+              modeUsed: 'Chatbot RAG',
+              citationsCount: 0,
+              latencyMs: ragResult.latencyMs,
+            });
+            sendEvent('done', { ok: true });
+            return res.end();
+          }
 
           catatAsisten({
             sender: 'system',
