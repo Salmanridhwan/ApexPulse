@@ -154,6 +154,28 @@ async function main() {
     assert(tautan.shareUrl?.startsWith('/share/'), 'shareUrl tidak berbentuk /share/<token>');
     catat('buat tautan bagikan', true, tautan.shareUrl);
 
+    // Kontrak paginasi daftar berkas: respons wajib menyebut total & adaLagi,
+    // dan limit benar-benar dipatuhi. Tanpa ini, daftar besar kembali membanjiri
+    // satu respons tanpa ada yang menyadarinya.
+    const rBerkas = await fetch(`${BASE}/api/berkas?limit=2&offset=0`, {
+      headers: { Cookie: cookie },
+    });
+    const jBerkas = await rBerkas.json();
+    assert(rBerkas.ok, `daftar berkas gagal: HTTP ${rBerkas.status}`);
+    assert(typeof jBerkas.total === 'number', 'respons /api/berkas tidak memuat total');
+    assert(typeof jBerkas.adaLagi === 'boolean', 'respons /api/berkas tidak memuat adaLagi');
+    // Lingkungan uji tidak punya kredensial repositori dokumen, jadi daftar bisa
+    // "belum terpetakan". Kontrak limit hanya dinilai bila pemetaan ada.
+    if (jBerkas.terpetakan) {
+      assert(jBerkas.limit === 2, `limit tidak dipatuhi: ${jBerkas.limit}`);
+      assert((jBerkas.berkas || []).length <= 2, 'halaman memuat lebih banyak baris dari limit');
+    }
+    catat(
+      'API berkas berpaginasi',
+      true,
+      `terpetakan=${jBerkas.terpetakan} total=${jBerkas.total} adaLagi=${jBerkas.adaLagi}`
+    );
+
     // ---- Bagian browser ----
     const execPath = cariChrome();
     browser = await puppeteer.launch({
@@ -214,6 +236,32 @@ async function main() {
     const sudahMasuk = await page.evaluate(() => !!localStorage.getItem('aionesboard_user'));
     assert(sudahMasuk, 'sesi tidak tercatat di browser setelah masuk');
     catat('masuk ke aplikasi', true, 'sidebar tampil');
+
+    // 3b. Halaman Manajemen Berkas: memakai pemuatan berpaginasi (limit/offset).
+    //     Isi daftar bisa kosong bila repositori dokumen belum dipetakan di
+    //     lingkungan uji — yang dinilai di sini halaman tetap tampil dan tidak
+    //     melempar galat runtime dengan bentuk respons baru.
+    await page.click('[data-testid="buka-manajemen-berkas"]');
+    await page.waitForSelector('[data-testid="halaman-manajemen-berkas"]', { timeout: 30_000 });
+    // Tiga keadaan sah: daftar terisi, daftar kosong, atau repositori belum
+    // dipetakan (lingkungan uji tanpa kredensial dokumen).
+    const keadaan = await page
+      .waitForFunction(
+        () =>
+          document.querySelector('[data-testid="baris-berkas"]') ||
+          document.querySelector('[data-testid="berkas-kosong"]') ||
+          document.querySelector('[data-testid="berkas-belum-terpetakan"]'),
+        { timeout: 30_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
+    assert(keadaan, 'halaman berkas tidak menampilkan daftar, keadaan kosong, maupun ajakan memetakan');
+    const label = await page.evaluate(() => {
+      if (document.querySelector('[data-testid="baris-berkas"]')) return 'daftar tampil';
+      if (document.querySelector('[data-testid="berkas-kosong"]')) return 'keadaan kosong tampil';
+      return 'repositori belum dipetakan';
+    });
+    catat('halaman manajemen berkas', true, label);
 
     // 4. Tautan bagikan terbuka untuk publik (tanpa cookie sesi).
     const halamanPublik = await browser.createBrowserContext();
