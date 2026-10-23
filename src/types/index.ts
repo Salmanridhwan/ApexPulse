@@ -476,7 +476,7 @@ export interface ChatMessage {
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_kb' | 'rag_error';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error';
   affectedWidgetId?: string;
   modeUsed?: 'Jalur A (LLM JSON)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;
