@@ -26,6 +26,7 @@ import {
   tandaiKatalog,
 } from './src/services/rag/kbKatalog';
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
+import { ambilHalaman, kumpulkanPotongan } from './src/services/rag/potonganDokumen';
 import {
   niatBuatDashboard,
   niatTambahWidget,
@@ -3909,10 +3910,63 @@ async function startServer() {
    * jadi yang ditampilkan adalah isi teks yang sudah terindeks, diambil lewat
    * /search lalu diurutkan menurut nomor potongan.
    */
+  /** Jumlah potongan per halaman pada pratinjau dokumen basis. */
+  const PER_HALAMAN_PRATINJAU = 20;
+
+  /** Normalkan judul berkas untuk pencocokan antar-repositori (tanpa ekstensi). */
+  function normalJudul(teks: string): string {
+    return String(teks || '')
+      .toLowerCase()
+      .replace(/\.[a-z0-9]{2,5}$/i, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Cari berkas asli dokumen basis di repositori instansi.
+   *
+   * Dokumen lama di basis dokumen sering tidak menyimpan `source_url`, sehingga
+   * tombol "lihat dokumen asli" tidak punya tujuan. Selama berkasnya ada di
+   * repositori (judul sama), tampilkan berkas aslinya — bukan teks hasil
+   * ekstraksi yang bisa terpotong.
+   */
+  async function cariBerkasAsliDiRepositori(
+    organizationId: string | null | undefined,
+    nama: string
+  ): Promise<string | null> {
+    if (!organizationId) return null;
+    const target = normalJudul(nama);
+    if (!target) return null;
+    try {
+      const daftar = await klienKms().daftarBerkas(organizationId);
+      const cocokPersis = daftar.find((b) => normalJudul(b.title) === target);
+      if (cocokPersis) return cocokPersis.id;
+      const cocokSebagian = daftar.find((b) => {
+        const t = normalJudul(b.title);
+        return t.length >= 6 && (t.includes(target) || target.includes(t));
+      });
+      return cocokSebagian?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Pratinjau dokumen yang hanya ada di basis dokumen instansi (belum ada
+   * berkasnya di repositori). RAG menyimpan potongan teks, bukan berkas asli —
+   * jadi yang ditampilkan adalah isi teks yang sudah terindeks.
+   *
+   * Dulu hanya dua kueri dengan `top_k: 50` dan seluruh potongan ditumpuk dalam
+   * satu halaman. Dua masalah: (1) retrieval mengembalikan potongan paling
+   * mirip, bukan seluruh isi dokumen, sehingga dokumen besar tampil terpotong;
+   * (2) halaman menjadi sangat panjang dan berat. Sekarang potongan dikumpulkan
+   * dari beberapa kueri penjelajah (lihat `potonganDokumen.ts`), di-dedupe,
+   * diurutkan menurut nomor potongan, dan ditampilkan per halaman.
+   */
   async function pratinjauBasis(req: Request, res: Response) {
     const session = requireAuth(req, res);
     if (!session) return;
-    const { tenant } = await konteksBerkas(req, session);
+    const { tenant, organizationId } = await konteksBerkas(req, session);
     const kb = String(tenant?.knowledgeBaseId || '').trim();
     const docId = String(req.params.id).replace(/^basis:/, '');
     if (!kb) return res.status(400).send('Instansi ini belum punya basis dokumen.');
@@ -3924,48 +3978,71 @@ async function startServer() {
     const dok = daftar?.dokumen.find((d) => d.id === docId);
     const nama = dok?.nama || docId;
 
-    const potongan = new Map<string, { isi: string; halaman?: number; bagian?: string }>();
-    // Kalau layanan basis menyimpan tautan berkas asli (source_url), pakai itu —
-    // pratinjau jadi berkas aslinya, bukan teks hasil ekstraksi.
-    let sumberAsli = '';
-    // Beberapa kueri supaya potongan yang relevan ikut terambil (RAG membatasi top_k).
-    const kueri = [nama.replace(/[_\-.]/g, ' '), `${nama.replace(/[_\-.]/g, ' ')} isi lengkap dokumen`];
-    for (const q of kueri) {
-      try {
+    const kumpulan = await kumpulkanPotongan({
+      kb,
+      docId,
+      nama,
+      jumlahKatalog: dok?.potongan,
+      panggil: async (kueri, topK) => {
         const r = await fetch(`${base}/search`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${kunci}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ knowledge_base_id: kb, query: q, top_k: 50 }),
+          body: JSON.stringify({ knowledge_base_id: kb, query: kueri, top_k: topK }),
           signal: AbortSignal.timeout(60000),
         });
-        const j: any = await r.json().catch(() => null);
-        for (const x of j?.data?.results || []) {
-          if (x.document_id !== docId) continue;
-          if (!sumberAsli && typeof x.source_url === 'string' && /^https?:/i.test(x.source_url)) sumberAsli = x.source_url;
-          if (!x.content) continue;
-          if (!potongan.has(x.chunk_id)) potongan.set(x.chunk_id, { isi: x.content, halaman: x.page, bagian: x.section });
-        }
-      } catch {
-        // kueri gagal: lanjutkan dengan potongan yang sudah ada
-      }
+        return r.json().catch(() => null);
+      },
+    });
+
+    // 1) Layanan basis menyediakan tautan berkas asli → pakai itu.
+    if (kumpulan.sumberAsli) return res.redirect(kumpulan.sumberAsli);
+
+    // 2) Berkas aslinya ada di repositori instansi → tampilkan berkas asli.
+    const kmsId = await cariBerkasAsliDiRepositori(organizationId, nama);
+    if (kmsId) {
+      const tenantQ = typeof req.query.tenantId === 'string' ? `?tenantId=${encodeURIComponent(req.query.tenantId)}` : '';
+      return res.redirect(`/api/berkas/${encodeURIComponent(kmsId)}/lihat${tenantQ}`);
     }
 
-    if (sumberAsli) return res.redirect(sumberAsli);
+    const diminta = Number(req.query.hlm) || 1;
+    const halaman = ambilHalaman(kumpulan.potongan, diminta, PER_HALAMAN_PRATINJAU);
+    const esc = (x: string) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const tenantQ = typeof req.query.tenantId === 'string' ? `&tenantId=${encodeURIComponent(req.query.tenantId)}` : '';
+    const tautanHalaman = (n: number) => `?hlm=${n}${tenantQ}`;
 
-    const urut = [...potongan.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const isi = urut.map(([, v]) => v.isi.trim()).join('\n\n');
-    const kurang = (dok?.potongan || 0) > urut.length;
+    const isiHalaman = halaman.isi
+      .map((p) => {
+        const label = [p.halaman ? `hlm. ${p.halaman}` : '', p.bagian || ''].filter(Boolean).join(' · ');
+        return `<section><div class="meta">${esc(label || 'potongan')}</div><pre>${esc(p.isi.trim())}</pre></section>`;
+      })
+      .join('\n');
+
+    const navigasi =
+      halaman.totalHalaman > 1
+        ? `<nav>${halaman.halaman > 1 ? `<a href="${tautanHalaman(halaman.halaman - 1)}">← Sebelumnya</a>` : '<span></span>'}
+<strong>Halaman ${halaman.halaman} dari ${halaman.totalHalaman}</strong>
+${halaman.halaman < halaman.totalHalaman ? `<a href="${tautanHalaman(halaman.halaman + 1)}">Berikutnya →</a>` : '<span></span>'}</nav>`
+        : '';
+
+    const catatanSebagian = kumpulan.sebagian
+      ? `<div class="note">Pratinjau memuat <b>${kumpulan.potongan.length} dari ${kumpulan.jumlahKatalog}</b> potongan yang terindeks. ` +
+        `Layanan basis dokumen hanya mengembalikan potongan yang cocok dengan kueri pencarian, jadi sebagian isi dokumen belum bisa ditampilkan di sini. ` +
+        `Berkas aslinya belum ada di repositori instansi.</div>`
+      : '';
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${esc(nama)}</title>
 <style>body{font-family:system-ui,Segoe UI,sans-serif;max-width:860px;margin:32px auto;padding:0 20px;color:#111;line-height:1.6}
-h1{font-size:18px;margin:0 0 4px}small{color:#666}pre{white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f7f7f8;border:1px solid #e5e5e5;border-radius:8px;padding:16px}
-.note{background:#fff8e1;border:1px solid #f0d68a;border-radius:8px;padding:10px 12px;font-size:12px;margin:12px 0}</style></head>
+h1{font-size:18px;margin:0 0 4px}small{color:#666}pre{white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f7f7f8;border:1px solid #e5e5e5;border-radius:8px;padding:14px;margin:4px 0 16px}
+.meta{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-top:12px}
+.note{background:#fff8e1;border:1px solid #f0d68a;border-radius:8px;padding:10px 12px;font-size:12px;margin:12px 0}
+nav{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #eee;padding-top:12px;margin-top:20px;font-size:13px}
+nav a{color:#0b62c4;text-decoration:none}nav a:hover{text-decoration:underline}</style></head>
 <body><h1>${esc(nama)}</h1>
-<small>${dok?.halaman ? `${dok.halaman} halaman · ` : ''}${urut.length}${dok?.potongan ? `/${dok.potongan}` : ''} potongan teks · basis dokumen instansi</small>
-${kurang ? '<div class="note">Pratinjau ini memuat sebagian potongan teks yang bisa diambil dari basis dokumen — berkas aslinya belum ada di repositori.</div>' : ''}
-${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum bisa diambil dari basis dokumen.</div>'}
+<small>${dok?.halaman ? `${dok.halaman} halaman · ` : ''}${kumpulan.potongan.length}${kumpulan.jumlahKatalog ? `/${kumpulan.jumlahKatalog}` : ''} potongan teks · basis dokumen instansi</small>
+${catatanSebagian}
+${isiHalaman || '<div class="note">Isi teks dokumen ini belum bisa diambil dari basis dokumen.</div>'}
+${navigasi}
 </body></html>`);
   }
 
