@@ -387,6 +387,67 @@ export class MysqlStore {
         INDEX idx_audit_waktu (waktu)
       ) ENGINE=InnoDB
     `);
+
+    /**
+     * Tabel hitungan percobaan (login & PIN tautan bagikan).
+     *
+     * Dulu hitungan hanya di memori proses: dengan dua host berbagi domain,
+     * penyerang yang diarahkan bergantian mendapat N× jatah percobaan. Satu
+     * baris = satu kunci (`ip:…`, `akun:…`, `pin:…`), `reset_pada` = epoch ms
+     * akhir jendela. Naikkan hitungan dilakukan atomik (satu statement) supaya
+     * dua host yang mencatat bersamaan tetap terhitung dua.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS percobaan_akses (
+        kunci VARCHAR(191) PRIMARY KEY,
+        jumlah INT NOT NULL DEFAULT 0,
+        reset_pada BIGINT NOT NULL,
+        INDEX idx_percobaan_reset (reset_pada)
+      ) ENGINE=InnoDB
+    `);
+  }
+
+  /** Baca hitungan percobaan untuk satu kunci (null bila belum ada). */
+  async bacaPercobaan(kunci: string): Promise<{ jumlah: number; resetPada: number } | null> {
+    if (!this.pool) return null;
+    const [rows] = await this.pool.query(
+      'SELECT jumlah, reset_pada FROM percobaan_akses WHERE kunci = ? LIMIT 1',
+      [kunci]
+    );
+    const row = (rows as Array<{ jumlah: number; reset_pada: number }>)[0];
+    if (!row) return null;
+    return { jumlah: Number(row.jumlah) || 0, resetPada: Number(row.reset_pada) || 0 };
+  }
+
+  /**
+   * Tambah satu percobaan gagal secara ATOMIK. Jendela yang sudah lewat
+   * dimulai ulang dari 1 (bukan diakumulasi selamanya).
+   */
+  async naikkanPercobaan(kunci: string, jendelaMs: number): Promise<{ jumlah: number; resetPada: number }> {
+    if (!this.pool) return { jumlah: 0, resetPada: 0 };
+    const sekarang = Date.now();
+    const resetBaru = sekarang + jendelaMs;
+    await this.pool.query(
+      `INSERT INTO percobaan_akses (kunci, jumlah, reset_pada) VALUES (?, 1, ?)
+       ON DUPLICATE KEY UPDATE
+         jumlah = IF(reset_pada <= ?, 1, jumlah + 1),
+         reset_pada = IF(reset_pada <= ?, VALUES(reset_pada), reset_pada)`,
+      [kunci, resetBaru, sekarang, sekarang]
+    );
+    const hasil = await this.bacaPercobaan(kunci);
+    return hasil || { jumlah: 1, resetPada: resetBaru };
+  }
+
+  /** Hapus hitungan (dipakai setelah percobaan berhasil). */
+  async hapusPercobaan(kunci: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM percobaan_akses WHERE kunci = ?', [kunci]);
+  }
+
+  /** Buang baris kedaluwarsa supaya tabel tidak tumbuh tanpa batas. */
+  async bersihkanPercobaanKedaluwarsa(): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM percobaan_akses WHERE reset_pada <= ?', [Date.now()]);
   }
 
   /** Tambah/perbarui SATU kewajiban lapor (upsert per-baris). */

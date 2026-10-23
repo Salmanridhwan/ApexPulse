@@ -49,6 +49,7 @@ import { AlertRule, BumdSector, ChatMessage, Dashboard, NotificationItem, Organi
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
+import { buatPembatasLintas } from './src/services/auth/pembatasLintas';
 import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -454,6 +455,36 @@ async function startServer() {
   // tidak praktis. Kunci: tautan + IP, supaya satu tautan bocor tidak bisa
   // ditebak beramai-ramai dari banyak alamat.
   const pembatasPin = buatPembatas(10, 15 * 60 * 1000);
+
+  /**
+   * Pembatas yang DIPAKAI route: hitungan bersama di MySQL (tabel
+   * `percobaan_akses`) supaya batas berlaku lintas instance, dengan pembatas
+   * memori di atas sebagai cadangan saat database tidak bisa dihubungi.
+   */
+  const simpanPercobaan = {
+    baca: (kunci: string) => db.percobaanBaca(kunci),
+    naikkan: async (kunci: string, jendelaMs: number) =>
+      (await db.percobaanNaikkan(kunci, jendelaMs)) || { jumlah: 0, resetPada: 0 },
+    hapus: (kunci: string) => db.percobaanHapus(kunci),
+  };
+  const pembatasIpLintas = buatPembatasLintas({
+    batas: 30,
+    jendelaMs: 15 * 60 * 1000,
+    simpan: simpanPercobaan,
+    cadangan: pembatasIp,
+  });
+  const pembatasAkunLintas = buatPembatasLintas({
+    batas: 10,
+    jendelaMs: 15 * 60 * 1000,
+    simpan: simpanPercobaan,
+    cadangan: pembatasAkun,
+  });
+  const pembatasPinLintas = buatPembatasLintas({
+    batas: 10,
+    jendelaMs: 15 * 60 * 1000,
+    simpan: simpanPercobaan,
+    cadangan: pembatasPin,
+  });
   setInterval(() => {
     pembatasIp.sapu();
     pembatasAkun.sapu();
@@ -504,6 +535,7 @@ async function startServer() {
       memoriMB: Math.round((process.memoryUsage().rss / 1024 / 1024) * 10) / 10,
       dbMs: await db.pingMysql(),
       cadangan: statusCadangan(daftarCadangan, Date.now(), 26, process.uptime() / 3600),
+      sinkronKonfigDetik: Number(process.env.CONFIG_REFRESH_SECONDS ?? 30),
       timestamp: Date.now(),
     });
   });
@@ -536,8 +568,8 @@ async function startServer() {
     // Batas percobaan: tanpa ini, kata sandi bisa ditebak otomatis tanpa henti.
     const kunciIp = `ip:${req.ip || 'lokal'}`;
     const kunciAkun = `akun:${cleanEmail}`;
-    const cekIp = pembatasIp.cek(kunciIp);
-    const cekAkun = pembatasAkun.cek(kunciAkun);
+    const cekIp = await pembatasIpLintas.cekLintas(kunciIp);
+    const cekAkun = await pembatasAkunLintas.cekLintas(kunciAkun);
     if (!cekIp.boleh || !cekAkun.boleh) {
       const tunggu = Math.max(cekIp.tungguDetik, cekAkun.tungguDetik);
       res.setHeader('Retry-After', String(tunggu));
@@ -556,14 +588,14 @@ async function startServer() {
     // untuk email tak dikenal & password salah (anti user-enumeration).
     const storedHash = user ? db.credentials[user.id] : undefined;
     if (!user || !storedHash || !verifyPassword(password, storedHash)) {
-      pembatasIp.gagal(kunciIp);
-      pembatasAkun.gagal(kunciAkun);
+      await pembatasIpLintas.gagalLintas(kunciIp);
+      await pembatasAkunLintas.gagalLintas(kunciAkun);
       return res.status(401).json({
         error: 'Email atau kata sandi tidak sesuai dengan kredensial instansi.',
       });
     }
-    pembatasIp.bersihkan(kunciIp);
-    pembatasAkun.bersihkan(kunciAkun);
+    await pembatasIpLintas.bersihkanLintas(kunciIp);
+    await pembatasAkunLintas.bersihkanLintas(kunciAkun);
 
     // Status keanggotaan diperiksa SETELAH kata sandi benar, supaya pesan
     // "menunggu persetujuan" tidak bisa dipakai menebak email mana yang terdaftar.
@@ -4383,7 +4415,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
    * Verifikasi PIN tautan edit tanpa mengubah apa pun. Dipakai halaman tautan
    * publik untuk membuka mode edit sebelum pengguna mulai menggeser widget.
    */
-  app.post('/api/share/:token/verifikasi-pin', (req: Request, res: Response) => {
+  app.post('/api/share/:token/verifikasi-pin', async (req: Request, res: Response) => {
     const token = req.params.token;
     const shareMeta = db.shareTokens[token] as any;
     if (!shareMeta) return res.status(404).json({ error: 'Tautan berbagi tidak ditemukan.' });
@@ -4398,7 +4430,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       });
     }
     const kunciPin = `pin:${token}:${req.ip || '-'}`;
-    const izin = pembatasPin.cek(kunciPin);
+    const izin = await pembatasPinLintas.cekLintas(kunciPin);
     if (!izin.boleh) {
       res.setHeader('Retry-After', String(izin.tungguDetik));
       return res.status(429).json({
@@ -4407,10 +4439,10 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       });
     }
     if (!verifyPassword(String(req.body?.pin || ''), hashPin)) {
-      pembatasPin.gagal(kunciPin);
+      await pembatasPinLintas.gagalLintas(kunciPin);
       return res.status(401).json({ error: 'PIN salah.', kode: 'PIN_SALAH' });
     }
-    pembatasPin.bersihkan(kunciPin);
+    await pembatasPinLintas.bersihkanLintas(kunciPin);
     res.json({ ok: true });
   });
 
@@ -4439,7 +4471,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
   /**
    * Edit widget lewat tautan publik (apabila mode 'editable').
    */
-  app.patch('/api/share/:token', (req: Request, res: Response) => {
+  app.patch('/api/share/:token', async (req: Request, res: Response) => {
     const token = req.params.token;
     const shareMeta = db.shareTokens[token] as any;
     const dashId = typeof shareMeta === 'object' && shareMeta ? shareMeta.dashboardId : shareMeta;
@@ -4461,7 +4493,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       });
     }
     const kunciPin = `pin:${token}:${req.ip || '-'}`;
-    const izin = pembatasPin.cek(kunciPin);
+    const izin = await pembatasPinLintas.cekLintas(kunciPin);
     if (!izin.boleh) {
       res.setHeader('Retry-After', String(izin.tungguDetik));
       return res.status(429).json({
@@ -4470,10 +4502,10 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
       });
     }
     if (!pinDikirim || !verifyPassword(pinDikirim, hashPin)) {
-      pembatasPin.gagal(kunciPin);
+      await pembatasPinLintas.gagalLintas(kunciPin);
       return res.status(401).json({ error: 'PIN tautan salah atau belum diisi.', kode: 'PIN_SALAH' });
     }
-    pembatasPin.bersihkan(kunciPin);
+    await pembatasPinLintas.bersihkanLintas(kunciPin);
     if (mode !== 'editable') {
       return res.status(403).json({ error: 'Tautan ini bersifat Read-Only dan tidak dapat diedit.' });
     }
@@ -5289,10 +5321,44 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     }
   }
 
+  /**
+   * Muat ulang `systemConfig` & daftar instansi dari MySQL secara berkala.
+   *
+   * Tanpa ini, instance yang tidak menerima permintaan simpan tetap memakai
+   * konfigurasi lama sampai di-restart (base URL/API key RAG baru, KB default,
+   * SMTP, instansi baru). Set `CONFIG_REFRESH_SECONDS=0` untuk mematikan.
+   */
+  function mulaiSinkronKonfigurasi(): () => void {
+    const detik = Number(process.env.CONFIG_REFRESH_SECONDS ?? 30);
+    if (!Number.isFinite(detik) || detik <= 0) {
+      console.log('[sinkron] pemuatan ulang konfigurasi dimatikan (CONFIG_REFRESH_SECONDS=0).');
+      return () => {};
+    }
+    let tik = 0;
+    const timer = setInterval(() => {
+      void db.muatUlangDariDatabase().then((berubah) => {
+        if (berubah.length > 0) {
+          console.log(`[sinkron] konfigurasi diperbarui dari database: ${berubah.join(', ')}`);
+        }
+      });
+      // Sekali per ~10 menit: buang baris hitungan percobaan yang jendelanya
+      // sudah lewat supaya tabel tidak tumbuh tanpa batas.
+      tik += 1;
+      if (tik % Math.max(1, Math.round(600 / detik)) === 0) {
+        void db.percobaanBersihkanKedaluwarsa();
+      }
+    }, detik * 1000);
+    timer.unref?.();
+    console.log(`[sinkron] konfigurasi & instansi dimuat ulang tiap ${detik} dtk dari database.`);
+    return () => clearInterval(timer);
+  }
+
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Aiones Boards Server] Berjalan pada port ${PORT}`);
     // Cadangan harian otomatis (produksi) — lihat docs/operasional.md.
     hentikanBackup = mulaiBackupTerjadwal();
+    // Perubahan konfigurasi dari instance lain langsung terpakai di sini.
+    hentikanSinkron = mulaiSinkronKonfigurasi();
   });
 
   // Batas waktu koneksi: header harus selesai 20 dtk, satu permintaan 2 mnt.
@@ -5301,6 +5367,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
   server.requestTimeout = 120_000;
   server.keepAliveTimeout = 65_000;
   let hentikanBackup: () => void = () => {};
+  let hentikanSinkron: () => void = () => {};
 
   // Graceful shutdown: tutup server & pool MySQL saat menerima SIGINT/SIGTERM.
   // Tanpa ini, proses tertinggal (orphan) ketika dijalankan lewat wrapper
@@ -5311,6 +5378,7 @@ ${isi ? `<pre>${esc(isi)}</pre>` : '<div class="note">Isi teks dokumen ini belum
     sedangTutup = true;
     console.log(`[Aiones Boards Server] Menerima ${sinyal} — menutup dengan rapi...`);
     hentikanBackup();
+    hentikanSinkron();
     // Berhenti menerima koneksi baru; paksa tutup setelah 5 dtk bila ada yang menggantung.
     server.close(() => {
       console.log('[Aiones Boards Server] Koneksi HTTP ditutup.');

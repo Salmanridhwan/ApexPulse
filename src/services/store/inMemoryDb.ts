@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { DbSnapshot, MysqlStore } from './mysqlStore';
+import { daftarBerubah, gabungKonfig, kunciKonfigBerubah } from './sinkronKonfig';
 import path from 'path';
 import {
   AlertRule,
@@ -893,6 +894,69 @@ export class InMemoryDb {
     this.trackWrite(this.mysql?.upsertBaris('systemConfig', 'utama', this.systemConfig));
     this.persist();
     return this.systemConfig;
+  }
+
+  /**
+   * Muat ulang konfigurasi & daftar instansi dari MySQL.
+   *
+   * Dipanggil berkala oleh server (lihat CONFIG_REFRESH_SECONDS) supaya
+   * perubahan yang disimpan di instance lain langsung terpakai di sini, tanpa
+   * restart. Mengembalikan daftar bagian yang berubah agar bisa dicatat di log;
+   * array kosong berarti tidak ada perubahan (atau MySQL tidak aktif).
+   */
+  /** Hitungan percobaan bersama (null bila MySQL tidak aktif → pemanggil pakai memori). */
+  public async percobaanBaca(kunci: string) {
+    return this.mysql ? this.mysql.bacaPercobaan(kunci) : null;
+  }
+
+  public async percobaanNaikkan(kunci: string, jendelaMs: number) {
+    if (!this.mysql) return null;
+    return this.mysql.naikkanPercobaan(kunci, jendelaMs);
+  }
+
+  public async percobaanHapus(kunci: string) {
+    if (this.mysql) await this.mysql.hapusPercobaan(kunci);
+  }
+
+  public async percobaanBersihkanKedaluwarsa() {
+    if (this.mysql) await this.mysql.bersihkanPercobaanKedaluwarsa();
+  }
+
+  public async muatUlangDariDatabase(): Promise<string[]> {
+    if (!this.mysql) return [];
+    const berubah: string[] = [];
+    try {
+      const konfigBaris = await this.mysql.loadBaris('systemConfig');
+      const konfigBaru = konfigBaris[0];
+      if (konfigBaru && typeof konfigBaru === 'object') {
+        const beda = kunciKonfigBerubah(
+          this.systemConfig as unknown as Record<string, unknown>,
+          konfigBaru as Record<string, unknown>
+        );
+        if (beda.length > 0) {
+          this.systemConfig = gabungKonfig(
+            this.systemConfig as unknown as Record<string, unknown>,
+            konfigBaru as Record<string, unknown>
+          ) as unknown as typeof this.systemConfig;
+          berubah.push(...beda.map((k) => `config.${k}`));
+        }
+      }
+
+      const tenantBaru = await this.mysql.loadTenants();
+      if (tenantBaru.length > 0) {
+        const bersih = this.deletedTenantIds.length
+          ? tenantBaru.filter((t) => !this.deletedTenantIds.includes(t.id))
+          : tenantBaru;
+        if (daftarBerubah(this.tenants, bersih)) {
+          this.tenants = bersih;
+          berubah.push('tenants');
+        }
+      }
+    } catch (err: any) {
+      // Database sesaat tidak bisa dibaca bukan alasan mematikan server.
+      console.warn('[AionesBoard DB] gagal memuat ulang konfigurasi:', err?.message || err);
+    }
+    return berubah;
   }
 
   // ================= Ketersediaan preset katalog =================
