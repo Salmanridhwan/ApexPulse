@@ -1327,7 +1327,7 @@ export class ConfigurableRagClient implements RagClient {
    * tidak ada (404/405), mengembalikan `jumlah: 0` dengan `catatan` yang jujur —
    * JANGAN diartikan "KB kosong" tanpa membedakan galat layanan.
    */
-  async daftarDokumen(kbId: string): Promise<{
+  async daftarDokumen(kbId: string, batasMs?: number): Promise<{
     kbId: string;
     jumlah: number;
     dokumen: Array<{
@@ -1356,7 +1356,12 @@ export class ConfigurableRagClient implements RagClient {
       };
     }
     const { dipakai } = await this.resolveBase(cfg);
-    const timeoutMs = Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 30000);
+    // `batasMs` dipakai pemanggil yang butuh daftar cepat (halaman repositori).
+    // Tanpa itu, empat dokumen besar bisa menahan halaman sampai 30 detik.
+    const timeoutMs =
+      batasMs && batasMs > 0
+        ? Math.min(batasMs, 30000)
+        : Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 30000);
     let res: Response;
     try {
       res = await fetch(`${dipakai}/knowledge?knowledge_base_id=${encodeURIComponent(kb)}`, {

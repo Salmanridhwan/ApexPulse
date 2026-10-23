@@ -64,6 +64,8 @@ import {
   statusUnggahanOffsite,
 } from './src/services/ops/backupTerjadwal';
 import { adaLagiHalaman, potongHalaman, potongUrut } from './src/services/http/halaman';
+import { adalahDokumenSambutan, gabungDokumenBasis } from './src/services/berkas/gabungBasis';
+import type { DokumenBasis } from './src/services/berkas/gabungBasis';
 import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
@@ -3680,40 +3682,25 @@ async function startServer() {
    * angka di halaman sama dengan isi basis — bukan cuma isi repositori.
    * Dokumen seperti ini belum punya salinan berkas, jadi tanpa pratinjau/unduh.
    */
-  async function gabungBerkasBasis(tenant: any, berkas: BerkasKMS[]): Promise<BerkasKMS[]> {
+  /** Batas tunggu daftar dokumen basis di halaman berkas (ms). */
+  const BATAS_DAFTAR_BASIS_MS = 10_000;
+
+  /**
+   * Ambil daftar dokumen basis sekali jalan.
+   *
+   * `null` = basis tidak terbaca (lambat/timeout/endpoint tidak ada). Pemanggil
+   * tetap menampilkan isi repositori + catatan jujur, bukan menunggu 30 detik.
+   */
+  async function ambilDokumenBasis(tenant: any): Promise<DokumenBasis[] | null> {
     const kb = String(tenant?.knowledgeBaseId || '').trim();
-    if (!kb) return berkas;
+    if (!kb) return null;
     try {
-      const hasil = await ragClient.daftarDokumen(kb);
-      // Nama di repositori = judul unggahan, sedangkan di basis = nama berkas asli.
-      // Cocokkan keduanya supaya berkas yang sama tidak tampil dua kali.
-      const namaDikenal = (b: BerkasKMS) => {
-        const dasar = String(b.fileUrl || '').split('/').pop() || '';
-        return [b.title, dasar, dasar.replace(/^doc-\d+-/, '')]
-          .map((x) => String(x || '').trim().toLowerCase())
-          .filter(Boolean);
-      };
-      const sudahAda = new Set(berkas.flatMap(namaDikenal));
-      const tambahan = hasil.dokumen
-        .filter((d) => !sudahAda.has(String(d.nama || '').trim().toLowerCase()))
-        // Dokumen sambutan repositori juga ikut terindeks ke basis — bukan dokumen instansi.
-        .filter((d) => !String(d.nama || '').startsWith('Info Project - '))
-        .map<BerkasKMS>((d) => ({
-          id: `basis:${d.id}`,
-          organizationId: '',
-          title: d.nama,
-          fileType: String(d.nama || '').split('.').pop()?.toUpperCase(),
-          uploadedAt: d.dibuat,
-          chunksCount: d.potongan,
-          halaman: d.halaman,
-          token: d.token,
-          ragStatus: d.status === 'completed' ? 'indexed' : d.status,
-          hanyaBasis: true,
-        }));
-      return [...berkas, ...tambahan];
+      const hasil = await ragClient.daftarDokumen(kb, BATAS_DAFTAR_BASIS_MS);
+      // `catatan` diisi layanan saat gagal/timeout — jangan dianggap "basis kosong".
+      if (hasil.catatan) return null;
+      return hasil.dokumen;
     } catch {
-      // Basis tak terjangkau: tampilkan isi repositori apa adanya, jangan gagal total.
-      return berkas;
+      return null;
     }
   }
 
@@ -3752,8 +3739,22 @@ async function startServer() {
     }
 
     try {
-      const mentah = await klienKms().daftarBerkas(org);
-      const berkas = cakupanAll ? mentah : await gabungBerkasBasis(tenant, tanpaDokumenSambutan(mentah));
+      // Repositori dan basis adalah dua sumber terpisah: jalankan bersamaan
+      // supaya halaman tidak menunggu dua kali lipat.
+      const [mentah, dokumenBasis] = await Promise.all([
+        klienKms().daftarBerkas(org),
+        cakupanAll ? Promise.resolve(null) : ambilDokumenBasis(tenant),
+      ]);
+      const gabung = cakupanAll
+        ? {
+            berkas: mentah,
+            jumlahBasis: 0,
+            jumlahSambutan: 0,
+            jumlahDitambah: 0,
+            catatan: undefined as string | undefined,
+          }
+        : gabungDokumenBasis(tanpaDokumenSambutan(mentah), dokumenBasis);
+      const berkas = gabung.berkas;
       const cari = typeof req.query.cari === 'string' ? req.query.cari : '';
       const tipe = typeof req.query.tipe === 'string' ? req.query.tipe : '';
       const tersaring = cari || tipe ? saringBerkas(berkas, { cari, tipe }) : berkas;
@@ -3780,6 +3781,8 @@ async function startServer() {
         pemetaanOtomatis: otomatis,
         projectKms: projectKms || null,
         instansi: tenant?.name || null,
+        dokumenBasis: { jumlah: gabung.jumlahBasis, sambutan: gabung.jumlahSambutan },
+        catatan: gabung.catatan,
       });
     } catch (err: any) {
       balasGalatKms(res, err);
@@ -3793,9 +3796,12 @@ async function startServer() {
     const { tenant, organizationId } = await konteksBerkas(req, session);
     if (!organizationId) return res.json({ ...berkasKosong(), terpetakan: false });
     try {
-      const mentah = await klienKms().daftarBerkas(organizationId);
-      const berkas = await gabungBerkasBasis(tenant, tanpaDokumenSambutan(mentah));
-      res.json({ ...hitungRingkasanBerkas(berkas), terpetakan: true });
+      const [mentah, dokumenBasis] = await Promise.all([
+        klienKms().daftarBerkas(organizationId),
+        ambilDokumenBasis(tenant),
+      ]);
+      const gabung = gabungDokumenBasis(tanpaDokumenSambutan(mentah), dokumenBasis);
+      res.json({ ...hitungRingkasanBerkas(gabung.berkas), terpetakan: true });
     } catch (err: any) {
       balasGalatKms(res, err);
     }
@@ -5108,7 +5114,12 @@ ${navigasi}
 
     try {
       const hasil = await ragClient.daftarDokumen(kb);
-      const namaSekarang = hasil.dokumen.map((d) => d.nama);
+      // Dokumen sambutan repositori ikut terindeks tetapi BUKAN berkas instansi.
+      // Menghitungnya membuat panel admin menulis "Berkas RAG: 5" sementara
+      // halaman repositori menampilkan 4 baris — terlihat seperti berkas hilang.
+      const namaSekarang = hasil.dokumen
+        .map((d) => d.nama)
+        .filter((n) => !adalahDokumenSambutan(n));
       const namaSebelum = Array.isArray(tenant.dokumenTerakhir) ? tenant.dokumenTerakhir : [];
       const belumPernahSinkron = namaSebelum.length === 0;
 
@@ -5122,7 +5133,7 @@ ${navigasi}
         : namaSebelum.filter((n) => !namaSekarang.includes(n));
 
       const diperbarui = await db.updateTenant(tenant.id, {
-        documentCount: hasil.jumlah,
+        documentCount: namaSekarang.length,
         dokumenTerakhir: namaSekarang,
         kbTersinkronPada: new Date().toISOString(),
       });
@@ -5131,7 +5142,7 @@ ${navigasi}
         tenantId: tenant.id,
         action: 'SINKRON RAG',
         target: `Instansi ${tenant.name} → KB ${kb}`,
-        details: `Jumlah dokumen: ${hasil.jumlah}${dokumenBaru.length ? ` · baru: ${dokumenBaru.length}` : ''}${
+        details: `Jumlah dokumen: ${namaSekarang.length}${dokumenBaru.length ? ` · baru: ${dokumenBaru.length}` : ''}${
           dokumenHilang.length ? ` · hilang: ${dokumenHilang.length}` : ''
         }`,
         userId: session.userId,

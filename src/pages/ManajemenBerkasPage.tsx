@@ -44,6 +44,8 @@ type BalasanBerkas = {
   limit?: number | null;
   offset?: number;
   adaLagi?: boolean;
+  /** Angka dokumen di basis RAG, dipakai menjelaskan selisih jumlah. */
+  dokumenBasis?: { jumlah: number; sambutan: number };
 };
 
 /** Banyak baris per halaman daftar berkas. */
@@ -597,6 +599,18 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                 </select>
               </div>
             </div>
+
+            {/* Selisih angka dengan panel admin dijelaskan di sini, bukan dibiarkan
+                terlihat seperti berkas yang hilang. */}
+            {data?.catatan && (
+              <div
+                className="mb-3 p-3 rounded-card border border-line bg-surface-2 text-[11px] text-ink-2 flex items-start gap-2"
+                data-testid="catatan-basis"
+              >
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ink-3" />
+                <span className="flex-1">{data.catatan}</span>
+              </div>
+            )}
 
             {berkasTampil.length === 0 ? (
               <div className="bg-surface p-10 rounded-card border border-line text-center" data-testid="berkas-kosong">
