@@ -16,6 +16,15 @@ export const PANJANG_MINIMAL = 10;
  */
 export const SANDI_BAWAAN_LAMA = ['apexpulse2026', 'aionesboard2026', 'demo123', 'password', '12345678'];
 
+/**
+ * Sandi bawaan akun admin yang berlaku sekarang.
+ *
+ * Sebelumnya aplikasi memaksa pengguna mengganti sandi saat login karena sandi
+ * bawaan dipakai bersama. Atas permintaan pemilik aplikasi kewajiban itu
+ * dihapus: akun admin memakai sandi tetap ini dan langsung bisa dipakai.
+ */
+export const SANDI_ADMIN_BAWAAN = 'Jagoai5758';
+
 /** true bila kata sandi termasuk sandi bawaan/umum (termasuk DEMO_PASSWORD di env). */
 export function adalahSandiBawaan(sandi: string): boolean {
   const daftar = [...SANDI_BAWAAN_LAMA];

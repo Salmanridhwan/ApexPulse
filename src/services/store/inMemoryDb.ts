@@ -29,6 +29,7 @@ import {
   WidgetSpec,
 } from '../../types';
 import { hashPassword, verifyPassword } from '../auth/session';
+import { SANDI_ADMIN_BAWAAN } from '../auth/password';
 import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
 import { normalisasiPeran } from '../laporan/alur';
 import { getFallbackDemoDashboard } from '../builder/fallback';
@@ -96,7 +97,8 @@ const SEED_USERS: SafeUser[] = [
 
 /** Password seed khusus per userId (selain default DEMO_PASSWORD). */
 const SEED_PASSWORDS: Record<string, string> = {
-  'user-admin-gmail': '123',
+  // Akun admin memakai sandi bawaan yang berlaku sekarang.
+  'user-admin-gmail': SANDI_ADMIN_BAWAAN,
   'user-user-gmail': '123',
 };
 
@@ -793,7 +795,7 @@ export class InMemoryDb {
 
   /** Password seed dari env DEMO_PASSWORD (default untuk demo lokal). */
   private seedCredentials() {
-    const demoPassword = process.env.DEMO_PASSWORD || 'aionesboard2026';
+    const demoPassword = process.env.DEMO_PASSWORD || SANDI_ADMIN_BAWAAN;
     for (const u of SEED_USERS) {
       this.credentials[u.id] = hashPassword(SEED_PASSWORDS[u.id] || demoPassword);
     }
@@ -845,15 +847,25 @@ export class InMemoryDb {
         this.users.push({ ...seed });
         berubah = true;
       }
-      if (SEED_PASSWORDS[seed.id]) {
-        if (!this.credentials[seed.id] || !verifyPassword(SEED_PASSWORDS[seed.id], this.credentials[seed.id])) {
-          this.credentials[seed.id] = hashPassword(SEED_PASSWORDS[seed.id]);
-          berubah = true;
-        }
-      } else if (!this.credentials[seed.id]) {
-        this.credentials[seed.id] = hashPassword(
-          process.env.DEMO_PASSWORD || 'aionesboard2026'
-        );
+      const sandiTarget =
+        SEED_PASSWORDS[seed.id] || process.env.DEMO_PASSWORD || SANDI_ADMIN_BAWAAN;
+      const hashLama = this.credentials[seed.id];
+      // Akun seed yang masih memakai sandi bawaan lama ("123", sandi demo lama)
+      // dipindahkan ke sandi yang berlaku sekarang, supaya satu sandi admin
+      // benar-benar bisa dipakai dan tidak ada akun yang tertinggal.
+      const masihSandiLama = hashLama
+        ? ['123', 'aionesboard2026', 'apexpulse2026'].some((lama) => verifyPassword(lama, hashLama))
+        : false;
+      if (!hashLama || masihSandiLama || !verifyPassword(sandiTarget, hashLama)) {
+        this.credentials[seed.id] = hashPassword(sandiTarget);
+        berubah = true;
+      }
+    }
+    // Kewajiban ganti sandi sudah dihapus: bersihkan tanda lama agar layar
+    // "wajib ganti sandi" tidak muncul lagi pada akun yang dibuat sebelumnya.
+    for (const u of this.users) {
+      if (u.mustChangePassword) {
+        u.mustChangePassword = false;
         berubah = true;
       }
     }

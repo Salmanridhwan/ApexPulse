@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { masalahKataSandi, kataSandiSementara, adalahSandiBawaan, PANJANG_MINIMAL } from '../src/services/auth/password';
+import {
+  masalahKataSandi,
+  kataSandiSementara,
+  adalahSandiBawaan,
+  PANJANG_MINIMAL,
+  SANDI_ADMIN_BAWAAN,
+} from '../src/services/auth/password';
 import { hashPassword, verifyPassword, signSession, verifySession, sessionCookieHeader } from '../src/services/auth/session';
 
 test('kata sandi: menolak terlalu pendek', () => {
@@ -17,6 +23,12 @@ test('kata sandi: menolak sandi bawaan/umum', () => {
   assert.match(String(masalahKataSandi('aionesboard2026')), /dipakai banyak orang/i);
   assert.equal(adalahSandiBawaan('AionesBoard2026'), true);
   assert.equal(adalahSandiBawaan('KucingOren92'), false);
+
+  // Sandi bawaan admin yang berlaku sekarang harus lolos aturan sandi, supaya
+  // akun admin bisa dipakai langsung tanpa dipaksa mengganti.
+  assert.equal(SANDI_ADMIN_BAWAAN, 'Jagoai5758');
+  assert.equal(masalahKataSandi(SANDI_ADMIN_BAWAAN), null, 'sandi admin sah menurut aturan');
+  assert.equal(adalahSandiBawaan(SANDI_ADMIN_BAWAAN), false, 'bukan sandi bawaan lama');
 });
 
 test('kata sandi: tidak boleh memuat bagian email', () => {

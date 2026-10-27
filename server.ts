@@ -55,7 +55,7 @@ import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { buatPembatasLintas } from './src/services/auth/pembatasLintas';
-import { adalahSandiBawaan, kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
+import { kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { dekripsiNilai } from './src/services/config/rahasia';
@@ -715,10 +715,10 @@ const app = express();
       });
     }
 
-    // Kata sandi bawaan lama (dipakai bersama oleh banyak akun) dianggap tidak
-    // sah sebagai sandi akhir → pengguna wajib menggantinya sebelum memakai
-    // aplikasi. Akun hasil reset admin juga ditandai lewat mustChangePassword.
-    const wajibGanti = user.mustChangePassword === true || adalahSandiBawaan(password);
+    // Kewajiban ganti sandi DIHAPUS (permintaan pemilik aplikasi): akun admin
+    // memakai sandi bawaan tetap dan langsung bisa dipakai, termasuk akun lama
+    // yang dulu ditandai mustChangePassword.
+    const wajibGanti = false;
 
     const token = signSession({
       userId: user.id,
@@ -776,11 +776,9 @@ const app = express();
 
   /** Terbitkan sesi + audit log untuk user yang sudah lolos verifikasi. */
   function terbitkanSesi(res: Response, user: SafeUser, cara: string) {
-    // Kata sandi bawaan lama (dipakai bersama oleh banyak akun) dianggap tidak
-    // sah sebagai sandi akhir → pengguna wajib menggantinya sebelum memakai
-    // aplikasi. Akun hasil reset admin juga ditandai lewat mustChangePassword.
-    // Login Google tidak memakai sandi lokal → hanya flag akun yang berlaku.
-    const wajibGanti = user.mustChangePassword === true;
+    // Kewajiban ganti sandi DIHAPUS (permintaan pemilik aplikasi), juga untuk
+    // akun yang masuk lewat Google.
+    const wajibGanti = false;
 
     const token = signSession({
       userId: user.id,
@@ -5359,10 +5357,10 @@ ${navigasi}
       avatar: req.body.role === 'admin' ? '👨‍💼' : '👩‍💼',
     };
     // Sandi awal = kata sandi sementara acak per akun (bukan sandi bersama yang
-    // tertulis di dokumentasi). Admin menyalinnya sekali dari respons ini, dan
-    // pengguna WAJIB menggantinya saat login pertama.
+    // tertulis di dokumentasi). Admin menyalinnya sekali dari respons ini;
+    // pengguna tidak lagi dipaksa menggantinya saat login pertama.
     const sandiAwal = kataSandiSementara();
-    db.createUser({ ...newUser, mustChangePassword: true }, hashPassword(sandiAwal));
+    db.createUser({ ...newUser, mustChangePassword: false }, hashPassword(sandiAwal));
     db.addAuditLog({
       tenantId: newUser.tenantId,
       userId: session.userId,
