@@ -124,7 +124,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
             <div className="min-w-0">
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-chip text-[9px] font-semibold bg-brand/25 text-brand-ink">Studio</span>
-              <p className="text-[10px] text-shell-ink-2 font-medium truncate mt-0.5">Dashboard Generator BUMD</p>
             </div>
           </div>
         ) : (
