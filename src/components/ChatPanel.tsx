@@ -15,6 +15,7 @@ import {
   Send,
   Sparkles,
   Table2,
+  Timer,
   Trash2,
   X,
 } from 'lucide-react';
@@ -176,7 +177,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (batal) return;
         setChatId(data.chat?.id);
         if (Array.isArray(data.chat?.messages) && data.chat.messages.length > 0) {
-          setMessages(data.chat.messages);
+          // Jangan timpa riwayat lokal dengan salinan server yang LEBIH PENDEK:
+          // balasan yang baru saja tampil bisa lenyap kalau penyimpanan di server
+          // sedikit tertinggal dari tampilan.
+          setMessages((prev) => (data.chat.messages.length >= prev.length ? data.chat.messages : prev));
         }
       } catch (err) {
         if (!batal) console.error('Gagal memuat riwayat chat:', err);
@@ -523,6 +527,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <p className="text-[11.5px] font-bold text-ink leading-snug">{s.judul}</p>
                         <p className="text-[10.5px] text-ink-2 leading-relaxed mt-0.5">{s.alasan}</p>
                         <p className="text-[10px] text-ink-3 leading-relaxed mt-0.5">{s.kapan}</p>
+                        {s.sumber && (
+                          <p className="text-[9.5px] text-pos mt-1 inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                            Angka dokumen: {s.sumber}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => setPratinjau(s)}
@@ -636,6 +646,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   );
                 })}
               </div>
+
+              {/* Estimasi selesai — supaya pengguna tahu harus menunggu berapa lama
+                  dan tidak mengira proses menggantung saat RAG lambat. */}
+              {(() => {
+                const est = currentSteps[idxLangkahAktif]?.estimasiDetik;
+                if (!est || !isStreaming) return null;
+                const sisa = Math.max(0, est - detik);
+                const menit = Math.floor(sisa / 60);
+                const detikSisa = sisa % 60;
+                return (
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-control bg-surface-2/70 border border-line/70 text-[11px] text-ink-2">
+                    <Timer className="w-3.5 h-3.5 text-brand shrink-0" />
+                    <span className="flex-1">
+                      {sisa > 0
+                        ? `Perkiraan selesai ± ${menit > 0 ? `${menit} mnt ${detikSisa} dtk` : `${detikSisa} dtk`} lagi`
+                        : 'Mendekati selesai — masih menunggu layanan dokumen'}
+                    </span>
+                    <span className="text-ink-3 tabular-nums">target ±{Math.round(est / 60)} mnt</span>
+                  </div>
+                );
+              })()}
 
               {/* Progress Line Bar — bergaris & alurnya bergerak supaya tetap terlihat hidup
                   walau persentasenya belum berubah (menunggu RAG bisa puluhan detik). */}

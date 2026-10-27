@@ -36,6 +36,17 @@ export interface RagQueryOptions {
    */
   strictGrounding?: boolean;
   timeoutMs?: number;
+  /**
+   * SAPUAN MENYELURUH: bangun dashboard dari SELURUH isi basis dokumen, bukan
+   * dari potongan teratas satu permintaan.
+   *
+   * Layanan RAG membatasi jumlah sumber per permintaan (~16) dan TIDAK
+   * mengirim teks potongan balik ke aplikasi, jadi "membaca semua dokumen"
+   * hanya bisa dilakukan dengan menyapu tiap area secara terpisah lalu
+   * menggabungkan hasilnya. Dipakai jalur pembuat dashboard; jangan dipakai
+   * untuk tanya-jawab biasa (mahal dan lambat).
+   */
+  sapuanPenuh?: boolean;
 }
 
 export interface RagResult {
@@ -56,6 +67,12 @@ export interface RagResult {
 
 export interface RagClient {
   query(options: RagQueryOptions): Promise<RagResult>;
+  /**
+   * Apakah hasil sapuan penuh untuk KB ini masih tersimpan (belum kedaluwarsa)?
+   * Dipakai untuk memberi estimasi waktu yang jujur ke pengguna: cache tersimpan
+   * = di bawah satu menit, tanpa cache = beberapa menit.
+   */
+  adaCacheSapuan?(kbId?: string, sector?: string): boolean;
   /**
    * Daftar dokumen di sebuah knowledge base (untuk panel admin).
    * Dipakai supaya saat KB ID dimasukkan, admin langsung tahu ADA BERAPA dokumen
@@ -159,7 +176,7 @@ export interface RagClient {
     tipe: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null>;
 
   /**

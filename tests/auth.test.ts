@@ -55,7 +55,7 @@ test('sesi: tanda tangan sah, rusak ditolak', () => {
 });
 
 test('sesi: penanda wajib ganti sandi ikut di token', () => {
-  const token = signSession({ userId: 'u2', role: 'analis', tenantId: 't1', name: 'Uji', mustChange: true });
+  const token = signSession({ userId: 'u2', role: 'pengguna', tenantId: 't1', name: 'Uji', mustChange: true });
   assert.equal(verifySession(token)?.mustChange, true);
 });
 

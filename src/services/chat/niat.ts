@@ -24,18 +24,37 @@ const OBJEK = /(?:^|[^a-z])(?:dashboard|dashboards|dashboardnya|kanvas|canvas|kp
 const TANYA = /(?:^|[^a-z])(?:apa|apakah|bagaimana|gimana|cara|kenapa|mengapa|berapa|siapa|kapan|dimana|mana)(?:[^a-z]|$)/i;
 
 /**
+ * Jawaban SINGKAT yang menyetujui tawaran sebelumnya: "oke buatkan",
+ * "ya silakan buatkan", "sip gas bikin".
+ *
+ * Dulu pesan seperti ini TIDAK dianggap perintah dashboard (tidak menyebut kata
+ * "dashboard"), sehingga jatuh ke jalur tanya-jawab, kena batas waktu RAG, dan
+ * dashboard tidak pernah dibuat — pengguna melihat balasan "berhenti".
+ */
+const KONFIRMASI_BUAT =
+  /^\s*(?:oke|ok|okey|okay|ya|yah|yup|sip|siap|boleh|silakan|silahkan|gas|lanjut|ayo|mangga|monggo|setuju|betul|benar|baik|good)[\s,.:!-]*(?:\S+\s+){0,3}?(?:buat(?:kan|in)?|bikin(?:kan)?|generate|kerjakan|eksekusi|lanjutkan)\b/i;
+
+/** Pesan yang HANYA berisi kata perintah: "buatkan", "gas", "lanjut". */
+const HANYA_PERINTAH =
+  /^\s*(?:oke\s+|ya\s+|sip\s+)?(?:buat(?:kan|in)?|bikin(?:kan)?|gas|lanjut(?:kan)?|kerjakan|eksekusi)(?:\s+(?:saja|aja|dong|ya|deh))?\s*[.!]*\s*$/i;
+
+/**
  * Apakah pesan meminta dashboard dibuat/diperbarui?
  *
  * Perintah + objek, dan BUKAN pertanyaan. Contoh yang HARUS true:
  *   "buatkan dashboard", "oke buatkan saya dashboardnya",
  *   "saya ingin kamu membuatkan saya dashboard ... 15-20 widget",
- *   "perbarui dashboard", "bikin kanvas baru".
+ *   "perbarui dashboard", "bikin kanvas baru",
+ *   "oke buatkan" (menyetujui tawaran asisten sebelumnya), "buatkan".
  * Contoh yang HARUS false (pertanyaan):
  *   "bagaimana cara buat dashboard?", "apa itu dashboard?".
  */
 export function niatBuatDashboard(prompt: unknown): boolean {
   const teks = String(prompt || '').toLowerCase();
   if (!teks.trim()) return false;
+  // Konfirmasi singkat diperiksa lebih dulu: kalimatnya tidak menyebut objek
+  // ("dashboard") karena objeknya ada di pesan asisten sebelumnya.
+  if (KONFIRMASI_BUAT.test(teks) || HANYA_PERINTAH.test(teks)) return true;
   if (TANYA.test(teks)) return false;
   return PERINTAH.test(teks) && OBJEK.test(teks);
 }

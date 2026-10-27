@@ -96,8 +96,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
   const [alurNama, setAlurNama] = useState('');
   const [alurDefault, setAlurDefault] = useState(false);
   const [alurTahap, setAlurTahap] = useState<TahapAlur[]>([
-    { urutan: 1, nama: 'Verifikasi', peran: 'analis' },
-    { urutan: 2, nama: 'Persetujuan', peran: 'direksi' },
+    { urutan: 1, nama: 'Verifikasi', peran: 'pengguna' },
   ]);
 
   const muatKewajiban = async () => {
@@ -246,8 +245,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
     setAlurNama('');
     setAlurDefault(false);
     setAlurTahap([
-      { urutan: 1, nama: 'Verifikasi', peran: 'analis' },
-      { urutan: 2, nama: 'Persetujuan', peran: 'direksi' },
+      { urutan: 1, nama: 'Verifikasi', peran: 'pengguna' },
     ]);
     setIsAlurOpen(true);
   };
@@ -706,7 +704,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                   tuntas. Laporan baru otomatis memakai alur <strong>default</strong>; bila instansi
                   belum punya alur, sistem memakai alur bawaan
                   {' '}
-                  <strong>Verifikasi (analis) → Persetujuan (direksi)</strong>.
+                  <strong>Verifikasi (pengguna)</strong>.
                 </div>
                 {alur.length === 0 ? (
                   <div className="text-center py-10">
@@ -1129,7 +1127,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                       setAlurTahap((prev) =>
                         prev.length >= 5
                           ? prev
-                          : [...prev, { urutan: prev.length + 1, nama: '', peran: 'analis' }]
+                          : [...prev, { urutan: prev.length + 1, nama: '', peran: 'pengguna' }]
                       )
                     }
                     disabled={alurTahap.length >= 5}
@@ -1167,8 +1165,7 @@ export const PelaporanPage: React.FC<PelaporanPageProps> = ({ tenantId, onBackTo
                         }
                         className="px-2 py-1.5 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                       >
-                        <option value="analis">Analis</option>
-                        <option value="direksi">Direksi</option>
+                        <option value="pengguna">Pengguna</option>
                         <option value="admin">Admin</option>
                       </select>
                       <button

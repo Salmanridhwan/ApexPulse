@@ -72,7 +72,8 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
-import { adalahPermintaanSaran, indikatorDariPrompt, susunSaranChart } from './src/services/chat/saranChart';
+import { adalahPermintaanSaran, dataDariWidget, indikatorDariPrompt, susunSaranChart } from './src/services/chat/saranChart';
+import { adalahPertanyaanDokumen, susunJawabanDokumen } from './src/services/chat/dokumen';
 import { generateInsightPresentasi } from './src/services/presentasi/generateInsight';
 import { susunSlide, VERSI_PRESENTASI } from './src/services/presentasi/slide';
 import { GoogleAuthError, verifikasiIdTokenGoogle } from './src/services/auth/google';
@@ -279,12 +280,25 @@ async function startServer() {
  * Anggaran waktu pengisian angka template dari dokumen.
  *
  * ponytail: tiap kartu bisa memakan 30-60 detik (dokumen laporan tahunan ribuan
- * halaman), dan dulu seluruh endpoint menunggu semuanya selesai. Proxy memutus
- * koneksi lebih dulu, jadi browser hanya melihat "Failed to fetch" dan pengguna
- * disuruh memeriksa konfigurasi RAG padahal RAG baik-baik saja. Sekarang total
- * dibatasi di bawah ambang proxy, dan sisa kartu ditandai kosong.
+ * halaman). Anggaran 35 detik ternyata terlalu pendek: 18 kartu tidak mungkin
+ * selesai, sehingga SELURUH kanvas tampil "Belum ada di dokumen". Sekarang
+ * 900 detik (15 menit). Pengguna meminta: kalau angkanya ADA di dokumen, tunggu
+ * sampai semua kartu terisi. Kartu yang gagal karena layanan sibuk (429/timeout)
+ * diulang satu per satu sampai berhasil; yang dokumennya memang tidak memuat
+ * indikator itu berhenti lebih awal, jadi batas ini hanya jaring pengaman.
  */
-const BATAS_ISI_TEMPLATE_MS = 35_000;
+const BATAS_ISI_TEMPLATE_MS = 900_000;
+
+/**
+ * Progres pengisian template per pekerjaan (jobId), dibaca UI lewat polling.
+ *
+ * Pengisian bisa 5–15 menit; tanpa progres, halaman tampak menggantung dan
+ * pengguna menutupnya di tengah jalan — kartu jadi kosong.
+ */
+const progresTemplate = new Map<
+  string,
+  { selesai: number; total: number; terisi: number; judul: string; mulai: number }
+>();
 
 /**
  * ponytail: tab yang dibiarkan terbuka terus menjalankan bundel JS lama, jadi
@@ -760,7 +774,7 @@ const app = express();
   /**
    * REGISTRASI akun baru (email + kata sandi).
    *
-   * Akun baru dibuat dengan peran 'analis' dan instansi default. Untuk mencegah
+   * Akun baru dibuat dengan peran 'pengguna' dan instansi default. Untuk mencegah
    * penyalahgunaan, pendaftaran bisa ditutup lewat env `ALLOW_REGISTRATION=false`.
    */
   app.post('/api/auth/register', async (req: Request, res: Response) => {
@@ -810,7 +824,7 @@ const app = express();
       id: `user-${Date.now()}`,
       email,
       name,
-      role: 'analis',
+      role: 'pengguna',
       tenantId,
       avatar: '👤',
       status: 'pending',
@@ -841,7 +855,7 @@ const app = express();
    *
    * Klien mengirim ID token dari Google Identity Services; server memverifikasi
    * tanda tangannya ke kunci publik Google. Bila email belum terdaftar, akun
-   * dibuat otomatis (peran 'analis', instansi default) — jadi "Masuk dengan
+   * dibuat otomatis (peran 'pengguna', instansi default) — jadi "Masuk dengan
    * Google" sekaligus berfungsi sebagai pendaftaran.
    */
   app.post('/api/auth/google', async (req: Request, res: Response) => {
@@ -883,6 +897,7 @@ const app = express();
         return res.status(400).json({
           error: 'Pilih instansi Anda sebelum mendaftar dengan Google.',
           kode: 'BUTUH_INSTANSI',
+          email: profil.email,
           instansiTersedia: db.tenants.map((t) => ({ id: t.id, name: t.name })),
         });
       }
@@ -890,7 +905,7 @@ const app = express();
         id: `user-g-${profil.sub || Date.now()}`,
         email: profil.email,
         name: profil.name,
-        role: 'analis',
+        role: 'pengguna',
         tenantId: instansiTujuan.id,
         avatar: profil.picture || '👤',
         googleSub: profil.sub,
@@ -924,6 +939,43 @@ const app = express();
 
     const statusGoogle = user.status || 'active';
     if (statusGoogle !== 'active') {
+      /**
+       * Akun yang masih MENUNGGU PERSETUJUAN boleh memperbaiki instansi tujuan.
+       *
+       * Tanpa ini, pilihan "Instansi BUMD" pada tombol Google tampak tidak
+       * berpengaruh untuk akun pending: server selalu membalas instansi lama,
+       * sehingga pendaftar yang salah pilih tidak punya jalan keluar selain
+       * meminta admin menghapus akunnya. Hanya berlaku selama status `pending`
+       * (belum aktif), jadi tidak ada data instansi yang bisa dipindah sembarangan.
+       */
+      if (statusGoogle === 'pending') {
+        const tenantIdBaru = String(req.body?.tenantId || '').trim();
+        const instansiBaru = tenantIdBaru ? db.tenants.find((t) => t.id === tenantIdBaru) : undefined;
+        const tenantSekarang = user.requestedTenantId || user.tenantId;
+        if (instansiBaru && instansiBaru.id !== tenantSekarang) {
+          const diperbarui = db.updateUser(user.id, {
+            tenantId: instansiBaru.id,
+            requestedTenantId: instansiBaru.id,
+            requestedAt: new Date().toISOString(),
+          } as any);
+          if (diperbarui) user = diperbarui;
+          db.addAuditLog({
+            tenantId: instansiBaru.id,
+            userId: user.id,
+            userName: user.name,
+            action: 'Ubah Instansi Pendaftaran (menunggu persetujuan)',
+            target: instansiBaru.name,
+            details: `Pendaftar ${user.email} memilih instansi lain selagi menunggu persetujuan.`,
+          });
+          return res.status(202).json({
+            status: 'pending',
+            email: user.email,
+            tenantId: instansiBaru.id,
+            tenantName: instansiBaru.name,
+            message: `Instansi pendaftaran Anda diperbarui menjadi ${instansiBaru.name}. Akun masih menunggu persetujuan admin instansi tersebut.`,
+          });
+        }
+      }
       const namaInstansiG = db.tenants.find((t) => t.id === (user!.requestedTenantId || user!.tenantId))?.name;
       return res.status(403).json({
         error:
@@ -931,7 +983,9 @@ const app = express();
             ? `Akun Google Anda terdaftar dan masih menunggu persetujuan admin ${namaInstansiG || 'instansi'}.`
             : 'Pendaftaran akun Anda ditolak. Hubungi admin instansi untuk informasi lebih lanjut.',
         kode: statusGoogle === 'pending' ? 'PENDING_APPROVAL' : 'ACCOUNT_REJECTED',
+        email: user!.email,
         tenantName: namaInstansiG || null,
+        tenantId: user!.requestedTenantId || user!.tenantId || null,
       });
     }
 
@@ -1198,11 +1252,22 @@ const app = express();
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    // jobId dipakai UI untuk membaca progres pengisian (polling) selama menunggu.
+    const jobId = String(req.body?.jobId || '').trim();
 
     try {
       // Salin widget template (id baru & segar) lalu isi angkanya dari dokumen.
       const seed = Date.now();
       const dasar = widgetDariTemplate(template, seed);
+      if (jobId) {
+        progresTemplate.set(jobId, {
+          selesai: 0,
+          total: dasar.length,
+          terisi: 0,
+          judul: 'Menyiapkan permintaan ke dokumen…',
+          mulai: Date.now(),
+        });
+      }
       const hasil = await isiTemplateDariRag(
         { ...template, widgets: dasar },
         {
@@ -1210,11 +1275,26 @@ const app = express();
           instansi: tenant.name,
           kbId,
           rag: ragClient,
-          // Batas total: kartu yang belum sempat selesai ditandai kosong, jadi
-          // permintaan tidak menggantung sampai koneksi diputus proxy.
+          // 2 serentak, bukan 8: RAG membalas 429 bila dihantam banyak permintaan
+          // sekaligus. Uji nyata: 8 serentak = hampir semua kartu kosong.
+          konkurensi: 2,
+          // Tunggu sampai semua kartu terisi: kartu yang gagal karena layanan
+          // sibuk diulang di putaran berikutnya, bukan langsung dikosongkan.
           batasMs: BATAS_ISI_TEMPLATE_MS,
+          putaranMaks: 6,
+          onProgres: (info) => {
+            if (!jobId) return;
+            progresTemplate.set(jobId, {
+              selesai: info.selesai,
+              total: info.total,
+              terisi: info.terisiTotal ?? 0,
+              judul: info.judul,
+              mulai: progresTemplate.get(jobId)?.mulai ?? Date.now(),
+            });
+          },
         }
       );
+      if (jobId) progresTemplate.delete(jobId);
 
       // Judul dashboard: buang penanda "(Contoh)" karena kini angkanya dari dokumen.
       const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
@@ -1254,10 +1334,37 @@ const app = express();
     } catch (err) {
       // Rincian teknis hanya untuk log; pengguna menerima kalimat yang jelas.
       console.error('[template] gagal membuat dashboard dari template:', jelaskanError(err));
+      if (jobId) progresTemplate.delete(jobId);
       return res.status(500).json({
         error: 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.',
       });
     }
+  });
+
+  /**
+   * Progres pengisian template (polling dari UI).
+   *
+   * Pengisian bisa 5–15 menit karena kartu yang gagal (429/timeout) diulang
+   * sampai terisi. Tanpa endpoint ini halaman hanya menampilkan detik berjalan
+   * tanpa tahu sudah berapa kartu yang berisi angka.
+   */
+  app.get('/api/dashboards/dari-template/progres/:jobId', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    // Buang entri lama supaya peta tidak tumbuh tanpa batas.
+    for (const [id, p] of progresTemplate) {
+      if (Date.now() - p.mulai > 3_600_000) progresTemplate.delete(id);
+    }
+    const p = progresTemplate.get(String(req.params.jobId || ''));
+    if (!p) return res.json({ aktif: false });
+    return res.json({
+      aktif: true,
+      selesai: p.selesai,
+      total: p.total,
+      terisi: p.terisi,
+      judul: p.judul,
+      detik: Math.round((Date.now() - p.mulai) / 1000),
+    });
   });
 
   /**
@@ -1593,6 +1700,21 @@ const app = express();
     const sendEvent = (event: string, data: any) => {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
+    // Generasi dashboard bisa berjalan beberapa menit. Tanpa denyut, koneksi
+    // yang menganggur lama bisa diputus browser/proxy sehingga balasan hilang
+    // di tengah jalan padahal server sudah selesai.
+    const denyut = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {
+        /* koneksi sudah tertutup */
+      }
+    }, 15000);
+    res.on('close', () => clearInterval(denyut));
+
+    // Dipakai juga oleh `catch` di bawah: kegagalan harus tetap meninggalkan
+    // balasan di riwayat, bukan pertanyaan yang menggantung.
+    let catatAsisten: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void = () => {};
 
     try {
       const lower = prompt.toLowerCase();
@@ -1606,21 +1728,39 @@ const app = express();
         : db.ensureGeneralChat(tenantId, session.userId);
       let pesanUserTercatat = false;
       const pesanBaru = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-        if (!chat) {
-          chat = activeDash
+        const simpan = (id: string) =>
+          db.addChatMessage(
+            id,
+            {
+              ...msg,
+              id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              timestamp: new Date().toISOString(),
+            },
+            tenantId
+          );
+        const buatChat = () =>
+          activeDash
             ? db.ensureChatForDashboard(activeDash.id, tenantId, session.userId, activeDash.title)
             : db.ensureGeneralChat(tenantId, session.userId);
+        if (!chat) chat = buatChat();
+        if (!chat) {
+          console.error('[chat] tidak ada chat untuk menyimpan pesan — pesan dibuang:', msg.sender);
+          return;
         }
-        if (!chat) return;
-        db.addChatMessage(
-          chat.id,
-          {
-            ...msg,
-            id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            timestamp: new Date().toISOString(),
-          },
-          tenantId
-        );
+        try {
+          if (simpan(chat.id)) return;
+          // Chat hilang dari memori (mis. tersinkron ulang dari tabel oleh proses
+          // sinkron 30 dtk) -> buat lagi lalu simpan. Dulu pesan DIBUANG diam-diam
+          // sehingga balasan asisten lenyap dari riwayat padahal sudah tampil.
+          chat = buatChat();
+          if (chat && simpan(chat.id)) {
+            console.warn('[chat] chat tidak ditemukan saat menyimpan; dibuat ulang:', chat.id);
+            return;
+          }
+          console.error('[chat] pesan gagal disimpan:', msg.sender);
+        } catch (err: any) {
+          console.error('[chat] galat saat menyimpan pesan:', err?.message || err);
+        }
       };
       const catatPesanUser = () => {
         if (pesanUserTercatat) return;
@@ -1628,23 +1768,117 @@ const app = express();
         pesanBaru({ sender: 'user', text: prompt });
       };
       /** Balasan asisten — urutannya dijamin setelah prompt user. */
-      const catatAsisten = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+      catatAsisten = (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
         catatPesanUser();
         pesanBaru(msg);
       };
 
+      // Case 0a-0: pengguna menanyakan ISI REPOSITORI ("ada berapa dokumen?",
+      // "dokumen apa saja?"). Model bahasa hanya melihat potongan teks yang
+      // terambil, jadi kalau ditanya jumlah ia menjawab dari potongan itu —
+      // pernah "5 dokumen" padahal basis berisi 8. Jawab dari daftar nyata.
+      // Perintah membuat dashboard tidak boleh dibajak pertanyaan inventaris:
+      // "buatkan dashboard lengkap dari semua dokumen di repositori" menyebut
+      // "dokumen di repositori" tetapi maksudnya MEMBUAT, bukan menghitung.
+      if (!niatBuatDashboard(prompt) && adalahPertanyaanDokumen(prompt)) {
+        sendEvent('step', {
+          id: 'dokumen-basis',
+          title: 'Membaca daftar dokumen instansi',
+          status: 'in_progress',
+        });
+        let pesan: string;
+        try {
+          const hasil = await ragClient.daftarDokumen(kbChat || '', 15000);
+          pesan = susunJawabanDokumen(hasil, tenantChat?.name);
+          sendEvent('step', {
+            id: 'dokumen-basis',
+            title:
+              hasil.jumlah > 0
+                ? `${hasil.jumlah} dokumen di basis dokumen instansi`
+                : 'Daftar dokumen belum bisa dibaca',
+            status: hasil.jumlah > 0 ? 'completed' : 'failed',
+          });
+        } catch (err: any) {
+          console.warn('[chat] gagal membaca daftar dokumen:', err?.message || err);
+          pesan = susunJawabanDokumen(null, tenantChat?.name);
+          sendEvent('step', { id: 'dokumen-basis', title: 'Layanan dokumen tidak tersedia', status: 'failed' });
+        }
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'daftar_dokumen', modeUsed: 'Chatbot RAG' });
+        sendEvent('result', { actionTaken: 'daftar_dokumen', message: pesan, modeUsed: 'Chatbot RAG' });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
+
       // Case 0a: pengguna minta REKOMENDASI tampilan chart → tawarkan pilihan
-      // beserta pratinjau. Kartu TIDAK langsung dipasang: pengguna melihat
-      // bentuknya di kanvas dulu, lalu menekan "Oke, tambahkan".
+      // beserta pratinjau berisi ANGKA NYATA dari dokumen instansi. Kartu TIDAK
+      // langsung dipasang: pengguna melihat bentuknya di kanvas dulu, lalu
+      // menekan "Oke, tambahkan". Angka diambil SEKALI lalu dipakai semua bentuk.
       if (adalahPermintaanSaran(prompt)) {
         const indikator = indikatorDariPrompt(prompt);
-        const saran = susunSaranChart(indikator);
-        const pesan =
-          `Berikut ${saran.length} pilihan tampilan${indikator ? ` untuk **${indikator}**` : ''}. ` +
-          `Tekan **Pratinjau** untuk melihat bentuknya seperti di kanvas, lalu **Oke, tambahkan ke kanvas** kalau sudah cocok. ` +
-          `Angka di pratinjau hanya contoh bentuk tampilan; angka sebenarnya diambil dari dokumen instansi saat kartunya ditambahkan.`;
+        const topik = indikator || 'indikator utama instansi';
+        sendEvent('step', {
+          id: 'saran-data',
+          title: `Mengambil angka "${topik}" dari dokumen instansi`,
+          status: 'in_progress',
+        });
+
+        let saran = susunSaranChart(indikator);
+        let pesan: string;
+        let modeSaran: 'Chatbot RAG' | 'Gagal (Layanan RAG)' = 'Chatbot RAG';
+        try {
+          const kbId = kbChat || '';
+          const bolehRag = db.systemConfig.ragProvider === 'http' && !!kbId;
+          const hasil = bolehRag
+            ? await ragClient.ambilDataWidget(
+                `Ambil angka indikator "${topik}" dari dokumen resmi instansi ini. ` +
+                  `Gunakan angka yang BENAR-BENAR ada di dokumen beserta sumbernya (nama dokumen & halaman). ` +
+                  `Kalau indikator ini tidak ada di dokumen, katakan tidak ada — jangan mengarang.`,
+                sector,
+                'bar',
+                tenantChat?.name,
+                kbId,
+                // Bedakan "dokumen tidak memuat" dari "layanan bermasalah":
+                // galat HTTP harus naik ke catch, bukan menyamar jadi data kosong.
+                { lemparSaatGagal: true }
+              )
+            : null;
+          const data = dataDariWidget(hasil?.data);
+          if (data) {
+            saran = susunSaranChart(indikator, data);
+            const titik = data.series[0]?.data.length || 0;
+            const seri = data.series.length;
+            pesan =
+              `Berikut ${saran.length} pilihan tampilan untuk **${topik}**. ` +
+              `Semua pratinjau memakai angka yang benar-benar ada di dokumen instansi ini` +
+              `${data.sumber ? ` (${data.sumber})` : ''} — ${titik} titik data` +
+              `${seri > 1 ? ` dalam ${seri} seri` : ''}. ` +
+              `Tekan **Pratinjau** untuk melihat bentuknya, lalu **Oke, tambahkan ke kanvas** kalau sudah cocok.`;
+            sendEvent('step', {
+              id: 'saran-data',
+              title: `Angka ditemukan: ${titik} titik data${data.sumber ? ` — ${data.sumber}` : ''}`,
+              status: 'completed',
+            });
+          } else {
+            pesan =
+              `Saya belum menemukan angka **${topik}** di dokumen instansi ini, jadi pratinjau di bawah hanya memperlihatkan bentuk tampilan — angkanya belum bisa saya isi. ` +
+              `Tambahkan atau rapikan dokumen instansi ini, lalu minta lagi.`;
+            sendEvent('step', {
+              id: 'saran-data',
+              title: 'Angka tidak ditemukan di dokumen',
+              status: 'failed',
+            });
+          }
+        } catch (err: any) {
+          modeSaran = 'Gagal (Layanan RAG)';
+          console.warn('[chat] gagal mengambil angka untuk rekomendasi chart:', err?.message || err);
+          pesan =
+            `Saya belum bisa mengambil angka **${topik}** karena **layanan dokumen sedang tidak tersedia**. ` +
+            `Pilihan bentuk tampilan di bawah tetap bisa dilihat, tetapi angkanya belum terisi. Silakan coba lagi beberapa saat lagi.`;
+          sendEvent('step', { id: 'saran-data', title: 'Layanan dokumen tidak tersedia', status: 'failed' });
+        }
+
         catatAsisten({ sender: 'system', text: pesan, actionTaken: 'saran_chart', saran });
-        sendEvent('result', { actionTaken: 'saran_chart', message: pesan, saran });
+        sendEvent('result', { actionTaken: 'saran_chart', message: pesan, saran, modeUsed: modeSaran });
         sendEvent('done', { ok: true });
         return res.end();
       }
@@ -2161,6 +2395,7 @@ const app = express();
       }
 
       // Case 3: DEFAULT -> Generate / Perbarui Dashboard via RAG Orchestrator
+      const mulaiGenerate = Date.now();
       const onProgress = (step: ProgressStep) => {
         sendEvent('step', step);
       };
@@ -2297,6 +2532,17 @@ const app = express();
       } else {
         replyText += `Dashboard berisi **${genResult.jumlahWidget} widget** dari dokumen instansi ini.\n`;
       }
+      // Durasi nyata penyusunan — melengkapi estimasi yang tampil saat proses
+      // berjalan, supaya pengguna tahu berapa lama sebenarnya.
+      {
+        const totalDetik = Math.round((Date.now() - mulaiGenerate) / 1000);
+        const menit = Math.floor(totalDetik / 60);
+        const sisaDetik = totalDetik % 60;
+        const durasi = menit > 0 ? `${menit} mnt ${sisaDetik} dtk` : `${sisaDetik} dtk`;
+        replyText += `⏱️ Waktu penyusunan: **${durasi}** — ${genResult.citationsCount} potongan dokumen dibaca.
+`;
+      }
+
       replyText += `Anda bisa meminta penyesuaian lebih lanjut (misalnya: *"rekomendasi chart"*, *"ubah grafik ke diagram garis"*, atau *"hapus widget [nama]"*).`;
 
       catatAsisten({
@@ -2320,7 +2566,30 @@ const app = express();
       res.end();
 
     } catch (err: any) {
-      sendEvent('error', { message: err?.message || 'Terjadi kesalahan sistem saat pemrosesan RAG.' });
+      // JANGAN biarkan pertanyaan pengguna menggantung tanpa balasan tersimpan:
+      // dulu cabang ini hanya mengirim event `error` lalu berhenti, sehingga
+      // setelah riwayat dimuat ulang balasan (dan sebab kegagalannya) hilang —
+      // terlihat seperti "respon berhenti". Sekarang kegagalan ikut dicatat.
+      const sebab = String(err?.message || 'Terjadi kesalahan sistem saat pemrosesan RAG.');
+      const pesanGalat =
+        `⚠️ Maaf, permintaan ini belum bisa saya selesaikan: **${sebab}**\n\n` +
+        `Dashboard Anda tidak diubah. Silakan coba lagi. Kalau permintaannya besar ` +
+        `(mis. belasan widget sekaligus), pecah jadi beberapa langkah — mis. minta 4–5 kartu dulu, ` +
+        `lalu "tambahkan grafik keuangan", dan seterusnya.`;
+      console.error('[chat] galat tak tertangani:', sebab);
+      try {
+        catatAsisten({
+          sender: 'system',
+          text: pesanGalat,
+          actionTaken: 'rag_error',
+          modeUsed: 'Gagal (Layanan RAG)',
+        } as any);
+      } catch (e: any) {
+        console.error('[chat] gagal menyimpan pesan galat:', e?.message || e);
+      }
+      sendEvent('result', { actionTaken: 'rag_error', message: pesanGalat, modeUsed: 'Gagal (Layanan RAG)' });
+      sendEvent('error', { message: sebab });
+      sendEvent('done', { ok: false });
       res.end();
     }
   });
@@ -2330,7 +2599,7 @@ const app = express();
     const session = requireAuth(req, res);
     if (!session) return;
     // Probe menyentuh layanan RAG (Base URL/API key) — hanya admin yang boleh.
-    // Non-admin (analis/direksi) dilarang menyentuh konfigurasi RAG sama sekali.
+    // Non-admin (pengguna) dilarang menyentuh konfigurasi RAG sama sekali.
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh menguji koneksi RAG.')) return;
     const cfg = db.systemConfig;
     try {
@@ -3929,6 +4198,14 @@ const app = express();
       const adaLimit = req.query.limit !== undefined && String(req.query.limit).trim() !== '';
       const halaman = adaLimit ? potongUrut(tersaring, req.query.limit, req.query.offset) : null;
 
+      // Sidebar menampilkan jumlah dokumen dari `tenant.documentCount`. Angka itu
+      // dulu hanya diisi saat instansi dibuat/dihubungkan, jadi tetap 3 padahal
+      // repositori sudah berisi 8 — pengguna melihat dua angka berbeda. Segerakan
+      // dengan isi repositori yang sebenarnya setiap kali daftar dibaca.
+      if (tenant && !cakupanAll && tenant.documentCount !== berkas.length) {
+        await db.updateTenant(tenant.id, { documentCount: berkas.length });
+      }
+
       res.json({
         berkas: halaman ? halaman.baris : tersaring,
         total: tersaring.length,
@@ -4979,7 +5256,7 @@ ${navigasi}
     if ((user.status || 'active') !== 'pending') {
       return res.status(409).json({ error: 'Akun ini bukan permintaan yang menunggu persetujuan.' });
     }
-    const ROLE_SAH: UserRole[] = ['admin', 'analis', 'direksi'];
+    const ROLE_SAH: UserRole[] = ['admin', 'pengguna'];
     const roleDiminta = req.body?.role;
     if (roleDiminta !== undefined && !ROLE_SAH.includes(roleDiminta)) {
       return res.status(400).json({ error: `Peran "${roleDiminta}" tidak dikenal.`, roleSah: ROLE_SAH });
@@ -5039,13 +5316,17 @@ ${navigasi}
     if (db.users.some((u) => u.email.toLowerCase() === email)) {
       return res.status(409).json({ error: 'Email sudah terdaftar di sistem.' });
     }
+    const ROLE_SAH: UserRole[] = ['admin', 'pengguna'];
+    if (req.body.role !== undefined && !ROLE_SAH.includes(req.body.role)) {
+      return res.status(400).json({ error: `Peran "${req.body.role}" tidak dikenal.`, roleSah: ROLE_SAH });
+    }
     const newUser: SafeUser = {
       id: `user-${Date.now()}`,
       email,
       name: req.body.name || 'Pengguna BUMD',
-      role: req.body.role || 'analis',
+      role: req.body.role || 'pengguna',
       tenantId: req.body.tenantId || 'tenant-pdam',
-      avatar: req.body.role === 'admin' ? '👨‍💼' : req.body.role === 'direksi' ? '👔' : '👩‍💼',
+      avatar: req.body.role === 'admin' ? '👨‍💼' : '👩‍💼',
     };
     // Sandi awal = kata sandi sementara acak per akun (bukan sandi bersama yang
     // tertulis di dokumentasi). Admin menyalinnya sekali dari respons ini, dan

@@ -104,10 +104,9 @@ import {
   User,
   WidgetSpec,
   WidgetStyle,
+  ProgresIsiTemplate,
 } from './types';
-import {
-  DashboardTemplate,
-} from './services/templates/dashboardTemplates';
+import { DashboardTemplate } from './services/templates/dashboardTemplates';
 
 export default function App() {
   // Public Share / Embed Route Handling (No Login Required)
@@ -442,28 +441,65 @@ export default function App() {
    * tidak ada di dokumen dikosongkan (tanpa angka contoh). Melempar galat bila
    * layanan RAG tidak terhubung supaya UI menampilkan pesan jujur.
    */
+  /** Progres pengisian template yang sedang berjalan (null = tidak ada). */
+  const [progresTemplate, setProgresTemplate] = useState<ProgresIsiTemplate | null>(null);
+
   const handleUseTemplate = async (
     template: DashboardTemplate
   ): Promise<{ terisi: number; kosong: number; total: number }> => {
     if (!currentTenant) throw new Error('Pilih instansi terlebih dahulu.');
-    const res = await fetch('/api/dashboards/dari-template', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: currentTenant.id,
-        templateId: template.id,
-        sector: template.sektor,
-      }),
+    // jobId: kunci pembacaan progres. Pengisian bisa 5–15 menit (kartu yang gagal
+    // diulang sampai terisi), jadi UI harus bisa menunjukkan sudah berapa kartu
+    // yang berisi angka — bukan hanya berputar tanpa kabar.
+    const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setProgresTemplate({
+      terisi: 0,
+      total: template.widgets.length,
+      selesai: 0,
+      judul: 'Menyiapkan permintaan ke dokumen…',
+      detik: 0,
     });
-    const isi = await res.json().catch(() => null);
-    if (!res.ok || !isi?.dashboard) {
-      throw new Error(isi?.error || 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.');
+    const pemantau = window.setInterval(async () => {
+      try {
+        const r = await fetch(`/api/dashboards/dari-template/progres/${jobId}`);
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!j?.aktif) return;
+        setProgresTemplate({
+          terisi: j.terisi ?? 0,
+          total: j.total ?? 0,
+          selesai: j.selesai ?? 0,
+          judul: j.judul || '',
+          detik: j.detik ?? 0,
+        });
+      } catch {
+        // Progres hanya pelengkap: kegagalan memantau tidak boleh membatalkan pembuatan.
+      }
+    }, 2000);
+    try {
+      const res = await fetch('/api/dashboards/dari-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: currentTenant.id,
+          templateId: template.id,
+          sector: template.sektor,
+          jobId,
+        }),
+      });
+      const isi = await res.json().catch(() => null);
+      if (!res.ok || !isi?.dashboard) {
+        throw new Error(isi?.error || 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.');
+      }
+      const newDash: Dashboard = isi.dashboard;
+      setDashboards((prev) => [newDash, ...prev]);
+      setActiveDashboard(newDash);
+      setViewMode('workspace');
+      return { terisi: isi.terisi ?? 0, kosong: isi.kosong ?? 0, total: isi.total ?? 0 };
+    } finally {
+      window.clearInterval(pemantau);
+      setProgresTemplate(null);
     }
-    const newDash: Dashboard = isi.dashboard;
-    setDashboards((prev) => [newDash, ...prev]);
-    setActiveDashboard(newDash);
-    setViewMode('workspace');
-    return { terisi: isi.terisi ?? 0, kosong: isi.kosong ?? 0, total: isi.total ?? 0 };
   };
 
   const handleDeleteDashboard = async (dashboardId: string) => {
@@ -1069,6 +1105,7 @@ export default function App() {
                   <DashboardTemplatesPage
                     currentTenant={currentTenant}
                     onUseTemplate={handleUseTemplate}
+                    progres={progresTemplate}
                   />
                 </React.Suspense>
               ) : viewMode === 'pelaporan' ? (

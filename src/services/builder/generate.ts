@@ -101,10 +101,21 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   logSummary.push(`[AionesBoard Orchestrator] Analisis query: "${userPrompt}" untuk sektor: ${sector}`);
 
   // Step 2: Query RAG & Retrieval Chunks
+  // Estimasi waktu ditampilkan ke pengguna. Sapuan penuh (10 area) butuh 4–10
+  // menit pada permintaan pertama; kalau hasilnya masih tersimpan di cache,
+  // prosesnya selesai di bawah satu menit. Angka ini sengaja diberi rentang
+  // supaya pengguna tidak mengira proses menggantung saat layanan lambat.
+  const adaCache = options.ragClient?.adaCacheSapuan?.(kbId, sector) ?? false;
   onProgress?.({
     id: 'step-2',
-    title: 'Menghubungi RAG API & retrieval potongan dokumen resmi',
+    title: adaCache
+      ? 'Mengambil hasil sapuan dokumen yang tersimpan (cepat)'
+      : 'Membaca seluruh bagian dokumen — 10 area laporan (perkiraan 6–10 menit)',
     status: 'in_progress',
+    // 600 dtk = tenggat sapuan. Uji nyata: permintaan tanpa cache selesai
+    // 400–620 dtk, jadi 480 dtk terlalu optimis dan pengguna melihat estimasi
+    // terlampaui padahal proses masih normal.
+    estimasiDetik: adaCache ? 45 : 600,
   });
 
   const availablePresets = WIDGET_CATALOG.filter(
@@ -125,6 +136,9 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       sector,
       instansi,
       kbId,
+      // Baca SELURUH isi basis dokumen (sapuan per area), bukan 8 potongan teratas.
+      // Tanpa ini grafik hanya berisi 3–6 titik dan bagian laporan lain terlewat.
+      sapuanPenuh: true,
     });
   } catch (err) {
     const pesan =

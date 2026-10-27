@@ -111,7 +111,7 @@ const PAKET = [
       'Asisten AI dari dokumen resmi instansi',
       'Manajemen berkas & basis dokumen',
       'Tautan bagikan (lihat saja / dengan PIN)',
-      'Peran pengguna: admin, analis, pimpinan',
+      'Peran pengguna: admin & pengguna',
     ],
   },
   {

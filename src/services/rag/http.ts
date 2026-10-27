@@ -169,6 +169,119 @@ export const SKEMA_FOKUS: Record<string, any> = {
 };
 
 /**
+ * Lima wilayah kota administrasi DKI Jakarta — dipakai untuk MEMERIKSA bahwa
+ * hasil ekstraksi area "wilayah" benar-benar berisi sebaran wilayah, bukan
+ * grafik pendapatan/deret tahunan yang sering keliru dikembalikan RAG.
+ */
+export const WILAYAH_LAYANAN = [
+  'Jakarta Pusat',
+  'Jakarta Utara',
+  'Jakarta Barat',
+  'Jakarta Selatan',
+  'Jakarta Timur',
+];
+
+/** Berapa nama wilayah layanan yang benar-benar disebut di hasil ekstraksi. */
+export function jumlahWilayahDisebut(teks: string): number {
+  const t = (teks || '').toLowerCase();
+  return WILAYAH_LAYANAN.filter((n) => t.includes(n.toLowerCase())).length;
+}
+
+/**
+ * Hasil area "wilayah" sah bila menyebut minimal dua wilayah layanan.
+ * Satu saja tidak cukup: judul seperti "Jakarta" bisa muncul di dokumen lain
+ * tanpa tabel sebaran.
+ */
+export function hasilWilayahSah(item: any): boolean {
+  if (!item) return false;
+  try {
+    return jumlahWilayahDisebut(JSON.stringify(item)) >= 2;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * AREA SAPUAN — daftar bagian yang dibaca satu per satu saat membangun dashboard
+ * penuh.
+ *
+ * Kenapa perlu: layanan RAG membatasi jumlah sumber per permintaan (sekitar 16)
+ * dan TIDAK mengirim teks potongan balik ke aplikasi, jadi satu permintaan tidak
+ * mungkin memuat seluruh isi basis dokumen. Dengan menyapu tiap area (satu
+ * /extract per area, `top_k` maksimum), seluruh bagian dokumen — deret bulanan,
+ * sebaran wilayah, laba rugi, SDM, investasi, target RKAP — ikut terbaca, bukan
+ * hanya potongan yang kebetulan masuk 8 teratas.
+ *
+ * Urutannya mengikuti struktur laporan BUMD supaya tidak ada bagian yang
+ * terlewat. Tambah area di sini kalau ada bagian laporan baru.
+ */
+export const AREA_SAPUAN: Array<{ id: string; label: string; instruksi: string }> = [
+  {
+    id: 'kpi',
+    label: 'KPI pokok perusahaan',
+    instruksi:
+      'KPI pokok perusahaan: jumlah pelanggan, NRW, cakupan layanan, air terjual, pendapatan usaha, laba bersih, jumlah pegawai, belanja modal',
+  },
+  {
+    id: 'bulanan',
+    label: 'Deret bulanan',
+    instruksi:
+      'deret BULANAN sepanjang tahun: NRW, air terjual, air terdistribusi, pengaduan, pendapatan per bulan. Sertakan SEMUA bulan yang ada di dokumen, dari Januari sampai Desember',
+  },
+  {
+    // Didahulukan: area inilah yang paling sering hilang saat waktu habis, padahal
+    // justru inilah data yang membuat dashboard terasa lengkap.
+    id: 'wilayah',
+    label: 'Sebaran wilayah',
+    instruksi:
+      'sebaran per WILAYAH layanan: jumlah pelanggan, air terjual, NRW, pengaduan per wilayah. ' +
+      'Wilayah yang dimaksud adalah kota administrasi: Jakarta Pusat, Jakarta Utara, Jakarta Barat, ' +
+      'Jakarta Selatan, Jakarta Timur. Satu baris/satu titik = satu wilayah, bukan satu tahun. ' +
+      'Sertakan SEMUA wilayah yang ada di dokumen, jangan hanya sebagian',
+  },
+  {
+    id: 'keuangan',
+    label: 'Keuangan',
+    instruksi:
+      'laporan keuangan: pendapatan usaha, beban usaha, laba kotor, beban umum dan administrasi, laba usaha, pendapatan non usaha, laba sebelum pajak, beban pajak, laba bersih, total aset, liabilitas, ekuitas',
+  },
+  {
+    id: 'operasional',
+    label: 'Operasional & neraca air',
+    instruksi:
+      'operasional dan neraca air: air baku, air terproduksi, air terdistribusi, air terjual, kehilangan air, kapasitas produksi, gangguan dan kebocoran',
+  },
+  {
+    id: 'pelayanan',
+    label: 'Pelayanan pelanggan',
+    instruksi:
+      'pelayanan pelanggan: pengaduan masuk, pengaduan selesai, persentase penyelesaian, rata-rata lama penyelesaian, indeks kepuasan pelanggan, sambungan baru',
+  },
+  {
+    id: 'sdm',
+    label: 'SDM',
+    instruksi:
+      'SDM: jumlah pegawai, komposisi pegawai menurut unit kerja atau pendidikan, rasio pelanggan per pegawai, biaya pegawai',
+  },
+  {
+    id: 'investasi',
+    label: 'Investasi & proyek',
+    instruksi: 'investasi dan proyek: belanja modal, rencana investasi, program atau proyek yang berjalan beserta nilainya',
+  },
+  {
+    id: 'target',
+    label: 'Target vs realisasi',
+    instruksi:
+      'target RKAP versus realisasi per indikator: nilai target, nilai realisasi, dan selisih atau persentase capaian untuk setiap indikator yang tercantum',
+  },
+  {
+    id: 'tata-kelola',
+    label: 'Risiko & tata kelola',
+    instruksi: 'risiko utama beserta mitigasinya, standar pelayanan (SLA), dan tata kelola atau kepatuhan yang tercantum di dokumen',
+  },
+];
+
+/**
  * Skema ekstraksi komponen keuangan (neraca + laba rugi) untuk fitur Kesehatan
  * Keuangan. Setiap field WAJIB membawa sitasi (`docName`, `page`,
  * `chunkSnippet`) supaya angkanya bisa dilacak ke dokumen resmi. Field yang
@@ -341,6 +454,28 @@ class PenataLetak {
   }
 }
 
+/**
+ * Susun ulang tata letak widget:
+ * 1. Kartu KPI maksimal 6 buah dan SELALU di baris paling atas (3 kartu per baris).
+ * 2. Grafik di tengah (2 per baris), tabel & narasi selebar kanvas di bawahnya.
+ *
+ * Tanpa ini, KPI dari area keuangan/SDM ikut mengalir di antara grafik sehingga
+ * pengguna harus menggulir untuk melihat angka pokok, dan jumlah kartu bisa
+ * belasan karena setiap area menyumbang KPI-nya sendiri.
+ */
+export function susunUlangWidget(widgets: any[]): any[] {
+  const MAKS_KPI = 6;
+  const kpi = widgets.filter((w) => w?.type === 'kpi').slice(0, MAKS_KPI);
+  const lain = widgets.filter((w) => w?.type !== 'kpi');
+  const penata = new PenataLetak();
+  return [...kpi, ...lain].map((w) => {
+    if (w?.type === 'kpi') return { ...w, grid: penata.kotak(4, 3) };
+    if (w?.type === 'table') return { ...w, grid: penata.kotak(12, 5) };
+    if (w?.type === 'narasi') return { ...w, grid: penata.kotak(12, 3) };
+    return { ...w, grid: penata.kotak(6, 4) };
+  });
+}
+
 /** Kutipan sumber satu widget. */
 function kutipanExtract(id: string, docName: unknown, page: unknown, snippet: unknown) {
   const halaman = Number(page);
@@ -407,6 +542,51 @@ export function satuanSeragam(teks: unknown): string | undefined {
 }
 
 const WARNA_SERI = ['#38c6e2', '#2bb8a8', '#e0a020', '#8f90e4'];
+
+/**
+ * Rantai penurunan tipe: bila data dokumen tidak mendukung bentuk asli kartu
+ * template (mis. donut untuk dua seri, heatmap tanpa dua baris), tampilkan
+ * dengan bentuk terdekat yang sah — jangan kosongkan kartunya.
+ */
+const RANTAI_TURUN: Record<string, string[]> = {
+  gauge: ['kpi'],
+  'bullet-target': ['kpi'],
+  donut: ['bar', 'line', 'table'],
+  pie: ['bar', 'line', 'table'],
+  funnel: ['bar', 'table'],
+  treemap: ['bar', 'table'],
+  heatmap: ['bar', 'line', 'table'],
+  waterfall: ['bar', 'line', 'table'],
+  scatter: ['bar', 'line', 'table'],
+  bubble: ['bar', 'line', 'table'],
+  radar: ['bar', 'line', 'table'],
+  combo: ['bar', 'line', 'table'],
+  area: ['line', 'bar', 'table'],
+  hbar: ['bar', 'line', 'table'],
+  line: ['bar', 'table'],
+  bar: ['line', 'table'],
+  sankey: ['table'],
+  map: ['bar', 'table'],
+  gantt: ['table'],
+};
+
+/**
+ * Cari bentuk tampilan lain yang sah untuk data yang sama.
+ *
+ * Dipakai pengisi template: kartu template memilih tipe tampilan (donut, heatmap,
+ * waterfall, gauge). Kalau datanya nyata tetapi tidak cocok dengan bentuk itu,
+ * dulu kartu dibiarkan kosong — pengguna melihat "Belum ada di dokumen" padahal
+ * angkanya ada di dokumen. Sekarang diturunkan ke bentuk terdekat (batang/garis/
+ * tabel, atau kartu angka untuk gauge).
+ */
+export function turunkanTipeAman(widget: any, tipeTarget: string): any | null {
+  const rantai = RANTAI_TURUN[tipeTarget] || ['bar', 'line', 'table'];
+  for (const t of rantai) {
+    const selaras = selaraskanTipe(widget, t);
+    if (selaras.ok && selaras.widget) return selaras.widget;
+  }
+  return null;
+}
 
 /**
  * Ubah hasil /extract (satu dashboard berupa data: kpi[], grafik, tabel, narasi)
@@ -538,14 +718,15 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
     if (w) widgets.push(w);
   });
 
-  // --- Tabel: maksimal 4 kolom dan 5 baris
+  // --- Tabel: maksimal 8 kolom dan 14 baris (cukup untuk 12 bulan + header,
+  //     supaya rincian bulanan/wilayah tidak terpotong seperti versi lama 4×5)
   const t = payload?.tabel;
   const kolom = (Array.isArray(t?.kolom) ? t.kolom : [])
-    .slice(0, 4)
+    .slice(0, 8)
     .map((c: any, i: number) => ({ key: `k${i}`, label: potong(c, 26) || `Kolom ${i + 1}` }));
   const baris = (Array.isArray(t?.baris) ? t.baris : [])
-    .slice(0, 5)
-    .map((r: any) => (Array.isArray(r) ? r.slice(0, 4) : []))
+    .slice(0, 14)
+    .map((r: any) => (Array.isArray(r) ? r.slice(0, 8) : []))
     .filter((r: any[]) => r.length > 0);
   if (t && kolom.length >= 2 && baris.length >= 1) {
     widgets.push({
@@ -658,6 +839,19 @@ export class ConfigurableRagClient implements RagClient {
   private getRagConfig: RagConfigFetcher;
   /** Hasil penyesuaian base URL (di-cache per nilai yang dikonfigurasi). */
   private baseTerpakai: { dikonfigurasi: string; dipakai: string; disesuaikan: boolean } | null = null;
+  /**
+   * Cache hasil sapuan menyeluruh per knowledge base.
+   *
+   * Sapuan penuh memanggil /extract 10 kali (±3–5 menit saat layanan lambat).
+   * Isi dokumen instansi jarang berubah, jadi hasilnya disimpan sebentar:
+   * pembuatan dashboard berikutnya memakai hasil yang sama tanpa memanggil RAG
+   * lagi. Kunci = kbId + sektor; masa berlaku 6 jam.
+   */
+  private cacheSapuan = new Map<
+    string,
+    { waktu: number; widgets: any[]; judul?: string; deskripsi?: string; areaKosong: string[]; kelompok: Array<{ id: string; widgets: any[] }> }
+  >();
+  private statisCacheSapuan = 6 * 60 * 60 * 1000;
 
   constructor(getRagConfig: RagConfigFetcher) {
     this.getRagConfig = getRagConfig;
@@ -710,7 +904,7 @@ export class ConfigurableRagClient implements RagClient {
     instruksi: string,
     skema: any = SKEMA_EKSTRAKSI,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; timeoutMs?: number }
+    opsi?: { lemparSaatGagal?: boolean; timeoutMs?: number; topK?: number }
   ): Promise<any | null> {
     const ac = new AbortController();
     // Batas waktu bisa dipersempit per panggilan: saat generasi dashboard, beberapa
@@ -731,7 +925,9 @@ export class ConfigurableRagClient implements RagClient {
         body: JSON.stringify({
           query: instruksi,
           ...(kbEfektif ? { knowledge_base_id: kbEfektif } : {}),
-          top_k: 8,
+          // top_k bawaan 8 cukup untuk satu widget; sapuan menyeluruh meminta
+          // batas maksimum layanan supaya satu area tidak kehilangan barisnya.
+          top_k: Math.max(1, Math.min(opsi?.topK ?? 8, 50)),
           output_schema: skema,
         }),
         signal: ac.signal,
@@ -810,7 +1006,7 @@ export class ConfigurableRagClient implements RagClient {
       `"combo" untuk dua metrik berbeda satuan. ` +
       `Setiap grafik: kategori 3 sampai 12 label, setiap seri panjangnya sama dengan kategori, semua angka dari dokumen. ` +
       `Pakai tipe yang benar-benar didukung data; kalau ragu, pakai "bar" atau "line". ` +
-      `(6) tabel: maksimal 4 kolom, maksimal 5 baris, isinya angka atau nama entitas pendek. ` +
+      `(6) tabel: maksimal 8 kolom, maksimal 14 baris (cukup untuk 12 bulan atau 5 wilayah), isinya angka atau nama entitas pendek. ` +
       `(7) narasi: maksimal 45 kata berisi ringkasan kinerja dari dokumen. Jangan menyalin visi misi, syarat sandi, atau kebijakan internal. ` +
       `Angka wajib berasal dari dokumen yang benar-benar ada. Untuk setiap angka sertakan docName, page, dan chunkSnippet aslinya.`;
   }
@@ -834,7 +1030,7 @@ export class ConfigurableRagClient implements RagClient {
     // memuat angka. Hasil fokus (skema kecil, yang terbukti terisi) dipakai sebagai
     // jaring: skema utuh tetap diutamakan bila menghasilkan dashboard yang layak.
     const batasUtama = Math.min(Math.max(30, cfg.timeoutMs || 60), 60);
-    const [itemUtama, fokus] = await Promise.all([
+    const [itemUtama, fokus, sapuan] = await Promise.all([
       this.ambilPayloadExtract(
         base,
         cfg,
@@ -843,39 +1039,81 @@ export class ConfigurableRagClient implements RagClient {
         options.kbId,
         { timeoutMs: batasUtama }
       ),
-      this.ekstrakFokusParalel(base, cfg, options),
+      // Saat sapuan menyeluruh aktif, ekstraksi fokus tidak dijalankan: sapuan
+      // sudah mencakup semua area, dan 4 panggilan tambahan hanya menambah beban
+      // sehingga layanan membalas 429.
+      options.sapuanPenuh
+        ? Promise.resolve({ widgets: [] as any[], judul: undefined as string | undefined, deskripsi: undefined as string | undefined })
+        : this.ekstrakFokusParalel(base, cfg, options),
+      // Sapuan menyeluruh: seluruh isi basis dibaca per area. Hanya untuk jalur
+      // pembuat dashboard — mahal, jadi tidak dipakai tanya-jawab biasa.
+      options.sapuanPenuh
+        ? this.sapuanMenyeluruh(base, cfg, options)
+        : Promise.resolve({
+            widgets: [] as any[],
+            judul: undefined,
+            deskripsi: undefined,
+            areaKosong: [] as string[],
+            kelompok: [] as Array<{ id: string; widgets: any[] }>,
+          }),
     ]);
 
     const widgetsUtama = itemUtama ? payloadKeWidgetSpec(itemUtama, options.sector) : [];
     // Tipe yang benar-benar digambar sebagai grafik (bukan kartu angka/tabel).
     const TIPE_GRAFIK = new Set(['line', 'area', 'bar', 'hbar', 'donut', 'pie', 'radar', 'scatter', 'bubble', 'heatmap', 'waterfall', 'funnel', 'combo', 'gauge']);
     const tipeGrafik = (ws: any[]) => new Set(ws.filter((w) => TIPE_GRAFIK.has(w.type)).map((w) => w.type));
-    // Skema utuh kadang hanya menghasilkan SATU jenis grafik walau instruksi sudah
-    // meminta beragam — dashboard jadi monoton. Hasil ekstraksi fokus (berjalan
-    // paralel, jadi tanpa tambahan waktu tunggu) dipakai untuk melengkapi variasi,
-    // bukan hanya saat jumlah widget kurang.
-    const kurangJenisGrafik = tipeGrafik(widgetsUtama).size < 2;
-    const gabung: any[] = [...widgetsUtama];
-    if (widgetsUtama.length < 3 || kurangJenisGrafik) {
-      for (const w of fokus.widgets) {
-        const tipeSudahAda = gabung.some((x: any) => x.type === w.type);
-        // Grafik: boleh menambah walau tipenya sudah ada selama jenis grafik
-        // masih kurang dari dua (mis. dua batang tetap lebih informatif daripada
-        // satu), selain itu hanya tipe yang belum ada.
-        if (!tipeSudahAda || (TIPE_GRAFIK.has(w.type) && tipeGrafik(gabung).size < 2)) gabung.push(w);
-      }
+
+    // Gabungkan: hasil sapuan (paling luas) dulu, lalu skema utuh, lalu fokus.
+    // Dedupe memakai judul+tipe yang dinormalkan supaya indikator yang sama dari
+    // dua area tidak muncul dua kali.
+    const kunciWidget = (w: any) =>
+      `${String(w?.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}|${String(w?.type || '')}`;
+    const sudahAda = new Set<string>();
+    const gabungSemua: any[] = [];
+    // Widget di luar kuota area — dipakai mengisi sisa slot bila masih ada.
+    const sisaKuota: any[] = [];
+    const tambahWidget = (w: any) => {
+      const k = kunciWidget(w);
+      if (!k || k === '|' || sudahAda.has(k)) return;
+      sudahAda.add(k);
+      gabungSemua.push(w);
+    };
+    (sapuan.kelompok || []).forEach((g: any) => {
+      const batasArea = g.id === 'kpi' ? 5 : 3;
+      g.widgets.forEach((w: any, i: number) => (i < batasArea ? tambahWidget(w) : sisaKuota.push(w)));
+    });
+    widgetsUtama.forEach(tambahWidget);
+    fokus.widgets.forEach(tambahWidget);
+
+    // Batas atas: dashboard tetap terbaca. Kuota per area di atas memastikan
+    // setiap area dapat jatah, jadi yang dipotong hanya kelebihan — bukan
+    // seluruh area yang kebetulan urutannya belakangan.
+    const MAKS_WIDGET = 26;
+    for (const w of sisaKuota) {
+      if (gabungSemua.length >= MAKS_WIDGET) break;
+      tambahWidget(w);
     }
-    const widgets = widgetsUtama.length >= 3 && !kurangJenisGrafik ? widgetsUtama : gabung;
+    // KPI maksimal 6 kartu dan semuanya di paling atas; grafik/tabel menyusul.
+    const widgets = susunUlangWidget(gabungSemua.slice(0, MAKS_WIDGET));
     if (widgets.length === 0) {
-      console.warn('[rag] /extract tidak menghasilkan widget (skema utuh & fokus sama-sama kosong)');
+      console.warn('[rag] /extract tidak menghasilkan widget (sapuan, skema utuh & fokus sama-sama kosong)');
       return null;
     }
-    if ((widgetsUtama.length < 3 || kurangJenisGrafik) && fokus.widgets.length > 0) {
+    if (sapuan.widgets?.length) {
+      console.log(
+        `[rag] sapuan menyeluruh dipakai: ${sapuan.widgets.length} widget dari ${AREA_SAPUAN.length} area ` +
+          `(area kosong: ${sapuan.areaKosong.length ? sapuan.areaKosong.join(', ') : '-'}); ` +
+          `skema utuh ${widgetsUtama.length}; fokus ${fokus.widgets.length}; total setelah dedupe ${widgets.length}.`
+      );
+    } else if ((widgetsUtama.length < 3 || tipeGrafik(widgetsUtama).size < 2) && fokus.widgets.length > 0) {
       console.log(
         `[rag] Jalur A dilengkapi ekstraksi fokus (${fokus.widgets.length} widget): skema utuh ${widgetsUtama.length} widget, ${tipeGrafik(widgetsUtama).size} jenis grafik.`
       );
     }
-    const item: any = itemUtama || { dashboardTitle: fokus.judul, description: fokus.deskripsi };
+    const item: any = itemUtama || {
+      dashboardTitle: sapuan.judul || fokus.judul,
+      description: sapuan.deskripsi || fokus.deskripsi,
+    };
     const structuredJson = {
       dashboardTitle: potong(item.dashboardTitle, BATAS_TEKS.judulDash) || `Dashboard ${options.sector.toUpperCase()}`,
       description:
@@ -925,7 +1163,7 @@ export class ConfigurableRagClient implements RagClient {
         : fokus === 'grafik'
           ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. '
           : fokus === 'tabel'
-            ? 'Isi maksimal 4 kolom dan 5 baris dengan angka nyata dari dokumen. '
+            ? 'Isi maksimal 8 kolom dan 14 baris dengan angka nyata dari dokumen; jangan potong seri 12 bulan atau 5 wilayah. '
             : 'Isi maksimal 45 kata ringkasan dari dokumen, bukan visi misi atau kebijakan internal. ';
     const sebutanInstansi = kbId?.trim()
       ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
@@ -973,6 +1211,225 @@ export class ConfigurableRagClient implements RagClient {
    * bersamaan sehingga total waktunya mendekati satu panggilan saja. Hanya widget yang
    * benar-benar lolos pemetaan yang dikembalikan; tidak ada angka contoh.
    */
+  /**
+   * Instruksi untuk SATU area sapuan. Menekankan agar model mengembalikan SEMUA
+   * baris/seri yang ada di dokumen — inilah yang mencegah grafik hanya berisi
+   * 3–6 titik padahal dokumennya memuat 12 bulan atau 5 wilayah.
+   */
+  private instruksiArea(
+    area: { id: string; label: string; instruksi: string },
+    options: RagQueryOptions,
+    ketat = false
+  ): string {
+    const instansi = (options.instansi || '').trim();
+    const kbTerskop = !!options.kbId?.trim();
+    return (
+      `Ambil data untuk SATU bagian dashboard: ${area.instruksi}. ` +
+      (kbTerskop
+        ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
+        : instansi
+          ? `Instansi: "${instansi}". Ambil angka HANYA dari dokumen instansi tersebut. `
+          : `Konteks instansi: sektor ${options.sector.toUpperCase()}. `) +
+      `Permintaan pengguna: "${options.prompt}". ` +
+      `ATURAN KELUARAN: ` +
+      `(1) LENGKAP — sertakan SEMUA baris/seri yang tercantum di dokumen (seluruh 12 bulan, seluruh wilayah, seluruh pos laporan), ` +
+      `jangan dipotong menjadi 3–6 titik dan jangan diringkas. ` +
+      `(2) Setiap angka WAJIB dari dokumen; kalau tidak ada, kosongkan — jangan dikarang dan jangan diisi 0. ` +
+      `(3) Isi "kpi" untuk angka tunggal, "grafik" untuk deret atau perbandingan, "tabel" untuk rincian banyak kolom, ` +
+      `"narasi" untuk 1–2 kalimat makna angkanya. ` +
+      `(4) Setiap item wajib menyertakan docName dan page sumbernya. ` +
+      `(5) Bila bagian ini tidak ada di dokumen, kembalikan kpi kosong.` +
+      (area.id === 'wilayah' ? this.instruksiWilayah(ketat) : '')
+    );
+  }
+
+  /**
+   * INSTRUKSI KHUSUS AREA WILAYAH.
+   *
+   * Percobaan normal sering salah: saat diminta "sebaran wilayah", RAG
+   * mengembalikan grafik pendapatan atau deret tahunan karena potongan yang
+   * terambil berbicara tentang kinerja, bukan tabel per kota administrasi.
+   * Karena itu instruksinya ditegaskan (daftar wilayah disebut satu per satu),
+   * dan pada percobaan kedua (`ketat`) hasilnya dipaksa berupa TABEL saja.
+   */
+  private instruksiWilayah(ketat: boolean): string {
+    const daftar = WILAYAH_LAYANAN.join(', ');
+    if (ketat) {
+      return (
+        ` ATURAN KHUSUS AREA WILAYAH (WAJIB DIPATUHI): balas HANYA "tabel", tanpa grafik dan tanpa narasi. ` +
+        `Tabel wajib berisi tepat satu baris per wilayah untuk: ${daftar}. ` +
+        `Kolom: Wilayah, Jumlah pelanggan, Air terjual (m3), NRW (%), Pengaduan. ` +
+        `DILARANG mengembalikan grafik pendapatan, grafik tahunan, atau deret bulanan — itu bukan sebaran wilayah. ` +
+        `Kalau dokumen memang tidak memuat rincian per wilayah, kembalikan kpi/grafik/tabel kosong; jangan diisi angka lain.`
+      );
+    }
+    return (
+      ` ATURAN KHUSUS AREA WILAYAH: sumbu/kategori atau kolom pertama WAJIB berisi nama wilayah ` +
+      `(${daftar}) — bukan tahun, bukan bulan. ` +
+      `Jangan mengganti permintaan ini dengan grafik pendapatan usaha atau tren tahunan. ` +
+      `Bila hanya sebagian wilayah tercantum di dokumen, ambil yang ada dan sebutkan wilayahnya masing-masing.`
+    );
+  }
+
+  /**
+   * SAPUAN MENYELURUH — baca seluruh isi basis dokumen dengan menyapu setiap area.
+   *
+   * Satu /extract per area, `top_k` maksimum, tiga permintaan berjalan
+   * berbarengan. Hasil semua area digabung dan di-id ulang supaya tidak bentrok.
+   * Dipakai hanya oleh jalur pembuat dashboard (`sapuanPenuh: true`).
+   */
+  private async sapuanMenyeluruh(
+    base: string,
+    cfg: { apiKey?: string; kbId?: string; timeoutMs: number },
+    options: RagQueryOptions
+  ): Promise<{
+    widgets: any[];
+    judul?: string;
+    deskripsi?: string;
+    areaKosong: string[];
+    kelompok: Array<{ id: string; widgets: any[] }>;
+  }> {
+    // Batas per area: cukup longgar untuk skema penuh, tetapi satu area yang
+    // lambat tidak boleh menahan seluruh permintaan.
+    const batas = Math.min(Math.max(45, cfg.timeoutMs || 60), 60);
+    // BERURUTAN (satu area pada satu waktu). Uji nyata: saat 3–4 permintaan
+    // dijalankan bersamaan, layanan RAG membalas 429 dan tiap panggilan melambat
+    // sampai lewat 60 dtk sehingga areanya kosong. Berurutan, satu /extract
+    // selesai 14–25 dtk dan semua area terisi.
+    const KONKUREN = 1;
+
+    // Cache: isi dokumen jarang berubah, jadi sapuan yang sama tidak diulang.
+    const kunciCache = `${options.kbId || cfg.kbId || '-'}|${options.sector}`;
+    const tersimpan = this.cacheSapuan.get(kunciCache);
+    if (tersimpan && Date.now() - tersimpan.waktu < this.statisCacheSapuan) {
+      const umurMenit = Math.round((Date.now() - tersimpan.waktu) / 60000);
+      console.log(`[rag] sapuan dari cache (${umurMenit} menit lalu): ${tersimpan.widgets.length} widget`);
+      return {
+        widgets: tersimpan.widgets,
+        judul: tersimpan.judul,
+        deskripsi: tersimpan.deskripsi,
+        areaKosong: tersimpan.areaKosong,
+        kelompok: tersimpan.kelompok,
+      };
+    }
+
+    const widgets: any[] = [];
+    const areaKosong: string[] = [];
+    const kelompokHasil: Array<{ id: string; widgets: any[] }> = [];
+    let judul: string | undefined;
+    let deskripsi: string | undefined;
+
+    // Tenggat total: permintaan tidak boleh menggantung tanpa akhir. Bila
+    // terlewati, sisa area dilewati dan dicatat (dashboard tetap terbentuk dari
+    // area yang sudah berhasil).
+    const tenggat = Date.now() + 600_000;
+    for (let i = 0; i < AREA_SAPUAN.length; i += KONKUREN) {
+      // Bagi sisa waktu secara adil: tiap area mendapat jatahnya sendiri, jadi
+      // area terakhir tidak kehabisan waktu hanya karena area awal lambat
+      // (dulu area "wilayah" sampai tidak pernah dicoba sama sekali).
+      const sisaArea = AREA_SAPUAN.length - i;
+      const sisaDetik = Math.max(0, Math.round((tenggat - Date.now()) / 1000));
+      const batasArea = Math.max(20, Math.min(batas, Math.floor(sisaDetik / sisaArea)));
+      if (Date.now() > tenggat) {
+        for (let j = i; j < AREA_SAPUAN.length; j++) areaKosong.push(`lewat-tenggat(${AREA_SAPUAN[j].id})`);
+        console.warn(`[rag] tenggat sapuan tercapai, ${AREA_SAPUAN.length - i} area dilewati`);
+        break;
+      }
+      const kelompok = AREA_SAPUAN.slice(i, i + KONKUREN);
+      const bagian = await Promise.allSettled(
+        kelompok.map(async (area) => {
+          // Ulangi sekali kalau layanan sedang sibuk (429/502/504/timeout) —
+          // tanpa ini area tersebut hilang dari dashboard hanya karena sesaat.
+          const ambil = async (percobaan: number): Promise<any> => {
+            try {
+              const hasil = await this.ambilPayloadExtract(
+                base,
+                cfg,
+                this.instruksiArea(area, options, percobaan > 1),
+                SKEMA_EKSTRAKSI,
+                options.kbId,
+                { timeoutMs: batasArea, topK: 50, lemparSaatGagal: true }
+              );
+              // Area wilayah: tolak hasil yang bukan sebaran wilayah (mis. grafik
+              // pendapatan), lalu ulangi SEKALI dengan instruksi ketat. Kalau tetap
+              // salah, area dikosongkan — lebih baik tidak ada widget daripada
+              // widget berisi angka yang salah konteks.
+              if (area.id === 'wilayah' && !hasilWilayahSah(hasil)) {
+                if (percobaan < 2) {
+                  console.warn('[rag] area wilayah: hasil bukan sebaran wilayah, ulang dengan instruksi ketat');
+                  await new Promise((r) => setTimeout(r, 1000));
+                  return ambil(percobaan + 1);
+                }
+                console.warn('[rag] area wilayah dilewati: dokumen tidak memberi sebaran wilayah yang sah');
+                return null;
+              }
+              return hasil;
+            } catch (err) {
+              const pesan = jelaskanError(err);
+              // Ulangi sekali untuk galat "layanan sibuk" DAN timeout: uji nyata
+              // menunjukkan permintaan yang timeout sering berhasil pada
+              // percobaan kedua. Percobaan maksimal dua supaya tidak menggantung.
+              const sibuk = /429|502|503|timeout|Timeout/i.test(pesan);
+              if (percobaan < 2 && sibuk && Date.now() + 25_000 < tenggat) {
+                await new Promise((r) => setTimeout(r, 2000));
+                return ambil(percobaan + 1);
+              }
+              throw err;
+            }
+          };
+          const item = await ambil(1);
+          if (!item) return { area: area.id, widgets: [] as any[], judul: undefined as string | undefined };
+          const ws = payloadKeWidgetSpec(item, options.sector).map((w: any, n: number) => ({
+            ...w,
+            // id unik per area — payloadKeWidgetSpec memakai w-kpi-1, w-grafik-1
+            // yang akan bentrok antar area.
+            id: `sw-${area.id}-${n + 1}`,
+          }));
+          return {
+            area: area.id,
+            widgets: ws,
+            judul: typeof item?.dashboardTitle === 'string' ? item.dashboardTitle : undefined,
+            deskripsi: typeof item?.description === 'string' ? item.description : undefined,
+          };
+        })
+      );
+      for (const h of bagian) {
+        if (h.status === 'fulfilled') {
+          const v = h.value;
+          if (v.widgets.length === 0) areaKosong.push(v.area);
+          else {
+            widgets.push(...v.widgets);
+            kelompokHasil.push({ id: v.area, widgets: v.widgets });
+            if (!judul && v.judul) judul = v.judul;
+            if (!deskripsi && (v as any).deskripsi) deskripsi = (v as any).deskripsi;
+          }
+        } else {
+          const alasan = jelaskanError(h.reason);
+          console.warn(`[rag] sapuan area gagal: ${alasan}`);
+          areaKosong.push(`gagal(${alasan.slice(0, 40)})`);
+        }
+      }
+      // Jeda kecil antar area supaya layanan tidak dihujani permintaan beruntun.
+      if (i + KONKUREN < AREA_SAPUAN.length) await new Promise((r) => setTimeout(r, 400));
+    }
+
+    console.log(
+      `[rag] sapuan menyeluruh: ${AREA_SAPUAN.length} area, ${widgets.length} widget, ` +
+        `area kosong: ${areaKosong.length ? areaKosong.join(', ') : '-'}`
+    );
+    if (widgets.length > 0) {
+      this.cacheSapuan.set(kunciCache, {
+        waktu: Date.now(),
+        widgets,
+        judul,
+        deskripsi,
+        areaKosong,
+        kelompok: kelompokHasil,
+      });
+    }
+    return { widgets, judul, deskripsi, areaKosong, kelompok: kelompokHasil };
+  }
+
   private async ekstrakFokusParalel(
     base: string,
     cfg: { apiKey?: string; kbId?: string; timeoutMs: number },
@@ -1023,7 +1480,7 @@ export class ConfigurableRagClient implements RagClient {
     tipeTarget: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
     const cfg = this.getRagConfig();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
@@ -1046,10 +1503,37 @@ export class ConfigurableRagClient implements RagClient {
     // Batasi tiap percobaan: satu percobaan yang menggantung tidak boleh menghabiskan
     // seluruh anggaran waktu sebelum percobaan kedua sempat berjalan.
     const batasPercobaan = Math.min(Math.max(30, cfg.timeoutMs || 60), 60);
-    let item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, SKEMA_FOKUS[fokus], kbId, {
-      ...(opsi || {}),
-      timeoutMs: batasPercobaan,
-    });
+    /**
+     * Panggil /extract dengan percobaan ulang saat layanan sibuk.
+     *
+     * Pengisian template memanggil 18 kartu sekaligus; RAG membalas 429 untuk
+     * sebagian besar permintaan. Dulu balasan 429 langsung dianggap "dokumen
+     * tidak memuat angkanya", sehingga SELURUH kanvas tampil "Belum ada di
+     * dokumen" padahal angkanya ada. Sekarang: jeda makin panjang (4 dtk, 8 dtk)
+     * dan maksimal tiga percobaan, selama anggaran waktu kartu masih ada.
+     */
+    const batasAkhir = Date.now() + Math.max(20_000, opsi?.batasMs ?? 150_000);
+    const ambilDenganCobaUlang = async (teks: string): Promise<any | null> => {
+      let pesanTerakhir = '';
+      for (let coba = 1; coba <= 3; coba += 1) {
+        const sisaDetik = Math.round((batasAkhir - Date.now()) / 1000);
+        if (sisaDetik < 10) break;
+        try {
+          return await this.ambilPayloadExtract(dipakai, cfg, teks, SKEMA_FOKUS[fokus], kbId, {
+            lemparSaatGagal: true,
+            timeoutMs: Math.min(batasPercobaan, sisaDetik),
+          });
+        } catch (err) {
+          pesanTerakhir = jelaskanError(err);
+          const sibuk = /429|502|503|504|timeout/i.test(pesanTerakhir);
+          if (!sibuk || coba === 3) break;
+          await new Promise((r) => setTimeout(r, coba === 1 ? 4000 : 8000));
+        }
+      }
+      if (pesanTerakhir) throw new Error(pesanTerakhir);
+      return null;
+    };
+    let item = await ambilDenganCobaUlang(instruksi);
     if (!item) return null;
     let widgets = bungkus(item);
 
@@ -1066,10 +1550,7 @@ export class ConfigurableRagClient implements RagClient {
         .trim();
       console.warn(`[rag] percobaan kedua untuk preset: "${polos}"`);
       const instruksiUmum = this.instruksiFokus(fokus, polos || query, sector, instansi, kbId, 'umum');
-      const item2 = await this.ambilPayloadExtract(dipakai, cfg, instruksiUmum, SKEMA_FOKUS[fokus], kbId, {
-        ...(opsi || {}),
-        timeoutMs: batasPercobaan,
-      });
+      const item2 = await ambilDenganCobaUlang(instruksiUmum);
       if (item2) {
         item = item2;
         widgets = bungkus(item2);
@@ -1105,6 +1586,16 @@ export class ConfigurableRagClient implements RagClient {
     // dengan pratinjaunya.
     const selaras = selaraskanTipe(cocok, tipeTarget);
     if (!selaras.ok || !selaras.widget) {
+      // Pengisi template minta penurunan bentuk: datanya ADA, hanya bentuk
+      // tampilannya yang tidak cocok (donut untuk 2 seri, heatmap tanpa 2 baris,
+      // gauge tanpa seri). Katalog TIDAK memakai ini — di sana tipe pilihan
+      // pengguna harus dihormati apa adanya.
+      if (opsi?.turunkanTipe) {
+        const turun = turunkanTipeAman(cocok, tipeTarget);
+        if (turun) {
+          return { data: turun, judul: item.dashboardTitle, deskripsi: item.description };
+        }
+      }
       return {
         data: null,
         judul: item.dashboardTitle,
@@ -1164,6 +1655,22 @@ export class ConfigurableRagClient implements RagClient {
       return { insight: teks };
     } catch (err) {
       return { insight: null, catatan: jelaskanError(err) };
+    }
+  }
+
+  /**
+   * Apakah hasil sapuan penuh untuk KB ini masih tersimpan?
+   * Dipakai pembuat dashboard untuk memberi estimasi waktu yang jujur:
+   * cache tersimpan → puluhan detik; tanpa cache → beberapa menit.
+   */
+  adaCacheSapuan(kbId?: string, sector?: string): boolean {
+    try {
+      const cfg: any = this.getRagConfig();
+      const kunci = `${kbId || cfg?.kbId || '-'}|${sector || 'pdam'}`;
+      const c = this.cacheSapuan.get(kunci);
+      return !!c && Date.now() - c.waktu < this.statisCacheSapuan;
+    } catch {
+      return false;
     }
   }
 

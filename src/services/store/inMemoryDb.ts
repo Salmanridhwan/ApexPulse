@@ -30,6 +30,7 @@ import {
 } from '../../types';
 import { hashPassword, verifyPassword } from '../auth/session';
 import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
+import { normalisasiPeran } from '../laporan/alur';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
@@ -62,8 +63,8 @@ const SEED_USERS: SafeUser[] = [
   {
     id: 'user-demo',
     email: 'demo@aionesboard.id',
-    name: 'Siti Rahmawati, S.E. (Analis BUMD)',
-    role: 'analis',
+    name: 'Siti Rahmawati, S.E. (Pengguna BUMD)',
+    role: 'pengguna',
     tenantId: 'tenant-pdam',
     avatar: '',
   },
@@ -71,7 +72,7 @@ const SEED_USERS: SafeUser[] = [
     id: 'user-direksi',
     email: 'direksi@aionesboard.id',
     name: 'Dr. Ir. Hendra Kusuma (Direktur Utama)',
-    role: 'direksi',
+    role: 'pengguna',
     tenantId: 'tenant-pdam',
     avatar: '',
   },
@@ -87,7 +88,7 @@ const SEED_USERS: SafeUser[] = [
     id: 'user-user-gmail',
     email: 'user@gmail.com',
     name: 'User Instansi',
-    role: 'analis',
+    role: 'pengguna',
     tenantId: 'tenant-pdam',
     avatar: '',
   },
@@ -475,6 +476,7 @@ export class InMemoryDb {
         if (this.deletedTenantIds.length > 0) {
           this.tenants = this.tenants.filter((t) => !this.deletedTenantIds.includes(t.id));
         }
+        this.normalisasiPeranLama();
         this.ensureSeedUsers();
         // Tenant dari MySQL bisa belum punya KB — backfill agar tidak jatuh
         // ke KB campur (lihat ensureTenantKb).
@@ -539,6 +541,9 @@ export class InMemoryDb {
         for (const r of baris) peta.set(r.id, r.data);
         this.users = Array.from(peta.values());
         for (const r of baris) if (r.passHash) this.credentials[r.id] = r.passHash;
+        // Peran lama di tabel auth_users (analis/direksi) → pengguna. Dilakukan
+        // SEBELUM loop upsert di bawah supaya baris di database ikut terkoreksi.
+        this.normalisasiPeranLama();
         // User seed dari kode tetap dijamin ada (mis. admin@gmail.com).
         this.ensureSeedUsers();
       }
@@ -638,7 +643,12 @@ export class InMemoryDb {
           await this.mysql.upsertChat(c.id, c.tenantId, c.dashboardId ?? null, c);
         }
       } else if (chatTabel.length > 0) {
-        this.chats = chatTabel;
+        // Jangan ganti daftar di memori selama masih ada tulisan menggantung.
+        // Hasil baca tabel bisa lebih tua daripada pesan yang baru saja
+        // ditambahkan; menimpanya membuat balasan asisten lenyap dari riwayat
+        // padahal sudah tampil di layar (dan `addChatMessage` berikutnya bisa
+        // kehilangan chat-nya sama sekali).
+        if (this.pendingWrites === 0) this.chats = chatTabel;
       }
     } catch (err: any) {
       console.error('[AionesBoard DB] Sinkron dashboard/chat gagal:', err?.message || err);
@@ -790,6 +800,35 @@ export class InMemoryDb {
   }
 
   /**
+   * Normalkan peran lama (`analis`, `direksi`) menjadi `pengguna`.
+   *
+   * Data dari MySQL maupun `data/db.json` cadangan lama masih memakai dua
+   * peran yang sudah digabung. Tanpa normalisasi, akun itu tidak cocok dengan
+   * gerbang izin mana pun (bukan admin, bukan pengguna) sehingga UI
+   * menampilkan hak akses yang salah. Idempoten — aman dipanggil tiap start.
+   */
+  private normalisasiPeranLama(): void {
+    let berubah = false;
+    for (const u of this.users) {
+      const peran = normalisasiPeran(u.role);
+      if (u.role !== peran) {
+        u.role = peran;
+        berubah = true;
+      }
+    }
+    for (const alur of this.alurVerifikasi) {
+      for (const tahap of alur.tahap || []) {
+        const peran = normalisasiPeran(tahap.peran);
+        if (tahap.peran !== peran) {
+          tahap.peran = peran;
+          berubah = true;
+        }
+      }
+    }
+    if (berubah) this.persist();
+  }
+
+  /**
    * Pastikan user seed (dari kode) selalu ada — dipanggil setelah state
    * dimuat dari MySQL, karena koleksi users di DB bisa berisi data lama
    * yang belum memuat user seed baru.
@@ -877,6 +916,8 @@ export class InMemoryDb {
       if (Array.isArray(parsed.perjanjianKinerja)) this.perjanjianKinerja = parsed.perjanjianKinerja;
       if (Array.isArray(parsed.lkjip)) this.lkjip = parsed.lkjip;
       if (parsed.credentials) this.credentials = parsed.credentials;
+      // Peran lama di berkas cadangan (analis/direksi) → pengguna.
+      this.normalisasiPeranLama();
       // Jamin user seed tetap ada walau file fallback sudah usang.
       this.ensureSeedUsers();
       // Jamin tenant seed punya KB (state lama belum menyimpan field ini).

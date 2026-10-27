@@ -239,7 +239,7 @@ export const Admin: React.FC<AdminProps> = ({
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userRole, setUserRole] = useState<UserRole>('analis');
+  const [userRole, setUserRole] = useState<UserRole>('pengguna');
   const [userTenantId, setUserTenantId] = useState('');
 
   // Tenant Modal State
@@ -321,7 +321,7 @@ export const Admin: React.FC<AdminProps> = ({
         setPermintaanGabung(gabungRes);
         setRolePermintaan((prev) => {
           const next = { ...prev };
-          for (const p of gabungRes) if (!next[p.id]) next[p.id] = 'analis';
+          for (const p of gabungRes) if (!next[p.id]) next[p.id] = 'pengguna';
           return next;
         });
       }
@@ -351,7 +351,7 @@ export const Admin: React.FC<AdminProps> = ({
       const res = await fetch(`/api/admin/join-requests/${p.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: rolePermintaan[p.id] || 'analis', tenantId: p.tenantId }),
+        body: JSON.stringify({ role: rolePermintaan[p.id] || 'pengguna', tenantId: p.tenantId }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Gagal menyetujui (HTTP ${res.status}).`);
@@ -1341,7 +1341,7 @@ export const Admin: React.FC<AdminProps> = ({
                     Manajemen Pengguna & Hak Akses Berbasis Peran (RBAC)
                   </h3>
                   <p className="text-xs text-ink-2">
-                    Kelola staf BUMD: Administrator, Analis Kinerja, dan Dewan Direksi / Pengawas
+                    Kelola staf BUMD: Administrator dan Pengguna
                   </p>
                 </div>
                 <button
@@ -1405,15 +1405,14 @@ export const Admin: React.FC<AdminProps> = ({
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <select
-                            value={rolePermintaan[p.id] || 'analis'}
+                            value={rolePermintaan[p.id] || 'pengguna'}
                             onChange={(e) =>
                               setRolePermintaan((prev) => ({ ...prev, [p.id]: e.target.value as UserRole }))
                             }
                             className="text-[11px] px-2 py-1.5 border border-line rounded-control bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-brand"
                             title="Peran saat disetujui"
                           >
-                            <option value="analis">Analis</option>
-                            <option value="direksi">Direksi</option>
+                            <option value="pengguna">Pengguna</option>
                             <option value="admin">Administrator</option>
                           </select>
                           <button
@@ -1478,16 +1477,10 @@ export const Admin: React.FC<AdminProps> = ({
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
                                   ? 'bg-brand/15 text-brand-ink border border-brand/30'
-                                  : u.role === 'direksi'
-                                    ? 'bg-warn/15 text-warn'
-                                    : 'bg-surface-2 text-ink'
+                                  : 'bg-surface-2 text-ink'
                                 }`}
                             >
-                              {u.role === 'admin'
-                                ? 'Administrator'
-                                : u.role === 'direksi'
-                                  ? 'Direksi / Pengawas'
-                                  : 'Analis Kinerja'}
+                              {u.role === 'admin' ? 'Administrator' : 'Pengguna'}
                             </span>
                           </td>
                           <td className="p-3">
@@ -2527,8 +2520,7 @@ export const Admin: React.FC<AdminProps> = ({
                     onChange={(e) => setUserRole(e.target.value as UserRole)}
                     className="field-lg"
                   >
-                    <option value="analis">Analis Kinerja (Dapat membuat & mengedit dashboard)</option>
-                    <option value="direksi">Direksi / Pengawas (Hak akses lihat & terima laporan)</option>
+                    <option value="pengguna">Pengguna (Buat dashboard, verifikasi laporan, tindak lanjut)</option>
                     <option value="admin">Administrator Sistem (Akses penuh tata kelola)</option>
                   </select>
                 </div>

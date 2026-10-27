@@ -28,30 +28,34 @@ import type {
 
 /** Alur bawaan bila instansi belum mendefinisikan alurnya sendiri. */
 export const ALUR_BAWAAN: TahapAlur[] = [
-  { urutan: 1, nama: 'Verifikasi', peran: 'analis' },
-  { urutan: 2, nama: 'Persetujuan', peran: 'direksi' },
+  { urutan: 1, nama: 'Verifikasi', peran: 'pengguna' },
 ];
 
 /** Label manusiawi peran. */
 export const LABEL_PERAN: Record<UserRole, string> = {
   admin: 'Admin',
-  analis: 'Analis',
-  direksi: 'Direksi',
+  pengguna: 'Pengguna',
 };
 
 /**
- * Normalisasi peran dari sesi (bertipe `string`) menjadi `UserRole`.
- * Nilai tak dikenal diperlakukan sebagai `analis` — peran paling terbatas,
- * supaya kesalahan data tidak pernah menaikkan hak akses.
+ * Normalisasi peran dari sesi/data lama (bertipe `string`) menjadi `UserRole`.
+ *
+ * Peran lama `analis` dan `direksi` digabung menjadi `pengguna` (gabungan hak
+ * keduanya). Nilai tak dikenal juga diperlakukan sebagai `pengguna` — peran
+ * paling terbatas, supaya kesalahan data tidak pernah menaikkan hak akses.
  */
 export function normalisasiPeran(peran: unknown): UserRole {
-  return peran === 'admin' || peran === 'direksi' || peran === 'analis' ? peran : 'analis';
+  return peran === 'admin' ? 'admin' : 'pengguna';
 }
 
 /**
  * Tahap efektif sebuah laporan: pakai alur instansi bila ada & valid,
  * kalau tidak jatuh ke `ALUR_BAWAAN`. Selalu mengembalikan daftar yang sudah
  * terurut dan hanya memuat tahap yang masuk akal (nama non-kosong).
+ *
+ * `peran` tiap tahap SELALU dinormalkan: alur yang tersimpan sebelum
+ * penggabungan peran masih memuat `analis`/`direksi`, dan tanpa normalisasi
+ * tidak ada peran yang cocok sehingga tahap itu tak bisa diselesaikan siapa pun.
  */
 export function tahapEfektif(
   laporan: Pick<LaporanPeriodik, 'alurId'>,
@@ -61,7 +65,11 @@ export function tahapEfektif(
   const sumber = alur?.tahap?.length ? alur.tahap : ALUR_BAWAAN;
   return sumber
     .filter((t) => t && typeof t.nama === 'string' && t.nama.trim())
-    .map((t) => ({ urutan: Number(t.urutan) || 0, nama: String(t.nama).trim(), peran: t.peran }))
+    .map((t) => ({
+      urutan: Number(t.urutan) || 0,
+      nama: String(t.nama).trim(),
+      peran: normalisasiPeran(t.peran),
+    }))
     .sort((a, b) => a.urutan - b.urutan);
 }
 
@@ -142,7 +150,7 @@ export function validasiAlur(tahap: unknown): string | null {
     if (!nama) return 'Setiap tahap wajib punya nama.';
     if (nama.length > 60) return `Nama tahap "${nama.slice(0, 20)}…" terlalu panjang (maks 60).`;
     const peran = (t as any).peran;
-    if (!['admin', 'analis', 'direksi'].includes(peran)) {
+    if (peran !== 'admin' && peran !== 'pengguna') {
       return `Peran tahap "${nama}" tidak dikenal.`;
     }
     const u = Number((t as any).urutan);

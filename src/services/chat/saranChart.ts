@@ -102,27 +102,191 @@ const PILIHAN: PilihanTipe[] = [
   },
 ];
 
-/**
- * Susun daftar saran tampilan untuk satu indikator.
- * `indikator` kosong → memakai sebutan umum supaya kalimatnya tetap masuk akal.
- */
-export function susunSaranChart(indikator: string): SaranChart[] {
-  const topik = rapikan(indikator) || 'indikator utama instansi';
-  return PILIHAN.map((p) => ({
-    id: `saran-${p.tipe}`,
-    tipe: p.tipe,
-    judul: `${topik} ${p.akhiran}`,
-    alasan: p.alasan,
-    kapan: p.kapan,
-    indikator: topik,
-  }));
+/** Apakah label sumbu-x berupa deret waktu (bulan/triwulan/tahun)? */
+function deretWaktu(xAxis: string[]): boolean {
+  const BULAN =
+    /^(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)/i;
+  const cocok = xAxis.filter(
+    (x) => BULAN.test(x) || /^\d{4}$/.test(x) || /\b(triwulan|kuartal|q[1-4]|semester)\b/i.test(x)
+  );
+  return xAxis.length > 0 && cocok.length >= Math.ceil(xAxis.length * 0.6);
 }
 
 /**
- * Widget contoh untuk PRATINJAU saja — bentuknya sama dengan kartu kanvas,
- * angkanya jelas contoh dan tidak pernah disimpan ke dashboard.
+ * Susun daftar saran tampilan untuk satu indikator.
+ * `indikator` kosong → memakai sebutan umum supaya kalimatnya tetap masuk akal.
+ *
+ * Bila `data` diisi (hasil pengambilan dari dokumen instansi), setiap saran
+ * membawa pratinjau berisi ANGKA NYATA — bukan contoh bentuk tampilan.
+ */
+export function susunSaranChart(indikator: string, data?: DataSaran | null): SaranChart[] {
+  const topik = rapikan(indikator) || 'indikator utama instansi';
+  // Donut hanya masuk akal untuk komposisi. Kalau datanya deret waktu, menawarkan
+  // "menurut komposisi" justru menyesatkan — angka benar, bentuknya salah.
+  const pilihan = data && deretWaktu(data.xAxis) ? PILIHAN.filter((p) => p.tipe !== 'donut') : PILIHAN;
+  return pilihan.map((p) => {
+    const saran: SaranChart = {
+      id: `saran-${p.tipe}`,
+      tipe: p.tipe,
+      judul: `${topik} ${p.akhiran}`,
+      alasan: p.alasan,
+      kapan: p.kapan,
+      indikator: topik,
+    };
+    if (data) {
+      saran.pratinjau = widgetPratinjauDariData(saran, data);
+      saran.sumber = data.sumber;
+    }
+    return saran;
+  });
+}
+
+/** Deret angka nyata yang dipakai bersama oleh semua bentuk pratinjau. */
+export interface DataSaran {
+  xAxis: string[];
+  series: Array<{ name: string; data: number[] }>;
+  unit?: string;
+  /** Nama dokumen + halaman asal angka. */
+  sumber?: string;
+}
+
+/** Ringkas sumber dari sitasi widget, mis. "Laporan Tahunan PAM JAYA 2024 hlm. 12". */
+function sumberDari(w: any): string | undefined {
+  const c = Array.isArray(w?.citations) ? w.citations[0] : undefined;
+  if (!c) return undefined;
+  const nama = String(c.docName || '').trim();
+  const halaman = Number(c.page) || 0;
+  if (!nama) return undefined;
+  return halaman > 0 ? `${nama} hlm. ${halaman}` : nama;
+}
+
+const keAngka = (v: any): number => {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * Ambil deret angka dari widget hasil RAG (grafik, tabel, atau KPI tunggal).
+ * Mengembalikan null kalau tidak ada angka yang bisa dipakai — pemanggil wajib
+ * jujur bahwa dokumennya belum memuat angka tersebut.
+ */
+export function dataDariWidget(w: any): DataSaran | null {
+  if (!w) return null;
+
+  const xAxis: string[] = Array.isArray(w.chart?.xAxis) ? w.chart.xAxis.map((x: any) => String(x)) : [];
+  const series = Array.isArray(w.chart?.series)
+    ? w.chart.series
+        .filter((s: any) => Array.isArray(s?.data) && s.data.length > 0)
+        .map((s: any) => ({ name: String(s?.name || w.title || 'Nilai'), data: s.data.map(keAngka) }))
+    : [];
+  if (xAxis.length > 0 && series.length > 0) {
+    return { xAxis, series, unit: w.chart?.unit ? String(w.chart.unit) : undefined, sumber: sumberDari(w) };
+  }
+
+  // Tabel: kolom teks pertama jadi label, kolom angka pertama jadi nilai.
+  const rows = Array.isArray(w.table?.rows) ? w.table.rows : [];
+  if (rows.length > 0) {
+    const kunci = Object.keys(rows[0] || {});
+    const kolomTeks = kunci.find((k) => typeof rows[0][k] === 'string');
+    const kolomAngka = kunci.find((k) => typeof rows[0][k] === 'number');
+    if (kolomTeks && kolomAngka) {
+      return {
+        xAxis: rows.map((r: any) => String(r[kolomTeks])),
+        series: [{ name: String(w.table?.columns?.find((c: any) => c.key === kolomAngka)?.label || 'Nilai'), data: rows.map((r: any) => keAngka(r[kolomAngka])) }],
+        unit: w.chart?.unit ? String(w.chart.unit) : undefined,
+        sumber: sumberDari(w),
+      };
+    }
+  }
+
+  // KPI tunggal: satu titik data, tetap boleh ditampilkan apa adanya.
+  if (w.kpi && w.kpi.value !== undefined && w.kpi.value !== null && w.kpi.value !== '') {
+    const nilai = keAngka(w.kpi.value);
+    if (Number.isFinite(nilai)) {
+      return {
+        xAxis: ['Nilai'],
+        series: [{ name: String(w.title || 'Nilai'), data: [nilai] }],
+        unit: w.kpi.unit ? String(w.kpi.unit) : undefined,
+        sumber: sumberDari(w),
+      };
+    }
+  }
+
+  return null;
+}
+
+/** Bangun pratinjau satu bentuk tampilan dari deret angka nyata. */
+export function widgetPratinjauDariData(saran: SaranChart, data: DataSaran): WidgetSpec {
+  const seri = data.series[0];
+  const dasar: WidgetSpec = {
+    id: `pratinjau-${saran.tipe}`,
+    type: saran.tipe,
+    title: saran.judul,
+    subtitle: data.sumber ? `Angka dokumen: ${data.sumber}` : 'Angka dari dokumen instansi',
+    category: 'Operasional',
+    confidence: 'sumber',
+    grid: { x: 0, y: 0, w: 12, h: 4 },
+    citations: [],
+    lastUpdated: new Date().toISOString(),
+  };
+
+  if (saran.tipe === 'kpi') {
+    const akhir = seri.data[seri.data.length - 1];
+    const sebelumnya = seri.data.length > 1 ? seri.data[seri.data.length - 2] : undefined;
+    const delta =
+      sebelumnya !== undefined && sebelumnya !== 0 ? ((akhir - sebelumnya) / Math.abs(sebelumnya)) * 100 : undefined;
+    const labelSebelum = data.xAxis[data.xAxis.length - 2];
+    return {
+      ...dasar,
+      grid: { x: 0, y: 0, w: 4, h: 3 },
+      kpi: {
+        value: akhir,
+        unit: data.unit,
+        delta: delta !== undefined ? Number(delta.toFixed(1)) : undefined,
+        deltaLabel:
+          delta !== undefined
+            ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1).replace('.', ',')}%${labelSebelum ? ` vs ${labelSebelum}` : ''}`
+            : undefined,
+        sparkline: seri.data.length > 1 ? seri.data : undefined,
+      },
+    };
+  }
+
+  if (saran.tipe === 'table') {
+    return {
+      ...dasar,
+      table: {
+        columns: [
+          { key: 'kategori', label: data.xAxis.length && data.xAxis.length === seri.data.length ? 'Kategori' : 'Periode' },
+          { key: 'nilai', label: seri.name || 'Nilai', format: 'number' },
+        ],
+        rows: data.xAxis.map((label, i) => ({ kategori: label, nilai: seri.data[i] ?? null })),
+      },
+    };
+  }
+
+  if (saran.tipe === 'donut') {
+    return {
+      ...dasar,
+      chart: { xAxis: data.xAxis, series: data.series, unit: data.unit, showLegend: true },
+    };
+  }
+
+  return {
+    ...dasar,
+    chart: { xAxis: data.xAxis, series: data.series, unit: data.unit, showLegend: data.series.length > 1 },
+  };
+}
+
+/**
+ * Widget contoh untuk PRATINJAU saja — HANYA dipakai kalau angka dokumen tidak
+ * tersedia. Bentuknya sama dengan kartu kanvas, angkanya jelas contoh dan tidak
+ * pernah disimpan ke dashboard.
  */
 export function widgetPratinjauSaran(saran: SaranChart): WidgetSpec {
+  // Pratinjau berangka nyata dari dokumen selalu diutamakan.
+  if (saran.pratinjau) return saran.pratinjau;
+
   const dasar: WidgetSpec = {
     id: `pratinjau-${saran.tipe}`,
     type: saran.tipe,

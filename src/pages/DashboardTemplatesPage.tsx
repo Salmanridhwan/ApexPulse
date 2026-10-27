@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -12,7 +12,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { BumdSector, Tenant } from '../types';
+import { BumdSector, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
@@ -20,6 +20,12 @@ import { pesanGalatRamah } from '../services/ui/pesanGalat';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
+  /**
+   * Progres pengisian angka dari dokumen. Pengisian bisa 5–15 menit karena kartu
+   * yang gagal (layanan sibuk) diulang sampai terisi — pengguna perlu melihat
+   * sudah berapa kartu yang berisi angka.
+   */
+  progres?: ProgresIsiTemplate | null;
   /**
    * Buat dashboard baru dari template DENGAN ANGKA DARI DOKUMEN RAG, lalu buka
    * kanvasnya. Mengembalikan ringkasan berapa kartu terisi dari dokumen dan
@@ -74,6 +80,7 @@ const komposisi = (t: DashboardTemplate): string => {
 export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   currentTenant,
   onUseTemplate,
+  progres,
 }) => {
   // Tab aktif. Default: template sektor instansi aktif (kalau ada), jika tidak template pertama.
   const [aktifId, setAktifId] = useState<string>(() => {
@@ -85,6 +92,20 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
   /** Status pengambilan angka dari dokumen saat tombol "Pakai Template Ini" ditekan. */
   const [memuat, setMemuat] = useState(false);
+  /**
+   * Detik berjalan selama pengisian. Pengisian 18 kartu bisa 2–4 menit; tanpa
+   * penghitung, halaman terlihat menggantung dan pengguna menutupnya di tengah
+   * jalan (kartu jadi kosong).
+   */
+  const [detik, setDetik] = useState(0);
+  useEffect(() => {
+    if (!memuat) {
+      setDetik(0);
+      return;
+    }
+    const t = setInterval(() => setDetik((d) => d + 1), 1000);
+    return () => clearInterval(t);
+  }, [memuat]);
   /**
    * Pesan galat untuk pengguna. Bahasa awam: tanpa istilah teknis (RAG, HTTP,
    * timeout) — pengguna hanya perlu tahu apa yang terjadi dan apa yang bisa
@@ -232,7 +253,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
               <span className="text-[11px] text-ink-3 font-medium truncate">
                 {memuat
-                  ? 'Mengambil angka dari dokumen instansi…'
+                  ? progres && progres.total > 0
+                    ? `${progres.terisi}/${progres.total} kartu terisi · ${detik} dtk · ${progres.judul || 'mengambil angka…'}`
+                    : `Mengambil angka dari dokumen instansi… ${detik} dtk`
                   : 'Angka setiap kartu diambil dari dokumen resmi instansi'}
               </span>
             </div>

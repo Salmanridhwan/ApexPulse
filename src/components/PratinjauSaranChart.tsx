@@ -28,9 +28,9 @@ const LABEL_TIPE: Record<string, string> = {
  * PRATINJAU SARAN CHART — memperlihatkan bentuk kartu persis seperti di kanvas,
  * lalu menyediakan tombol "Oke, tambahkan ke kanvas".
  *
- * Angka pada pratinjau hanya contoh bentuk. Angka sungguhan diambil dari dokumen
- * instansi saat tombol Oke ditekan; kalau dokumen tidak memuat indikatornya,
- * kartu tidak dipasang dan pengguna diberi tahu dengan kalimat biasa.
+ * Angka pada pratinjau diambil dari dokumen instansi (server mengirim `saran.pratinjau`).
+ * Hanya kalau dokumen belum memuat indikatornya, pratinjau memakai bentuk contoh dan
+ * mengatakannya terus terang.
  */
 export const PratinjauSaranChart: React.FC<PratinjauSaranChartProps> = ({
   saran,
@@ -114,9 +114,9 @@ export const PratinjauSaranChart: React.FC<PratinjauSaranChartProps> = ({
             />
           </ChartSelectionProvider>
           <p className="text-[10.5px] text-ink-3 leading-relaxed mt-3">
-            Angka di atas hanya contoh bentuk tampilan. Setelah ditambahkan, angka diambil dari dokumen
-            resmi instansi; kalau indikatornya tidak ada di dokumen, kartu ditandai kosong — bukan diisi
-            angka karangan.
+            {saran.pratinjau
+              ? `Angka di atas diambil langsung dari dokumen instansi${saran.sumber ? ` (${saran.sumber})` : ''}. Menekan "Oke, tambahkan" memasang kartu ini ke kanvas dengan angka yang sama.`
+              : 'Angka di atas hanya contoh bentuk tampilan karena dokumen instansi belum memuat indikator ini. Setelah ditambahkan, angka diambil dari dokumen resmi instansi; kalau indikatornya tidak ada, kartu ditandai kosong — bukan diisi angka karangan.'}
           </p>
         </div>
 

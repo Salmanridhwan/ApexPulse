@@ -466,7 +466,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-shell-ink truncate" title={currentUser?.name}>{currentUser?.name || 'Pengguna'}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[9px] font-semibold text-shell-ink-2 uppercase tracking-wider block">{currentUser?.role || 'Analis'}</span>
+                  <span className="text-[9px] font-semibold text-shell-ink-2 uppercase tracking-wider block">{currentUser?.role === 'admin' ? 'Admin' : 'Pengguna'}</span>
                   <span className="w-1 h-1 rounded-full bg-shell-ink-2" />
                   <span className="text-[9px] text-pos font-medium">Online</span>
                 </div>

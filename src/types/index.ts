@@ -1,6 +1,14 @@
 export type BumdSector = 'pdam' | 'pasar' | 'bank' | 'rsud' | 'transportasi' | 'aneka_usaha';
 
-export type UserRole = 'admin' | 'analis' | 'direksi';
+/**
+ * Peran pengguna aplikasi.
+ *
+ * Hanya dua peran: `admin` (pengelola instalasi — akses penuh tata kelola) dan
+ * `pengguna` (gabungan hak analis + direksi lama: pekerjaan operasional,
+ * verifikasi laporan, dan persetujuan). Peran `analis`/`direksi` sudah
+ * dihapus; data lama dinormalkan ke `pengguna` oleh `normalisasiPeran`.
+ */
+export type UserRole = 'admin' | 'pengguna';
 
 export interface Tenant {
   id: string;
@@ -469,6 +477,12 @@ export interface ProgressStep {
   id: string;
   title: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  /**
+   * Perkiraan lama proses ini (detik) — ditampilkan ke pengguna supaya ia tahu
+   * harus menunggu berapa lama. Diisi server: sapuan penuh tanpa cache bisa
+   * 8 menit, sedangkan hasil cache selesai di bawah satu menit.
+   */
+  estimasiDetik?: number;
 }
 
 /** Satu pilihan tampilan chart yang ditawarkan asisten di percakapan. */
@@ -482,6 +496,14 @@ export interface SaranChart {
   kapan: string;
   /** Indikator yang diminta pengguna; dipakai saat mengambil angka dari dokumen. */
   indikator: string;
+  /**
+   * Pratinjau berisi ANGKA NYATA dari dokumen instansi. Diisi server setelah
+   * mengambil data lewat RAG; bila kosong, klien memakai bentuk contoh dan
+   * wajib mengatakannya terus terang.
+   */
+  pratinjau?: WidgetSpec;
+  /** Sumber angka pratinjau, mis. "Laporan Tahunan PAM JAYA 2024 hlm. 12". */
+  sumber?: string;
 }
 
 export interface ChatMessage {
@@ -489,7 +511,7 @@ export interface ChatMessage {
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error' | 'saran_chart';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error' | 'saran_chart' | 'daftar_dokumen';
   /**
    * Pilihan tampilan chart yang ditawarkan asisten. Pengguna melihat pratinjau
    * bentuknya, lalu menekan Oke untuk menambahkannya ke kanvas (angkanya baru
@@ -588,7 +610,7 @@ export interface LampiranLaporan {
 /**
  * Satu tahap dalam rantai persetujuan laporan.
  *
- * Contoh: `{ urutan: 1, nama: 'Verifikasi Kabag Keuangan', peran: 'analis' }`.
+ * Contoh: `{ urutan: 1, nama: 'Verifikasi Kabag Keuangan', peran: 'pengguna' }`.
  * `peran` menentukan siapa yang berhak MENYELESAIKAN tahap ini (admin selalu boleh).
  */
 export interface TahapAlur {
@@ -1296,4 +1318,23 @@ export interface RingkasanBerkas {
   terbesarKb: number;
   /** Waktu unggah terbaru (ISO), null bila kosong. */
   terbaruPada: string | null;
+}
+
+
+/**
+ * Progres pengisian angka template dari dokumen.
+ *
+ * Ditampilkan saat "Pakai Template Ini" berjalan: pengisian bisa 5–15 menit
+ * karena kartu yang gagal (layanan sibuk) diulang sampai terisi.
+ */
+export interface ProgresIsiTemplate {
+  /** Kartu yang sudah berisi angka. */
+  terisi: number;
+  total: number;
+  /** Kartu yang sudah selesai diproses (terisi maupun dinyatakan tidak ada). */
+  selesai: number;
+  /** Judul kartu yang sedang diproses. */
+  judul: string;
+  /** Detik berjalan sejak pengisian dimulai. */
+  detik: number;
 }

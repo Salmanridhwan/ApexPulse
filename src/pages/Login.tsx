@@ -99,9 +99,18 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
    * Pendaftaran berhasil DITERIMA tetapi belum aktif: akun menunggu persetujuan
    * admin instansi. Sesi sengaja tidak dibuat, jadi halaman ini menggantikan form.
    */
-  const [pendingInfo, setPendingInfo] = useState<{ email: string; tenantName?: string | null; message: string } | null>(
-    null
-  );
+  const [pendingInfo, setPendingInfo] = useState<{
+    email: string;
+    tenantName?: string | null;
+    tenantId?: string | null;
+    message: string;
+    /** ID token Google yang dipakai mendaftar — dipakai ulang saat ganti instansi. */
+    credential?: string;
+    /** true = email Google belum terdaftar; panel meminta instansi lebih dulu. */
+    perluPilih?: boolean;
+  } | null>(null);
+  /** Instansi pilihan pada layar "Menunggu persetujuan" (bisa diperbaiki di situ). */
+  const [pendingTenant, setPendingTenant] = useState<string>('');
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   /** Simpan profil user untuk boot UI cepat (sesi asli tetap cookie HttpOnly). */
@@ -138,29 +147,47 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
    * Kirim ID token Google ke server untuk diverifikasi & diterbitkan sesi.
    * Server membuat akun otomatis bila email belum terdaftar.
    */
-  const masukDenganGoogle = async (credential: string) => {
+  const masukDenganGoogle = async (credential: string, tenantOverride?: string) => {
     setErrorMessage(null);
     setGoogleError(null);
     setIsLoading(true);
     try {
+      // Instansi HANYA dikirim bila pengguna memilihnya sendiri pada panel
+      // setelah klik Google. Tidak ada fallback ke instansi pertama — itulah
+      // sumber bug "langsung terpilih Tirta Moedal".
+      const tenantGoogle = tenantOverride ?? '';
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential, tenantId: regTenant }),
+        body: JSON.stringify(tenantGoogle ? { credential, tenantId: tenantGoogle } : { credential }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         if (data?.kode === 'BUTUH_INSTANSI') {
-          // Server tidak lagi menebak instansi: arahkan ke form daftar yang punya dropdown.
-          setMode('register');
-          throw new Error(data.error || 'Pilih instansi Anda dulu, lalu klik tombol Google lagi.');
+          // Email Google belum terdaftar dan belum ada instansi yang dipilih.
+          // Tampilkan panel pemilih instansi; token Google disimpan agar bisa
+          // dipakai ulang tanpa perlu sign-in ulang.
+          setPendingInfo({
+            email: data?.email || '',
+            tenantName: null,
+            tenantId: null,
+            message:
+              'Email Google Anda belum terdaftar. Pilih instansi BUMD tempat Anda bertugas untuk melanjutkan pendaftaran.',
+            credential,
+            perluPilih: true,
+          });
+          setPendingTenant('');
+          return;
         }
         if (data?.kode === 'PENDING_APPROVAL' || data?.kode === 'ACCOUNT_REJECTED') {
           setPendingInfo({
-            email: '',
+            email: data?.email || '',
             tenantName: data?.tenantName || null,
+            tenantId: data?.tenantId || null,
             message: data?.error || 'Akun Anda belum aktif.',
+            credential,
           });
+          setPendingTenant(data?.tenantId || '');
           return;
         }
         throw new Error(data?.error || 'Login Google gagal.');
@@ -169,8 +196,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
         setPendingInfo({
           email: data?.email || '',
           tenantName: data?.tenantName || null,
+          tenantId: data?.tenantId || null,
           message: data?.message || 'Pendaftaran diterima dan menunggu persetujuan admin instansi.',
+          credential,
         });
+        setPendingTenant(data?.tenantId || '');
         return;
       }
       simpanSesi(data.user, rememberMe);
@@ -223,7 +253,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
       bersihkan?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleClientId, mode]);
+  }, [googleClientId, mode, regTenant]);
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -386,12 +416,14 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
             {/* Pendaftaran diterima tetapi belum aktif: tidak ada sesi, form diganti
                 panel status supaya pendaftar tahu harus menunggu persetujuan admin. */}
             {pendingInfo && (
-              <div className="absolute inset-0 z-20 bg-surface p-6 sm:p-8 flex flex-col justify-center gap-4">
+              <div className="absolute inset-0 z-20 bg-surface p-6 sm:p-8 flex flex-col justify-center gap-4 overflow-y-auto">
                 <div className="w-11 h-11 rounded-control bg-warn/15 border border-warn/30 flex items-center justify-center text-warn">
-                  <Clock className="w-5 h-5" />
+                  {pendingInfo.perluPilih ? <Building2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                 </div>
                 <div className="space-y-1.5">
-                  <h2 className="text-base font-bold text-ink">Menunggu persetujuan admin</h2>
+                  <h2 className="text-base font-bold text-ink">
+                    {pendingInfo.perluPilih ? 'Pilih instansi BUMD' : 'Menunggu persetujuan admin'}
+                  </h2>
                   <p className="text-xs text-ink-2 leading-relaxed">{pendingInfo.message}</p>
                 </div>
                 <div className="p-3 bg-surface-2 border border-line rounded-card text-xs space-y-1">
@@ -401,15 +433,60 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                       <span className="font-mono">{pendingInfo.email}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 text-ink-2">
-                    <Building2 className="w-3.5 h-3.5 text-ink-3" />
-                    <span>{pendingInfo.tenantName || 'Instansi yang Anda pilih'}</span>
-                  </div>
-                  <p className="text-[11px] text-ink-3 pt-1 leading-relaxed">
-                    Anda belum bisa masuk sampai admin instansi menyetujui pendaftaran ini. Setelah
-                    disetujui, gunakan halaman masuk seperti biasa.
-                  </p>
+                  {!pendingInfo.perluPilih && (
+                    <div className="flex items-center gap-1.5 text-ink-2">
+                      <Building2 className="w-3.5 h-3.5 text-ink-3" />
+                      <span>{pendingInfo.tenantName || 'Instansi yang Anda pilih'}</span>
+                    </div>
+                  )}
+                  {!pendingInfo.perluPilih && (
+                    <p className="text-[11px] text-ink-3 pt-1 leading-relaxed">
+                      Anda belum bisa masuk sampai admin instansi menyetujui pendaftaran ini. Setelah
+                      disetujui, gunakan halaman masuk seperti biasa.
+                    </p>
+                  )}
                 </div>
+                {pendingInfo.credential && (
+                  <div className="p-3 bg-surface-2 border border-line rounded-card space-y-2">
+                    <label
+                      htmlFor="pending-tenant"
+                      className="text-[11px] font-semibold text-ink-2 flex items-center gap-1.5"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-ink-3" />
+                      Instansi BUMD
+                    </label>
+                    <select
+                      id="pending-tenant"
+                      value={pendingTenant}
+                      onChange={(e) => setPendingTenant(e.target.value)}
+                      className="w-full text-xs bg-surface border border-line rounded-control px-2.5 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    >
+                      <option value="">— Pilih instansi —</option>
+                      {daftarTenant.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={
+                        !pendingTenant ||
+                        (!pendingInfo.perluPilih && pendingTenant === (pendingInfo.tenantId || '')) ||
+                        isLoading
+                      }
+                      onClick={() => void masukDenganGoogle(pendingInfo.credential!, pendingTenant)}
+                      className="w-full py-2 bg-surface border border-line rounded-control font-semibold text-xs text-ink hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoading ? 'Memproses…' : pendingInfo.perluPilih ? 'Daftar ke instansi ini' : 'Simpan instansi'}
+                    </button>
+                    <p className="text-[10px] text-ink-3 leading-relaxed">
+                      {pendingInfo.perluPilih
+                        ? 'Pilih instansi BUMD tempat Anda bertugas, lalu klik Daftar. Admin instansi tersebut akan menyetujui akun Anda.'
+                        : 'Salah pilih instansi? Ganti di sini lalu klik Simpan instansi — pendaftaran langsung dipindahkan ke instansi yang Anda pilih.'}
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -654,7 +731,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                 </button>
 
                 <p className="text-[10.5px] text-ink-3 leading-relaxed text-center">
-                  Dengan mendaftar, akun Anda dibuat dengan peran <strong>Analis</strong>. Admin instansi
+                  Dengan mendaftar, akun Anda dibuat dengan peran <strong>Pengguna</strong>. Admin instansi
                   dapat menyesuaikan peran setelahnya.
                 </p>
               </form>
@@ -672,6 +749,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                   </span>
                   <div className="flex-1 h-px bg-line" />
                 </div>
+                {/* Instansi TIDAK dipilih di sini. Pendaftar memilihnya pada panel
+                    setelah klik Google, supaya tidak ada instansi yang terpilih
+                    otomatis dan alurnya sama untuk masuk maupun daftar. */}
                 <div ref={googleBtnRef} className="flex justify-center min-h-[40px]" />
                 {googleError && (
                   <p className="text-[11px] text-neg text-center leading-relaxed">{googleError}</p>
