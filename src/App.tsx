@@ -148,18 +148,9 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<AdminTabId>('overview');
 
   // App Core State
-  // Admin langsung diarahkan ke panel admin (tanpa lewat workspace).
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'berkas' | 'admin'>(() => {
-    const saved = localStorage.getItem('aionesboard_user') || sessionStorage.getItem('aionesboard_user');
-    if (saved) {
-      try {
-        if (JSON.parse(saved)?.role === 'admin') return 'admin';
-      } catch (e) {
-        // ignore
-      }
-    }
-    return 'workspace';
-  });
+  // Tampilan awal SELALU daftar Workspace ("Semua Dashboard"), bukan salah satu
+  // dashboard: pengguna memilih sendiri kanvas yang mau dibuka.
+  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'berkas' | 'admin'>('dashboards');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
 
@@ -374,11 +365,11 @@ export default function App() {
       .then((data: Dashboard[]) => {
         if (!Array.isArray(data)) return;
         setDashboards(data);
-        if (data.length > 0) {
-          setActiveDashboard(data[0]);
-        } else {
-          setActiveDashboard(null);
-        }
+        // Jangan membuka dashboard mana pun secara otomatis: pertahankan pilihan
+        // pengguna bila masih ada, selain itu biarkan kosong (tetap di daftar).
+        setActiveDashboard((sebelumnya) =>
+          sebelumnya ? data.find((d) => d.id === sebelumnya.id) || null : null
+        );
       })
       .catch((err) => console.error('Fetch dashboards error:', err));
 
@@ -511,8 +502,10 @@ export default function App() {
       if (res.ok) {
         setDashboards((prev) => prev.filter((d) => d.id !== dashboardId));
         if (activeDashboard?.id === dashboardId) {
-          const remaining = dashboards.filter((d) => d.id !== dashboardId);
-          setActiveDashboard(remaining[0] || null);
+          // Setelah menghapus, jangan langsung membuka dashboard lain —
+          // kembalikan pengguna ke daftar Workspace.
+          setActiveDashboard(null);
+          setViewMode('dashboards');
         }
       }
     } catch (err) {
