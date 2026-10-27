@@ -306,9 +306,24 @@ const progresTemplate = new Map<
  * diperbarui — pengguna mengira fiturnya tidak ada sama sekali. Versi bundel di
  * bawah dipakai klien untuk mendeteksi tab seperti itu dan menawarkan muat ulang.
  */
+/**
+ * Folder berkas UI yang disajikan ke browser.
+ *
+ * Panel hosting membuat satu folder `releases/<stempel-waktu>` per deploy dan
+ * memindahkan symlink `current` ke rilis terbaru. Folder `dist/` di root hanya
+ * sisa build lama, jadi menyajikan `dist/` membuat fitur baru tidak pernah
+ * muncul di produksi walaupun pipeline melaporkan "Health Check success".
+ * Di mesin pengembang tidak ada `current`, sehingga `dist/` tetap dipakai.
+ */
+function folderDist(): string {
+  const rilis = path.join(__dirname, 'current');
+  if (fs.existsSync(path.join(rilis, 'index.html'))) return rilis;
+  return path.join(__dirname, 'dist');
+}
+
 function versiBundelSaatIni(): string {
   try {
-    const html = fs.readFileSync(path.join(__dirname, 'dist', 'index.html'), 'utf8');
+    const html = fs.readFileSync(path.join(folderDist(), 'index.html'), 'utf8');
     const cocok = html.match(/assets\/index-([A-Za-z0-9_-]+)\.js/);
     if (cocok) return cocok[1];
   } catch {
@@ -5857,10 +5872,10 @@ ${navigasi}
   app.get('/terms', (_req: Request, res: Response) => res.redirect(301, '/syarat-ketentuan'));
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================
-  const distExists = fs.existsSync(path.join(__dirname, 'dist', 'index.html'));
+  const distExists = fs.existsSync(path.join(folderDist(), 'index.html'));
   if (process.env.NODE_ENV === 'production' || distExists) {
     app.use(
-      express.static(path.join(__dirname, 'dist'), {
+      express.static(folderDist(), {
         // index.html TIDAK boleh di-cache: kalau di-cache, pengguna yang membuka
         // ulang halaman masih memakai bundel lama dan mengira fitur baru hilang.
         setHeaders: (res, filePath) => {
@@ -5872,7 +5887,7 @@ ${navigasi}
     );
     app.get('*', (_req: Request, res: Response) => {
       res.setHeader('Cache-Control', 'no-store, must-revalidate');
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(folderDist(), 'index.html'));
     });
   } else {
     const vite = await createViteServer({
