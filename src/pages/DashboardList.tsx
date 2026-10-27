@@ -1,4 +1,3 @@
-import { Tilt } from '../components/Tilt';
 import React, { useState } from 'react';
 import {
   Activity,
@@ -171,10 +170,11 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               ).length;
               const tableCount = dash.widgets.filter((w) => w.type === 'table').length;
 
+              // Tanpa efek hover (tilt/lift): kartu tampil datar sesuai permintaan.
               return (
-                <Tilt key={dash.id} className="h-full">
+                <div key={dash.id} className="h-full">
                 <div
-                  className="card relative flex flex-col justify-between overflow-hidden group h-full pl-1.5"
+                  className="card relative flex flex-col justify-between overflow-hidden h-full pl-1.5"
                 >
                   <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />
                   <div className="p-5 space-y-3.5">
@@ -200,7 +200,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     <div>
                       <h3
                         onClick={() => onSelectDashboard(dash)}
-                        className="text-base font-bold text-ink group-hover:text-brand-ink cursor-pointer transition-colors line-clamp-1 tracking-tight"
+                        className="text-base font-bold text-ink cursor-pointer line-clamp-1 tracking-tight"
                         title={dash.title}
                       >
                         {dash.title}
@@ -309,7 +309,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     </div>
                   </div>
                 </div>
-                </Tilt>
+                </div>
               );
             })}
           </div>
