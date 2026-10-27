@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
   ClipboardCheck,
@@ -6,11 +6,9 @@ import {
   ClipboardList,
   History,
   Layers,
-  LayoutGrid,
   LayoutTemplate,
   LogOut,
   Plus,
-  Search,
   Shield,
   ShieldAlert,
   Boxes,
@@ -24,23 +22,6 @@ import { LogoTile, AvatarTile } from './BrandMark';
 import { Dashboard, Tenant, User } from '../types';
 import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
 import { ADMIN_TABS, AdminTabId } from './adminTabs';
-
-function waktuRelatif(iso?: string): string {
-  if (!iso) return '';
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '';
-  const selisih = Date.now() - t;
-  if (selisih < 0) return 'baru saja';
-  const menit = Math.floor(selisih / 60000);
-  if (menit < 1) return 'baru saja';
-  if (menit < 60) return `${menit} mnt lalu`;
-  const jam = Math.floor(menit / 60);
-  if (jam < 24) return `${jam} jam lalu`;
-  const hari = Math.floor(jam / 24);
-  if (hari === 1) return 'kemarin';
-  if (hari < 7) return `${hari} hari lalu`;
-  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 export interface SidebarProps {
   isCollapsed: boolean;
@@ -116,21 +97,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
 }) => {
-  const [kueri, setKueri] = useState('');
-
-  const dashboardsTersaring = useMemo(() => {
-    const q = kueri.trim().toLowerCase();
-    if (!q) return dashboards;
-    return dashboards.filter(
-      (d) => d.title.toLowerCase().includes(q) || (d.sector || '').toLowerCase().includes(q)
-    );
-  }, [dashboards, kueri]);
-
-  const judulDuplikat = useMemo(() => {
-    const hitung = new Map<string, number>();
-    dashboards.forEach((d) => hitung.set(d.title, (hitung.get(d.title) || 0) + 1));
-    return new Set(Array.from(hitung.entries()).filter(([, n]) => n > 1).map(([t]) => t));
-  }, [dashboards]);
+  /**
+   * Menu Workspace tetap tersorot saat pengguna membuka salah satu dashboard,
+   * sebab dashboard sekarang dibuka dari dalam halaman Workspace — bukan dari
+   * daftar tersendiri di sidebar.
+   */
+  const diWorkspace = currentView === 'dashboards' || currentView === 'workspace';
 
   return (
     <aside
@@ -222,52 +194,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* 3. SCROLLABLE NAVIGATION (flex-1 overflow-y-auto min-h-0) */}
       <nav className={`flex-1 min-h-0 overflow-y-auto px-2.5 py-3 space-y-4 no-scrollbar ${isCollapsed ? 'px-2' : ''}`}>
-        {/* GRUP 1: Workspace & Dashboard */}
+        {/* GRUP 1: Workspace — satu pintu ke semua dashboard.
+            Permintaan pemilik aplikasi: sidebar tidak lagi mendaftar tiap
+            dashboard satu per satu; daftarnya ada di dalam halaman Workspace. */}
         <div>
           {!isCollapsed && (
             <div className="px-2 pb-1.5 flex items-center justify-between text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">
-              <span>Dashboard</span>
+              <span>Workspace</span>
               <button onClick={onCreateDashboard} className="p-0.5 text-shell-ink-2 hover:text-shell-ink hover:bg-shell-hover rounded-chip transition-colors" title="Buat Dashboard Baru">
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
-          {!isCollapsed && dashboards.length > 4 && (
-            <div className="relative mb-1.5">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-shell-ink-2 pointer-events-none" />
-              <input type="search" value={kueri} onChange={(e) => setKueri(e.target.value)} placeholder="Cari dashboard..." className="w-full text-[11px] text-shell-ink bg-shell-2 border border-shell-line rounded-control pl-7 pr-2 py-1.5 placeholder:text-shell-ink-2 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition-colors [&::-webkit-search-cancel-button]:hidden" aria-label="Cari dashboard" />
-            </div>
-          )}
-          <button onClick={onOpenDashboardList} className={`w-full flex items-center gap-2.5 py-2 px-2.5 rounded-control text-xs transition-colors text-left mb-1 group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'dashboards' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title={`Semua Dashboard (${dashboards.length})`}>
-            {currentView === 'dashboards' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-            <Layers className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'dashboards' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+          <button
+            onClick={onOpenDashboardList}
+            className={`w-full flex items-center gap-2.5 py-2 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${diWorkspace ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+            title={`Workspace — ${dashboards.length} dashboard`}
+            data-testid="buka-workspace"
+          >
+            {diWorkspace && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+            <Layers className={`w-4 h-4 shrink-0 transition-colors ${diWorkspace ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
             {!isCollapsed && (
               <>
-                <span className="flex-1 truncate">Galeri Semua</span>
-                <span className={`text-[10px] font-mono px-1.5 rounded-chip shrink-0 ${currentView === 'dashboards' ? 'bg-brand/20 text-brand' : 'bg-shell-hover text-shell-ink-2'}`}>{dashboards.length}</span>
+                <span className="flex-1 truncate">Semua Dashboard</span>
+                <span className={`text-[10px] font-mono px-1.5 rounded-chip shrink-0 ${diWorkspace ? 'bg-brand/20 text-brand' : 'bg-shell-hover text-shell-ink-2'}`}>{dashboards.length}</span>
               </>
             )}
           </button>
-          <div className="space-y-0.5">
-            {dashboardsTersaring.map((d) => {
-              const isActive = currentView === 'workspace' && activeDashboard?.id === d.id;
-              const perluPembeda = judulDuplikat.has(d.title);
-              return (
-                <button key={d.id} onClick={() => onSelectDashboard(d)} className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${isActive ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title={`${d.title} · ${d.widgets?.length || 0} widget · diperbarui ${waktuRelatif(d.updatedAt)}`}>
-                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-                  <LayoutGrid className={`w-3.5 h-3.5 shrink-0 transition-colors ${isActive ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-                  {!isCollapsed && (
-                    <span className="flex-1 min-w-0">
-                      <span className="block truncate text-[12px] leading-tight">{d.title}</span>
-                      <span className={`block text-[9px] leading-tight mt-0.5 truncate ${isActive ? 'text-shell-ink-2' : 'text-shell-ink-2'}`}>{d.widgets?.length || 0} widget{perluPembeda && <> · {waktuRelatif(d.updatedAt)}</>}</span>
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-            {dashboardsTersaring.length === 0 && !isCollapsed && dashboards.length > 0 && <div className="px-3 py-3 text-[11px] text-shell-ink-2 italic">Tidak ada dashboard cocok dengan "{kueri}".</div>}
-            {dashboards.length === 0 && !isCollapsed && <div className="px-3 py-2 text-[11px] text-shell-ink-2 italic">Belum ada dashboard tersimpan.</div>}
-          </div>
         </div>
 
         {/* GRUP 2: Referensi */} 

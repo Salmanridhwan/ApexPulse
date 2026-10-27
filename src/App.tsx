@@ -874,7 +874,7 @@ export default function App() {
                   <span className="truncate max-w-[18vw]">{currentTenant?.name || 'BUMD'}</span>
                   <span className="text-ink-3">/</span>
                   <span className="text-brand">
-                    {viewMode === 'dashboards' ? 'Galeri'
+                    {viewMode === 'dashboards' ? 'Workspace'
                       : viewMode === 'audit' ? 'Audit'
                       : viewMode === 'alerts' ? 'Alert'
                       : viewMode === 'charts' ? 'Chart'
@@ -891,7 +891,7 @@ export default function App() {
                 {viewMode !== 'workspace' && (
                   <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-ink leading-tight mt-0.5">
                     {viewMode === 'dashboards'
-                      ? 'Galeri Dashboard'
+                      ? 'Workspace'
                       : viewMode === 'audit'
                         ? 'Jejak Audit & Kepatuhan'
                         : viewMode === 'alerts'
