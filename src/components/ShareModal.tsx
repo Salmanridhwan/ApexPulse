@@ -140,9 +140,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     </div>
   ) : null;
 
-  const fullShareUrl = shareToken
-    ? `${window.location.origin}/share/${shareToken}`
-    : `${window.location.origin}/share/demo-token`;
+  // Tanpa token tidak ada tautan. Jangan pernah menampilkan alamat contoh
+  // (`/share/demo-token`) — di server produksi alamat itu mati, dan pengguna
+  // yang menyalinnya mengira tautannya sudah jadi.
+  const fullShareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : '';
 
   const embedUrl = shareToken ? `${window.location.origin}/embed/${shareToken}` : '';
   const embedSnippet = embedUrl
@@ -150,6 +151,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     : '';
 
   const copyToClipboard = () => {
+    if (!fullShareUrl) return;
     navigator.clipboard.writeText(fullShareUrl);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
