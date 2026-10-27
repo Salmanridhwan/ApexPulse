@@ -1,0 +1,1111 @@
+[
+ {
+  "id": "sw-kpi-1",
+  "kpi": {
+   "unit": "sambungan",
+   "delta": 2,
+   "value": "951.640",
+   "deltaLabel": "+18.748 sambungan vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 0,
+   "y": 0
+  },
+  "type": "kpi",
+  "title": "Jumlah pelanggan",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-1",
+    "date": "",
+    "page": 6,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Jumlah pelanggan pada akhir 2024 tercatat 951.640 sambungan, bertambah 18.748 sambungan dibandingkan 2023.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.801Z"
+ },
+ {
+  "id": "sw-kpi-2",
+  "kpi": {
+   "unit": "%",
+   "delta": -3.9,
+   "value": "43,85",
+   "deltaLabel": "-1,77 poin persentase vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 3,
+   "y": 0
+  },
+  "type": "kpi",
+  "title": "NRW",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-2",
+    "date": "",
+    "page": 6,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "NRW dihitung sebesar 43,85 persen, turun 1,77 poin persentase dibandingkan 2023 yang sebesar 45,62 persen.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.802Z"
+ },
+ {
+  "id": "sw-kpi-3",
+  "kpi": {
+   "unit": "%",
+   "delta": 2.2,
+   "value": "69,12",
+   "deltaLabel": "+1,47 poin persentase vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 6,
+   "y": 0
+  },
+  "type": "kpi",
+  "title": "Cakupan layanan",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-3",
+    "date": "",
+    "page": 6,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Cakupan layanan meningkat dari 67,65 persen menjadi 69,12 persen dari populasi wilayah administratif.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-kpi-4",
+  "kpi": {
+   "unit": "m³",
+   "delta": 5.6,
+   "value": "376.887.150",
+   "deltaLabel": "+19.924.922 m³ vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 9,
+   "y": 0
+  },
+  "type": "kpi",
+  "title": "Air terjual",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-4",
+    "date": "",
+    "page": 6,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Air terjual 345.015.675 356.962.228 376.887.150 m³",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-kpi-5",
+  "kpi": {
+   "unit": "Rp miliar",
+   "delta": 8.2,
+   "value": "3.184,72",
+   "deltaLabel": "+8,21% vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 0,
+   "y": 3
+  },
+  "type": "kpi",
+  "title": "Pendapatan usaha",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-5",
+    "date": "",
+    "page": 9,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pendapatan usaha 2024 tercatat Rp 3.184,72 miliar, tumbuh 8,21 persen dari Rp 2.943,02 miliar pada 2023.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-1",
+  "kpi": {
+   "unit": "m³",
+   "value": "671.250.480"
+  },
+  "grid": {
+   "h": 3,
+   "w": 2,
+   "x": 3,
+   "y": 3
+  },
+  "type": "kpi",
+  "title": "Air terdistribusi 2024",
+  "periode": "Jan–Des 2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-1",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Total air terdistribusi sepanjang 2024 tercatat 671.250.480 m³",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-2",
+  "kpi": {
+   "unit": "m³",
+   "value": "376.887.150"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 6,
+   "y": 3
+  },
+  "type": "kpi",
+  "title": "Air terjual 2024",
+  "periode": "Jan–Des 2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-2",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "air terjual 376.887.150 m³",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-3",
+  "kpi": {
+   "unit": "%",
+   "delta": -3.9,
+   "value": "43,85",
+   "deltaLabel": "Turun 1,77 poin"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 9,
+   "y": 3
+  },
+  "type": "kpi",
+  "title": "NRW tahunan 2024",
+  "periode": "2024 vs 2023",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-3",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "NRW tahunan menjadi 43,85 persen. Angka ini konsisten dengan laporan tahunan dan lebih rendah 1,77 poin daripada NRW 2023.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-keuangan-2",
+  "kpi": {
+   "unit": "Rupiah",
+   "delta": 8.1,
+   "value": "(1.905.640.000.000)",
+   "deltaLabel": "vs periode sebelumnya"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 0,
+   "y": 6
+  },
+  "type": "kpi",
+  "title": "Beban Usaha",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-2",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Beban usaha (1.905.640.000.000) (1.762.370.000.000)",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-keuangan-3",
+  "kpi": {
+   "unit": "Rupiah",
+   "delta": 8.3,
+   "value": "1.279.080.000.000",
+   "deltaLabel": "vs periode sebelumnya"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 3,
+   "y": 6
+  },
+  "type": "kpi",
+  "title": "Laba Kotor",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-3",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Laba kotor 1.279.080.000.000 1.180.640.000.000",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-kpi-6",
+  "kpi": {
+   "unit": "Rp miliar",
+   "delta": 4.2,
+   "value": "1.300,31",
+   "deltaLabel": "+4,24% vs 2023"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 6,
+   "y": 6
+  },
+  "type": "kpi",
+  "title": "Laba bersih",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-6",
+    "date": "",
+    "page": 9,
+    "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Laba bersih tahun berjalan 1.247,36 1.300,31 4,24",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-4",
+  "kpi": {
+   "unit": "kasus",
+   "value": "128.460"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 9,
+   "y": 6
+  },
+  "type": "kpi",
+  "title": "Pengaduan masuk 2024",
+  "periode": "Jan–Des 2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-4",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pengaduan masuk sepanjang tahun 128.460 kasus dengan 98,7 persen dinyatakan selesai pada tahun yang sama.",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-5",
+  "kpi": {
+   "unit": "%",
+   "value": "98,7"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 0,
+   "y": 9
+  },
+  "type": "kpi",
+  "title": "Penyelesaian pengaduan 2024",
+  "periode": "Jan–Des 2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-5",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "128.460 kasus dengan 98,7 persen dinyatakan selesai",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-keuangan-4",
+  "kpi": {
+   "unit": "Rupiah",
+   "delta": 7.5,
+   "value": "(968.450.000.000)",
+   "deltaLabel": "vs periode sebelumnya"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 3,
+   "y": 9
+  },
+  "type": "kpi",
+  "title": "Beban Umum dan Administrasi",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-4",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Beban umum dan administrasi (968.450.000.000) (900.970.000.000)",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-keuangan-5",
+  "kpi": {
+   "unit": "Rupiah",
+   "delta": 11.1,
+   "value": "310.630.000.000",
+   "deltaLabel": "vs periode sebelumnya"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 6,
+   "y": 9
+  },
+  "type": "kpi",
+  "title": "Laba Usaha",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-5",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Laba usaha 310.630.000.000 279.670.000.000",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-keuangan-6",
+  "kpi": {
+   "unit": "Rupiah",
+   "delta": 6.2,
+   "value": "2.104.880.000.000",
+   "deltaLabel": "vs periode sebelumnya"
+  },
+  "grid": {
+   "h": 3,
+   "w": 3,
+   "x": 9,
+   "y": 9
+  },
+  "type": "kpi",
+  "title": "Pendapatan Non Usaha",
+  "periode": "2024",
+  "category": "Keuangan",
+  "subtitle": "PAM JAYA",
+  "citations": [
+   {
+    "id": "cit-extract-kpi-6",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pendapatan non usaha 2.104.880.000.000 1.982.290.000.000",
+    "confidenceScore": 0.95
+   }
+  ],
+  "unitKerja": "PAM JAYA",
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-bulanan-6",
+  "grid": {
+   "h": 4,
+   "w": 12,
+   "x": 0,
+   "y": 12
+  },
+  "type": "line",
+  "chart": {
+   "unit": "%",
+   "xAxis": [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember"
+   ],
+   "series": [
+    {
+     "data": [
+      44.46,
+      44.39,
+      44.3,
+      44.17,
+      44.03,
+      43.92,
+      43.81,
+      43.69,
+      43.57,
+      43.45,
+      43.33,
+      43.21
+     ],
+     "name": "NRW",
+     "color": "#38c6e2"
+    }
+   ],
+   "showLegend": false
+  },
+  "title": "NRW per bulan 2024",
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "%",
+  "citations": [
+   {
+    "id": "cit-extract-grafik-2",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pola bulanan menunjukkan NRW tertinggi pada Januari (44,46 persen) dan terendah pada Desember (43,21 persen)",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-7",
+  "grid": {
+   "h": 4,
+   "w": 12,
+   "x": 0,
+   "y": 16
+  },
+  "type": "bar",
+  "chart": {
+   "unit": "kasus",
+   "xAxis": [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember"
+   ],
+   "series": [
+    {
+     "data": [
+      10420,
+      9880,
+      10960,
+      10740,
+      10580,
+      10210,
+      10680,
+      10740,
+      10620,
+      10780,
+      10860,
+      11990
+     ],
+     "name": "Pengaduan masuk",
+     "color": "#38c6e2"
+    },
+    {
+     "data": [
+      10285,
+      9752,
+      10818,
+      10600,
+      10442,
+      10077,
+      10541,
+      10600,
+      10482,
+      10640,
+      10719,
+      11834
+     ],
+     "name": "Pengaduan selesai",
+     "color": "#2bb8a8"
+    }
+   ],
+   "showLegend": true
+  },
+  "title": "Pengaduan masuk dan selesai per bulan 2024",
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "kasus",
+  "citations": [
+   {
+    "id": "cit-extract-grafik-3",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "| Januari 54.841.164 30.458.929 44,46 10.420 10.285 98,7",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-wilayah-1",
+  "grid": {
+   "h": 4,
+   "w": 6,
+   "x": 0,
+   "y": 20
+  },
+  "type": "table",
+  "table": {
+   "rows": [
+    {
+     "k0": "Jakarta Pusat",
+     "k1": "186.420",
+     "k2": "74.318.640",
+     "k3": "41,20",
+     "k4": "24.180"
+    },
+    {
+     "k0": "Jakarta Utara",
+     "k1": "172.880",
+     "k2": "68.402.910",
+     "k3": "46,80",
+     "k4": "27.640"
+    },
+    {
+     "k0": "Jakarta Barat",
+     "k1": "208.360",
+     "k2": "82.146.280",
+     "k3": "45,10",
+     "k4": "29.320"
+    },
+    {
+     "k0": "Jakarta Selatan",
+     "k1": "196.240",
+     "k2": "77.905.420",
+     "k3": "42,60",
+     "k4": "25.410"
+    },
+    {
+     "k0": "Jakarta Timur",
+     "k1": "187.740",
+     "k2": "74.113.900",
+     "k3": "43,60",
+     "k4": "21.910"
+    }
+   ],
+   "columns": [
+    {
+     "key": "k0",
+     "label": "Wilayah"
+    },
+    {
+     "key": "k1",
+     "label": "Jumlah pelanggan"
+    },
+    {
+     "key": "k2",
+     "label": "Air terjual (m3)"
+    },
+    {
+     "key": "k3",
+     "label": "NRW (%)"
+    },
+    {
+     "key": "k4",
+     "label": "Pengaduan"
+    }
+   ]
+  },
+  "title": "Sebaran Pelanggan, Air Terjual, NRW, dan Pengaduan per…",
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "Laporan-Kinerja-Operasional-dan…",
+  "citations": [
+   {
+    "id": "cit-extract-tabel-1",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Tabel 3. Kinerja per wilayah layanan, 2024 | Wilayah | Pelanggan | Air terjual (m³) | NRW (%) | Pengaduan | Jakarta Pusat 186.420 74.318.640 41,20 24.180 | Jakarta Utara 172.880 68.402.910 46,80 27.640 | Jakarta Barat 208.360 82.146.280 45,10 29.320 | Jakarta Selatan 196.240 77.905.420 42,60 25.410 | Jakarta Timur 187.740 74.113.900 43,60 21.910",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.803Z"
+ },
+ {
+  "id": "sw-bulanan-8",
+  "grid": {
+   "h": 4,
+   "w": 6,
+   "x": 6,
+   "y": 20
+  },
+  "type": "table",
+  "table": {
+   "rows": [
+    {
+     "k0": "Januari",
+     "k1": "54.841.164",
+     "k2": "30.458.929",
+     "k3": "44,46",
+     "k4": "10.420",
+     "k5": "10.285",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Februari",
+     "k1": "52.626.038",
+     "k2": "29.265.480",
+     "k3": "44,39",
+     "k4": "9.880",
+     "k5": "9.752",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Maret",
+     "k1": "56.183.665",
+     "k2": "31.294.452",
+     "k3": "44,30",
+     "k4": "10.960",
+     "k5": "10.818",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "April",
+     "k1": "55.378.165",
+     "k2": "30.917.778",
+     "k3": "44,17",
+     "k4": "10.740",
+     "k5": "10.600",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Mei",
+     "k1": "56.049.415",
+     "k2": "31.371.007",
+     "k3": "44,03",
+     "k4": "10.580",
+     "k5": "10.442",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Juni",
+     "k1": "55.176.789",
+     "k2": "30.943.291",
+     "k3": "43,92",
+     "k4": "10.210",
+     "k5": "10.077",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Juli",
+     "k1": "56.720.666",
+     "k2": "31.871.494",
+     "k3": "43,81",
+     "k4": "10.680",
+     "k5": "10.541",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Agustus",
+     "k1": "56.452.165",
+     "k2": "31.788.365",
+     "k3": "43,69",
+     "k4": "10.740",
+     "k5": "10.600",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "September",
+     "k1": "55.915.165",
+     "k2": "31.553.077",
+     "k3": "43,57",
+     "k4": "10.620",
+     "k5": "10.482",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Oktober",
+     "k1": "56.317.915",
+     "k2": "31.847.931",
+     "k3": "43,45",
+     "k4": "10.780",
+     "k5": "10.640",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "November",
+     "k1": "56.787.791",
+     "k2": "32.181.793",
+     "k3": "43,33",
+     "k4": "10.860",
+     "k5": "10.719",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Desember",
+     "k1": "58.801.542",
+     "k2": "33.393.553",
+     "k3": "43,21",
+     "k4": "11.990",
+     "k5": "11.834",
+     "k6": "98,7",
+     "k7": "-"
+    },
+    {
+     "k0": "Jumlah",
+     "k1": "671.250.480",
+     "k2": "376.887.150",
+     "k3": "43,85",
+     "k4": "128.460",
+     "k5": "126.790",
+     "k6": "98,7",
+     "k7": "-"
+    }
+   ],
+   "columns": [
+    {
+     "key": "k0",
+     "label": "Bulan"
+    },
+    {
+     "key": "k1",
+     "label": "Air terdistribusi (m³)"
+    },
+    {
+     "key": "k2",
+     "label": "Air terjual (m³)"
+    },
+    {
+     "key": "k3",
+     "label": "NRW (%)"
+    },
+    {
+     "key": "k4",
+     "label": "Pengaduan masuk"
+    },
+    {
+     "key": "k5",
+     "label": "Pengaduan selesai"
+    },
+    {
+     "key": "k6",
+     "label": "Penyelesaian (%)"
+    },
+    {
+     "key": "k7",
+     "label": "Pendapatan per bulan…"
+    }
+   ]
+  },
+  "title": "Kinerja bulanan 2024 (Januari–Desember)",
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "Laporan-Kinerja-Operasional-dan…",
+  "citations": [
+   {
+    "id": "cit-extract-tabel-1",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "| Jumlah | 671.250.480 | 376.887.150 | 43,85 | 128.460 | 126.790 | 98,7 |",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-keuangan-7",
+  "grid": {
+   "h": 4,
+   "w": 6,
+   "x": 0,
+   "y": 24
+  },
+  "type": "table",
+  "table": {
+   "rows": [
+    {
+     "k0": "Pendapatan Usaha",
+     "k1": "3.184.720.000.000",
+     "k2": "2.943.020.000.000"
+    },
+    {
+     "k0": "Beban Usaha",
+     "k1": "(1.905.640.000.000)",
+     "k2": "(1.762.370.000.000)"
+    },
+    {
+     "k0": "Laba Kotor",
+     "k1": "1.279.080.000.000",
+     "k2": "1.180.640.000.000"
+    },
+    {
+     "k0": "Beban Umum dan Administrasi",
+     "k1": "(968.450.000.000)",
+     "k2": "(900.970.000.000)"
+    },
+    {
+     "k0": "Laba Usaha",
+     "k1": "310.630.000.000",
+     "k2": "279.670.000.000"
+    },
+    {
+     "k0": "Pendapatan Non Usaha",
+     "k1": "2.104.880.000.000",
+     "k2": "1.982.290.000.000"
+    },
+    {
+     "k0": "Laba Sebelum Pajak",
+     "k1": "1.673.200.000.000",
+     "k2": "1.596.690.000.000"
+    },
+    {
+     "k0": "Beban Pajak Penghasilan",
+     "k1": "(372.890.000.000)",
+     "k2": "(349.330.000.000)"
+    },
+    {
+     "k0": "Laba Bersih Tahun Berjalan",
+     "k1": "1.300.310.000.000",
+     "k2": "1.247.360.000.000"
+    },
+    {
+     "k0": "Total Aset",
+     "k1": "5.386.240.000.000",
+     "k2": "4.824.460.000.000"
+    },
+    {
+     "k0": "Liabilitas",
+     "k1": "1.683.420.000.000",
+     "k2": "1.515.960.000.000"
+    },
+    {
+     "k0": "Ekuitas",
+     "k1": "3.702.820.000.000",
+     "k2": "3.308.500.000.000"
+    }
+   ],
+   "columns": [
+    {
+     "key": "k0",
+     "label": "Pos Laporan"
+    },
+    {
+     "key": "k1",
+     "label": "2024 (Rupiah)"
+    },
+    {
+     "key": "k2",
+     "label": "2023 (Rupiah)"
+    }
+   ]
+  },
+  "title": "Ringkasan Laporan Keuangan PAM JAYA 2024 vs 2023",
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "Laporan-Keuangan-Audited-PAM-JA…",
+  "citations": [
+   {
+    "id": "cit-extract-tabel-1",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Tabel 1. Laporan posisi keuangan (neraca); Tabel 3. Laporan laba rugi dan penghasilan komprehensif lain",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-bulanan-9",
+  "grid": {
+   "h": 4,
+   "w": 6,
+   "x": 6,
+   "y": 24
+  },
+  "type": "narasi",
+  "title": "Makna deret bulanan",
+  "narasi": {
+   "text": "NRW menurun bertahap dari 44,46% pada Januari menjadi 43,21% pada Desember, dengan NRW tahunan 43,85%; pengaduan bulanan berkisar 9.880–11.990 kasus dan penyelesaian konsisten 98,7%."
+  },
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "Laporan-Kinerja-Operasional-dan…",
+  "citations": [
+   {
+    "id": "cit-extract-narasi-1",
+    "date": "",
+    "page": 2,
+    "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pola bulanan menunjukkan NRW tertinggi pada Januari (44,46 persen) dan terendah pada Desember (43,21 persen)",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ },
+ {
+  "id": "sw-keuangan-8",
+  "grid": {
+   "h": 4,
+   "w": 12,
+   "x": 0,
+   "y": 28
+  },
+  "type": "narasi",
+  "title": "Makna Angka",
+  "narasi": {
+   "text": "Pendapatan usaha 2024 tercatat Rp 3.184,72 miliar dan laba bersih Rp 1.300,31 miliar, dengan total aset Rp 5.386,24 miliar serta ekuitas Rp 3.702,82 miliar; seluruh pos mengacu pada laporan keuangan audited 2024."
+  },
+  "periode": "2026-Q1",
+  "category": "Keuangan",
+  "subtitle": "Laporan-Keuangan-Audited-PAM-JA…",
+  "citations": [
+   {
+    "id": "cit-extract-narasi-1",
+    "date": "",
+    "page": 3,
+    "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+    "chunkSnippet": "Pendapatan usaha 3.184.720.000.000; Laba tahun berjalan 1.300.310.000.000; Jumlah aset 5.386.240.000.000; Ekuitas 3.702.820.000.000",
+    "confidenceScore": 0.95
+   }
+  ],
+  "confidence": "sumber",
+  "lastUpdated": "2026-10-26T13:31:24.805Z"
+ }
+]

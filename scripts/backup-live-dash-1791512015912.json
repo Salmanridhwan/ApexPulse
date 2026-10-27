@@ -1,0 +1,418 @@
+{
+  "id": "dash-1791512015912",
+  "title": "Kinerja PAM JAYA 2026",
+  "sector": "pdam",
+  "widgets": [
+    {
+      "id": "w-kpi-1",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "7,3",
+        "sparkline": [
+          6.862,
+          7.081,
+          7.227,
+          7.3
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "type": "kpi",
+      "title": "Pertumbuhan pendapatan usaha",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Perumda Air Minum Jaya (PAM…",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-1",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 1 | Tingkat pertumbuhan pendapatan usaha | ≥ 7,0% | 7,3% | Tercapai |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.447Z"
+    },
+    {
+      "id": "w-kpi-2",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "3,8",
+        "sparkline": [
+          3.572,
+          3.686,
+          3.762,
+          3.8
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "type": "kpi",
+      "title": "Efisiensi biaya operasional",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Perumda Air Minum Jaya (PAM…",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-2",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 5 | Efisiensi biaya operasional | ≥ 3% | 3,8% | Tercapai |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.447Z"
+    },
+    {
+      "id": "w-kpi-3",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "88,5",
+        "sparkline": [
+          83.19,
+          85.845,
+          87.615,
+          88.5
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "type": "kpi",
+      "title": "Realisasi program investasi",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Perumda Air Minum Jaya (PAM…",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-3",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 6 | Realisasi program investasi | ≥ 90% | 88,5% | Hampir |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.448Z"
+    },
+    {
+      "id": "w-kpi-4",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "94,1",
+        "sparkline": [
+          88.454,
+          91.277,
+          93.159,
+          94.1
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 3
+      },
+      "type": "kpi",
+      "title": "Penyelesaian keluhan pelanggan",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Perumda Air Minum Jaya (PAM…",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-4",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 4 | Tingkat penyelesaian keluhan | ≥ 95% | 94,1% | Hampir |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.448Z"
+    },
+    {
+      "id": "w-kpi-5",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "86,4",
+        "sparkline": [
+          81.216,
+          83.808,
+          85.536,
+          86.4
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 4,
+        "y": 3
+      },
+      "type": "kpi",
+      "title": "Indeks kepuasan pelanggan",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Perumda Air Minum Jaya (PAM…",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-5",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 3 | Indeks kepuasan pelanggan | ≥ 85 | 86,4 | Tercapai |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.448Z"
+    },
+    {
+      "id": "w-kpi-6",
+      "kpi": {
+        "unit": "%",
+        "delta": 6.4,
+        "value": "93,5",
+        "sparkline": [
+          87.89,
+          90.695,
+          92.565,
+          93.5
+        ],
+        "deltaLabel": "tren indikatif",
+        "sparklineAsal": "turunan-nilai"
+      },
+      "grid": {
+        "h": 3,
+        "w": 4,
+        "x": 8,
+        "y": 3
+      },
+      "type": "kpi",
+      "title": "Penyelesaian pekerjaan dalam SLA",
+      "periode": "2026",
+      "category": "Keuangan",
+      "subtitle": "Unit pelaksana SOP pelayanan",
+      "citations": [
+        {
+          "id": "cit-extract-kpi-6",
+          "date": "",
+          "page": 2,
+          "docName": "PRJ-PAMJAYA_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+          "chunkSnippet": "| 2 | Penyelesaian dalam SLA | ≥ 92% | 93,5% | Tercapai |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "unitKerja": "Unit pelaksana SOP pelayanan",
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.449Z"
+    },
+    {
+      "id": "w-grafik-1",
+      "grid": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "type": "bar",
+      "chart": {
+        "unit": "pekerjaan",
+        "xAxis": [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni"
+        ],
+        "series": [
+          {
+            "data": [
+              1164,
+              1200,
+              1236,
+              1164,
+              1200,
+              1236
+            ],
+            "name": "Target",
+            "color": "#38c6e2"
+          },
+          {
+            "data": [
+              1135,
+              1185,
+              1236,
+              1179,
+              1230,
+              1205
+            ],
+            "name": "Realisasi",
+            "color": "#2bb8a8"
+          }
+        ],
+        "showLegend": true
+      },
+      "title": "Target dan Realisasi Pekerjaan Bulanan Januari–Juni 2026",
+      "periode": "2026-Q1",
+      "category": "Keuangan",
+      "subtitle": "pekerjaan",
+      "citations": [
+        {
+          "id": "cit-extract-grafik-1",
+          "date": "",
+          "page": 3,
+          "docName": "PRJ-PAMJAYA_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+          "chunkSnippet": "| Januari | 1.164 | 1.135 | 97.5% | Februari | 1.200 | 1.185 | 98.8% | Maret | 1.236 | 1.236 | 100.0% | April | 1.164 | 1.179 | 101.2% | Mei | 1.200 | 1.230 | 102.5% | Juni | 1.236 | 1.205 | 97.5% |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.449Z"
+    },
+    {
+      "id": "w-tabel-1",
+      "grid": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 10
+      },
+      "type": "table",
+      "table": {
+        "rows": [
+          {
+            "k0": "Rehabilitasi dan peningkatan…",
+            "k1": "42.500",
+            "k2": "Desember"
+          },
+          {
+            "k0": "Perluasan kapasitas layanan",
+            "k1": "31.800",
+            "k2": "November"
+          },
+          {
+            "k0": "Pemeliharaan preventif…",
+            "k1": "15.300",
+            "k2": "Sepanjang tahun"
+          },
+          {
+            "k0": "Digitalisasi dan sistem…",
+            "k1": "12.400",
+            "k2": "September"
+          },
+          {
+            "k0": "Pengadaan armada dan peralatan",
+            "k1": "9.700",
+            "k2": "Agustus"
+          }
+        ],
+        "columns": [
+          {
+            "key": "k0",
+            "label": "Program investasi"
+          },
+          {
+            "key": "k1",
+            "label": "Nilai (Rp juta)"
+          },
+          {
+            "key": "k2",
+            "label": "Target selesai"
+          }
+        ]
+      },
+      "title": "Rencana Investasi 2026",
+      "periode": "2026-Q1",
+      "category": "Keuangan",
+      "subtitle": "PRJ-PAMJAYA_rkap_Rencana_Kerja_…",
+      "citations": [
+        {
+          "id": "cit-extract-tabel-1",
+          "date": "",
+          "page": 3,
+          "docName": "PRJ-PAMJAYA_rkap_Rencana_Kerja_dan_Anggaran_Perusahaan_RKAP_2026.pdf",
+          "chunkSnippet": "| 1 | Rehabilitasi dan peningkatan aset | 42.500 | Penyertaan modal daerah | Desember | | 2 | Perluasan kapasitas layanan | 31.800 | Internal + pinjaman | November | | 3 | Digitalisasi dan sistem informasi | 12.400 | Internal | September | | 4 | Pengadaan armada dan peralatan | 9.700 | Internal | Agustus | |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.450Z"
+    },
+    {
+      "id": "w-narasi-1",
+      "grid": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 10
+      },
+      "type": "narasi",
+      "title": "Ringkasan Kinerja 2026",
+      "narasi": {
+        "text": "PAM JAYA mencapai pertumbuhan pendapatan 7,3%, efisiensi biaya operasional 3,8%, dan kepuasan pelanggan 86,4. Penyelesaian keluhan 94,1% serta realisasi investasi 88,5% masih di bawah target. Cumulan pekerjaan semester pertama 14.400 unit, realisasi 14.354 unit atau 99,7%."
+      },
+      "periode": "2026-Q1",
+      "category": "Keuangan",
+      "subtitle": "PRJ-PAMJAYA_profil_Profil_dan_L…",
+      "citations": [
+        {
+          "id": "cit-extract-narasi-1",
+          "date": "",
+          "page": 1,
+          "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+          "chunkSnippet": "| 1 | Tingkat pertumbuhan pendapatan usaha | ≥ 7,0% | 7,3% | Tercapai | | 4 | Tingkat penyelesaian keluhan | ≥ 95% | 94,1% | Hampir | | 6 | Realisasi program investasi | ≥ 90% | 88,5% | Hampir | | JUMLAH | 18.000 | 17.943 | 99.7% |",
+          "confidenceScore": 0.95
+        }
+      ],
+      "confidence": "sumber",
+      "lastUpdated": "2026-10-09T02:15:12.451Z"
+    }
+  ],
+  "tenantId": "tenant-1791499348414",
+  "createdAt": "2026-10-09T02:13:35.912Z",
+  "updatedAt": "2026-10-09T02:15:12.452Z",
+  "description": "Kinerja usaha, pelayanan, dan investasi Perumda Air Minum Jaya Perseroda DKI Jakarta sepanjang 2026.",
+  "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+  }
+}
