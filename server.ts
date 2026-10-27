@@ -309,16 +309,31 @@ const progresTemplate = new Map<
 /**
  * Folder berkas UI yang disajikan ke browser.
  *
- * Panel hosting membuat satu folder `releases/<stempel-waktu>` per deploy dan
- * memindahkan symlink `current` ke rilis terbaru. Folder `dist/` di root hanya
- * sisa build lama, jadi menyajikan `dist/` membuat fitur baru tidak pernah
- * muncul di produksi walaupun pipeline melaporkan "Health Check success".
- * Di mesin pengembang tidak ada `current`, sehingga `dist/` tetap dipakai.
+ * Panel hosting bisa menyimpan hasil build di dua tempat sekaligus:
+ * `releases/<stempel-waktu>/` (dirujuk symlink `current`) dan `dist/` di root.
+ * Keduanya tidak selalu kompak — pernah `dist/` tertinggal berhari-hari
+ * sementara `current` baru, dan sebaliknya setelah satu host dibangun ulang.
+ * Karena itu dipilih yang `index.html`-nya PALING BARU, bukan salah satu tetap:
+ * begitu bundel lama disajikan, pengguna mengira deploy tidak membawa perubahan.
+ * Di mesin pengembang tidak ada `current`, jadi `dist/` yang dipakai.
  */
 function folderDist(): string {
-  const rilis = path.join(__dirname, 'current');
-  if (fs.existsSync(path.join(rilis, 'index.html'))) return rilis;
-  return path.join(__dirname, 'dist');
+  const kandidat = [path.join(__dirname, 'current'), path.join(__dirname, 'dist')];
+  let terpilih = '';
+  let waktuTerbaru = -1;
+  for (const folder of kandidat) {
+    const berkas = path.join(folder, 'index.html');
+    try {
+      const waktu = fs.statSync(berkas).mtimeMs;
+      if (waktu > waktuTerbaru) {
+        waktuTerbaru = waktu;
+        terpilih = folder;
+      }
+    } catch {
+      /* kandidat ini tidak punya index.html */
+    }
+  }
+  return terpilih || path.join(__dirname, 'dist');
 }
 
 function versiBundelSaatIni(): string {
