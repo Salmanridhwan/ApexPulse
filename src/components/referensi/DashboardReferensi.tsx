@@ -258,7 +258,7 @@ const opsiBar = (
       ...dasar.tooltip,
       trigger: 'axis',
       formatter: (p: any[]) =>
-        `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0]?.name} 2025</div>` +
+        `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0]?.name}</div>` +
         p
           .map(
             (x) =>
@@ -269,10 +269,19 @@ const opsiBar = (
     xAxis: { type: 'category', data: bulan, ...dasar.sumbu },
     yAxis: {
       type: 'value',
-      // sedikit ruang di atas batang tertinggi supaya label angkanya muat
-      max: 28,
+      // skala mengikuti data supaya batang tidak terpotong
+      max: (() => {
+        const tertinggi = Math.max(...pendapatan, 1);
+        const langkah = Math.pow(10, Math.floor(Math.log10(tertinggi))) / 2;
+        return Math.ceil((tertinggi * 1.18) / langkah) * langkah;
+      })(),
       splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
-      axisLabel: { color: WARNA.teks3, fontSize: 10 * s, formatter: '{value} M' },
+      axisLabel: {
+        color: WARNA.teks3,
+        fontSize: 10 * s,
+        formatter: (v: number) =>
+          `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(v)} M`,
+      },
     },
     series: [
       {
@@ -364,23 +373,31 @@ const opsiDonat = (s: number, beban?: NilaiBeban[]) => ({
   ],
 });
 
-const opsiArea = (s: number, arus?: number[]) => {
+const opsiArea = (s: number, arus?: number[], label?: string[]) => {
   const nilaiArus = arus?.length ? arus : ARUS_CONTOH;
+  const sumbu = label && label.length === nilaiArus.length ? label : nilaiArus.map((_, i) => `${i + 1}`);
   const dasar = gayaDasar(s);
   return {
-    grid: { left: 4, right: 12 * s, top: 12 * s, bottom: 2, containLabel: true },
+    grid: { left: 4, right: 26 * s, top: 14 * s, bottom: 4, containLabel: true },
     tooltip: {
       ...dasar.tooltip,
       trigger: 'axis',
       axisPointer: { type: 'line', lineStyle: { color: 'rgba(255,138,31,0.45)', type: 'dashed', width: 1 } },
-      formatter: (p: any) => `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">Hari ${p[0].dataIndex + 1}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
+      formatter: (p: any) => `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0].name}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
     },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: nilaiArus.map((_, i) => `${i + 1}`),
+      data: sumbu,
       ...dasar.sumbu,
-      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, interval: 6 },
+      axisLabel: {
+        color: WARNA.teks3,
+        fontSize: 8.5 * s,
+        interval: 0,
+        rotate: 0,
+        margin: 6 * s,
+        lineHeight: 10 * s,
+      },
     },
     yAxis: {
       type: 'value',
@@ -473,7 +490,9 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
   // Total di lubang cincin & label puncak ikut nilai dokumen.
   const CINCIN_TOTAL = nilai?.cincinTotal?.trim() || '12,35 M';
   const PUNCAK_NILAI = PENDAPATAN_BULANAN[PUNCAK] ?? 0;
-  const PUNCAK_LABEL = 'Desember (tertinggi)';
+  const PUNCAK_LABEL = BULAN.length
+    ? `${BULAN[PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN))] || ''} (tertinggi)`
+    : 'Nilai tertinggi';
   // Angka turunan dihitung dari data (bukan ditulis tetap), supaya saat memakai
   // data dokumen tidak ada angka contoh yang tertinggal.
   const PERTUMBUHAN = (() => {
@@ -545,7 +564,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
       ambil('bar', barRef.current)?.setOption(opsiBar(skala, { bulan: BULAN, pendapatan: PENDAPATAN_BULANAN, garis: garis }), true);
       ambil('donut', donutRef.current)?.setOption(opsiDonat(skala, RINCIAN_BEBAN), true);
-      ambil('area', areaRef.current)?.setOption(opsiArea(skala, ARUS_KAS), true);
+      ambil('area', areaRef.current)?.setOption(opsiArea(skala, ARUS_KAS, nilai?.areaLabel), true);
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
@@ -557,7 +576,9 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       batal = true;
       pengamat?.disconnect();
     };
-  }, [skala]);
+    // `nilai` WAJIB jadi dependensi: data dokumen datang belakangan (async),
+    // tanpa ini grafik tetap memakai angka contoh walau judulnya sudah berubah.
+  }, [skala, nilai]);
 
   // Bersihkan grafik saat komponen dilepas.
   useEffect(
@@ -685,7 +706,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             <div className="text-right">
               <div className="text-[1.15em] font-bold leading-none tabular-nums">Rp {String(PUNCAK_NILAI).replace('.', ',')} M</div>
               <div className="text-[0.78em] mt-[0.2em] inline-flex items-center gap-[0.15em]" style={{ color: WARNA.hijau }}>
-                <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> {String(PERTUMBUHAN).replace('.', ',')}% vs 2024
+                <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> {String(PERTUMBUHAN).replace('.', ',')}% {BULAN.length > 1 ? `vs ${BULAN[BULAN.length - 2]}` : 'vs periode lalu'}
               </div>
             </div>
           </div>
@@ -693,7 +714,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             item={[
               {
                 warna: WARNA.oranye,
-                label: 'Pendapatan 2025',
+                label: BULAN.length ? `Pendapatan ${BULAN[0]}–${BULAN[BULAN.length - 1]}` : 'Pendapatan',
                 redup: true,
                 nilai: `Rp ${String(TOTAL_PENDAPATAN.toFixed(1)).replace('.', ',')} M`,
               },
@@ -710,7 +731,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           <div className="shrink-0">
             <h3 className="text-[0.98em] font-semibold">{nilai?.cincinJudul || 'Rincian Beban'}</h3>
             <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
-              Komposisi beban operasional
+              {nilai?.cincinSub || 'Komposisi beban operasional'}
             </p>
           </div>
           {/* Legenda di SAMPING cincin supaya cincin dapat ruang penuh (lebih besar),
@@ -800,7 +821,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             <div>
               <h3 className="text-[0.98em] font-semibold">Arus Kas</h3>
               <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
-                29 hari terakhir
+                {nilai?.areaSub || '29 hari terakhir'}
               </p>
             </div>
             <span className="text-[0.78em] font-semibold" style={{ color: ARUS_TUMBUH >= 0 ? WARNA.hijau : WARNA.merah }}>

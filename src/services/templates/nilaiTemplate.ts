@@ -57,6 +57,8 @@ export interface NilaiTemplate {
   cincinTotal?: string;
   transaksi?: NilaiTransaksi[];
   area?: number[];
+  areaLabel?: string[];
+  areaSub?: string;
   target?: NilaiTarget[];
   insight?: string;
   /** Subjudul grafik batang menyesuaikan isi data (per tahun / per bulan). */
@@ -167,7 +169,12 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
       hasil.cincinSub = pendapatan ? 'Nilai tiap sumber pendapatan' : 'Komposisi beban operasional';
       const totalMentah = nilai.reduce((a, b) => a + b, 0);
       const satuan = teks(cincin.chart.unit).trim();
-      hasil.cincinTotal = `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(totalMentah)}${satuan ? ` ${satuan}` : ''}`;
+      const fmt = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+      const besar = /rupiah|rp|idr/i.test(String(satuan || ''));
+      hasil.cincinTotal =
+        besar && totalMentah >= 1e9
+          ? `${fmt.format(totalMentah / 1e9)} M`
+          : `${fmt.format(totalMentah)}${satuan ? ` ${satuan}` : ''}`;
     }
   }
 
@@ -198,8 +205,29 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
 
   // ── Area arus kas ─────────────────────────────────────────────────────────
   const area = daftar.find((w) => w.type === 'area');
-  if (area?.chart?.series?.[0]?.data?.length) {
-    hasil.area = (area.chart.series[0].data || []).map((x) => angka(x));
+  if (area?.chart?.series?.length) {
+    // Ambil seri terakhir (periode terbaru) supaya angka yang tampil paling baru.
+    const seri = area.chart.series[area.chart.series.length - 1];
+    if (seri?.data?.length) {
+      hasil.area = (seri.data || []).map((x) => angka(x));
+      const sumbu = area.chart.xAxis || [];
+      const kategori = sumbu.some((l) => /kas|modal|laba|pendapatan|beban|belanja/i.test(String(l)));
+      if (kategori && sumbu.length === hasil.area.length) {
+        hasil.areaLabel = sumbu.map((l) =>
+          String(l)
+            .replace(/…|\.\.\.$/, '')
+            .replace(/\s+(tahun|berjalan|operasional|lainnya)$/i, '')
+            .trim()
+            .split(/\s+/)
+            .slice(0, 1)
+            .join(' ')
+            .slice(0, 9),
+        );
+        hasil.areaSub = `Nilai tiap komponen, ${seri.name || 'periode terbaru'}`;
+      } else if (sumbu.length === hasil.area.length) {
+        hasil.areaLabel = sumbu.map(String);
+      }
+    }
   }
 
   // ── Progres target ────────────────────────────────────────────────────────
