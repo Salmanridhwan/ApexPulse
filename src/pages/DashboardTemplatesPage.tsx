@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BarChart3,
   CheckCircle2,
   Clock,
-  Eye,
   Database,
+  Eye,
   LayoutGrid,
   LayoutTemplate,
   Loader2,
@@ -450,18 +451,30 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 <Presentation className="w-4 h-4" />
                 <span>Mode Presentasi</span>
               </button>
+              {/* Satu tombol dipakai bolak-balik: "Pratinjau dengan data asli" saat
+                  masih menampilkan contoh, berubah jadi "Kembali ke contoh" saat
+                  pratinjau data asli sedang terbuka — jadi tidak perlu tombol
+                  kembali terpisah di panel pratinjau. */}
               <button
-                onClick={() => void bukaAsli()}
-                disabled={memuatAsli || memuat || !currentTenant || st?.status === 'proses'}
+                onClick={() => (asli ? setAsli(null) : void bukaAsli())}
+                disabled={!asli && (memuatAsli || memuat || !currentTenant || st?.status === 'proses')}
                 data-testid={`pakai-template-${aktif.id}`}
                 title={
-                  st?.status === 'siap'
-                    ? 'Tampilkan dashboard ini dengan angka asli dari dokumen instansi'
-                    : 'Data asli masih disiapkan; pratinjau terbuka sendiri begitu siap'
+                  asli
+                    ? 'Tutup pratinjau data asli dan kembali melihat tampilan contoh'
+                    : st?.status === 'siap'
+                      ? 'Tampilkan dashboard ini dengan angka asli dari dokumen instansi'
+                      : 'Data asli masih disiapkan; pratinjau terbuka sendiri begitu siap'
                 }
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className={
+                  asli
+                    ? 'inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors'
+                    : 'inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
+                }
               >
-                {memuatAsli || st?.status === 'proses' ? (
+                {asli ? (
+                  <ArrowLeft className="w-4 h-4" />
+                ) : memuatAsli || st?.status === 'proses' ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : st?.status === 'siap' ? (
                   <Eye className="w-4 h-4" />
@@ -469,13 +482,15 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                   <Sparkles className="w-4 h-4" />
                 )}
                 <span>
-                  {st?.status === 'proses'
-                    ? `Menyiapkan data… ${st.terisi}/${st.total}`
-                    : memuatAsli
-                      ? 'Memuat pratinjau…'
-                      : 'Pratinjau dengan data asli'}
+                  {asli
+                    ? 'Kembali ke contoh'
+                    : st?.status === 'proses'
+                      ? `Menyiapkan data… ${st.terisi}/${st.total}`
+                      : memuatAsli
+                        ? 'Memuat pratinjau…'
+                        : 'Pratinjau dengan data asli'}
                 </span>
-                {!memuatAsli && st?.status !== 'proses' && <ArrowRight className="w-3.5 h-3.5" />}
+                {!asli && !memuatAsli && st?.status !== 'proses' && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
@@ -520,12 +535,6 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setAsli(null)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                >
-                  Kembali ke contoh
-                </button>
                 <button
                   onClick={() => void pakai()}
                   disabled={memuat}
