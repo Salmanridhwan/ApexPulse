@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  CheckCircle2,
   Clock,
+  Eye,
   Database,
   LayoutGrid,
   LayoutTemplate,
@@ -12,13 +14,14 @@ import {
   Sparkles,
   Target,
 } from 'lucide-react';
-import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
+import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardReferensi } from '../components/referensi/DashboardReferensi';
 import { DashboardAnalitik } from '../components/referensi/DashboardAnalitik';
 import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
+import { DashboardCanvas } from '../components/DashboardCanvas';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
@@ -36,6 +39,24 @@ interface DashboardTemplatesPageProps {
   onUseTemplate: (
     template: DashboardTemplate
   ) => Promise<{ terisi: number; kosong: number; total: number }>;
+}
+
+/**
+ * Status kesiapan "data asli" satu template.
+ *
+ * Angka template TIDAK lagi diambil saat tombol ditekan (dulu pengguna menunggu
+ * 5–15 menit). Server menyiapkannya lebih dulu — saat server hidup, saat dokumen
+ * baru masuk ke basis pengetahuan, dan saat galeri ini dibuka — lalu menyimpannya.
+ * Galeri hanya membaca status ini: sudah siap → tampil seketika; belum → beri tahu
+ * bahwa datanya masih loading beserta progresnya.
+ */
+interface StatusTemplate {
+  templateId: string;
+  status: 'belum' | 'proses' | 'siap' | 'gagal';
+  terisi: number;
+  total: number;
+  progres: { selesai: number; total: number; judul: string } | null;
+  selesaiPada: number | null;
 }
 
 /** Ringkas komposisi widget: "4 KPI · 11 Grafik · 1 Tabel · 1 Narasi". */
@@ -104,6 +125,37 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   const [galat, setGalat] = useState<string | null>(null);
   /** Mode presentasi pratinjau (layar penuh, seluruh dashboard dalam satu halaman). */
   const [presentasi, setPresentasi] = useState(false);
+  /** Kesiapan data asli per template (dibaca dari server, diperbarui berkala). */
+  const [statusTpl, setStatusTpl] = useState<Record<string, StatusTemplate>>({});
+  /** Hasil pratinjau dengan angka dokumen; `null` = masih menampilkan contoh. */
+  const [asli, setAsli] = useState<{ widgets: WidgetSpec[]; terisi: number; kosong: number } | null>(
+    null
+  );
+  const [memuatAsli, setMemuatAsli] = useState(false);
+  const [galatAsli, setGalatAsli] = useState<string | null>(null);
+
+  /** Baca status kesiapan semua template. Gagal membaca bukan alasan menakut-nakuti
+   *  pengguna: cukup tampilkan "belum disiapkan" dan biarkan percobaan berikutnya. */
+  const muatStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/templates/status');
+      if (!res.ok) return;
+      const data = (await res.json()) as { templates?: StatusTemplate[] };
+      const peta: Record<string, StatusTemplate> = {};
+      for (const t of data.templates ?? []) peta[t.templateId] = t;
+      setStatusTpl(peta);
+    } catch {
+      /* diamkan: status hanya pelengkap */
+    }
+  }, []);
+
+  // Status disegarkan berkala supaya begitu server selesai menyiapkan (mis. setelah
+  // dokumen baru masuk), tombol berubah sendiri jadi siap tanpa perlu muat ulang.
+  useEffect(() => {
+    void muatStatus();
+    const t = setInterval(() => void muatStatus(), 7000);
+    return () => clearInterval(t);
+  }, [muatStatus]);
 
   const aktif = useMemo(
     () => DASHBOARD_TEMPLATES.find((t) => t.id === aktifId) ?? DASHBOARD_TEMPLATES[0],
@@ -164,6 +216,90 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     }
   };
 
+  /**
+   * Mulai siapkan data asli untuk template yang sedang dilihat — di latar belakang.
+   *
+   * Tujuannya agar saat pengguna menekan "Pratinjau dengan data asli", angkanya
+   * sudah siap (bukan menunggu 5–15 menit di depan tombol). Hanya template yang
+   * benar-benar dibuka yang disiapkan, supaya layanan dokumen tidak dibanjiri.
+   */
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(`/api/templates/pratinjau?templateId=${encodeURIComponent(aktif.id)}`);
+        if (res.ok) void muatStatus();
+      } catch {
+        /* diamkan: status hanya pelengkap */
+      }
+    })();
+  }, [aktif.id, muatStatus]);
+
+  const st = statusTpl[aktif.id];
+
+  /**
+   * Buka pratinjau dengan DATA ASLI.
+   *
+   * Kalau server sudah menyiapkan angkanya, tampil seketika. Kalau belum, jangan
+   * diam — beri tahu bahwa masih loading, lalu tunggu (server sudah menyiapkan di
+   * latar belakang) dan buka sendiri begitu siap.
+   */
+  const bukaAsli = async () => {
+    if (memuatAsli) return;
+    setMemuatAsli(true);
+    setGalatAsli(null);
+    const ambil = async (): Promise<boolean> => {
+      const res = await fetch(`/api/templates/pratinjau?templateId=${encodeURIComponent(aktif.id)}`);
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        widgets?: WidgetSpec[] | null;
+        terisi?: number;
+        kosong?: number;
+        galat?: string | null;
+        error?: string;
+      };
+      if (!res.ok && !data.status) throw new Error(data.error || 'Pratinjau gagal dimuat.');
+      if (data.status === 'siap' && Array.isArray(data.widgets)) {
+        setAsli({ widgets: data.widgets, terisi: data.terisi ?? 0, kosong: data.kosong ?? 0 });
+        return true;
+      }
+      if (data.status === 'gagal') {
+        throw new Error(data.galat || 'Penyiapan data dari dokumen gagal.');
+      }
+      return false;
+    };
+    try {
+      if (await ambil()) return;
+      setGalatAsli(
+        'Data asli masih disiapkan dari dokumen instansi. Pratinjau akan terbuka sendiri begitu siap — Anda boleh tetap di halaman ini.'
+      );
+      for (let i = 0; i < 240; i += 1) {
+        await new Promise((r) => setTimeout(r, 5000));
+        if (await ambil()) {
+          setGalatAsli(null);
+          return;
+        }
+        if (i % 2 === 0) void muatStatus();
+      }
+      setGalatAsli('Penyiapan data memakan waktu lebih lama dari biasanya. Coba lagi beberapa saat lagi.');
+    } catch (err) {
+      setGalatAsli(pesanGalatRamah(err));
+    } finally {
+      setMemuatAsli(false);
+      void muatStatus();
+    }
+  };
+
+  /** Teks status di toolbar: apa yang sedang terjadi dengan data asli template ini. */
+  const statusTeks = memuat
+    ? 'Membuat dashboard dari data yang sudah siap…'
+    : st?.status === 'siap'
+      ? `Data asli siap · ${st.terisi}/${st.total} kartu berisi angka dokumen`
+      : st?.status === 'proses'
+        ? `Menyiapkan data asli dari dokumen… ${st.terisi}/${st.total} kartu`
+        : st?.status === 'gagal'
+          ? 'Penyiapan data asli gagal — tekan tombol pratinjau untuk mencoba lagi'
+          : 'Data asli belum disiapkan — tekan tombol pratinjau untuk memulai';
+
   return (
     <div className="flex-1 bg-canvas min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1">
@@ -180,13 +316,15 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               </span>
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
-              Tiap template punya tujuan dan cara penyampaian sendiri. Pilih yang sesuai, tekan{' '}
-              <strong>Pakai Template Ini</strong>, angkanya diambil dari dokumen instansi Anda.
+              Tiap template punya tujuan dan cara penyampaian sendiri. Tekan{' '}
+              <strong>Pratinjau dengan data asli</strong> untuk melihatnya berisi angka dokumen
+              instansi Anda, lalu <strong>Simpan sebagai dashboard</strong> — tanpa menunggu.
             </p>
             <p className="text-[10.5px] text-brand-ink mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
               <span>
-                Pratinjau memakai <strong>angka contoh</strong>. Setelah dipakai, indikator yang
+                Pratinjau di bawah memakai <strong>angka contoh</strong>. Angka asli disiapkan
+                lebih dulu oleh server, jadi pratinjau data asli tampil seketika; indikator yang
                 tidak ada di dokumen ditandai <strong>kosong</strong>.
               </span>
             </p>
@@ -288,13 +426,17 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           {/* Toolbar bawah — tombol pakai template */}
           <div className="border-t border-line px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface-2 rounded-b-card">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+              {st?.status === 'siap' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-pos shrink-0" />
+              ) : st?.status === 'proses' || memuatAsli ? (
+                <Loader2 className="w-3.5 h-3.5 text-brand-ink shrink-0 animate-spin" />
+              ) : (
+                <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+              )}
               <span className="text-[11px] text-ink-3 font-medium truncate">
-                {memuat
-                  ? progres && progres.total > 0
-                    ? `${progres.terisi}/${progres.total} kartu terisi · ${detik} dtk · ${progres.judul || 'mengambil angka…'}`
-                    : `Mengambil angka dari dokumen instansi… ${detik} dtk`
-                  : 'Angka setiap kartu diambil dari dokumen resmi instansi'}
+                {memuat && progres && progres.total > 0
+                  ? `${progres.terisi}/${progres.total} kartu terisi · ${detik} dtk · ${progres.judul || 'menyiapkan…'}`
+                  : statusTeks}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -309,20 +451,43 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 <span>Mode Presentasi</span>
               </button>
               <button
-                onClick={pakai}
-                disabled={memuat || !currentTenant}
+                onClick={() => void bukaAsli()}
+                disabled={memuatAsli || memuat || !currentTenant || st?.status === 'proses'}
                 data-testid={`pakai-template-${aktif.id}`}
+                title={
+                  st?.status === 'siap'
+                    ? 'Tampilkan dashboard ini dengan angka asli dari dokumen instansi'
+                    : 'Data asli masih disiapkan; pratinjau terbuka sendiri begitu siap'
+                }
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
-                <span>{memuat ? 'Mengambil dari dokumen…' : 'Pakai Template Ini'}</span>
-                {!memuat && <ArrowRight className="w-3.5 h-3.5" />}
+                {memuatAsli || st?.status === 'proses' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : st?.status === 'siap' ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                <span>
+                  {st?.status === 'proses'
+                    ? `Menyiapkan data… ${st.terisi}/${st.total}`
+                    : memuatAsli
+                      ? 'Memuat pratinjau…'
+                      : 'Pratinjau dengan data asli'}
+                </span>
+                {!memuatAsli && st?.status !== 'proses' && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
 
           {/* Galat tetap ditampilkan, tetapi dengan bahasa awam — tanpa istilah
               teknis yang tidak dipahami pengguna. */}
+          {galatAsli && (
+            <div className="border-t border-warn/30 bg-warn/10 px-4 sm:px-5 py-2.5 flex items-start gap-2">
+              <Clock className="w-4 h-4 text-warn shrink-0 mt-0.5" />
+              <p className="text-[11.5px] text-ink-2 leading-relaxed">{galatAsli}</p>
+            </div>
+          )}
           {galat && (
             <div className="border-t border-neg/30 bg-neg/10 px-4 sm:px-5 py-3 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
@@ -339,9 +504,56 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             rincian beban, daftar transaksi, area arus kas, progres target, dan
             strip insight. Susunannya sengaja tidak memakai DashboardCanvas agar
             bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
-        <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
-          <KomponenPratinjau />
-        </div>
+        {asli ? (
+          <div className="rounded-card border border-line overflow-hidden bg-canvas">
+            <div className="px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface border-b border-line">
+              <div className="min-w-0 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-pos shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-ink">Pratinjau dengan data asli</p>
+                  <p className="text-[11px] text-ink-3 leading-relaxed">
+                    {asli.terisi}/{asli.widgets.length} kartu berisi angka dari dokumen instansi
+                    {asli.kosong > 0
+                      ? ` · ${asli.kosong} kartu belum ada di dokumen (ditandai kosong)`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setAsli(null)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                >
+                  Kembali ke contoh
+                </button>
+                <button
+                  onClick={() => void pakai()}
+                  disabled={memuat}
+                  data-testid="simpan-dari-pratinjau"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
+                >
+                  {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
+                  <span>{memuat ? 'Menyimpan…' : 'Simpan sebagai dashboard'}</span>
+                </button>
+              </div>
+            </div>
+            <DashboardCanvas
+              widgets={asli.widgets}
+              onEditWidget={() => {}}
+              onManualCorrection={() => {}}
+              onDeleteWidget={() => {}}
+              onDuplicateWidget={() => {}}
+              onReorderWidgets={() => {}}
+              onResizeWidget={() => {}}
+              preview
+              readOnly
+            />
+          </div>
+        ) : (
+          <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
+            <KomponenPratinjau />
+          </div>
+        )}
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
           <BarChart3 className="w-3 h-3 mt-0.5 shrink-0" />

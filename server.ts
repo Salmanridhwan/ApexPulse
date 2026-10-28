@@ -72,6 +72,15 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
+import {
+  ambilPratinjau,
+  aturBerkasGudang,
+  basiikanTenant,
+  daftarPratinjau,
+  masihBerlaku,
+  siapkanPratinjau,
+  type EntriPratinjau,
+} from './src/services/templates/gudangPratinjau';
 import { adalahPermintaanSaran, dataDariWidget, indikatorDariPrompt, susunSaranChart } from './src/services/chat/saranChart';
 import { adalahPertanyaanDokumen, susunJawabanDokumen } from './src/services/chat/dokumen';
 import { generateInsightPresentasi } from './src/services/presentasi/generateInsight';
@@ -299,6 +308,79 @@ const progresTemplate = new Map<
   string,
   { selesai: number; total: number; terisi: number; judul: string; mulai: number }
 >();
+
+/**
+ * Versi basis pengetahuan instansi. Berubah setiap kali dokumen disinkronkan, jadi
+ * pratinjau template yang dibuat sebelum dokumen baru masuk otomatis dianggap basi.
+ */
+function versiKbTenant(tenant: any): string {
+  return String(tenant?.kbTersinkronPada || tenant?.kbDiperbaruiPada || '0');
+}
+
+/**
+ * Siapkan angka satu template untuk satu instansi (isi dari dokumen), hasilnya
+ * disimpan di gudang pratinjau. Dipanggil di latar belakang — bukan saat tombol
+ * ditekan — supaya pratinjau bisa tampil seketika.
+ */
+function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinjau> {
+  const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+  const dasar = widgetDariTemplate(template, Date.now());
+  return siapkanPratinjau({
+    tenantId: tenant.id,
+    templateId: template.id,
+    kbId,
+    versiKb: versiKbTenant(tenant),
+    total: dasar.length,
+    pekerja: async (onProgres) => {
+      const hasil = await isiTemplateDariRag(
+        { ...template, widgets: dasar },
+        {
+          sector: tenant.sector as BumdSector,
+          instansi: tenant.name,
+          kbId,
+          rag: ragClient,
+          konkurensi: 2,
+          batasMs: BATAS_ISI_TEMPLATE_MS,
+          putaranMaks: 6,
+          onProgres: (info) =>
+            onProgres({ selesai: info.selesai, total: info.total, judul: info.judul }),
+        }
+      );
+      return {
+        widgets: hasil.widgets,
+        terisi: hasil.terisi,
+        kosong: hasil.kosong,
+        catatan: hasil.catatan,
+      };
+    },
+  });
+}
+
+/**
+ * Hangatkan SEMUA template untuk satu instansi, berurutan di latar belakang.
+ * Dipanggil saat server hidup, saat dokumen baru disinkronkan, dan saat galeri
+ * template dibuka — jadi pengguna tidak pernah menunggu di depan tombol.
+ */
+function hangatkanTemplateTenant(tenant: any): void {
+  if (!tenant?.id) return;
+  const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+  if (!kbId) return;
+  // Instansi tanpa KB sendiri dan tanpa dokumen tidak punya angka untuk diisi;
+  // menyiapkannya hanya membuang kuota layanan dokumen.
+  if (!String(tenant.knowledgeBaseId || '').trim() && !(Number(tenant.documentCount) > 0)) return;
+  void (async () => {
+    for (const t of DASHBOARD_TEMPLATES) {
+      try {
+        await siapkanTemplateTenant(tenant, t);
+      } catch (err) {
+        console.error(
+          `[pratinjau] gagal menyiapkan ${t.id} untuk ${tenant.id}:`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+  })();
+}
 
 /**
  * ponytail: tab yang dibiarkan terbuka terus menjalankan bundel JS lama, jadi
@@ -1267,6 +1349,95 @@ const app = express();
    * dokumen instansi. Kartu yang indikatornya tidak ada di dokumen dikosongkan
    * dengan penanda jujur — tidak ada angka contoh yang ditampilkan.
    */
+  /**
+   * STATUS PRATINJAU DATA ASLI satu template.
+   *
+   * `status`:
+   *  - `siap`   → widgets berisi angka dokumen (boleh langsung ditampilkan)
+   *  - `proses` → masih disiapkan; `progres` memberi tahu sudah berapa kartu
+   *  - `belum`  → belum pernah disiapkan; permintaan ini akan memulainya
+   *  - `gagal`  → penyiapan gagal (mis. layanan dokumen mati)
+   */
+  app.get('/api/templates/pratinjau', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const templateId = String(req.query.templateId || '').trim();
+    const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const versi = versiKbTenant(tenant);
+    const entri = ambilPratinjau(tenant.id, template.id, kbId);
+    const siap = masihBerlaku(entri, versi);
+
+    // Belum siap dan tidak sedang diproses → mulai sekarang (di latar belakang).
+    // Setelah gagal, beri jeda 2 menit sebelum mencoba lagi: tanpa jeda, tiap
+    // kunjungan halaman memicu pengisian baru dan layanan dokumen makin sibuk.
+    const jedaGagal = entri?.status === 'gagal' && Date.now() - (entri.selesai ?? 0) < 120_000;
+    if (!siap && entri?.status !== 'proses' && !jedaGagal) {
+      void siapkanTemplateTenant(tenant, template);
+    }
+
+    return res.json({
+      templateId: template.id,
+      status: siap ? 'siap' : entri?.status ?? 'belum',
+      progres: entri?.progres ?? { selesai: 0, total: template.widgets.length, judul: 'Menunggu…' },
+      terisi: entri?.terisi ?? 0,
+      kosong: entri?.kosong ?? 0,
+      total: template.widgets.length,
+      selesaiPada: entri?.selesai ?? null,
+      galat: entri?.galat ?? null,
+      widgets: siap ? entri!.widgets : null,
+    });
+  });
+
+  /** Minta penyiapan ulang (mis. setelah dokumen berubah atau pengguna ingin coba lagi). */
+  app.post('/api/templates/siapkan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const templateId = String(req.body?.templateId || '').trim();
+    const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
+
+    basiikanTenant(tenant.id);
+    void siapkanTemplateTenant(tenant, template);
+    return res.status(202).json({ status: 'proses' });
+  });
+
+  /** Ringkasan status semua template satu instansi (badge di galeri). */
+  app.get('/api/templates/status', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const versi = versiKbTenant(tenant);
+    const entri = daftarPratinjau(tenant.id);
+
+    return res.json({
+      templates: DASHBOARD_TEMPLATES.map((t) => {
+        const e = entri.find((x) => x.templateId === t.id && x.kbId === kbId);
+        const siap = masihBerlaku(e ?? null, versi);
+        return {
+          templateId: t.id,
+          status: siap ? 'siap' : e?.status ?? 'belum',
+          terisi: e?.terisi ?? 0,
+          total: t.widgets.length,
+          progres: e?.progres ?? null,
+          selesaiPada: e?.selesai ?? null,
+        };
+      }),
+    });
+  });
+
   app.post('/api/dashboards/dari-template', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1280,96 +1451,66 @@ const app = express();
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
-    // jobId dipakai UI untuk membaca progres pengisian (polling) selama menunggu.
-    const jobId = String(req.body?.jobId || '').trim();
+    const versi = versiKbTenant(tenant);
+    const entri = ambilPratinjau(tenant.id, template.id, kbId);
 
-    try {
-      // Salin widget template (id baru & segar) lalu isi angkanya dari dokumen.
-      const seed = Date.now();
-      const dasar = widgetDariTemplate(template, seed);
-      if (jobId) {
-        progresTemplate.set(jobId, {
-          selesai: 0,
-          total: dasar.length,
-          terisi: 0,
-          judul: 'Menyiapkan permintaan ke dokumen…',
-          mulai: Date.now(),
-        });
-      }
-      const hasil = await isiTemplateDariRag(
-        { ...template, widgets: dasar },
-        {
-          // Template kini TIDAK terikat sektor. Sektor hanya dipakai untuk
-          // menyesuaikan istilah saat menyusun pertanyaan ke dokumen, jadi
-          // selalu ikut instansi yang sedang login.
-          sector: (req.body?.sector || tenant.sector) as BumdSector,
-          instansi: tenant.name,
-          kbId,
-          rag: ragClient,
-          // 2 serentak, bukan 8: RAG membalas 429 bila dihantam banyak permintaan
-          // sekaligus. Uji nyata: 8 serentak = hampir semua kartu kosong.
-          konkurensi: 2,
-          // Tunggu sampai semua kartu terisi: kartu yang gagal karena layanan
-          // sibuk diulang di putaran berikutnya, bukan langsung dikosongkan.
-          batasMs: BATAS_ISI_TEMPLATE_MS,
-          putaranMaks: 6,
-          onProgres: (info) => {
-            if (!jobId) return;
-            progresTemplate.set(jobId, {
-              selesai: info.selesai,
-              total: info.total,
-              terisi: info.terisiTotal ?? 0,
-              judul: info.judul,
-              mulai: progresTemplate.get(jobId)?.mulai ?? Date.now(),
-            });
-          },
-        }
-      );
-      if (jobId) progresTemplate.delete(jobId);
-
-      // Judul dashboard: buang penanda "(Contoh)" karena kini angkanya dari dokumen.
-      const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
-
-      const newDash: Dashboard = {
-        id: `dash-${Date.now()}`,
-        tenantId,
-        title: judulBersih,
-        description: template.deskripsiDashboard.replace(
-          /Angka bersifat contoh[^.]*\./i,
-          'Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.'
-        ),
-        sector: tenant.sector,
-        widgets: hasil.widgets,
-        globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      db.createDashboard(newDash);
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Buat Dashboard dari Template',
-        target: newDash.title,
-        details: `Template ${template.nama}: ${hasil.terisi} kartu terisi dari dokumen, ${hasil.kosong} kartu belum ada di dokumen.`,
-      });
-
-      return res.status(201).json({
-        dashboard: newDash,
-        terisi: hasil.terisi,
-        kosong: hasil.kosong,
-        total: template.widgets.length,
-        catatan: hasil.catatan,
-        kedaluwarsa: hasil.kedaluwarsa,
-      });
-    } catch (err) {
-      // Rincian teknis hanya untuk log; pengguna menerima kalimat yang jelas.
-      console.error('[template] gagal membuat dashboard dari template:', jelaskanError(err));
-      if (jobId) progresTemplate.delete(jobId);
-      return res.status(500).json({
-        error: 'Dashboard belum bisa dibuat. Coba lagi beberapa saat lagi.',
+    /**
+     * Data template sudah disiapkan lebih dulu (lihat `hangatkanTemplateTenant`).
+     * Kalau belum siap, jangan menahan pengguna 5–15 menit: siapkan di latar
+     * belakang dan beri tahu UI bahwa datanya masih loading.
+     */
+    if (!masihBerlaku(entri, versi)) {
+      if (entri?.status !== 'proses') void siapkanTemplateTenant(tenant, template);
+      return res.status(409).json({
+        error: 'Data template masih disiapkan dari dokumen. Coba lagi sebentar lagi.',
+        status: entri?.status ?? 'belum',
+        progres: entri?.progres ?? null,
       });
     }
+
+    // Salin widget siap pakai dengan id baru; definisi template tidak boleh berubah.
+    const seed = Date.now();
+    const widgets = entri!.widgets.map((w, i) => ({
+      ...w,
+      id: `tpl-${template.id}-${seed}-${i + 1}`,
+      grid: { ...w.grid },
+    }));
+
+    // Judul dashboard: buang penanda "(Contoh)" karena angkanya dari dokumen.
+    const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
+
+    const newDash: Dashboard = {
+      id: `dash-${Date.now()}`,
+      tenantId,
+      title: judulBersih,
+      description: template.deskripsiDashboard.replace(
+        /Angka bersifat contoh[^.]*\./i,
+        'Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.'
+      ),
+      sector: tenant.sector,
+      widgets,
+      globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.createDashboard(newDash);
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Buat Dashboard dari Template',
+      target: newDash.title,
+      details: `Template ${template.nama}: ${entri!.terisi} kartu terisi dari dokumen, ${entri!.kosong} kartu belum ada di dokumen.`,
+    });
+
+    return res.status(201).json({
+      dashboard: newDash,
+      terisi: entri!.terisi,
+      kosong: entri!.kosong,
+      total: widgets.length,
+      catatan: entri!.catatan,
+      kedaluwarsa: false,
+    });
   });
 
   /**
@@ -4349,6 +4490,13 @@ const app = express();
         target: String(req.body?.judul || nama),
         details: `Berkas ${nama} (${(isi.length / 1024).toFixed(0)} KB) diunggah ke project KMS ${organizationId}${kbTujuan ? ` · KB ${kbTujuan}` : ''}${berkas?.cdnFileId ? ` · CDN ${berkas.cdnFileId}` : ''}${berkas?.ragStatus ? ` · status RAG: ${berkas.ragStatus}` : ''}`,
       });
+      // Dokumen baru masuk ke basis pengetahuan → pratinjau template instansi ini
+      // tidak lagi mewakili isi dokumen. Tandai basi dan siapkan ulang di latar
+      // belakang, supaya angka template ikut dokumen terbaru tanpa menunggu klik.
+      if (tenant?.id) {
+        basiikanTenant(tenant.id);
+        hangatkanTemplateTenant(tenant);
+      }
       res.status(201).json({ success: true, berkas, knowledgeBase: kbTujuan || null });
     } catch (err: any) {
       balasGalatKms(res, err);
@@ -5623,6 +5771,11 @@ ${navigasi}
         userName: session.name,
       });
 
+      // Dokumen bisa bertambah/berkurang: pratinjau lama tidak lagi mewakili isi
+      // dokumen, jadi ditandai basi lalu disiapkan ulang di latar belakang.
+      basiikanTenant(tenant.id);
+      hangatkanTemplateTenant(diperbarui || tenant);
+
       return {
         ok: true,
         tenant: diperbarui || tenant,
@@ -5991,6 +6144,20 @@ ${navigasi}
     hentikanBackup = mulaiBackupTerjadwal();
     // Perubahan konfigurasi dari instance lain langsung terpakai di sini.
     hentikanSinkron = mulaiSinkronKonfigurasi();
+
+    /**
+     * PRATINJAU TEMPLATE — disiapkan sejak server hidup.
+     *
+     * Hasil pengisian sebelumnya dimuat dari berkas supaya restart tidak
+     * menghapus data. Yang belum siap (atau sudah basi karena dokumen berubah)
+     * disiapkan di latar belakang dengan jeda, agar tidak berebut sumber daya
+     * dengan permintaan pengguna pertama.
+     */
+    aturBerkasGudang(path.join(process.cwd(), 'data', 'template-pratinjau.json'));
+    // Sengaja TIDAK menyiapkan semua instansi saat server hidup: 6 instansi × 3
+    // template = 18 pengisian sekaligus, dan layanan dokumen membalas 429 —
+    // pengisian justru gagal semua. Penyiapan dimulai saat galeri template
+    // instansi itu dibuka (atau setelah dokumennya disinkronkan).
   });
 
   // Batas waktu koneksi: header harus selesai 20 dtk, satu permintaan 2 mnt.
