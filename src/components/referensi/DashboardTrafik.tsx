@@ -871,19 +871,14 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
                 </span>
               </div>
             </div>
-            <ul className="flex-1 min-w-0 flex flex-col justify-around gap-[0.2em]">
+            <ul className="flex-1 min-w-0 flex flex-col justify-center gap-[0.42em]">
               {PERILAKU.map((p) => (
-                <li key={p.nama} className="min-w-0">
-                  <div className="flex items-center gap-[0.3em] text-[0.65em]">
-                    <span className="w-[0.45em] h-[0.45em] rounded-[0.12em] shrink-0" style={{ backgroundColor: p.warna }} />
-                    <span className="truncate" style={{ color: WARNA.teks2 }}>
-                      {p.nama}
-                    </span>
-                    <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
-                  </div>
-                  <div className="text-[0.56em] mt-[0.05em] pl-[0.75em]" style={{ color: WARNA.teks3 }}>
-                    {p.jumlah} dari 100
-                  </div>
+                <li key={p.nama} className="min-w-0 flex items-center gap-[0.3em] text-[0.68em]">
+                  <span className="w-[0.46em] h-[0.46em] rounded-[0.12em] shrink-0" style={{ backgroundColor: p.warna }} />
+                  <span className="truncate" style={{ color: WARNA.teks2 }}>
+                    {p.nama}
+                  </span>
+                  <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
                 </li>
               ))}
             </ul>
