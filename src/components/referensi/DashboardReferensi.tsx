@@ -452,21 +452,24 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
   // Terapkan nilai dokumen ke slot template SEBELUM render/opsi grafik dibuat.
   // (Konstanta di atas bersifat modul karena dipakai juga oleh pembentuk opsi
   // grafik di luar komponen; jadi nilai aktif ditulis di sini.)
+  const pakaiData = !!nilai;
   const KPI: Kpi[] = (nilai?.kpi?.length ? nilai.kpi : KPI_CONTOH).map(
     (k, i) => ({ ...k, Ikon: k.Ikon ?? IKON_KPI[i % IKON_KPI.length] }) as Kpi
   );
-  const BULAN: string[] = nilai?.batang?.label?.length ? nilai.batang.label : BULAN_CONTOH;
+  const BULAN: string[] = nilai?.batang?.label?.length ? nilai.batang.label : pakaiData ? [] : BULAN_CONTOH;
   const PENDAPATAN_BULANAN: number[] = nilai?.batang?.nilai?.length
     ? nilai.batang.nilai
-    : PENDAPATAN_CONTOH;
+    : pakaiData
+      ? []
+      : PENDAPATAN_CONTOH;
   const garis = PENDAPATAN_BULANAN;
   const TOTAL_PENDAPATAN = PENDAPATAN_BULANAN.reduce((a, b) => a + b, 0);
   const PUNCAK = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
-  const RINCIAN_BEBAN: NilaiBeban[] = nilai?.cincin?.length ? nilai.cincin : BEBAN_CONTOH;
-  const ARUS_KAS: number[] = nilai?.area?.length ? nilai.area : ARUS_CONTOH;
-  const TRANSAKSI: NilaiTransaksi[] = nilai?.transaksi?.length ? nilai.transaksi : TRANSAKSI_CONTOH;
-  const TARGET: NilaiTarget[] = nilai?.target?.length ? nilai.target : TARGET_CONTOH;
-  const INSIGHT = nilai?.insight?.trim() ? nilai.insight : INSIGHT_CONTOH;
+  const RINCIAN_BEBAN: NilaiBeban[] = nilai?.cincin?.length ? nilai.cincin : pakaiData ? [] : BEBAN_CONTOH;
+  const ARUS_KAS: number[] = nilai?.area?.length ? nilai.area : pakaiData ? [] : ARUS_CONTOH;
+  const TRANSAKSI: NilaiTransaksi[] = nilai?.transaksi?.length ? nilai.transaksi : pakaiData ? [] : TRANSAKSI_CONTOH;
+  const TARGET: NilaiTarget[] = nilai?.target?.length ? nilai.target : pakaiData ? [] : TARGET_CONTOH;
+  const INSIGHT = nilai?.insight?.trim() ? nilai.insight : pakaiData ? '' : INSIGHT_CONTOH;
   // Total di lubang cincin & label puncak ikut nilai dokumen.
   const CINCIN_TOTAL = nilai?.cincinTotal?.trim() || '12,35 M';
   const PUNCAK_NILAI = PENDAPATAN_BULANAN[PUNCAK] ?? 0;
@@ -629,7 +632,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 )}
               </div>
 
-              <div className="flex items-center gap-[0.4em] text-[0.76em] font-semibold">
+              <div className={`flex items-center gap-[0.4em] text-[0.76em] font-semibold ${pakaiData && k.delta === 0 ? 'hidden' : ''}`}>
                 <span className="inline-flex items-center gap-[0.15em]" style={{ color: warna }}>
                   {datar ? (
                     <span className="w-[0.9em] text-center leading-none">–</span>
@@ -676,7 +679,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             <div>
               <h3 className="text-[0.98em] font-semibold">Ikhtisar Pendapatan</h3>
               <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
-                Pendapatan usaha per bulan, 2025
+                {nilai?.batangSub || 'Pendapatan usaha per bulan, 2025'}
               </p>
             </div>
             <div className="text-right">
@@ -705,7 +708,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
           <div className="shrink-0">
-            <h3 className="text-[0.98em] font-semibold">Rincian Beban</h3>
+            <h3 className="text-[0.98em] font-semibold">{nilai?.cincinJudul || 'Rincian Beban'}</h3>
             <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
               Komposisi beban operasional
             </p>
@@ -751,7 +754,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       >
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
           <div className="flex items-center justify-between gap-[0.25em] mb-[0.6em] shrink-0">
-            <h3 className="text-[0.98em] font-semibold truncate min-w-0">Transaksi Terbaru</h3>
+            <h3 className="text-[0.98em] font-semibold truncate min-w-0">{nilai?.tabelJudul || 'Transaksi Terbaru'}</h3>
             <button
               type="button"
               onClick={() => setSemuaTransaksi((v) => !v)}
@@ -765,7 +768,12 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             </button>
           </div>
           <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto gulir-tema pr-[0.2em]' : ''}`}>
-            {(semuaTransaksi ? [...TRANSAKSI_CONTOH, ...TRANSAKSI_LAIN_CONTOH] : TRANSAKSI_CONTOH).map((t) => (
+            {TRANSAKSI.length === 0 && (
+              <li className="text-[0.78em]" style={{ color: WARNA.teks3 }}>
+                Belum ada data {nilai?.tabelJudul ? 'tabel' : 'transaksi'} di dokumen instansi.
+              </li>
+            )}
+            {(semuaTransaksi ? [...TRANSAKSI, ...(pakaiData ? [] : TRANSAKSI_LAIN_CONTOH)] : TRANSAKSI).map((t) => (
               <li key={t.nama} className="flex items-center gap-[0.6em]">
                 <span
                   className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
@@ -806,6 +814,11 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
           <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
           <ul className={`space-y-[0.7em] ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
+            {TARGET.length === 0 && (
+              <li className="text-[0.78em]" style={{ color: WARNA.teks3 }}>
+                Belum ada angka capaian target di dokumen instansi.
+              </li>
+            )}
             {TARGET.map((t) => (
               <li key={t.nama}>
                 <div className="flex items-center justify-between text-[0.8em] mb-[0.3em]">
@@ -840,7 +853,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           <div className="min-w-0">
             <p className="text-[0.92em] font-semibold">Insight Keuangan</p>
             <p className="text-[0.8em] leading-relaxed" style={{ color: WARNA.teks3 }}>
-              {INSIGHT}
+              {INSIGHT || 'Belum ada insight keuangan di dokumen instansi.'}
             </p>
           </div>
         </div>

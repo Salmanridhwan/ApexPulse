@@ -39,7 +39,7 @@ export interface NilaiTransaksi {
   ket: string;
   nilai: string;
   naik: boolean;
-  Ikon?: React.ComponentType<{ className?: string }>;
+  Ikon: React.ComponentType<{ className?: string }>;
 }
 
 export interface NilaiTarget {
@@ -59,6 +59,13 @@ export interface NilaiTemplate {
   area?: number[];
   target?: NilaiTarget[];
   insight?: string;
+  /** Subjudul grafik batang menyesuaikan isi data (per tahun / per bulan). */
+  batangSub?: string;
+  /** Judul cincin menyesuaikan isi data (komposisi pendapatan vs beban). */
+  cincinJudul?: string;
+  cincinSub?: string;
+  /** Judul daftar menyesuaikan isi tabel dokumen. */
+  tabelJudul?: string;
 }
 
 const IKON_TRANSAKSI = [Droplets, CreditCard, Landmark, Wallet];
@@ -130,7 +137,13 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
   if (batang?.chart) {
     const label = (batang.chart.xAxis || []).map((x) => teks(x));
     const nilai = (batang.chart.series?.[0]?.data || []).map((x) => angka(x));
-    if (label.length && nilai.length) hasil.batang = { label, nilai };
+    if (label.length && nilai.length) {
+      hasil.batang = { label, nilai };
+      const tahunan = label.every((l) => /^\d{4}$/.test(l));
+      hasil.batangSub = tahunan
+        ? `Pendapatan usaha per tahun, ${label[0]}–${label[label.length - 1]}`
+        : 'Pendapatan usaha per bulan';
+    }
   }
 
   // ── Cincin: komposisi (persen dihitung dari nilai) ─────────────────────────
@@ -148,6 +161,10 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
       .filter((x) => x.nilai > 0);
     if (isi.length) {
       hasil.cincin = isi;
+      const nama = label.join(' ').toLowerCase();
+      const pendapatan = /rekening|sambungan|denda|retribusi|pendapatan/.test(nama);
+      hasil.cincinJudul = pendapatan ? 'Komposisi Pendapatan' : 'Rincian Beban';
+      hasil.cincinSub = pendapatan ? 'Nilai tiap sumber pendapatan' : 'Komposisi beban operasional';
       const totalMentah = nilai.reduce((a, b) => a + b, 0);
       const satuan = teks(cincin.chart.unit).trim();
       hasil.cincinTotal = `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(totalMentah)}${satuan ? ` ${satuan}` : ''}`;
@@ -172,7 +189,11 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
         Ikon: IKON_TRANSAKSI[i % IKON_TRANSAKSI.length],
       };
     });
-    if (baris.length) hasil.transaksi = baris;
+    if (baris.length) {
+      hasil.transaksi = baris;
+      const labelKolom = kolom.map((k) => k.label).join(' ');
+      hasil.tabelJudul = /bulan|nrW|m³|m3/i.test(labelKolom) ? 'Data Bulanan' : 'Transaksi Terbaru';
+    }
   }
 
   // ── Area arus kas ─────────────────────────────────────────────────────────
@@ -200,12 +221,8 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
     const st = statusTarget(persen);
     isiTarget.push({ nama: LABEL_TARGET[0], capai: persen, status: st.status, warna: st.warna });
   }
-  if (isiTarget.length) {
-    while (isiTarget.length < 3) {
-      isiTarget.push({ nama: LABEL_TARGET[isiTarget.length], capai: 0, status: 'perlu perhatian', warna: '#ef4444' });
-    }
-    hasil.target = isiTarget;
-  }
+  // Hanya target yang benar-benar ada di dokumen. Tidak ada angka → kartu kosong.
+  if (isiTarget.length) hasil.target = isiTarget;
 
   // ── Insight ───────────────────────────────────────────────────────────────
   const narasi = daftar.find((w) => w.type === 'narasi');
