@@ -651,12 +651,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-center justify-between gap-[0.5em] mb-[0.6em] shrink-0">
-            <h3 className="text-[0.98em] font-semibold">Progres Target</h3>
-            <Legenda
-              item={Array.from(new Map(TARGET.map((t) => [t.status, { warna: t.warna, label: t.status }])).values())}
-            />
-          </div>
+          <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
           <ul className={`space-y-[0.7em] ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
             {TARGET.map((t) => (
               <li key={t.nama}>
