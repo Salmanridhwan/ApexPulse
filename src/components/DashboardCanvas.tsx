@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
+import { hitungBarisKanvas, tinggiBaris } from '../services/tataLetak/satuHalaman';
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -21,6 +22,15 @@ interface DashboardCanvasProps {
    * widget belum nyata — sembunyikan menu ⋯ dan matikan drag/resize.
    */
   preview?: boolean;
+  /**
+   * Tampilkan dashboard dalam SATU layar penuh tanpa scroll.
+   *
+   * Tinggi baris dihitung dari sisa tinggi layar, jadi seluruh widget selalu
+   * terlihat sekaligus (grafik mengecil sendiri karena ECharts mengikuti ukuran
+   * kartu). Hanya berlaku di layar lebar (≥1024px); di layar kecil kanvas tetap
+   * bisa digeser karena kartu selebar layar tidak mungkin dipaksa muat.
+   */
+  satuHalaman?: boolean;
 }
 
 export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
@@ -35,6 +45,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onOpenChat,
   readOnly = false,
   preview = false,
+  satuHalaman = false,
 }) => {
   // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -48,6 +59,74 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
 
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
   const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
+
+  // ===== Mode satu halaman =====
+  /** Wadah kanvas — dipakai mengukur sisa tinggi layar. */
+  const wadahRef = useRef<HTMLDivElement | null>(null);
+  const [tinggiTersedia, setTinggiTersedia] = useState(0);
+  const [layarLebar, setLayarLebar] = useState(false);
+
+  /**
+   * Ukur dari tepi atas kanvas sampai dasar layar. Dipakai `useLayoutEffect` supaya
+   * tinggi sudah benar sebelum layar digambar (tidak ada kedipan/gulir sesaat).
+   * Diukur ulang saat jendela berubah ukuran dan sekali lagi setelah 350 ms —
+   * baris alat di atas kanvas (filter, tombol) kadang muncul belakangan.
+   */
+  useLayoutEffect(() => {
+    if (!satuHalaman) return;
+    const ukur = () => {
+      const el = wadahRef.current;
+      if (!el) return;
+      setLayarLebar(window.innerWidth >= 1024);
+      const atas = el.getBoundingClientRect().top;
+      setTinggiTersedia(Math.max(0, Math.round(window.innerHeight - atas - 12)));
+    };
+    ukur();
+    const tunda = window.setTimeout(ukur, 350);
+    window.addEventListener('resize', ukur);
+    /**
+     * Tinggi di atas kanvas bisa berubah tanpa jendela diubah ukurannya (mis.
+     * baris filter muncul, atau tombol alat bertambah). Pantau tinggi halaman;
+     * `setState` dengan nilai sama tidak memicu render, jadi tidak ada loop.
+     */
+    const pengamat = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => ukur()) : null;
+    pengamat?.observe(document.body);
+    return () => {
+      window.clearTimeout(tunda);
+      window.removeEventListener('resize', ukur);
+      pengamat?.disconnect();
+    };
+  }, [satuHalaman, widgets.length]);
+
+  /**
+   * Jumlah baris yang dibutuhkan grid 12 kolom (sama dengan cara CSS grid
+   * menempatkan kartu: kalau sisa kolom tidak cukup, kartu pindah baris).
+   */
+  const barisKanvas = useMemo(() => hitungBarisKanvas(widgets), [widgets]);
+
+  /** Prasyarat mode satu halaman (dipakai juga untuk memilih jarak/padding). */
+  const pasSatuHalamanAwal = satuHalaman && layarLebar && tinggiTersedia > 0 && barisKanvas > 0;
+
+  /**
+   * Mode satu halaman memakai jarak & padding lebih rapat (10px / 12px) supaya
+   * ruang yang tersisa benar-benar dipakai kartu, bukan celah.
+   */
+  const JARAK = pasSatuHalamanAwal ? 10 : 16;
+  const PADDING = pasSatuHalamanAwal ? 12 : 20;
+  /** Baris lebih pendek dari ini membuat grafik tak terbaca → pakai skala turun. */
+  const BARIS_MIN = 84;
+
+  const pasSatuHalaman = pasSatuHalamanAwal;
+  const tinggiIsi = Math.max(0, tinggiTersedia - PADDING * 2);
+  /**
+   * Tinggi baris & skala dihitung murni di `satuHalaman.ts` (ada tesnya): kalau
+   * baris minimum pun tidak cukup, seluruh grid diperkecil dengan `scale`
+   * supaya TETAP muat satu layar tanpa scroll.
+   */
+  const tata = pasSatuHalaman ? tinggiBaris(tinggiIsi, barisKanvas, JARAK, BARIS_MIN) : { tinggi: 0, skala: 1 };
+  const tinggiBarisFinal = tata.tinggi;
+  const skala = tata.skala;
+  const tinggiGrid = barisKanvas * tinggiBarisFinal + JARAK * Math.max(0, barisKanvas - 1);
   /** Diskritkan lebar mentah ke bucket yang dikenali pemetaan colSpan. */
   const bucket = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
 
@@ -134,8 +213,28 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   }
 
   return (
-    <div className="canvas-tegas p-4 sm:p-5">
-      <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-4">
+    <div
+      ref={wadahRef}
+      className={`canvas-tegas ${pasSatuHalaman ? 'overflow-hidden' : 'p-4 sm:p-5'}`}
+      style={pasSatuHalaman ? { height: tinggiTersedia, padding: PADDING } : undefined}
+    >
+      <div
+        className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-4"
+        style={
+          pasSatuHalaman
+            ? {
+                gridTemplateRows: `repeat(${barisKanvas}, minmax(0, ${tinggiBarisFinal}px))`,
+                height: tinggiGrid,
+                rowGap: JARAK,
+                columnGap: JARAK,
+                paddingBottom: 0,
+                transform: skala < 1 ? `scale(${skala})` : undefined,
+                transformOrigin: 'top left',
+                width: skala < 1 ? `${100 / skala}%` : undefined,
+              }
+            : undefined
+        }
+      >
       {widgets.map((widget, urutan) => {
         // Map grid.w to responsive Tailwind column span
         // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
@@ -185,13 +284,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               setDragId(null);
               setOverId(null);
             }}
-            className={`${colSpan} ${tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
+            className={`${colSpan} ${pasSatuHalaman ? 'min-h-0 overflow-hidden' : tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
               } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
           >
             <WidgetCard
               widget={widget}
               urutan={urutan}
               preview={preview}
+              padat={pasSatuHalaman}
               onEdit={onEditWidget}
               onManualCorrection={onManualCorrection}
               onDelete={onDeleteWidget}

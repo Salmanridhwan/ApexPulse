@@ -117,6 +117,9 @@ export interface ChartEchartsProps {
    * id/judul widget supaya tiap kartu mulai dari hue yang berbeda.
    */
   warnaSeed?: number;
+  /** Mode padat (dashboard satu halaman): lepas tinggi minimum supaya grafik
+   *  tetap tampil utuh di kartu pendek. */
+  padat?: boolean;
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -141,6 +144,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   ganttData,
   style,
   warnaSeed = 0,
+  padat = false,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -418,8 +422,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     const nilai = view.seriesView[0]?.data?.[0] ?? 0;
     return (
       <div className="w-full h-full flex flex-col">
-        <div className="flex justify-end mb-1">{toggleDataButton}</div>
-        <div className="relative flex-1 min-h-[190px] flex items-center justify-center">
+        {!padat && <div className="flex justify-end mb-1">{toggleDataButton}</div>}
+        <div className={`relative flex-1 flex items-center justify-center ${padat ? 'min-h-0' : 'min-h-[190px]'}`}>
           {showData ? (
             tabelView
           ) : (
@@ -432,8 +436,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex justify-end mb-1">{toggleDataButton}</div>
-      <div className="relative flex-1 min-h-[190px]">
+      {!padat && <div className="flex justify-end mb-1">{toggleDataButton}</div>}
+      <div className={`relative flex-1 ${padat ? 'min-h-0' : 'min-h-[190px]'}`}>
         <div ref={chartRef} className={`absolute inset-0 ${showData ? 'invisible' : ''}`} />
         {showData && tabelView}
       </div>

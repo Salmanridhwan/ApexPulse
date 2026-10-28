@@ -1291,6 +1291,7 @@ export default function App() {
                   <DashboardCanvas
                     widgets={widgetsTampilInternal}
                     readOnly={filterAktif}
+                    satuHalaman
                     onEditWidget={handleEditWidget}
                     onManualCorrection={handleManualCorrection}
                     onDeleteWidget={handleDeleteWidget}

@@ -10,6 +10,8 @@ interface WidgetRendererProps {
   widget: WidgetSpec;
   /** Posisi kartu di kanvas (opsional) — menggeser hue awal grafik. */
   urutan?: number;
+  /** Mode padat (dashboard satu halaman) — diteruskan ke grafik & tabel. */
+  padat?: boolean;
 }
 
 /** Tipe yang dirender lewat ChartEcharts. */
@@ -35,7 +37,7 @@ const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
   return h;
 };
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false }) => {
   if (TIPE_CHART.includes(widget.type)) {
     const seed = seedWarna(widget, urutan);
     const seri = widget.chart?.series || [];
@@ -54,7 +56,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }
         series={seriBerwarna}
         unit={widget.chart?.unit}
         stacked={widget.chart?.stacked}
-        showLegend={widget.chart?.showLegend}
+        showLegend={padat ? false : widget.chart?.showLegend}
         min={widget.chart?.min}
         max={widget.chart?.max}
         heatmapData={widget.heatmap?.data}
@@ -70,6 +72,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan }
         ganttData={widget.gantt}
         style={widget.style}
         warnaSeed={seed}
+        padat={padat}
       />
     );
   }

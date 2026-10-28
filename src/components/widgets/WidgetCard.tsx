@@ -34,6 +34,11 @@ interface WidgetCardProps {
   preview?: boolean;
   /** Posisi kartu di kanvas: dipakai menggeser hue awal grafik. */
   urutan?: number;
+  /**
+   * Mode padat (dashboard satu halaman): kepala kartu dipadatkan dan tinggi
+   * minimum badan dilepas, supaya grafik tetap terlihat saat kartu hanya ~80px.
+   */
+  padat?: boolean;
 }
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
@@ -44,6 +49,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   onDuplicate,
   preview = false,
   urutan,
+  padat = false,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   /**
@@ -114,14 +120,27 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
 
       {/* Widget Header — pita judul terpisah dari badan kartu oleh garis 1px,
           supaya judul tidak "berenang" bersama grafiknya. */}
-      <div className="px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line">
+      <div
+        className={
+          padat
+            ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b border-line'
+            : 'px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line'
+        }
+      >
         <div className="min-w-0">
-          <h3 className="text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]" title={widget.title}>
+          <h3
+            className={
+              padat
+                ? 'text-[11px] font-bold text-ink leading-tight line-clamp-1'
+                : 'text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]'
+            }
+            title={widget.title}
+          >
             {widget.title}
           </h3>
           {/* Subtitle disembunyikan untuk KPI yang punya target — badan kartu sudah
               menampilkan baris target di progress bar, jadi tidak dobel. */}
-          {widget.subtitle && !(widget.type === 'kpi' && widget.kpi?.target !== undefined) && (
+          {!padat && widget.subtitle && !(widget.type === 'kpi' && widget.kpi?.target !== undefined) && (
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-2 truncate mt-1" title={widget.subtitle}>
               {widget.subtitle}
             </p>
@@ -239,10 +258,14 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
 
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
-        className={`px-5 pb-4 pt-3 flex-1 flex flex-col ${
-          ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
-            'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
-            'radar', 'map', 'gantt', 'table'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
+        className={`flex-1 flex flex-col ${
+          padat
+            ? 'px-2 pb-1 pt-0.5 min-h-0'
+            : `px-5 pb-4 pt-3 ${
+                ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
+                  'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
+                  'radar', 'map', 'gantt', 'table'].includes(widget.type) ? 'min-h-[140px]' : 'min-h-0'
+              }`
         }`}
       >
         {widget.dataKosong ? (
@@ -257,7 +280,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             </p>
           </div>
         ) : (
-          <WidgetRenderer widget={widget} urutan={urutan} />
+          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} />
         )}
       </div>
     </div>
