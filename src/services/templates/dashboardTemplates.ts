@@ -218,7 +218,62 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   ],
 };
 
-export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK];
+// ============================================================================
+// 3. TRAFIK WEB & PERILAKU PENGUNJUNG — papan analitik situs (8 kartu)
+// ============================================================================
+const TEMPLATE_TRAFIK: DashboardTemplate = {
+  id: 'tpl-trafik',
+  nama: 'Trafik Web & Perilaku',
+  tujuan:
+    'Memantau trafik situs dan perilaku pengunjung: rasio pentalan, kedalaman halaman, waktu di situs, pengunjung baru, sumber trafik, dinamika relevansi, komposisi usia, halaman populer, jenis perangkat, sistem operasi, dan frasa pencarian.',
+  caraPenyampaian:
+    'Gaya gelap-netral dengan lima warna kategori: lima kartu KPI bersparkline, grafik batang bertumpuk sumber trafik 31 hari dengan legenda di samping, garis dinamika relevansi, komposisi usia, daftar halaman populer, cincin jenis perangkat, alat ukur faktor perilaku, komposisi sistem operasi, dan daftar frasa pencarian.',
+  deskripsi: 'Papan trafik: 5 KPI, sumber trafik, relevansi, usia, halaman, perangkat, perilaku, OS, frasa pencarian.',
+  fokus: ['Sumber trafik', 'Perilaku pengunjung', 'Usia & perangkat', 'Halaman populer', 'Frasa pencarian'],
+  aksen: '#22d3ee',
+  judulDashboard: 'Trafik Web & Perilaku (Contoh)',
+  deskripsiDashboard:
+    'Tampilan contoh mengikuti referensi ketiga: 5 KPI bersparkline, batang sumber trafik, garis relevansi, komposisi usia, halaman populer, cincin perangkat, alat ukur perilaku, sistem operasi, dan frasa pencarian. Seluruh angka ilustrasi.',
+  widgets: [
+    kpi('Rasio Pentalan', 'Persen kunjungan sekali lihat', 57, '%', 1, 'vs periode lalu', [52, 54, 53, 56, 55, 58, 57, 59, 56, 57]),
+    kpi('Kedalaman Halaman', 'Halaman per kunjungan', 1.45, 'halaman', 0.05, 'vs periode lalu', [1.2, 1.25, 1.3, 1.28, 1.35, 1.4, 1.38, 1.42, 1.44, 1.45]),
+    kpi('Waktu di Situs', 'Rata-rata durasi kunjungan', 4.9, 'menit', 1, 'vs periode lalu', [3.6, 3.9, 3.8, 4.1, 4.3, 4.2, 4.5, 4.6, 4.8, 4.9]),
+    kpi('Pengunjung', 'Total pengunjung unik', '1.120', 'orang', 11, 'vs periode lalu', [980, 1010, 990, 1040, 1060, 1050, 1080, 1090, 1110, 1120]),
+    kpi('Pengunjung Baru', 'Pengunjung pertama kali', 340, 'orang', -24, 'vs periode lalu', [380, 372, 366, 360, 356, 350, 348, 344, 342, 340]),
+
+    grafik('bar', 'Sumber Trafik', 'Jumlah pengunjung per hari, 1–31 Januari 2023', { w: 8, h: 4 }, [
+      '01.01', '05.01', '10.01', '15.01', '20.01', '25.01', '31.01',
+    ], [
+      { name: 'Mesin Pencari', data: [8, 20, 36, 62, 36, 14, 6] },
+      { name: 'Iklan', data: [2, 3, 5, 9, 5, 2, 1] },
+      { name: 'Media Sosial', data: [1, 3, 5, 8, 5, 2, 1] },
+      { name: 'Akses Langsung', data: [0, 1, 1, 2, 1, 0, 0] },
+    ], 'pengunjung'),
+
+    grafik('line', 'Dinamika Relevansi', 'Poin relevansi harian', { w: 4, h: 4 }, [
+      '01.01', '08.01', '15.01', '22.01', '31.01',
+    ], [{ name: 'Relevansi', data: [42, 52, 62, 55, 46] }], 'poin'),
+
+    w('donut', 'Jenis Perangkat', 'Porsi kunjungan per perangkat, persen', { w: 4, h: 4 }, {
+      chart: {
+        xAxis: ['PC', 'Ponsel', 'Tablet'],
+        series: [{ name: 'Kunjungan', data: [69.7, 29.0, 1.3] }],
+        unit: '%',
+        showLegend: true,
+      },
+    }),
+
+    narasi(
+      'Ringkasan',
+      'Kesimpulan cepat dari angka contoh di atas',
+      { w: 8, h: 3 },
+      'Trafik memuncak di pertengahan Januari dengan mesin pencari sebagai sumber utama. Pengunjung bertambah 11 orang, tetapi pengunjung baru turun 24 orang sehingga pemerolehan kanal baru perlu didorong.',
+      ['Naikkan porsi pengunjung baru lewat kanal sosial.', 'Pertahankan halaman /program-federal yang menyumbang 40,3%.'],
+    ),
+  ],
+};
+
+export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK, TEMPLATE_TRAFIK];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {

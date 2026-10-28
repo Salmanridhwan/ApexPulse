@@ -16,6 +16,7 @@ import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardReferensi } from '../components/referensi/DashboardReferensi';
 import { DashboardAnalitik } from '../components/referensi/DashboardAnalitik';
+import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 
@@ -115,13 +116,16 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * Komponen pratinjau per template. Tiap template punya tampilan acuan sendiri,
    * jadi galeri menampilkan komponen yang sesuai — bukan satu komponen generik.
    */
-  const KomponenPratinjau = aktif.id === 'tpl-analitik' ? DashboardAnalitik : DashboardReferensi;
+  const KomponenPratinjau =
+    aktif.id === 'tpl-analitik' ? DashboardAnalitik : aktif.id === 'tpl-trafik' ? DashboardTrafik : DashboardReferensi;
 
   /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
   const susunanChip =
     aktif.id === 'tpl-analitik'
       ? '4 KPI · 3 grafik · tabel · kalender · tugas'
-      : '4 KPI · 3 grafik · daftar · progres';
+      : aktif.id === 'tpl-trafik'
+        ? '5 KPI · 4 grafik · 3 daftar · alat ukur'
+        : '4 KPI · 3 grafik · daftar · progres';
 
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
