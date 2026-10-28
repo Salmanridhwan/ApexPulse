@@ -27,10 +27,10 @@ export function lebarKolom(w: number | undefined): number {
 }
 
 /**
- * Jumlah baris yang dipakai grid 12 kolom untuk daftar widget ini.
+ * Jumlah baris grid 12 kolom untuk daftar widget ini (pemasangan murni).
  * Mengembalikan 0 kalau tidak ada widget (tidak ada yang perlu dipas-kan).
  */
-export function hitungBarisKanvas(widgets: Pick<WidgetSpec, 'grid'>[]): number {
+export function hitungBarisGrid(widgets: Pick<WidgetSpec, 'grid'>[]): number {
   if (widgets.length === 0) return 0;
   let baris = 1;
   let kolom = 0;
@@ -43,6 +43,23 @@ export function hitungBarisKanvas(widgets: Pick<WidgetSpec, 'grid'>[]): number {
     kolom += c;
   }
   return baris;
+}
+
+/**
+ * Jumlah baris SELURUH kanvas.
+ *
+ * ATURAN KPI: kartu KPI tidak pernah dibagi ke dua baris — berapa pun jumlahnya
+ * (maksimal 6), semuanya duduk dalam SATU baris di paling atas. Karena itu baris
+ * KPI dihitung 1 baris tetap, lalu sisanya (grafik/tabel/narasi) dipas-kan biasa
+ * di grid 12 kolom.
+ *
+ * Lebar tiap kartu KPI tidak lagi memakai `grid.w`, melainkan dibagi rata oleh
+ * kanvas (`repeat(jumlahKpi, 1fr)`) — lihat `DashboardCanvas`.
+ */
+export function hitungBarisKanvas(widgets: Array<Pick<WidgetSpec, 'grid'> & { type?: string }>): number {
+  const adaKpi = widgets.some((w) => w.type === 'kpi');
+  const lain = widgets.filter((w) => w.type !== 'kpi');
+  return (adaKpi ? 1 : 0) + hitungBarisGrid(lain);
 }
 
 /**

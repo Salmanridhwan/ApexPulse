@@ -75,7 +75,8 @@ const kpi = (
   subtitle: string,
   value: number | string,
   unit: string,
-  delta: number,
+  /** `undefined` = metrik non-persen (chip delta selalu menambah "%"). */
+  delta: number | undefined,
   deltaLabel: string,
   sparkline: number[],
   target?: number,
@@ -143,12 +144,12 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   deskripsiDashboard:
     'Template ringkasan satu halaman (8 kartu): 6 KPI utama, grafik tren pendapatan vs beban, dan narasi kesimpulan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Pendapatan Usaha', 'Realisasi periode berjalan', '128,4', 'Miliar Rp', 6.8, '+6,8% vs target', [110, 113, 116, 120, 124, 128.4], 120, 'Target'),
-    kpi('Laba Bersih', 'Setelah seluruh beban usaha', '23,7', 'Miliar Rp', 4.2, '+4,2% YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
-    kpi('Beban Operasional', 'Terhadap pagu yang ditetapkan', '96,2', 'Miliar Rp', -1.4, '-1,4% dari pagu', [99, 98.4, 97.8, 97.1, 96.8, 96.2], 98, 'Pagu'),
-    kpi('Realisasi Anggaran', 'Serapan belanja periode ini', 87.5, '%', 3.1, '+3,1% dari triwulan lalu', [78, 80, 82, 84, 86, 87.5], 90, 'Target'),
-    kpi('Indeks Kepuasan Layanan', 'Skala 0-100', 82.4, 'poin', 1.8, '+1,8 poin', [78, 79, 80, 81, 81.8, 82.4], 85, 'Target'),
-    kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', -4, '-4 dari semester lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
+    kpi('Pendapatan Usaha', 'Realisasi periode berjalan', '128,4', 'Miliar Rp', 6.8, 'vs target', [110, 113, 116, 120, 124, 128.4], 120, 'Target'),
+    kpi('Laba Bersih', 'Setelah seluruh beban usaha', '23,7', 'Miliar Rp', 4.2, 'YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
+    kpi('Beban Operasional', 'Terhadap pagu yang ditetapkan', '96,2', 'Miliar Rp', -1.4, 'dari pagu', [99, 98.4, 97.8, 97.1, 96.8, 96.2], 98, 'Pagu'),
+    kpi('Realisasi Anggaran', 'Serapan belanja periode ini', 87.5, '%', 3.1, 'dari triwulan lalu', [78, 80, 82, 84, 86, 87.5], 90, 'Target'),
+    kpi('Indeks Kepuasan Layanan', 'Skala 0-100', 82.4, 'poin', undefined, 'naik 1,8 poin', [78, 79, 80, 81, 81.8, 82.4], 85, 'Target'),
+    kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', undefined, 'turun 4 dari semester lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
 
     grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 12, h: 4 }, BULAN, [
       { name: 'Pendapatan', data: [98, 101, 104, 107, 110, 113, 116, 119, 122, 124, 126, 128.4] },
@@ -183,10 +184,10 @@ const TEMPLATE_PEMANTAUAN: DashboardTemplate = {
   deskripsiDashboard:
     'Template pemantauan harian (8 kartu): 4 KPI status, tren tujuh hari, heatmap beban per unit, dan daftar isu. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Volume Layanan Hari Ini', 'Transaksi/pelanggan dilayani', '12.480', 'transaksi', 2.4, '+2,4% vs kemarin', [11200, 11600, 11900, 12100, 12300, 12480]),
-    kpi('Waktu Layanan Rata-rata', 'Semakin rendah semakin baik', 6.8, 'menit', -0.6, '-0,6 menit', [8.2, 7.9, 7.6, 7.3, 7.1, 6.8], 7, 'Standar'),
-    kpi('Pekerjaan Selesai', 'Terhadap total pekerjaan masuk', 96.2, '%', 1.2, '+1,2% vs kemarin', [92, 93, 94, 94.8, 95.4, 96.2], 95, 'Target'),
-    kpi('Gangguan Aktif', 'Laporan belum tertangani', 7, 'laporan', -3, '-3 dari kemarin', [16, 14, 12, 10, 9, 7], 0, 'Target'),
+    kpi('Volume Layanan Hari Ini', 'Transaksi/pelanggan dilayani', '12.480', 'transaksi', 2.4, 'vs kemarin', [11200, 11600, 11900, 12100, 12300, 12480]),
+    kpi('Waktu Layanan Rata-rata', 'Semakin rendah semakin baik', 6.8, 'menit', undefined, 'turun 0,6 menit', [8.2, 7.9, 7.6, 7.3, 7.1, 6.8], 7, 'Standar'),
+    kpi('Pekerjaan Selesai', 'Terhadap total pekerjaan masuk', 96.2, '%', 1.2, 'vs kemarin', [92, 93, 94, 94.8, 95.4, 96.2], 95, 'Target'),
+    kpi('Gangguan Aktif', 'Laporan belum tertangani', 7, 'laporan', undefined, 'turun 3 dari kemarin', [16, 14, 12, 10, 9, 7], 0, 'Target'),
 
     grafik('line', 'Volume Layanan 7 Hari Terakhir', 'Pola harian untuk melihat lonjakan', { w: 6, h: 4 }, HARI,
       [{ name: 'Transaksi', data: [10800, 11400, 11900, 12100, 12300, 9600, 7200] }], 'transaksi', { showLegend: false }),
@@ -243,10 +244,10 @@ const TEMPLATE_LAPORAN: DashboardTemplate = {
   deskripsiDashboard:
     'Template laporan berkala (8 kartu): 4 KPI capaian, tabel rekap indikator, dua grafik tren, dan uraian capaian. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Capaian Target Kinerja', 'Rata-rata seluruh indikator', 97.3, '%', 2.4, '+2,4% dari periode lalu', [88, 90, 92, 94, 96, 97.3], 100, 'Target'),
-    kpi('Nilai Evaluasi Kinerja', 'Skala 0-100', 86.5, 'poin', 3.2, '+3,2 poin', [78, 80, 82, 83.5, 85, 86.5], 85, 'Target'),
-    kpi('Program Tercapai', 'Dari total program kerja', 14, 'program', 2, '+2 program', [9, 10, 11, 12, 13, 14], 15, 'Target'),
-    kpi('Sisa Target Periode', 'Yang harus dikejar', 5, 'indikator', -2, '-2 indikator', [11, 10, 9, 8, 6, 5], 0, 'Target'),
+    kpi('Capaian Target Kinerja', 'Rata-rata seluruh indikator', 97.3, '%', 2.4, 'dari periode lalu', [88, 90, 92, 94, 96, 97.3], 100, 'Target'),
+    kpi('Nilai Evaluasi Kinerja', 'Skala 0-100', 86.5, 'poin', undefined, 'naik 3,2 poin', [78, 80, 82, 83.5, 85, 86.5], 85, 'Target'),
+    kpi('Program Tercapai', 'Dari total program kerja', 14, 'program', undefined, 'bertambah 2 program', [9, 10, 11, 12, 13, 14], 15, 'Target'),
+    kpi('Sisa Target Periode', 'Yang harus dikejar', 5, 'indikator', undefined, 'berkurang 2 indikator', [11, 10, 9, 8, 6, 5], 0, 'Target'),
 
     tabel('Rekap Kinerja per Indikator', 'Periode berjalan, dibandingkan target', { w: 12, h: 3 }, [
       { key: 'indikator', label: 'Indikator' },
@@ -303,10 +304,10 @@ const TEMPLATE_ANGGARAN: DashboardTemplate = {
   deskripsiDashboard:
     'Template anggaran (8 kartu): 4 KPI pagu/serapan, tabel rinci per program, bar perbandingan, dan catatan anggaran. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Pagu Anggaran', 'Total alokasi periode ini', '320,0', 'Miliar Rp', 0, 'Tetap', [320, 320, 320, 320, 320, 320]),
-    kpi('Realisasi Anggaran', 'Belanja sudah terealisasi', '268,4', 'Miliar Rp', 5.6, '+5,6% dari bulan lalu', [190, 205, 220, 236, 252, 268.4], 288, 'Target'),
-    kpi('Sisa Anggaran', 'Belum terserap', '51,6', 'Miliar Rp', -5.6, '-5,6% dari bulan lalu', [130, 115, 100, 84, 68, 51.6]),
-    kpi('Serapan Anggaran', 'Realisasi terhadap pagu', 83.9, '%', 3.4, '+3,4% dari bulan lalu', [59, 64, 69, 74, 79, 83.9], 90, 'Target'),
+    kpi('Pagu Anggaran', 'Total alokasi periode ini', '320,0', 'Miliar Rp', 0, 'tetap', [320, 320, 320, 320, 320, 320]),
+    kpi('Realisasi Anggaran', 'Belanja sudah terealisasi', '268,4', 'Miliar Rp', 5.6, 'dari bulan lalu', [190, 205, 220, 236, 252, 268.4], 288, 'Target'),
+    kpi('Sisa Anggaran', 'Belum terserap', '51,6', 'Miliar Rp', -5.6, 'dari bulan lalu', [130, 115, 100, 84, 68, 51.6]),
+    kpi('Serapan Anggaran', 'Realisasi terhadap pagu', 83.9, '%', 3.4, 'dari bulan lalu', [59, 64, 69, 74, 79, 83.9], 90, 'Target'),
 
     tabel('Realisasi per Program', 'Pagu, realisasi, dan sisa tiap program', { w: 12, h: 3 }, [
       { key: 'program', label: 'Program' },
@@ -358,9 +359,9 @@ const TEMPLATE_PELANGGAN: DashboardTemplate = {
   deskripsiDashboard:
     'Template pelanggan & layanan (8 kartu): 4 KPI, komposisi segmen, sebaran wilayah, rincian keluhan, dan catatan layanan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Jumlah Pelanggan', 'Pelanggan aktif terlayani', '148.650', 'pelanggan', 2.2, '+3.200 pelanggan baru', [140200, 142100, 143900, 145800, 147200, 148650]),
-    kpi('Pelanggan Baru', 'Penambahan periode ini', '3.200', 'pelanggan', 8.4, '+8,4% dari periode lalu', [2100, 2300, 2500, 2700, 2950, 3200], 3000, 'Target'),
-    kpi('Keluhan Selesai', 'Terhadap keluhan masuk', 96.2, '%', 1.4, '+1,4% dari periode lalu', [92, 93, 94, 94.8, 95.4, 96.2], 95, 'Target'),
+    kpi('Jumlah Pelanggan', 'Pelanggan aktif terlayani', '148.650', 'pelanggan', 2.2, '3.200 pelanggan baru', [140200, 142100, 143900, 145800, 147200, 148650]),
+    kpi('Pelanggan Baru', 'Penambahan periode ini', '3.200', 'pelanggan', 8.4, 'dari periode lalu', [2100, 2300, 2500, 2700, 2950, 3200], 3000, 'Target'),
+    kpi('Keluhan Selesai', 'Terhadap keluhan masuk', 96.2, '%', 1.4, 'dari periode lalu', [92, 93, 94, 94.8, 95.4, 96.2], 95, 'Target'),
     kpi('Indeks Kepuasan', 'Skala 0-100', 82.4, 'poin', 1.8, '+1,8 poin', [78, 79, 80, 81, 81.8, 82.4], 85, 'Target'),
 
     w('donut', 'Komposisi Pelanggan per Segmen', 'Porsi tiap segmen', { w: 6, h: 4 }, {
@@ -425,9 +426,9 @@ const TEMPLATE_RISIKO: DashboardTemplate = {
     'Template risiko & audit (8 kartu): 4 KPI, matriks risiko, status tindak lanjut, daftar temuan, dan catatan kepatuhan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', -4, '-4 dari periode lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
-    kpi('Tindak Lanjut Selesai', 'Terhadap total rekomendasi', 78.5, '%', 6.2, '+6,2% dari periode lalu', [58, 62, 66, 70, 74, 78.5], 90, 'Target'),
-    kpi('Risiko Tinggi', 'Terdaftar pada matriks risiko', 4, 'risiko', -1, '-1 dari periode lalu', [7, 7, 6, 5, 5, 4], 2, 'Target'),
-    kpi('Indeks Kepatuhan', 'Kepatuhan prosedur & regulasi', 92.3, '%', 1.5, '+1,5% dari periode lalu', [88, 89, 90, 90.8, 91.6, 92.3], 95, 'Target'),
+    kpi('Tindak Lanjut Selesai', 'Terhadap total rekomendasi', 78.5, '%', 6.2, 'dari periode lalu', [58, 62, 66, 70, 74, 78.5], 90, 'Target'),
+    kpi('Risiko Tinggi', 'Terdaftar pada matriks risiko', 4, 'risiko', undefined, 'turun 1 dari periode lalu', [7, 7, 6, 5, 5, 4], 2, 'Target'),
+    kpi('Indeks Kepatuhan', 'Kepatuhan prosedur & regulasi', 92.3, '%', 1.5, 'dari periode lalu', [88, 89, 90, 90.8, 91.6, 92.3], 95, 'Target'),
 
     w('heatmap', 'Matriks Risiko (Dampak x Kemungkinan)', 'Jumlah risiko per sel', { w: 6, h: 4 }, {
       heatmap: {

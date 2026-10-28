@@ -9,6 +9,9 @@ import { hitungBarisKanvas, lebarKolom, tinggiBaris, KOLOM_KANVAS } from '../src
  * menyisakan celah/gulir 1-2 piksel.
  */
 const g = (w: number) => ({ grid: { x: 0, y: 0, w, h: 3 } });
+/** Kartu KPI: berapa pun jumlahnya, semua duduk di satu baris. */
+const kpi = (w = 3) => ({ type: 'kpi', grid: { x: 0, y: 0, w, h: 3 } });
+const grafik = (w: number) => ({ type: 'line', grid: { x: 0, y: 0, w, h: 4 } });
 
 test('lebar kartu dipetakan ke kolom 12 seperti kelas col-span', () => {
   assert.equal(lebarKolom(12), 12);
@@ -41,6 +44,20 @@ test('kartu yang tidak cukup kolom pindah ke baris berikutnya', () => {
 
 test('tabel selebar kanvas selalu memakai baris sendiri', () => {
   assert.equal(hitungBarisKanvas([g(6), g(12)]), 2);
+});
+
+test('enam KPI tetap satu baris (tidak pecah 4 + 2)', () => {
+  // Lebar grid.w KPI diabaikan kanvas: 6 kartu KPI = 1 baris.
+  assert.equal(hitungBarisKanvas([kpi(), kpi(), kpi(), kpi(), kpi(), kpi()]), 1);
+  // Berapa pun lebar yang tercatat, KPI tidak pernah menambah baris.
+  assert.equal(hitungBarisKanvas([kpi(12), kpi(12), kpi(12)]), 1);
+});
+
+test('baris KPI dihitung sekali, sisanya memasang grid seperti biasa', () => {
+  // 6 KPI (1 baris) + 2 grafik selebar 6 (1 baris) + narasi 12 (1 baris) = 3.
+  assert.equal(hitungBarisKanvas([kpi(), kpi(), kpi(), kpi(), kpi(), kpi(), grafik(6), grafik(6), grafik(12)]), 3);
+  // Tanpa KPI, hitungan murni grid.
+  assert.equal(hitungBarisKanvas([grafik(6), grafik(6)]), 1);
 });
 
 test('dashboard 18 kartu tidak dianggap muat satu baris', () => {

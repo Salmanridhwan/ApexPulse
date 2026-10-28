@@ -1,8 +1,8 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
-import { hitungBarisKanvas, tinggiBaris } from '../services/tataLetak/satuHalaman';
+import { hitungBarisGrid, hitungBarisKanvas, tinggiBaris } from '../services/tataLetak/satuHalaman';
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -33,6 +33,21 @@ interface DashboardCanvasProps {
   satuHalaman?: boolean;
 }
 
+/**
+ * KANVAS DASHBOARD.
+ *
+ * Dua aturan tata letak yang dipegang di sini:
+ *
+ * 1. BARIS KPI TUNGGAL — semua kartu KPI (maksimal 6) selalu berada dalam SATU
+ *    baris di paling atas, selebar kanvas dibagi rata (`repeat(n, 1fr)`).
+ *    Lebar `grid.w` pada kartu KPI diabaikan karena kalau dipakai, 6 kartu KPI
+ *    akan pecah menjadi dua baris (4 + 2) dan mendorong grafik ke bawah.
+ *    Di layar < 1024px baris ini memakai 2 kolom agar angkanya tetap terbaca.
+ *
+ * 2. SATU HALAMAN — saat `satuHalaman`, tinggi tiap baris = sisa tinggi layar
+ *    dibagi jumlah baris, dan seluruh isi kanvas diskalakan bila baris jadi
+ *    terlalu pendek. Tidak ada scroll.
+ */
 export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   widgets,
   onEditWidget,
@@ -59,6 +74,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
 
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
   const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
+
+  /** Lebar jendela — menentukan baris KPI memakai 1 baris penuh atau 2 kolom. */
+  const [lebarLayar, setLebarLayar] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth));
+  useEffect(() => {
+    const ubah = () => setLebarLayar(window.innerWidth);
+    window.addEventListener('resize', ubah);
+    return () => window.removeEventListener('resize', ubah);
+  }, []);
 
   // ===== Mode satu halaman =====
   /** Wadah kanvas — dipakai mengukur sisa tinggi layar. */
@@ -99,10 +122,26 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   }, [satuHalaman, widgets.length]);
 
   /**
-   * Jumlah baris yang dibutuhkan grid 12 kolom (sama dengan cara CSS grid
-   * menempatkan kartu: kalau sisa kolom tidak cukup, kartu pindah baris).
+   * Pisahkan KPI dari kartu lain: KPI selalu satu baris tersendiri di atas,
+   * sisanya dipas-kan di grid 12 kolom seperti biasa.
+   */
+  const widgetsKpi = useMemo(() => widgets.filter((w) => w.type === 'kpi'), [widgets]);
+  const widgetsLain = useMemo(() => widgets.filter((w) => w.type !== 'kpi'), [widgets]);
+
+  /** Baris untuk kartu non-KPI (grafik, tabel, narasi, ...). */
+  const barisLain = useMemo(() => hitungBarisGrid(widgetsLain), [widgetsLain]);
+
+  /**
+   * Jumlah baris SELURUH kanvas: 1 baris KPI (kalau ada KPI) + baris kartu lain.
+   * Aturan ini ada di `satuHalaman.ts` supaya bisa diuji tanpa DOM.
    */
   const barisKanvas = useMemo(() => hitungBarisKanvas(widgets), [widgets]);
+
+  /**
+   * Kolom baris KPI: dibagi rata sebanyak jumlah KPI di layar lebar (SELALU satu
+   * baris), dan 2 kolom di layar kecil supaya angka tidak terpotong.
+   */
+  const kolomKpi = widgetsKpi.length === 0 ? 0 : lebarLayar >= 1024 ? widgetsKpi.length : Math.min(2, widgetsKpi.length);
 
   /** Prasyarat mode satu halaman (dipakai juga untuk memilih jarak/padding). */
   const pasSatuHalamanAwal = satuHalaman && layarLebar && tinggiTersedia > 0 && barisKanvas > 0;
@@ -126,7 +165,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const tata = pasSatuHalaman ? tinggiBaris(tinggiIsi, barisKanvas, JARAK, BARIS_MIN) : { tinggi: 0, skala: 1 };
   const tinggiBarisFinal = tata.tinggi;
   const skala = tata.skala;
-  const tinggiGrid = barisKanvas * tinggiBarisFinal + JARAK * Math.max(0, barisKanvas - 1);
+  /** Tinggi total kartu non-KPI (dipakai sebagai tinggi grid utamanya). */
+  const tinggiGridLain = barisLain * tinggiBarisFinal + JARAK * Math.max(0, barisLain - 1);
+
   /** Diskritkan lebar mentah ke bucket yang dikenali pemetaan colSpan. */
   const bucket = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
 
@@ -173,6 +214,92 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
     ids.splice(ke, 0, ids.splice(dari, 1)[0]);
     onReorderWidgets(ids);
   };
+
+  /**
+   * Satu kartu kanvas. Dipakai baris KPI maupun grid utama supaya drag & resize
+   * berperilaku sama di keduanya.
+   *
+   * `kpi` = true: lebar kartu diatur baris KPI (bukan `grid.w`), jadi tidak ada
+   * col-span dan tidak ada pegangan resize (lebarnya sudah dibagi rata).
+   */
+  const renderKartu = (widget: WidgetSpec, urutan: number, kpi: boolean) => {
+    // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
+    const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
+    let colSpan = 'col-span-1 md:col-span-4 lg:col-span-2';
+    if (wAktif >= 10) {
+      colSpan = 'col-span-1 md:col-span-12 lg:col-span-12';
+    } else if (wAktif >= 7) {
+      colSpan = 'col-span-1 md:col-span-12 lg:col-span-8';
+    } else if (wAktif >= 5) {
+      colSpan = 'col-span-1 md:col-span-6 lg:col-span-6';
+    } else if (wAktif >= 4) {
+      colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
+    } else if (wAktif >= 3) {
+      colSpan = 'col-span-1 md:col-span-4 lg:col-span-3';
+    }
+
+    // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
+    const tinggiMin = ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
+      'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
+      'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
+      ? 'min-h-[248px]'
+      : 'min-h-[110px]';
+
+    return (
+      <div
+        key={widget.id}
+        data-widget-id={widget.id}
+        draggable={!readOnly && !preview}
+        onDragStart={(e) => {
+          setDragId(widget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', widget.id);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setOverId(widget.id);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          pindahkan(dragId || e.dataTransfer.getData('text/plain'), widget.id);
+          setDragId(null);
+          setOverId(null);
+        }}
+        onDragEnd={() => {
+          setDragId(null);
+          setOverId(null);
+        }}
+        className={`${kpi ? '' : colSpan} ${pasSatuHalaman ? 'min-h-0 overflow-hidden' : tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
+          } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
+      >
+        <WidgetCard
+          widget={widget}
+          urutan={urutan}
+          preview={preview}
+          padat={pasSatuHalaman}
+          onEdit={onEditWidget}
+          onManualCorrection={onManualCorrection}
+          onDelete={onDeleteWidget}
+          onDuplicate={onDuplicateWidget}
+        />
+        {/* Resize handle: strip tipis di tepi kiri & kanan — tarik untuk ubah lebar.
+            Tidak ada pada kartu KPI: lebarnya sudah dibagi rata dalam satu baris. */}
+        {!kpi && !readOnly && !preview && ([-1, 1] as const).map((arah) => (
+          <span
+            key={arah}
+            data-resize={arah === -1 ? 'kiri' : 'kanan'}
+            onMouseDown={(e) => mulaiResize(e, widget, arah)}
+            className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${arah === -1 ? 'left-0' : 'right-0'
+              } ${resizeId === widget.id ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
+              }`}
+            title="Tarik untuk ubah lebar widget"
+          />
+        ))}
+      </div>
+    );
+  };
+
   if (widgets.length === 0) {
     return (
       <div className="canvas-tegas flex-1 flex flex-col items-center justify-center p-12 text-center">
@@ -219,99 +346,47 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       style={pasSatuHalaman ? { height: tinggiTersedia, padding: PADDING } : undefined}
     >
       <div
-        className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 auto-rows-min pb-4"
         style={
-          pasSatuHalaman
-            ? {
-                gridTemplateRows: `repeat(${barisKanvas}, minmax(0, ${tinggiBarisFinal}px))`,
-                height: tinggiGrid,
-                rowGap: JARAK,
-                columnGap: JARAK,
-                paddingBottom: 0,
-                transform: skala < 1 ? `scale(${skala})` : undefined,
-                transformOrigin: 'top left',
-                width: skala < 1 ? `${100 / skala}%` : undefined,
-              }
+          skala < 1
+            ? { transform: `scale(${skala})`, transformOrigin: 'top left', width: `${100 / skala}%` }
             : undefined
         }
       >
-      {widgets.map((widget, urutan) => {
-        // Map grid.w to responsive Tailwind column span
-        // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
-        const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
-        let colSpan = 'col-span-1 md:col-span-4 lg:col-span-2';
-        if (wAktif >= 10) {
-          colSpan = 'col-span-1 md:col-span-12 lg:col-span-12';
-        } else if (wAktif >= 7) {
-          colSpan = 'col-span-1 md:col-span-12 lg:col-span-8';
-        } else if (wAktif >= 5) {
-          colSpan = 'col-span-1 md:col-span-6 lg:col-span-6';
-        } else if (wAktif >= 4) {
-          colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
-        } else if (wAktif >= 3) {
-          colSpan = 'col-span-1 md:col-span-4 lg:col-span-3';
-        }
-        
-        // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
-        const tinggiMin = ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
-          'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
-          'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
-          ? 'min-h-[248px]'
-          : 'min-h-[110px]';
-
-        return (
+        {/* ===== BARIS KPI TUNGGAL (selalu satu baris, selebar kanvas dibagi rata) ===== */}
+        {widgetsKpi.length > 0 && (
           <div
-            key={widget.id}
-            data-widget-id={widget.id}
-            draggable={!readOnly && !preview}
-            onDragStart={(e) => {
-              setDragId(widget.id);
-              e.dataTransfer.effectAllowed = 'move';
-              e.dataTransfer.setData('text/plain', widget.id);
+            data-kpi-row="1"
+            className="grid"
+            style={{
+              gridTemplateColumns: `repeat(${kolomKpi}, minmax(0, 1fr))`,
+              gap: JARAK,
+              height: pasSatuHalaman ? tinggiBarisFinal : undefined,
+              marginBottom: JARAK,
             }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              setOverId(widget.id);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              pindahkan(dragId || e.dataTransfer.getData('text/plain'), widget.id);
-              setDragId(null);
-              setOverId(null);
-            }}
-            onDragEnd={() => {
-              setDragId(null);
-              setOverId(null);
-            }}
-            className={`${colSpan} ${pasSatuHalaman ? 'min-h-0 overflow-hidden' : tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
-              } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
           >
-            <WidgetCard
-              widget={widget}
-              urutan={urutan}
-              preview={preview}
-              padat={pasSatuHalaman}
-              onEdit={onEditWidget}
-              onManualCorrection={onManualCorrection}
-              onDelete={onDeleteWidget}
-              onDuplicate={onDuplicateWidget}
-            />
-            {/* Resize handle: strip tipis di tepi kiri & kanan — tarik untuk ubah lebar. */}
-            {!readOnly && !preview && ([-1, 1] as const).map((arah) => (
-              <span
-                key={arah}
-                data-resize={arah === -1 ? 'kiri' : 'kanan'}
-                onMouseDown={(e) => mulaiResize(e, widget, arah)}
-                className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${arah === -1 ? 'left-0' : 'right-0'
-                  } ${resizeId === widget.id ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
-                  }`}
-                title="Tarik untuk ubah lebar widget"
-              />
-            ))}
+            {widgetsKpi.map((widget, i) => renderKartu(widget, i, true))}
           </div>
-        );
-      })}
+        )}
+
+        {/* ===== Kartu lain: grid 12 kolom ===== */}
+        {widgetsLain.length > 0 && (
+          <div
+            className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 auto-rows-min"
+            style={
+              pasSatuHalaman
+                ? {
+                    gridTemplateRows: `repeat(${barisLain}, minmax(0, ${tinggiBarisFinal}px))`,
+                    height: tinggiGridLain,
+                    rowGap: JARAK,
+                    columnGap: JARAK,
+                    paddingBottom: 0,
+                  }
+                : { gap: 16 }
+            }
+          >
+            {widgetsLain.map((widget, i) => renderKartu(widget, widgetsKpi.length + i, false))}
+          </div>
+        )}
       </div>
     </div>
   );
