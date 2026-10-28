@@ -343,7 +343,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
-          konten={<DashboardReferensi />}
+          konten={<DashboardReferensi penuh />}
         />
       )}
     </div>

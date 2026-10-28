@@ -77,6 +77,28 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onExit]);
 
+  /**
+   * Mode "konten": yang ditampilkan adalah tampilan siap-pakai (mis. replika
+   * dashboard referensi). Bilah atas tidak dipakai supaya SELURUH layar terpakai;
+   * tombol Keluar dibuat mengambang di sudut kanan atas (Esc tetap berlaku).
+   */
+  if (konten) {
+    return (
+      <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden" style={{ backgroundColor: '#0a0a0b' }}>
+        <div className="flex-1 min-h-0 overflow-hidden">{konten}</div>
+        <button
+          onClick={onExit}
+          title="Keluar presentasi (Esc)"
+          className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-lg transition-colors"
+          style={{ backgroundColor: 'rgba(255,138,31,0.92)', color: '#1a1206' }}
+        >
+          <X className="w-3.5 h-3.5" />
+          <span>Keluar</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[60] bg-canvas flex flex-col overflow-hidden">
       {/* ===== Bilah atas ===== */}

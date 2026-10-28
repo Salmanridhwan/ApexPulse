@@ -3,8 +3,6 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
-  Bell,
-  CalendarDays,
   CreditCard,
   Droplets,
   Landmark,
@@ -23,13 +21,15 @@ import { loadEcharts } from '../widgets/echartsSetup';
  * dengan daftar legenda, daftar transaksi, grafik area arus kas, batang progres
  * target, dan strip insight di bawah.
  *
- * Catatan penting:
- * - SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen instansi. Karena
- *   itu komponen ini hanya dipakai sebagai PRATINJAU tampilan di galeri template,
- *   tidak dipakai untuk dashboard yang berisi data dokumen.
- * - Komponen ini sengaja dibuat mandiri (tidak memakai DashboardCanvas) supaya
- *   susunannya bisa sama persis dengan referensi; grafik memakai ECharts
- *   langsung dengan warna yang ditentukan di sini.
+ * Dua mode pakai:
+ * - `penuh` = false → dipakai di galeri template (tinggi mengikuti isi, ada jarak
+ *   antar baris). Dipakai sebagai pratinjau di halaman.
+ * - `penuh` = true  → dipakai MODE PRESENTASI: seluruh baris membagi tinggi layar
+ *   (`flex-1`), grafik ikut memanjang, jadi tidak ada ruang kosong di bawah.
+ *
+ * Catatan penting: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen
+ * instansi. Komponen ini hanya untuk pratinjau tampilan, tidak dipakai untuk
+ * dashboard berisi data dokumen.
  */
 
 const WARNA = {
@@ -41,7 +41,6 @@ const WARNA = {
   teks2: '#b7bdc6',
   teks3: '#8b929c',
   oranye: '#ff8a1f',
-  oranyeTerang: '#ffb066',
   hijau: '#22c55e',
   merah: '#ef4444',
   teal: '#2dd4bf',
@@ -49,7 +48,6 @@ const WARNA = {
   kuning: '#f5a524',
 };
 
-/** Kartu KPI ringkas — label, ikon bulat, angka besar, chip delta, sparkline. */
 interface Kpi {
   label: string;
   nilai: string;
@@ -146,7 +144,15 @@ const jalurSpark = (seri: number[]) => {
   };
 };
 
-export const DashboardReferensi: React.FC = () => {
+interface DashboardReferensiProps {
+  /**
+   * true = isi seluruh tinggi wadah (mode presentasi / layar penuh): baris
+   * dibagi dengan `flex-1` dan grafik memanjang, tidak ada ruang kosong.
+   */
+  penuh?: boolean;
+}
+
+export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false }) => {
   const barRef = useRef<HTMLDivElement | null>(null);
   const donutRef = useRef<HTMLDivElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
@@ -164,7 +170,7 @@ export const DashboardReferensi: React.FC = () => {
         const c = ec.init(barRef.current);
         const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
         c.setOption({
-          grid: { left: 4, right: 8, top: 18, bottom: 4, containLabel: true },
+          grid: { left: 4, right: 8, top: 16, bottom: 2, containLabel: true },
           tooltip: {
             trigger: 'axis',
             backgroundColor: '#1f2126',
@@ -195,7 +201,6 @@ export const DashboardReferensi: React.FC = () => {
               data: PENDAPATAN_BULANAN.map((v, i) => ({
                 value: v,
                 itemStyle: {
-                  // Batang terpilih lebih terang, sisanya oranye redup (referensi).
                   color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.34)',
                   borderRadius: [4, 4, 0, 0],
                 },
@@ -222,7 +227,7 @@ export const DashboardReferensi: React.FC = () => {
           series: [
             {
               type: 'pie',
-              radius: ['64%', '92%'],
+              radius: ['62%', '92%'],
               center: ['50%', '50%'],
               avoidLabelOverlap: false,
               label: { show: false },
@@ -239,7 +244,7 @@ export const DashboardReferensi: React.FC = () => {
       if (areaRef.current) {
         const c = ec.init(areaRef.current);
         c.setOption({
-          grid: { left: 4, right: 6, top: 12, bottom: 4, containLabel: true },
+          grid: { left: 4, right: 6, top: 10, bottom: 2, containLabel: true },
           tooltip: {
             trigger: 'axis',
             backgroundColor: '#1f2126',
@@ -297,40 +302,17 @@ export const DashboardReferensi: React.FC = () => {
     };
   }, []);
 
-  const totalBeban = RINCIAN_BEBAN.reduce((n, r) => n + r.nilai, 0);
+  /** Kartu dasar: gelap, garis tipis, sudut 14px. `penuh` → mengisi tinggi baris. */
+  const kartu = (tambahan = '') =>
+    `rounded-[14px] p-3.5 ${penuh ? 'h-full flex flex-col min-h-0' : ''} ${tambahan}`;
 
   return (
-    <div className="rounded-[18px] p-4 sm:p-6" style={{ backgroundColor: WARNA.latar, color: WARNA.teks }}>
-      {/* ===== Kepala halaman ===== */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div className="min-w-0">
-          <h2 className="text-[17px] sm:text-[19px] font-bold tracking-tight">
-            Selamat pagi, Pimpinan <span aria-hidden>👋</span>
-          </h2>
-          <p className="text-[11.5px] mt-0.5" style={{ color: WARNA.teks3 }}>
-            Berikut ringkasan kinerja instansi Anda hari ini.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
-            style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks2 }}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            22 Mei 2025
-          </span>
-          <span
-            className="relative inline-flex items-center justify-center w-8 h-8 rounded-full"
-            style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks2 }}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: WARNA.oranye }} />
-          </span>
-        </div>
-      </div>
-
+    <div
+      className={penuh ? 'h-full w-full flex flex-col gap-3 p-3 sm:p-4 overflow-hidden' : 'rounded-[18px] p-4 sm:p-6'}
+      style={{ backgroundColor: WARNA.latar, color: WARNA.teks }}
+    >
       {/* ===== Baris 1: 4 kartu KPI ===== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${penuh ? 'flex-[0.95] min-h-0' : 'mb-3'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
           const bagus = naik === k.naikBagus;
@@ -338,18 +320,14 @@ export const DashboardReferensi: React.FC = () => {
           const warna = bagus ? WARNA.hijau : WARNA.merah;
           const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
           return (
-            <div
-              key={k.label}
-              className="rounded-[14px] p-3.5 flex flex-col gap-2"
-              style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-            >
+            <div key={k.label} className={kartu('gap-2')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
               <div className="flex items-start justify-between gap-2">
                 <span className="text-[11px] font-medium leading-tight" style={{ color: WARNA.teks3 }}>
                   {k.label}
                 </span>
                 <span
                   className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full"
-                  style={{ border: `1px solid rgba(255,138,31,0.35)`, backgroundColor: 'rgba(255,138,31,0.10)', color: WARNA.oranye }}
+                  style={{ border: '1px solid rgba(255,138,31,0.35)', backgroundColor: 'rgba(255,138,31,0.10)', color: WARNA.oranye }}
                 >
                   <k.Ikon className="w-3.5 h-3.5" />
                 </span>
@@ -375,7 +353,12 @@ export const DashboardReferensi: React.FC = () => {
                 </span>
               </div>
 
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-9 mt-0.5" aria-hidden>
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className={penuh ? 'w-full flex-1 min-h-[22px] mt-0.5' : 'w-full h-9 mt-0.5'}
+                aria-hidden
+              >
                 <defs>
                   <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={warna} stopOpacity="0.42" />
@@ -391,12 +374,9 @@ export const DashboardReferensi: React.FC = () => {
       </div>
 
       {/* ===== Baris 2: grafik batang + cincin ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-        <div
-          className="lg:col-span-2 rounded-[14px] p-3.5"
-          style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-        >
-          <div className="flex items-start justify-between gap-3 mb-1">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-3 ${penuh ? 'flex-[1.3] min-h-0' : 'mb-3'}`}>
+        <div className={`lg:col-span-2 ${kartu()}`} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <div className="flex items-start justify-between gap-3 mb-1 shrink-0">
             <div>
               <h3 className="text-[12.5px] font-semibold">Ikhtisar Pendapatan</h3>
               <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
@@ -410,19 +390,18 @@ export const DashboardReferensi: React.FC = () => {
               </div>
             </div>
           </div>
-          <div ref={barRef} className="w-full h-[168px]" />
+          <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[168px]'} />
         </div>
 
-        <div
-          className="rounded-[14px] p-3.5"
-          style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-        >
-          <h3 className="text-[12.5px] font-semibold">Rincian Beban</h3>
-          <p className="text-[10.5px] mb-1" style={{ color: WARNA.teks3 }}>
-            Komposisi beban operasional
-          </p>
-          <div className="relative">
-            <div ref={donutRef} className="w-full h-[132px]" />
+        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <div className="shrink-0">
+            <h3 className="text-[12.5px] font-semibold">Rincian Beban</h3>
+            <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
+              Komposisi beban operasional
+            </p>
+          </div>
+          <div className={penuh ? 'relative flex-1 min-h-0 mt-1' : 'relative mt-1'}>
+            <div ref={donutRef} className={penuh ? 'w-full h-full' : 'w-full h-[132px]'} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-[13px] font-bold leading-none tabular-nums">12,35 M</span>
               <span className="text-[9px] mt-0.5" style={{ color: WARNA.teks3 }}>
@@ -430,7 +409,7 @@ export const DashboardReferensi: React.FC = () => {
               </span>
             </div>
           </div>
-          <ul className="mt-1.5 space-y-1">
+          <ul className={`mt-1.5 space-y-1 shrink-0 ${penuh ? 'max-h-[46%] overflow-hidden' : ''}`}>
             {RINCIAN_BEBAN.map((r) => (
               <li key={r.nama} className="flex items-center gap-2 text-[10.5px]">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
@@ -443,23 +422,19 @@ export const DashboardReferensi: React.FC = () => {
               </li>
             ))}
           </ul>
-          <p className="sr-only">Total komposisi {totalBeban}%</p>
         </div>
       </div>
 
       {/* ===== Baris 3: transaksi + arus kas + target ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-        <div
-          className="rounded-[14px] p-3.5"
-          style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-        >
-          <div className="flex items-center justify-between mb-2">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-3 ${penuh ? 'flex-[1.05] min-h-0' : 'mb-3'}`}>
+        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <div className="flex items-center justify-between mb-2 shrink-0">
             <h3 className="text-[12.5px] font-semibold">Transaksi Terbaru</h3>
             <span className="text-[10px] inline-flex items-center gap-0.5" style={{ color: WARNA.oranye }}>
               Lihat semua <ArrowRight className="w-3 h-3" />
             </span>
           </div>
-          <ul className="space-y-2">
+          <ul className={`space-y-2 ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
             {TRANSAKSI.map((t) => (
               <li key={t.nama} className="flex items-center gap-2.5">
                 <span
@@ -474,10 +449,7 @@ export const DashboardReferensi: React.FC = () => {
                     {t.ket}
                   </p>
                 </div>
-                <span
-                  className="text-[10.5px] font-semibold tabular-nums shrink-0"
-                  style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}
-                >
+                <span className="text-[10.5px] font-semibold tabular-nums shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
                   {t.nilai} jt
                 </span>
               </li>
@@ -485,11 +457,8 @@ export const DashboardReferensi: React.FC = () => {
           </ul>
         </div>
 
-        <div
-          className="rounded-[14px] p-3.5"
-          style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-        >
-          <div className="flex items-start justify-between gap-2 mb-1">
+        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <div className="flex items-start justify-between gap-2 mb-1 shrink-0">
             <div>
               <h3 className="text-[12.5px] font-semibold">Arus Kas</h3>
               <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
@@ -500,15 +469,12 @@ export const DashboardReferensi: React.FC = () => {
               +18,4%
             </span>
           </div>
-          <div ref={areaRef} className="w-full h-[126px]" />
+          <div ref={areaRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[126px]'} />
         </div>
 
-        <div
-          className="rounded-[14px] p-3.5"
-          style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
-        >
-          <h3 className="text-[12.5px] font-semibold mb-2">Progres Target</h3>
-          <ul className="space-y-2.5">
+        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <h3 className="text-[12.5px] font-semibold mb-2 shrink-0">Progres Target</h3>
+          <ul className={`space-y-2.5 ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
             {TARGET.map((t) => (
               <li key={t.nama}>
                 <div className="flex items-center justify-between text-[10.5px] mb-1">
@@ -521,7 +487,7 @@ export const DashboardReferensi: React.FC = () => {
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex items-center gap-2 text-[10px]" style={{ color: WARNA.teks3 }}>
+          <div className="mt-3 flex items-center gap-2 text-[10px] shrink-0" style={{ color: WARNA.teks3 }}>
             <span className="inline-flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: WARNA.hijau }} /> di atas target
             </span>
@@ -534,7 +500,7 @@ export const DashboardReferensi: React.FC = () => {
 
       {/* ===== Strip insight ===== */}
       <div
-        className="rounded-[14px] p-3.5 flex flex-wrap items-center justify-between gap-3"
+        className="rounded-[14px] p-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0"
         style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
       >
         <div className="min-w-0 flex items-start gap-2.5">
