@@ -1,25 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  DollarSign,
-  Dumbbell,
-  Home,
-  Monitor,
-  MoreVertical,
-  Package,
-  RotateCcw,
-  Shirt,
-  ShoppingBag,
-  Sparkles,
-  Star,
-  Target,
-  Truck,
-  UserPlus,
-  Users,
-} from 'lucide-react';
+import { ChevronDown, DollarSign, MoreVertical, ShoppingBag, Target, Users } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
 
 /**
@@ -28,14 +8,13 @@ import { loadEcharts } from '../widgets/echartsSetup';
  * Referensi: dashboard analitik bisnis bertema navy gelap — 4 kartu KPI
  * (ikon berwarna + sparkline), grafik area pendapatan, batang pesanan per
  * status, cincin sumber kunjungan dengan legenda di samping, tabel pesanan
- * terbaru, kategori teratas, kalender jadwal, umpan aktivitas, dan tugas.
+ * terbaru, dan empat grafik pendukung: nilai pesanan per kategori, pesanan
+ * per jam, metode pembayaran, serta tren konversi.
  *
  * INTERAKSI (semua tombol berfungsi)
- * - Chip "Harian/Mingguan" & "Bulan Ini/Bulan Lalu" membuka menu dan benar-benar
- *   mengganti data grafik.
+ * - Chip "Harian/Mingguan", "Bulan Ini/Bulan Lalu", "Nilai/Unit",
+ *   "Hari ini/Rata-rata" membuka menu dan benar-benar mengganti data grafik.
  * - "Lihat semua" membuka daftar penuh (dapat digulir di dalam kartu).
- * - Panah kalender berpindah bulan; tanggal rapat disorot.
- * - Kotak centang tugas dapat dicentang/dilepas.
  * - Tombol ⋮ pada tabel membuka menu (salin ID / tandai selesai).
  *
  * Catatan: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen instansi.
@@ -165,48 +144,67 @@ const PESANAN_AWAL = [
   { id: '#ORD-10428', nama: 'Cameron Williamson', inisial: 'CW', tanggal: '7 Jun 2024', jumlah: 'Rp 320.000', status: 'Dikirim', warna: WARNA.ungu },
 ];
 
-const KATEGORI = [
-  { nama: 'Elektronik', nilai: 'Rp 48.920', persen: 38, warna: WARNA.biru, Ikon: Monitor },
-  { nama: 'Fesyen', nilai: 'Rp 32.480', persen: 25, warna: WARNA.ungu, Ikon: Shirt },
-  { nama: 'Rumah & Dapur', nilai: 'Rp 18.760', persen: 14, warna: WARNA.teal, Ikon: Home },
-  { nama: 'Kecantikan', nilai: 'Rp 15.240', persen: 12, warna: WARNA.oranye, Ikon: Sparkles },
-  { nama: 'Olahraga', nilai: 'Rp 9.030', persen: 7, warna: WARNA.pink, Ikon: Dumbbell },
-  { nama: 'Mainan & Hobi', nilai: 'Rp 6.410', persen: 5, warna: WARNA.biruMuda, Ikon: Sparkles },
-  { nama: 'Otomotif', nilai: 'Rp 4.870', persen: 4, warna: WARNA.hijau, Ikon: Truck },
-  { nama: 'Buku & Alat Tulis', nilai: 'Rp 3.220', persen: 3, warna: WARNA.merah, Ikon: Package },
+/**
+ * Nilai pesanan per kategori. Mode "Nilai" memakai rupiah, mode "Unit" memakai
+ * jumlah pesanan. Keduanya terhubung ke angka KPI: pendapatan Rp 128.430 dan
+ * 1.542 pesanan.
+ */
+const KATEGORI_NILAI = [
+  { nama: 'Elektronik', nilai: 48920, warna: WARNA.biru },
+  { nama: 'Fesyen', nilai: 32480, warna: WARNA.ungu },
+  { nama: 'Rumah & Dapur', nilai: 18760, warna: WARNA.teal },
+  { nama: 'Kecantikan', nilai: 15240, warna: WARNA.oranye },
+  { nama: 'Olahraga', nilai: 9030, warna: WARNA.pink },
+  { nama: 'Lainnya', nilai: 4000, warna: WARNA.biruMuda },
 ];
 
-const JADWAL = [
-  { nama: 'Rapat Tim', waktu: '10.00 – 10.30', warna: WARNA.biru },
-  { nama: 'Tinjauan Pemasaran', waktu: '11.00 – 12.00', warna: WARNA.ungu },
-  { nama: 'Rapat Produk', waktu: '14.00 – 15.00', warna: WARNA.teal },
-  { nama: 'Panggilan Klien', waktu: '16.00 – 17.00', warna: WARNA.oranye },
+const KATEGORI_UNIT = [
+  { nama: 'Elektronik', nilai: 486, warna: WARNA.biru },
+  { nama: 'Fesyen', nilai: 402, warna: WARNA.ungu },
+  { nama: 'Rumah & Dapur', nilai: 268, warna: WARNA.teal },
+  { nama: 'Kecantikan', nilai: 214, warna: WARNA.oranye },
+  { nama: 'Olahraga', nilai: 112, warna: WARNA.pink },
+  { nama: 'Lainnya', nilai: 60, warna: WARNA.biruMuda },
 ];
 
-const AKTIVITAS = [
-  { teks: 'Pesanan #ORD-10435 dibuat', waktu: '2 mnt lalu', warna: WARNA.hijau, Ikon: Package },
-  { teks: 'Jane Cooper membuat akun baru', waktu: '15 mnt lalu', warna: WARNA.biru, Ikon: UserPlus },
-  { teks: 'Pesanan #ORD-10433 dikirim', waktu: '1 jam lalu', warna: WARNA.ungu, Ikon: Truck },
-  { teks: 'Dana #ORD-10430 dikembalikan', waktu: '2 jam lalu', warna: WARNA.oranye, Ikon: RotateCcw },
-  { teks: 'Ulasan baru untuk Headphone', waktu: '3 jam lalu', warna: WARNA.pink, Ikon: Star },
-  { teks: 'Stok Elektronik diperbarui', waktu: '4 jam lalu', warna: WARNA.teal, Ikon: Monitor },
-  { teks: 'Pesanan #ORD-10426 selesai', waktu: '5 jam lalu', warna: WARNA.hijau, Ikon: Check },
-];
+/** Sebaran 1.542 pesanan menurut jam (24 jam). */
+const JAM_PESANAN: Record<string, number[]> = {
+  'Hari ini': [12, 12, 13, 16, 21, 30, 43, 61, 81, 101, 115, 121, 117, 105, 91, 81, 76, 77, 80, 80, 73, 60, 44, 31],
+  'Rata-rata': [11, 11, 12, 15, 20, 28, 40, 56, 75, 93, 106, 111, 107, 97, 84, 74, 70, 71, 74, 73, 67, 55, 41, 28],
+};
 
-const TUGAS = [
-  { nama: 'Perbarui daftar produk', persen: 75, warna: WARNA.biru, selesai: true },
-  { nama: 'Tinjau umpan balik pelanggan', persen: 60, warna: WARNA.teal, selesai: true },
-  { nama: 'Siapkan laporan bulanan', persen: 40, warna: WARNA.ungu, selesai: false },
-  { nama: 'Optimalkan situs web', persen: 20, warna: WARNA.oranye, selesai: false },
-  { nama: 'Audit harga pesaing', persen: 10, warna: WARNA.pink, selesai: false },
-];
+/** Metode pembayaran (jumlah pesanan). */
+const PEMBAYARAN: Record<string, { nama: string; nilai: number; warna: string }[]> = {
+  'Bulan Ini': [
+    { nama: 'Transfer Bank', nilai: 612, warna: WARNA.biru },
+    { nama: 'Kartu Kredit', nilai: 385, warna: WARNA.ungu },
+    { nama: 'E-Wallet', nilai: 342, warna: WARNA.teal },
+    { nama: 'COD', nilai: 141, warna: WARNA.oranye },
+    { nama: 'Cicilan', nilai: 62, warna: WARNA.pink },
+  ],
+  'Bulan Lalu': [
+    { nama: 'Transfer Bank', nilai: 540, warna: WARNA.biru },
+    { nama: 'Kartu Kredit', nilai: 352, warna: WARNA.ungu },
+    { nama: 'E-Wallet', nilai: 300, warna: WARNA.teal },
+    { nama: 'COD', nilai: 128, warna: WARNA.oranye },
+    { nama: 'Cicilan', nilai: 48, warna: WARNA.pink },
+  ],
+};
 
-/** Kalender: jumlah hari & indeks hari pertama tiap bulan (0 = Minggu). */
-const BULAN_KALENDER = [
-  { nama: 'Mei 2024', hari: 31, mulai: 3, sorot: 12 },
-  { nama: 'Juni 2024', hari: 30, mulai: 6, sorot: 17 },
-  { nama: 'Juli 2024', hari: 31, mulai: 1, sorot: 4 },
-];
+/** Tren konversi (persen) — rata-rata 3,27% seperti KPI. */
+const KONVERSI: Record<string, { label: string[]; nilai: number[] }> = {
+  Harian: {
+    label: Array.from({ length: 30 }, (_, i) => {
+      const tgl = 12 + i;
+      return tgl <= 31 ? `${tgl} Mei` : `${tgl - 31} Jun`;
+    }),
+    nilai: [2.9, 3.1, 2.8, 3.0, 3.2, 3.4, 3.1, 3.3, 3.5, 3.2, 3.0, 3.4, 3.6, 3.3, 3.1, 3.5, 3.7, 3.4, 3.2, 3.6, 3.8, 3.5, 3.3, 3.7, 3.9, 3.6, 3.4, 3.2, 3.3, 3.27],
+  },
+  Mingguan: {
+    label: ['Minggu 1', 'Minggu 2', 'Minggu 3', 'Minggu 4'],
+    nilai: [2.95, 3.3, 3.45, 3.27],
+  },
+};
 
 /** Jalur SVG sparkline halus (kurva Catmull-Rom → bezier). */
 const jalurSpark = (seri: number[]) => {
@@ -437,6 +435,212 @@ const opsiDonat = (s: number, mode: string) => {
   };
 };
 
+const gradasiBatangArah = (warna: string, s: number) => ({
+  type: 'linear',
+  x: 0,
+  y: 0,
+  x2: 1,
+  y2: 0,
+  colorStops: [
+    { offset: 0, color: `${warna}77` },
+    { offset: 1, color: warna },
+  ],
+});
+
+/** Nilai pesanan per kategori (batang mendatar). */
+const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
+  const dasar = gayaDasar(s);
+  const data = mode === 'Nilai' ? KATEGORI_NILAI : KATEGORI_UNIT;
+  const urut = [...data].reverse();
+  const maks = Math.max(...data.map((d) => d.nilai));
+  return {
+    animationDuration: 750,
+    animationEasing: 'cubicOut' as const,
+    grid: { left: 2, right: 46 * s, top: 4, bottom: 2, containLabel: true },
+    tooltip: {
+      ...dasar,
+      trigger: 'item',
+      formatter: (p: any) =>
+        `${p.marker} ${p.name}<br/><b>${mode === 'Nilai' ? `Rp ${Number(p.value).toLocaleString('id-ID')}` : `${p.value} pesanan`}</b>`,
+    },
+    xAxis: { type: 'value', max: maks, show: false },
+    yAxis: {
+      type: 'category',
+      data: urut.map((d) => d.nama),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: WARNA.teks2, fontSize: 9.4 * s, margin: 6 * s },
+    },
+    series: [
+      {
+        type: 'bar',
+        barWidth: '54%',
+        data: urut.map((d) => ({ value: d.nilai, itemStyle: { color: gradasiBatangArah(d.warna, s), borderRadius: [0, 4 * s, 4 * s, 0] } })),
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          distance: 6 * s,
+          color: WARNA.teks2,
+          fontSize: 9 * s,
+          fontWeight: 'bold',
+          formatter: (p: any) =>
+            mode === 'Nilai' ? `${(Number(p.value) / 1000).toFixed(1).replace('.', ',')} rb` : `${p.value}`,
+        },
+        emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.25)' } },
+      },
+    ],
+  };
+};
+
+/** Pesanan per jam (batang 24 jam). */
+const opsiJam = (s: number, mode: string) => {
+  const dasar = gayaDasar(s);
+  const nilai = JAM_PESANAN[mode] ?? JAM_PESANAN['Hari ini'];
+  const puncak = Math.max(...nilai);
+  return {
+    animationDuration: 750,
+    animationEasing: 'cubicOut' as const,
+    grid: { left: 2, right: 4, top: 12 * s, bottom: 2, containLabel: true },
+    tooltip: {
+      ...dasar,
+      trigger: 'axis',
+      axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,255,255,0.05)' } },
+      formatter: (p: any[]) => `<div style="color:${WARNA.teks3}">Pukul ${p[0]?.name}</div><b>${p[0]?.value} pesanan</b>`,
+    },
+    xAxis: {
+      type: 'category',
+      data: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}`),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, interval: 3 },
+    },
+    yAxis: { type: 'value', show: false, max: Math.ceil(puncak / 20) * 20 },
+    series: [
+      {
+        type: 'bar',
+        barWidth: '62%',
+        data: nilai.map((v) => ({
+          value: v,
+          itemStyle: {
+            color:
+              v >= puncak * 0.85
+                ? { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: WARNA.biruMuda }, { offset: 1, color: `${WARNA.biru}66` }] }
+                : { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${WARNA.biru}cc` }, { offset: 1, color: `${WARNA.biru}22` }] },
+            borderRadius: [3 * s, 3 * s, 0, 0],
+          },
+        })),
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(255,255,255,0.035)' },
+      },
+    ],
+  };
+};
+
+/** Metode pembayaran (cincin). */
+const opsiBayar = (s: number, mode: string) => {
+  const dasar = gayaDasar(s);
+  const data = PEMBAYARAN[mode] ?? PEMBAYARAN['Bulan Ini'];
+  return {
+    animationDuration: 800,
+    tooltip: {
+      ...dasar,
+      trigger: 'item',
+      formatter: (p: any) => `${p.marker} ${p.name}<br/><b>${p.value} pesanan</b> (${p.percent}%)`,
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['62%', '92%'],
+        center: ['50%', '50%'],
+        label: { show: false },
+        labelLine: { show: false },
+        itemStyle: { borderColor: WARNA.kartu, borderWidth: 3 * s, borderRadius: 5 * s, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 8 * s },
+        emphasis: { scale: true, scaleSize: 5 * s, itemStyle: { shadowBlur: 16 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
+        data: data.map((d) => ({ name: d.nama, value: d.nilai, itemStyle: { color: d.warna } })),
+      },
+    ],
+  };
+};
+
+/** Tren konversi (garis + area). */
+const opsiKonversi = (s: number, mode: string) => {
+  const dasar = gayaDasar(s);
+  const d = KONVERSI[mode] ?? KONVERSI.Harian;
+  const rata = d.nilai.reduce((a, b) => a + b, 0) / d.nilai.length;
+  return {
+    animationDuration: 750,
+    animationEasing: 'cubicOut' as const,
+    grid: { left: 2, right: 8, top: 12 * s, bottom: 2, containLabel: true },
+    tooltip: {
+      ...dasar,
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: 'rgba(34,197,94,0.45)', type: 'dashed' } },
+      formatter: (p: any[]) => `<div style="color:${WARNA.teks3}">${p[0]?.name}</div><b>${String(p[0]?.value).replace('.', ',')}%</b>`,
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: d.label,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: WARNA.teks3,
+        fontSize: 8.2 * s,
+        interval: (i: number) => i === 0 || i === d.label.length - 1,
+        align: 'center',
+        margin: 5 * s,
+        hideOverlap: false,
+      },
+    },
+    yAxis: {
+      type: 'value',
+      min: 2,
+      max: 4.4,
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)', type: 'dashed' } },
+      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, formatter: (v: number) => `${String(v).replace('.', ',')}%` },
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: 0.42,
+        symbol: 'circle',
+        symbolSize: 6 * s,
+        showSymbol: false,
+        data: d.nilai,
+        lineStyle: { width: 2.2 * s, color: WARNA.hijau, shadowColor: 'rgba(34,197,94,0.5)', shadowBlur: 10 * s, shadowOffsetY: 3 * s },
+        itemStyle: { color: WARNA.hijau, borderColor: WARNA.kartu, borderWidth: 2 * s },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(34,197,94,0.38)' },
+              { offset: 1, color: 'rgba(34,197,94,0.01)' },
+            ],
+          },
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          lineStyle: { color: 'rgba(255,255,255,0.35)', type: 'dashed', width: 1 },
+          label: {
+            formatter: `rata ${String(rata.toFixed(2)).replace('.', ',')}%`,
+            color: WARNA.teks2,
+            fontSize: 8.6 * s,
+            position: 'insideEndTop',
+          },
+          data: [{ yAxis: Number(rata.toFixed(2)) }],
+        },
+      },
+    ],
+  };
+};
+
 interface DashboardAnalitikProps {
   /** true = isi seluruh tinggi wadah (mode presentasi / layar penuh). */
   penuh?: boolean;
@@ -449,14 +653,11 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
   const [modeArea, setModeArea] = useState<'Harian' | 'Mingguan'>('Harian');
   const [modeBatang, setModeBatang] = useState<'Bulan Ini' | 'Bulan Lalu'>('Bulan Ini');
   const [modeDonat, setModeDonat] = useState<'Bulan Ini' | 'Bulan Lalu'>('Bulan Ini');
+  const [modeKategori, setModeKategori] = useState<'Nilai' | 'Unit'>('Nilai');
+  const [modeJam, setModeJam] = useState<'Hari ini' | 'Rata-rata'>('Hari ini');
+  const [modeBayar, setModeBayar] = useState<'Bulan Ini' | 'Bulan Lalu'>('Bulan Ini');
+  const [modeKonversi, setModeKonversi] = useState<'Harian' | 'Mingguan'>('Harian');
   const [semuaPesanan, setSemuaPesanan] = useState(false);
-  const [semuaKategori, setSemuaKategori] = useState(false);
-  const [semuaAktivitas, setSemuaAktivitas] = useState(false);
-  const [semuaTugas, setSemuaTugas] = useState(false);
-  const [bulan, setBulan] = useState(1); // 0 = Mei, 1 = Juni, 2 = Juli 2024
-  const [tugasSelesai, setTugasSelesai] = useState<Record<string, boolean>>(
-    Object.fromEntries(TUGAS.map((t) => [t.nama, t.selesai])),
-  );
   const [menuBaris, setMenuBaris] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
   const [pesanan, setPesanan] = useState(PESANAN_AWAL);
@@ -465,6 +666,10 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
   const areaRef = useRef<HTMLDivElement | null>(null);
   const batangRef = useRef<HTMLDivElement | null>(null);
   const donatRef = useRef<HTMLDivElement | null>(null);
+  const kategoriRef = useRef<HTMLDivElement | null>(null);
+  const jamRef = useRef<HTMLDivElement | null>(null);
+  const bayarRef = useRef<HTMLDivElement | null>(null);
+  const konversiRef = useRef<HTMLDivElement | null>(null);
   const instans = useRef<Record<string, any>>({});
 
   // Ukur wadah → tentukan skala huruf.
@@ -507,18 +712,24 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
       ambil('area', areaRef.current)?.setOption(opsiArea(skala, modeArea), true);
       ambil('batang', batangRef.current)?.setOption(opsiBatang(skala, modeBatang), true);
       ambil('donat', donatRef.current)?.setOption(opsiDonat(skala, modeDonat), true);
+      ambil('kategori', kategoriRef.current)?.setOption(opsiKategori(skala, modeKategori), true);
+      ambil('jam', jamRef.current)?.setOption(opsiJam(skala, modeJam), true);
+      ambil('bayar', bayarRef.current)?.setOption(opsiBayar(skala, modeBayar), true);
+      ambil('konversi', konversiRef.current)?.setOption(opsiKonversi(skala, modeKonversi), true);
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
       });
-      [areaRef, batangRef, donatRef].forEach((r) => r.current && pengamat?.observe(r.current));
+      [areaRef, batangRef, donatRef, kategoriRef, jamRef, bayarRef, konversiRef].forEach(
+        (r) => r.current && pengamat?.observe(r.current),
+      );
     });
 
     return () => {
       batal = true;
       pengamat?.disconnect();
     };
-  }, [skala, modeArea, modeBatang, modeDonat]);
+  }, [skala, modeArea, modeBatang, modeDonat, modeKategori, modeJam, modeBayar, modeKonversi]);
 
   useEffect(
     () => () => {
@@ -619,16 +830,9 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
 
   const dataArea = AREA_DATA[modeArea];
   const dataDonat = DONAT_DATA[modeDonat];
-  const kategoriTampil = semuaKategori ? KATEGORI : KATEGORI.slice(0, 5);
-  const aktivitasTampil = semuaAktivitas ? AKTIVITAS : AKTIVITAS.slice(0, 5);
-  const tugasTampil = semuaTugas ? TUGAS : TUGAS.slice(0, 4);
   const pesananTampil = semuaPesanan ? pesanan : pesanan.slice(0, 5);
-
-  const bulanAktif = BULAN_KALENDER[bulan];
-  const selKalender: Array<number | null> = [
-    ...Array.from({ length: bulanAktif.mulai }, () => null),
-    ...Array.from({ length: bulanAktif.hari }, (_, i) => i + 1),
-  ];
+  const dataBayar = PEMBAYARAN[modeBayar] ?? PEMBAYARAN['Bulan Ini'];
+  const totalBayar = dataBayar.reduce((a, b) => a + b.nilai, 0);
 
   return (
     <div
@@ -840,172 +1044,91 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
           </div>
         </div>
 
-        {/* Kolom tengah: kategori + jadwal */}
+        {/* Kolom tengah: nilai per kategori + pesanan per jam */}
         <div className="flex flex-col gap-[0.7em] min-h-0">
           <div className={`${kartu()} ${penuh ? 'baris-100' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Kategori Teratas"
-              aksi={<Tautan teks={semuaKategori ? 'Ringkas' : 'Lihat semua'} onClick={() => setSemuaKategori((v) => !v)} />}
+              judul="Nilai Pesanan per Kategori"
+              aksi={
+                <Pilih
+                  nilai={modeKategori}
+                  opsi={['Nilai', 'Unit']}
+                  onPilih={(v) => setModeKategori(v as 'Nilai' | 'Unit')}
+                />
+              }
             />
-            <ul className={`flex-1 min-h-0 flex flex-col gap-[0.3em] ${daftar}`}>
-              {kategoriTampil.map((k) => (
-                <li key={k.nama} className="min-w-0">
-                  <div className="flex items-center gap-[0.35em] text-[0.68em] mb-[0.18em]">
-                    <span
-                      className="shrink-0 inline-flex items-center justify-center w-[1.25em] h-[1.25em] rounded-[0.3em]"
-                      style={{ backgroundColor: `${k.warna}22`, color: k.warna }}
-                    >
-                      <k.Ikon className="w-[0.8em] h-[0.8em]" />
-                    </span>
-                    <span className="truncate font-medium">{k.nama}</span>
-                    <span className="ml-auto tabular-nums shrink-0" style={{ color: WARNA.teks2 }}>
-                      {k.nilai}
-                    </span>
-                    <span className="tabular-nums font-semibold shrink-0 w-[2.1em] text-right">{k.persen}%</span>
-                  </div>
-                  <div className="h-[0.32em] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                    <div
-                      className="h-full rounded-full transition-[width] duration-500"
-                      style={{ width: `${k.persen}%`, background: `linear-gradient(90deg, ${k.warna}, ${k.warna}99)` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div ref={kategoriRef} className={bidang('h-[9.6em]')} />
           </div>
 
           <div className={`${kartu()} ${penuh ? 'baris-130' : ''}`} style={gayaKartu}>
-            <Kepala judul="Jadwal Mendatang" aksi={<Tautan teks="Hari ini" onClick={() => setBulan(1)} />} />
-            <div className={penuh ? 'flex-1 min-h-0 flex gap-[0.6em]' : 'flex gap-[0.6em]'}>
-              <div className={penuh ? 'flex-1 min-w-0 flex flex-col' : 'flex-1 min-w-0'}>
-                <div className="flex items-center justify-between shrink-0 mb-[0.2em]">
-                  <button
-                    type="button"
-                    onClick={() => setBulan((b) => (b + BULAN_KALENDER.length - 1) % BULAN_KALENDER.length)}
-                    className="inline-flex items-center justify-center w-[1.1em] h-[1.1em] rounded hover:bg-white/10"
-                    aria-label="Bulan sebelumnya"
-                  >
-                    <ChevronLeft className="w-[0.85em] h-[0.85em]" style={{ color: WARNA.teks2 }} />
-                  </button>
-                  <span className="text-[0.68em] font-semibold">{bulanAktif.nama}</span>
-                  <button
-                    type="button"
-                    onClick={() => setBulan((b) => (b + 1) % BULAN_KALENDER.length)}
-                    className="inline-flex items-center justify-center w-[1.1em] h-[1.1em] rounded hover:bg-white/10"
-                    aria-label="Bulan berikutnya"
-                  >
-                    <ChevronRight className="w-[0.85em] h-[0.85em]" style={{ color: WARNA.teks2 }} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-7 gap-[0.06em] text-center text-[0.55em] shrink-0" style={{ color: WARNA.teks3 }}>
-                  {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((h, i) => (
-                    <span key={`${h}-${i}`}>{h}</span>
-                  ))}
-                </div>
-                <div
-                  className={
-                    penuh
-                      ? 'grid grid-cols-7 gap-[0.06em] flex-1 min-h-0 content-start text-center text-[0.56em]'
-                      : 'grid grid-cols-7 gap-[0.06em] content-start text-center text-[0.56em]'
-                  }
-                >
-                  {selKalender.map((d, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center justify-center rounded-full h-[1.5em]"
-                      style={
-                        d === bulanAktif.sorot
-                          ? { backgroundColor: WARNA.biru, color: '#fff', fontWeight: 700 }
-                          : { color: d ? WARNA.teks2 : 'transparent' }
-                      }
-                    >
-                      {d ?? '·'}
-                    </span>
-                  ))}
+            <Kepala
+              judul="Pesanan per Jam"
+              aksi={
+                <Pilih
+                  nilai={modeJam}
+                  opsi={['Hari ini', 'Rata-rata']}
+                  onPilih={(v) => setModeJam(v as 'Hari ini' | 'Rata-rata')}
+                />
+              }
+            />
+            <div ref={jamRef} className={bidang('h-[8.6em]')} />
+          </div>
+        </div>
+
+        {/* Kolom kanan: metode pembayaran + tren konversi */}
+        <div className="flex flex-col gap-[0.7em] min-h-0">
+          <div className={`${kartu()} ${penuh ? 'baris-115' : ''}`} style={gayaKartu}>
+            <Kepala
+              judul="Metode Pembayaran"
+              aksi={
+                <Pilih
+                  nilai={modeBayar}
+                  opsi={['Bulan Ini', 'Bulan Lalu']}
+                  onPilih={(v) => setModeBayar(v as 'Bulan Ini' | 'Bulan Lalu')}
+                />
+              }
+            />
+            <div className="flex-1 min-h-0 flex flex-col">
+              <div className="relative w-full flex-1 min-h-[5em]">
+                <div ref={bayarRef} className="absolute inset-0" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[1.05em] font-bold leading-none tabular-nums">
+                    {totalBayar.toLocaleString('id-ID')}
+                  </span>
+                  <span className="text-[0.58em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
+                    pesanan
+                  </span>
                 </div>
               </div>
-              <ul className="flex-1 min-w-0 flex flex-col justify-center gap-[0.3em]">
-                {JADWAL.map((j) => (
-                  <li key={j.nama} className="flex items-start gap-[0.35em] text-[0.64em] min-w-0">
-                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0 mt-[0.35em]" style={{ backgroundColor: j.warna }} />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{j.nama}</span>
-                      <span className="block truncate" style={{ color: WARNA.teks3 }}>
-                        {j.waktu}
-                      </span>
+              <ul className="w-full shrink-0 flex flex-col gap-[0.16em] mt-[0.25em]">
+                {dataBayar.map((d) => (
+                  <li key={d.nama} className="flex items-center gap-[0.3em] text-[0.62em] min-w-0">
+                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: d.warna }} />
+                    <span className="truncate" style={{ color: WARNA.teks2 }}>
+                      {d.nama}
                     </span>
+                    <span className="ml-auto tabular-nums shrink-0" style={{ color: WARNA.teks3 }}>
+                      {Math.round((d.nilai / totalBayar) * 1000) / 10}%
+                    </span>
+                    <span className="tabular-nums font-semibold shrink-0 w-[2.2em] text-right">{d.nilai}</span>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-        </div>
-
-        {/* Kolom kanan: aktivitas + tugas */}
-        <div className="flex flex-col gap-[0.7em] min-h-0">
-          <div className={`${kartu()} ${penuh ? 'baris-115' : ''}`} style={gayaKartu}>
-            <Kepala
-              judul="Aktivitas Terbaru"
-              aksi={<Tautan teks={semuaAktivitas ? 'Ringkas' : 'Lihat semua'} onClick={() => setSemuaAktivitas((v) => !v)} />}
-            />
-            <ul className={`flex-1 min-h-0 flex flex-col gap-[0.25em] ${daftar}`}>
-              {aktivitasTampil.map((a) => (
-                <li key={a.teks} className="flex items-center gap-[0.4em] text-[0.64em] min-w-0">
-                  <span
-                    className="shrink-0 inline-flex items-center justify-center w-[1.3em] h-[1.3em] rounded-[0.3em]"
-                    style={{ backgroundColor: `${a.warna}22`, color: a.warna }}
-                  >
-                    <a.Ikon className="w-[0.8em] h-[0.8em]" />
-                  </span>
-                  <span className="truncate" style={{ color: WARNA.teks2 }}>
-                    {a.teks}
-                  </span>
-                  <span className="ml-auto shrink-0 text-[0.92em]" style={{ color: WARNA.teks3 }}>
-                    {a.waktu}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
 
           <div className={`${kartu()} ${penuh ? 'baris-100' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Tugas"
-              aksi={<Tautan teks={semuaTugas ? 'Ringkas' : 'Lihat semua'} onClick={() => setSemuaTugas((v) => !v)} />}
+              judul="Tren Konversi"
+              aksi={
+                <Pilih
+                  nilai={modeKonversi}
+                  opsi={['Harian', 'Mingguan']}
+                  onPilih={(v) => setModeKonversi(v as 'Harian' | 'Mingguan')}
+                />
+              }
             />
-            <ul className={`flex-1 min-h-0 flex flex-col gap-[0.3em] ${daftar}`}>
-              {tugasTampil.map((t) => {
-                const cek = tugasSelesai[t.nama];
-                return (
-                  <li key={t.nama} className="min-w-0">
-                    <div className="flex items-center gap-[0.35em] text-[0.66em] mb-[0.18em]">
-                      <button
-                        type="button"
-                        onClick={() => setTugasSelesai((m) => ({ ...m, [t.nama]: !m[t.nama] }))}
-                        className="shrink-0 inline-flex items-center justify-center w-[1.05em] h-[1.05em] rounded-[0.25em] transition-colors"
-                        style={cek ? { backgroundColor: WARNA.biru, color: '#fff' } : { border: `1px solid ${WARNA.teks3}` }}
-                        aria-label={`Tandai ${t.nama}`}
-                      >
-                        {cek ? <Check className="w-[0.72em] h-[0.72em]" /> : null}
-                      </button>
-                      <span
-                        className="truncate"
-                        style={{ color: cek ? WARNA.teks3 : WARNA.teks2, textDecoration: cek ? 'line-through' : 'none' }}
-                      >
-                        {t.nama}
-                      </span>
-                      <span className="ml-auto tabular-nums font-semibold shrink-0">{t.persen}%</span>
-                    </div>
-                    <div className="h-[0.3em] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                      <div
-                        className="h-full rounded-full transition-[width] duration-500"
-                        style={{ width: `${t.persen}%`, background: `linear-gradient(90deg, ${t.warna}, ${t.warna}99)`, opacity: cek ? 0.5 : 1 }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div ref={konversiRef} className={bidang('h-[8.6em]')} />
           </div>
         </div>
       </div>

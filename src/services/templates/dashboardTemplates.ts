@@ -176,15 +176,15 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   id: 'tpl-analitik',
   nama: 'Analitik Bisnis Harian',
   tujuan:
-    'Memantau kinerja bisnis harian: pendapatan, jumlah pesanan, pengguna, rasio konversi, status pesanan, sumber kunjungan, pesanan terbaru, kategori teratas, jadwal, dan tugas.',
+    'Memantau kinerja bisnis harian: pendapatan, jumlah pesanan, pengguna, rasio konversi, status pesanan, sumber kunjungan, pesanan terbaru, nilai pesanan per kategori, pesanan per jam, metode pembayaran, dan tren konversi.',
   caraPenyampaian:
-    'Gaya navy gelap dengan lima aksen (biru, teal, ungu, oranye, pink): empat kartu KPI bersparkline di baris atas, grafik area pendapatan harian, batang pesanan per status, cincin sumber kunjungan dengan legenda di samping, tabel pesanan terbaru, kategori teratas berprogres, kalender jadwal, umpan aktivitas, dan daftar tugas.',
-  deskripsi: 'Papan analitik: 4 KPI, tren pendapatan, status pesanan, sumber kunjungan, tabel, kategori, jadwal, aktivitas, tugas.',
-  fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Kategori teratas', 'Tugas tim'],
+    'Gaya navy gelap dengan lima aksen (biru, teal, ungu, oranye, pink): empat kartu KPI bersparkline di baris atas, grafik area pendapatan harian, batang pesanan per status, cincin sumber kunjungan dengan legenda di samping, tabel pesanan terbaru, batang mendatar nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi dengan garis rata-rata.',
+  deskripsi: 'Papan analitik: 4 KPI, tren pendapatan, status pesanan, sumber kunjungan, tabel, kategori, per jam, pembayaran, konversi.',
+  fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Nilai per kategori', 'Metode pembayaran'],
   aksen: '#3b82f6',
   judulDashboard: 'Analitik Bisnis Harian (Contoh)',
   deskripsiDashboard:
-    'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, kategori teratas, kalender jadwal, umpan aktivitas, dan tugas berprogres. Seluruh angka ilustrasi.',
+    'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, batang nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi. Seluruh angka ilustrasi.',
   widgets: [
     kpi('Pendapatan', 'vs 12 Apr – 11 Mei', '128.430', 'Rp', 12.5, 'vs 12 Apr – 11 Mei', [30, 34, 31, 38, 36, 42, 40, 47, 45, 52]),
     kpi('Pesanan', 'vs 12 Apr – 11 Mei', '1.542', 'pesanan', 8.3, 'vs 12 Apr – 11 Mei', [20, 24, 22, 28, 26, 31, 29, 35, 33, 38]),
@@ -207,6 +207,32 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
         showLegend: true,
       },
     }),
+
+    grafik('bar', 'Nilai Pesanan per Kategori', 'Nilai pesanan (Rp) per kategori, bulan ini', { w: 4, h: 4 }, [
+      'Elektronik', 'Fesyen', 'Rumah & Dapur', 'Kecantikan', 'Olahraga', 'Lainnya',
+    ], [{ name: 'Nilai', data: [48920, 32480, 18760, 15240, 9030, 4000] }], 'Rp'),
+
+    grafik('bar', 'Pesanan per Jam', 'Sebaran 1.542 pesanan menurut jam', { w: 4, h: 4 }, [
+      '00', '03', '06', '09', '12', '15', '18', '21',
+    ], [
+      {
+        name: 'Pesanan',
+        data: [12, 16, 43, 101, 117, 81, 80, 60],
+      },
+    ], 'pesanan'),
+
+    w('donut', 'Metode Pembayaran', 'Jumlah pesanan per metode, bulan ini', { w: 4, h: 4 }, {
+      chart: {
+        xAxis: ['Transfer Bank', 'Kartu Kredit', 'E-Wallet', 'COD', 'Cicilan'],
+        series: [{ name: 'Pesanan', data: [612, 385, 342, 141, 62] }],
+        unit: 'pesanan',
+        showLegend: true,
+      },
+    }),
+
+    grafik('line', 'Tren Konversi', 'Rasio konversi harian, 12 Mei – 10 Jun 2024', { w: 4, h: 4 }, [
+      '12 Mei', '18 Mei', '24 Mei', '30 Mei', '5 Jun', '10 Jun',
+    ], [{ name: 'Konversi', data: [2.9, 3.4, 3.1, 3.6, 3.4, 3.27] }], '%'),
 
     narasi(
       'Ringkasan',

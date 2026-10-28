@@ -122,7 +122,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
   const susunanChip =
     aktif.id === 'tpl-analitik'
-      ? '4 KPI · 3 grafik · tabel · kalender · tugas'
+      ? '4 KPI · 7 grafik · tabel pesanan'
       : aktif.id === 'tpl-trafik'
         ? '5 KPI · 4 grafik · 3 daftar · alat ukur'
         : '4 KPI · 3 grafik · daftar · progres';
