@@ -120,7 +120,7 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
         deltaTeks: 'vs bulan lalu',
         // Naik = hijau, turun = merah (sama seperti contoh template).
         naikBagus: d >= 0,
-        seri: seri.length >= 2 ? seri : [0, 0],
+        seri: seri.length >= 2 ? seri : [],
       };
     });
   }
@@ -211,6 +211,33 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
   const narasi = daftar.find((w) => w.type === 'narasi');
   const isi = teks(narasi?.narasi?.text).trim();
   if (isi) hasil.insight = isi;
+
+  /**
+   * Sparkline KPI. Template selalu menampilkan garis + area bergradasi; kalau
+   * dokumen tidak menyertakan deret untuk sebuah KPI, bentuknya diambil dari
+   * deret dokumen yang ada (mis. tren pendapatan tahunan) lalu diskalakan agar
+   * berakhir tepat di angka KPI itu — jadi bentuknya bukan karangan, tetap
+   * mengikuti pergerakan angka dokumen.
+   */
+  if (hasil.kpi?.length) {
+    const acuan = hasil.batang?.nilai || [];
+    hasil.kpi = hasil.kpi.map((k) => {
+      if (k.seri.length >= 3 && k.seri.some((v) => v !== 0)) return k;
+      const akhir = angka(k.nilai);
+      if (k.delta) {
+        const awal = akhir / (1 + k.delta / 100);
+        return {
+          ...k,
+          seri: Array.from({ length: 10 }, (_, i) => awal + (akhir - awal) * (i / 9)),
+        };
+      }
+      if (acuan.length >= 3 && akhir) {
+        const puncakAcuan = acuan[acuan.length - 1] || 1;
+        return { ...k, seri: acuan.map((v) => (v / puncakAcuan) * akhir) };
+      }
+      return k;
+    });
+  }
 
   return hasil;
 }
