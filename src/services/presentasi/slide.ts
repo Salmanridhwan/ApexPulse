@@ -111,7 +111,14 @@ export function narasiInsight(w: WidgetSpec): string {
     const bagian: string[] = [`Nilai saat ini ${v}${u}`];
     if (typeof w.kpi.delta === 'number') {
       const arah = w.kpi.delta >= 0 ? 'naik' : 'turun';
-      bagian.push(`${arah} ${Math.abs(w.kpi.delta)}% ${w.kpi.deltaLabel || 'dibanding periode sebelumnya'}`);
+      // Sebagian label sudah memuat persentasenya sendiri ("+6,8% vs target").
+      // Menambahkan angka lagi menghasilkan "naik 6.8% +6,8% vs target".
+      const label = (w.kpi.deltaLabel || '').trim();
+      bagian.push(
+        label.includes('%')
+          ? `${arah} ${label}`
+          : `${arah} ${Math.abs(w.kpi.delta)}% ${label || 'dibanding periode sebelumnya'}`
+      );
     }
     if (typeof w.kpi.target === 'number') {
       bagian.push(`target ${w.kpi.target}${u}`);

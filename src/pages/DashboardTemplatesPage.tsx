@@ -8,14 +8,17 @@ import {
   LayoutGrid,
   LayoutTemplate,
   Loader2,
+  Presentation,
   Sparkles,
   Target,
 } from 'lucide-react';
-import { ProgresIsiTemplate, Tenant } from '../types';
+import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
+import { PresentationMode } from '../components/PresentationMode';
+import { narasiInsight, susunSlide, VERSI_PRESENTASI } from '../services/presentasi/slide';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
@@ -99,6 +102,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * dilakukan.
    */
   const [galat, setGalat] = useState<string | null>(null);
+  /** Mode presentasi pratinjau (layar penuh, satu slide per layar). */
+  const [presentasi, setPresentasi] = useState(false);
 
   const aktif = useMemo(
     () => DASHBOARD_TEMPLATES.find((t) => t.id === aktifId) ?? DASHBOARD_TEMPLATES[0],
@@ -108,6 +113,33 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
+
+  /**
+   * Dashboard BAYANGAN untuk mode presentasi pratinjau.
+   *
+   * Slide disusun dari widget template (bukan dari server) dan tiap widget diberi
+   * narasi ringkas yang dihitung dari angkanya sendiri — bukan dari dokumen. Karena
+   * itu `PresentationMode` dipanggil dengan `pratinjau` supaya tidak memanggil RAG.
+   */
+  const dashPratinjau = useMemo<Dashboard>(() => {
+    const widgets = widgetPratinjau.map((w) => ({ ...w, insight: w.insight || narasiInsight(w) }));
+    return {
+      id: `tpl-pratinjau-${aktif.id}`,
+      tenantId: currentTenant?.id ?? '',
+      title: aktif.judulDashboard,
+      description: aktif.deskripsiDashboard,
+      sector: (currentTenant?.sector ?? 'aneka_usaha') as BumdSector,
+      widgets,
+      globalFilters: { periode: 'Contoh', unitKerja: 'Semua', kategori: 'Semua' },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      presentasi: {
+        slides: susunSlide(widgets),
+        disusunAt: new Date().toISOString(),
+        versi: VERSI_PRESENTASI,
+      },
+    };
+  }, [aktif, widgetPratinjau, currentTenant]);
 
   const pakai = async () => {
     if (memuat) return;
@@ -253,16 +285,28 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                   : 'Angka setiap kartu diambil dari dokumen resmi instansi'}
               </span>
             </div>
-            <button
-              onClick={pakai}
-              disabled={memuat || !currentTenant}
-              data-testid={`pakai-template-${aktif.id}`}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
-              <span>{memuat ? 'Mengambil dari dokumen…' : 'Pakai Template Ini'}</span>
-              {!memuat && <ArrowRight className="w-3.5 h-3.5" />}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setPresentasi(true)}
+                disabled={memuat || widgetPratinjau.length === 0}
+                data-testid="presentasi-template"
+                title="Buka mode presentasi: satu slide per layar, bisa pakai tombol panah"
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Presentation className="w-4 h-4" />
+                <span>Mode Presentasi</span>
+              </button>
+              <button
+                onClick={pakai}
+                disabled={memuat || !currentTenant}
+                data-testid={`pakai-template-${aktif.id}`}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
+                <span>{memuat ? 'Mengambil dari dokumen…' : 'Pakai Template Ini'}</span>
+                {!memuat && <ArrowRight className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
 
           {/* Galat tetap ditampilkan, tetapi dengan bahasa awam — tanpa istilah
@@ -302,6 +346,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           </span>
         </p>
       </div>
+
+      {/* Mode presentasi pratinjau — layar penuh, satu slide per layar.
+          `pratinjau` membuat komponen ini TIDAK memanggil RAG (angka contoh). */}
+      {presentasi && (
+        <PresentationMode
+          dashboard={dashPratinjau}
+          tenantName={currentTenant?.name}
+          onExit={() => setPresentasi(false)}
+          onUpdate={() => {}}
+          pratinjau
+        />
+      )}
     </div>
   );
 };

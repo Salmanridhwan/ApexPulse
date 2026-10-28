@@ -13,6 +13,12 @@ interface PresentationModeProps {
   onExit: () => void;
   /** Dipanggil saat dashboard berubah (mis. setelah insight/slide digenerate). */
   onUpdate: (d: Dashboard) => void;
+  /**
+   * Mode pratinjau (dari galeri template): slide disusun dari widget template
+   * yang angkanya CONTOH, jadi TIDAK memanggil RAG dan tombol "Susun Ulang"
+   * disembunyikan — tidak ada dokumen yang bisa diklaim sebagai sumber.
+   */
+  pratinjau?: boolean;
 }
 
 /** Berapa widget per slide → kelas grid agar tiap chart tetap besar. */
@@ -35,6 +41,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   tenantId,
   onExit,
   onUpdate,
+  pratinjau = false,
 }) => {
   const [slides, setSlides] = useState<SlidePresentasi[]>(() => dashboard.presentasi?.slides ?? []);
   const [idx, setIdx] = useState(0);
@@ -148,6 +155,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
     if (mulaiRef.current) return;
     mulaiRef.current = true;
     masukFullscreen();
+    // Pratinjau template: slide sudah disusun dari widget template, angkanya
+    // contoh — jangan panggil RAG (tidak ada dokumen sumber untuk diklaim).
+    if (pratinjau) return;
     if (dashboard.widgets.length === 0) return;
 
     const tersimpan = dashboard.presentasi;
@@ -160,7 +170,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       adaYangHilang;
 
     if (basi) void siapkan(false);
-  }, [dashboard.presentasi, dashboard.widgets, masukFullscreen, siapkan]);
+  }, [dashboard.presentasi, dashboard.widgets, masukFullscreen, siapkan, pratinjau]);
 
   // Sinkronkan status fullscreen + kunci scroll body selama presentasi.
   useEffect(() => {
@@ -217,15 +227,23 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => void siapkan(true)}
-            disabled={menyiapkan}
-            title="Susun ulang narasi & slide dari RAG"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-40"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${menyiapkan ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Susun Ulang</span>
-          </button>
+          {pratinjau && (
+            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-chip text-[10px] font-bold text-warn bg-warn/10 border border-warn/30">
+              <Sparkles className="w-3 h-3" />
+              Pratinjau template · angka contoh
+            </span>
+          )}
+          {!pratinjau && (
+            <button
+              onClick={() => void siapkan(true)}
+              disabled={menyiapkan}
+              title="Susun ulang narasi & slide dari RAG"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${menyiapkan ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Susun Ulang</span>
+            </button>
+          )}
           <button
             onClick={() => setShowNarasi((v) => !v)}
             title={showNarasi ? 'Sembunyikan narasi' : 'Tampilkan narasi'}
