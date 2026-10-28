@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, DollarSign, MoreVertical, ShoppingBag, Target, Users } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
+import { teksNilai, type NilaiAnalitik, type NilaiAnalitikDeret } from '../../services/templates/nilaiTemplate';
 
 /**
  * DASHBOARD ANALITIK — replika tampilan acuan kedua.
@@ -18,6 +19,14 @@ import { loadEcharts } from '../widgets/echartsSetup';
  * - Tombol ⋮ pada tabel membuka menu (salin ID / tandai selesai).
  *
  * Catatan: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen instansi.
+ *
+ * PRATINJAU DATA ASLI
+ * Prop `nilai` membawa angka dokumen ke slot kartu yang sama. Komponen ini tetap
+ * satu-satunya pemegang desain: susunan, geometri kartu, dan warnanya tidak
+ * dihitung dari data — hanya angkanya yang berganti. Slot yang tidak ada di
+ * dokumen dibiarkan KOSONG (tanpa angka contoh), dan chip pembanding
+ * (Harian/Bulan Lalu/Nilai…) disembunyikan karena dokumen hanya memuat satu
+ * potret — memilih mode pembanding hanya akan menampilkan angka karangan.
  */
 
 const WARNA = {
@@ -46,9 +55,13 @@ interface Kpi {
   seri: number[];
   warna: string;
   Ikon: React.ComponentType<{ className?: string }>;
+  /** Warna delta: hijau saat naik, merah saat turun. */
+  naik?: boolean;
+  /** true = kartu tetap ada tetapi dokumen tidak punya angkanya. */
+  kosong?: boolean;
 }
 
-const KPI: Kpi[] = [
+const KPI_CONTOH: Kpi[] = [
   {
     label: 'Pendapatan',
     nilai: 'Rp 128.430',
@@ -230,6 +243,43 @@ const jalurSpark = (seri: number[]) => {
   return { garis: d, area: `${d}L100,100L0,100Z` };
 };
 
+/** Batas atas sumbu yang "rapi": 1/2/2,5/5/10 × pangkat 10 (820 → 1000). */
+const maksRapi = (puncak: number): number => {
+  if (!Number.isFinite(puncak) || puncak <= 0) return 1;
+  const pangkat = 10 ** Math.floor(Math.log10(puncak));
+  const n = puncak / pangkat;
+  const faktor = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+  return faktor * pangkat;
+};
+
+/** Angka ringkas gaya Indonesia: 48920 → "48,9 rb". */
+const ringkas = (v: number): string =>
+  new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+
+/** Warna batang kategori & metode pembayaran (sama seperti contoh). */
+const WARNA_KATEGORI = [WARNA.biru, WARNA.ungu, WARNA.teal, WARNA.oranye, WARNA.pink, WARNA.biruMuda];
+const WARNA_BAYAR = [WARNA.biru, WARNA.ungu, WARNA.teal, WARNA.oranye, WARNA.pink];
+
+/** Warna pil status pada tabel pesanan (mengikuti contoh). */
+const WARNA_STATUS: Record<string, string> = {
+  selesai: WARNA.hijau,
+  diproses: WARNA.biru,
+  dikirim: WARNA.ungu,
+  dibatalkan: WARNA.merah,
+  dikembalikan: WARNA.oranye,
+};
+
+/** Penanda slot yang dokumennya tidak memuat angka — kartu tetap, isinya kosong. */
+const Kosong: React.FC<{ teks?: string; absolut?: boolean }> = ({ teks = 'Belum ada angka di dokumen', absolut = true }) => (
+  <div
+    className={`${absolut ? 'absolute inset-0' : 'flex-1 min-h-0'} flex items-center justify-center px-[0.8em] pointer-events-none`}
+  >
+    <span className="text-[0.68em] leading-snug text-center" style={{ color: WARNA.teks3 }}>
+      {teks}
+    </span>
+  </div>
+);
+
 /** Gaya dasar grafik: huruf, tooltip, dan sumbu mengikuti `skala`. */
 const gayaDasar = (s: number) => ({
   tooltip: {
@@ -261,10 +311,11 @@ const gradasiBatang = (warna: string) => ({
   ],
 });
 
-const opsiArea = (s: number, mode: string) => {
+const opsiArea = (s: number, d: NilaiAnalitikDeret & { satuan?: string; dariDokumen: boolean }) => {
   const dasar = gayaDasar(s);
-  const d = AREA_DATA[mode] ?? AREA_DATA.Harian;
-  const maks = Math.ceil(Math.max(...d.nilai) / 10000) * 10000;
+  const puncak = Math.max(...d.nilai);
+  const maks = d.dariDokumen ? maksRapi(puncak * 1.08) : Math.ceil(puncak / 10000) * 10000;
+  const format = (v: number) => teksNilai(v, d.satuan);
   return {
     animationDuration: 700,
     animationEasing: 'cubicOut' as const,
@@ -274,9 +325,9 @@ const opsiArea = (s: number, mode: string) => {
       trigger: 'axis',
       axisPointer: { type: 'line', lineStyle: { color: 'rgba(96,165,250,0.5)', type: 'dashed', width: 1 } },
       formatter: (p: any[]) =>
-        `<div style="font-size:${10 * s}px;color:${WARNA.teks3};margin-bottom:${2 * s}px">${p[0]?.name} 2024</div>` +
+        `<div style="font-size:${10 * s}px;color:${WARNA.teks3};margin-bottom:${2 * s}px">${p[0]?.name}${d.dariDokumen ? '' : ' 2024'}</div>` +
         `<div style="display:flex;align-items:center;gap:${6 * s}px"><span style="width:${8 * s}px;height:${8 * s}px;border-radius:50%;background:${WARNA.biru};display:inline-block"></span>` +
-        `<b style="font-size:${12 * s}px">Rp ${Number(p[0]?.value ?? 0).toLocaleString('id-ID')}</b></div>`,
+        `<b style="font-size:${12 * s}px">${format(Number(p[0]?.value ?? 0))}</b></div>`,
     },
     xAxis: {
       type: 'category',
@@ -290,7 +341,11 @@ const opsiArea = (s: number, mode: string) => {
       max: maks,
       splitNumber: 4,
       splitLine: dasar.garisBantu,
-      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, formatter: (v: number) => `${v / 1000} rb` },
+      axisLabel: {
+        color: WARNA.teks3,
+        fontSize: 9 * s,
+        formatter: d.dariDokumen ? (v: number) => ringkas(v) : (v: number) => `${v / 1000} rb`,
+      },
     },
     series: [
       {
@@ -331,7 +386,7 @@ const opsiArea = (s: number, mode: string) => {
             backgroundColor: 'rgba(18,26,38,0.9)',
             borderRadius: 4 * s,
             padding: [2 * s, 5 * s],
-            formatter: (p: any) => `Rp ${Number(p.value).toLocaleString('id-ID')}`,
+            formatter: (p: any) => format(Number(p.value)),
           },
           data: [{ type: 'max', name: 'Tertinggi' }],
         },
@@ -340,9 +395,9 @@ const opsiArea = (s: number, mode: string) => {
   };
 };
 
-const opsiBatang = (s: number, mode: string) => {
+const opsiBatang = (s: number, nilai: Array<number | null>, dariDokumen: boolean) => {
   const dasar = gayaDasar(s);
-  const nilai = BATANG_DATA[mode] ?? BATANG_DATA['Bulan Ini'];
+  const puncak = Math.max(...nilai.map((v) => v ?? 0), 0);
   return {
     animationDuration: 700,
     animationEasing: 'cubicOut' as const,
@@ -364,10 +419,16 @@ const opsiBatang = (s: number, mode: string) => {
     },
     yAxis: {
       type: 'value',
-      max: 1000,
-      interval: 250,
+      max: dariDokumen ? maksRapi(puncak * 1.1) : 1000,
+      ...(dariDokumen ? {} : { interval: 250 }),
       splitLine: dasar.garisBantu,
-      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, formatter: (v: number) => (v === 0 ? '0' : `${v / 1000}K`) },
+      axisLabel: {
+        color: WARNA.teks3,
+        fontSize: 9 * s,
+        formatter: dariDokumen
+          ? (v: number) => ringkas(v)
+          : (v: number) => (v === 0 ? '0' : `${v / 1000}K`),
+      },
     },
     series: [
       {
@@ -399,8 +460,7 @@ const opsiBatang = (s: number, mode: string) => {
   };
 };
 
-const opsiDonat = (s: number, mode: string) => {
-  const d = DONAT_DATA[mode] ?? DONAT_DATA['Bulan Ini'];
+const opsiDonat = (s: number, data: { nama: string; nilai: number }[]) => {
   return {
     animationDuration: 800,
     animationEasing: 'cubicOut' as const,
@@ -429,7 +489,7 @@ const opsiDonat = (s: number, mode: string) => {
           shadowBlur: 8 * s,
         },
         emphasis: { scale: true, scaleSize: 6 * s, itemStyle: { shadowBlur: 18 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
-        data: d.nilai.map((v, i) => ({ name: SUMBER_NAMA[i], value: v, itemStyle: { color: WARNA_SUMBER[i] } })),
+        data: data.map((d, i) => ({ name: d.nama, value: d.nilai, itemStyle: { color: WARNA_SUMBER[i % WARNA_SUMBER.length] } })),
       },
     ],
   };
@@ -448,11 +508,18 @@ const gradasiBatangArah = (warna: string, s: number) => ({
 });
 
 /** Nilai pesanan per kategori (batang mendatar). */
-const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
+const opsiKategori = (
+  s: number,
+  data: { nama: string; nilai: number; warna?: string }[],
+  mode: 'Nilai' | 'Unit',
+  dariDokumen: boolean,
+) => {
   const dasar = gayaDasar(s);
-  const data = mode === 'Nilai' ? KATEGORI_NILAI : KATEGORI_UNIT;
   const urut = [...data].reverse();
-  const maks = Math.max(...data.map((d) => d.nilai));
+  const maks = Math.max(...data.map((d) => d.nilai), 1);
+  const satuan = dariDokumen ? undefined : mode === 'Nilai' ? 'Rp' : 'pesanan';
+  const labelNilai = (v: number) =>
+    dariDokumen ? ringkas(v) : mode === 'Nilai' ? `${(v / 1000).toFixed(1).replace('.', ',')} rb` : `${v}`;
   return {
     animationDuration: 750,
     animationEasing: 'cubicOut' as const,
@@ -460,8 +527,7 @@ const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
     tooltip: {
       ...dasar,
       trigger: 'item',
-      formatter: (p: any) =>
-        `${p.marker} ${p.name}<br/><b>${mode === 'Nilai' ? `Rp ${Number(p.value).toLocaleString('id-ID')}` : `${p.value} pesanan`}</b>`,
+      formatter: (p: any) => `${p.marker} ${p.name}<br/><b>${teksNilai(Number(p.value), satuan)}</b>`,
     },
     xAxis: { type: 'value', max: maks, show: false },
     yAxis: {
@@ -475,7 +541,13 @@ const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
       {
         type: 'bar',
         barWidth: '54%',
-        data: urut.map((d) => ({ value: d.nilai, itemStyle: { color: gradasiBatangArah(d.warna, s), borderRadius: [0, 4 * s, 4 * s, 0] } })),
+        data: urut.map((d, i) => ({
+          value: d.nilai,
+          itemStyle: {
+            color: gradasiBatangArah(d.warna ?? WARNA_KATEGORI[(urut.length - 1 - i) % WARNA_KATEGORI.length], s),
+            borderRadius: [0, 4 * s, 4 * s, 0],
+          },
+        })),
         showBackground: true,
         backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
         label: {
@@ -485,8 +557,7 @@ const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
           color: WARNA.teks2,
           fontSize: 9 * s,
           fontWeight: 'bold',
-          formatter: (p: any) =>
-            mode === 'Nilai' ? `${(Number(p.value) / 1000).toFixed(1).replace('.', ',')} rb` : `${p.value}`,
+          formatter: (p: any) => labelNilai(Number(p.value)),
         },
         emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.25)' } },
       },
@@ -494,11 +565,10 @@ const opsiKategori = (s: number, mode: 'Nilai' | 'Unit') => {
   };
 };
 
-/** Pesanan per jam (batang 24 jam). */
-const opsiJam = (s: number, mode: string) => {
+/** Pesanan per jam (batang). */
+const opsiJam = (s: number, d: NilaiAnalitikDeret, dariDokumen: boolean) => {
   const dasar = gayaDasar(s);
-  const nilai = JAM_PESANAN[mode] ?? JAM_PESANAN['Hari ini'];
-  const puncak = Math.max(...nilai);
+  const puncak = Math.max(...d.nilai);
   return {
     animationDuration: 750,
     animationEasing: 'cubicOut' as const,
@@ -511,17 +581,17 @@ const opsiJam = (s: number, mode: string) => {
     },
     xAxis: {
       type: 'category',
-      data: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}`),
+      data: d.label,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, interval: 3 },
+      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, interval: dariDokumen ? 'auto' : 3 },
     },
-    yAxis: { type: 'value', show: false, max: Math.ceil(puncak / 20) * 20 },
+    yAxis: { type: 'value', show: false, max: dariDokumen ? maksRapi(puncak) : Math.ceil(puncak / 20) * 20 },
     series: [
       {
         type: 'bar',
         barWidth: '62%',
-        data: nilai.map((v) => ({
+        data: d.nilai.map((v) => ({
           value: v,
           itemStyle: {
             color:
@@ -538,14 +608,13 @@ const opsiJam = (s: number, mode: string) => {
   };
 };
 
-/** Metode pembayaran (cincin). */
 /** Metode pembayaran (batang mendatar berperingkat — bukan pie). */
-const opsiBayar = (s: number, mode: string) => {
+const opsiBayar = (s: number, data: { nama: string; nilai: number; warna?: string }[], dariDokumen: boolean) => {
   const dasar = gayaDasar(s);
-  const data = PEMBAYARAN[mode] ?? PEMBAYARAN['Bulan Ini'];
-  const total = data.reduce((a, b) => a + b.nilai, 0);
+  const total = data.reduce((a, b) => a + b.nilai, 0) || 1;
   const urut = [...data].reverse();
-  const maks = Math.max(...data.map((d) => d.nilai));
+  const maks = Math.max(...data.map((d) => d.nilai), 1);
+  const angka = (v: number) => (dariDokumen ? ringkas(v) : String(v));
   return {
     animationDuration: 750,
     animationEasing: 'cubicOut' as const,
@@ -554,7 +623,7 @@ const opsiBayar = (s: number, mode: string) => {
       ...dasar,
       trigger: 'item',
       formatter: (p: any) =>
-        `${p.marker} ${p.name}<br/><b>${p.value} pesanan</b> · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
+        `${p.marker} ${p.name}<br/><b>${angka(Number(p.value))} pesanan</b> · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
     },
     xAxis: { type: 'value', max: maks, show: false },
     yAxis: {
@@ -568,9 +637,12 @@ const opsiBayar = (s: number, mode: string) => {
       {
         type: 'bar',
         barWidth: '54%',
-        data: urut.map((d) => ({
+        data: urut.map((d, i) => ({
           value: d.nilai,
-          itemStyle: { color: gradasiBatangArah(d.warna, s), borderRadius: [0, 4 * s, 4 * s, 0] },
+          itemStyle: {
+            color: gradasiBatangArah(d.warna ?? WARNA_BAYAR[(urut.length - 1 - i) % WARNA_BAYAR.length], s),
+            borderRadius: [0, 4 * s, 4 * s, 0],
+          },
         })),
         showBackground: true,
         backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
@@ -582,7 +654,7 @@ const opsiBayar = (s: number, mode: string) => {
           fontSize: 8.8 * s,
           fontWeight: 'bold',
           formatter: (p: any) =>
-            `${p.value} · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
+            `${angka(Number(p.value))} · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
         },
         emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.25)' } },
       },
@@ -591,10 +663,12 @@ const opsiBayar = (s: number, mode: string) => {
 };
 
 /** Tren konversi (garis + area). */
-const opsiKonversi = (s: number, mode: string) => {
+const opsiKonversi = (s: number, d: NilaiAnalitikDeret & { dariDokumen: boolean }) => {
   const dasar = gayaDasar(s);
-  const d = KONVERSI[mode] ?? KONVERSI.Harian;
   const rata = d.nilai.reduce((a, b) => a + b, 0) / d.nilai.length;
+  // Dokumen bisa memuat konversi di skala apa pun — sumbu mengikuti angkanya.
+  const minY = d.dariDokumen ? Math.max(0, Math.floor(Math.min(...d.nilai) * 10) / 10 - 0.2) : 2;
+  const maxY = d.dariDokumen ? Math.ceil(Math.max(...d.nilai) * 10) / 10 + 0.2 : 4.4;
   return {
     animationDuration: 750,
     animationEasing: 'cubicOut' as const,
@@ -622,8 +696,8 @@ const opsiKonversi = (s: number, mode: string) => {
     },
     yAxis: {
       type: 'value',
-      min: 2,
-      max: 4.4,
+      min: minY,
+      max: maxY,
       splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)', type: 'dashed' } },
       axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, formatter: (v: number) => `${String(v).replace('.', ',')}%` },
     },
@@ -668,11 +742,17 @@ const opsiKonversi = (s: number, mode: string) => {
 };
 
 interface DashboardAnalitikProps {
+  /**
+   * Angka dari dokumen instansi. Bila diisi, ANGKA pada kartu diganti angka
+   * dokumen — susunan, geometri, dan warna kartu tetap persis seperti contoh.
+   * Slot yang tidak ada di dokumen dibiarkan kosong (tanpa angka contoh).
+   */
+  nilai?: NilaiAnalitik;
   /** true = isi seluruh tinggi wadah (mode presentasi / layar penuh). */
   penuh?: boolean;
 }
 
-export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = false }) => {
+export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = false, nilai }) => {
   const [skala, setSkala] = useState(1);
 
   // ---- state interaksi (semua tombol mengubah tampilan/data) ----
@@ -697,6 +777,92 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
   const bayarRef = useRef<HTMLDivElement | null>(null);
   const konversiRef = useRef<HTMLDivElement | null>(null);
   const instans = useRef<Record<string, any>>({});
+
+  /**
+   * ── Sumber angka tiap slot ────────────────────────────────────────────────
+   * Tanpa prop `nilai`: kartu memakai angka contoh (tampilan galeri).
+   * Dengan `nilai`: HANYA angka dokumen yang dipakai. Slot yang dokumennya tidak
+   * memuat angka menjadi `null` → kartu tetap dirender dengan geometri yang sama,
+   * tetapi isinya kosong (tidak ada angka contoh yang menyelinap).
+   */
+  const pakaiData = !!nilai;
+
+  // 4 kartu KPI: jumlah kartu selalu 4 supaya barisnya sama tinggi dengan contoh.
+  const KPI: Kpi[] = pakaiData
+    ? KPI_CONTOH.map((contoh, i) => {
+        const d = nilai?.kpi?.[i];
+        if (!d) return { ...contoh, nilai: '', delta: '', deltaTeks: '', seri: [], kosong: true };
+        return {
+          ...contoh,
+          label: d.label || contoh.label,
+          nilai: d.nilai,
+          delta: d.delta,
+          deltaTeks: d.deltaTeks,
+          naik: d.naik,
+          seri: d.seri,
+        };
+      })
+    : KPI_CONTOH;
+
+  // Grafik area "Ikhtisar Pendapatan".
+  const dataArea: NilaiAnalitikDeret | null = pakaiData ? nilai?.pendapatan ?? null : AREA_DATA[modeArea];
+  const satuanArea = pakaiData ? nilai?.pendapatanSatuan : 'Rp';
+  const totalArea = dataArea ? dataArea.nilai.reduce((a, b) => a + b, 0) : null;
+  const teksTotalArea = totalArea == null ? '—' : teksNilai(totalArea, satuanArea);
+  const rentangArea = dataArea
+    ? (pakaiData ? nilai?.pendapatanRentang : undefined) ??
+      `${dataArea.label[0] ?? ''} – ${dataArea.label[dataArea.label.length - 1] ?? ''}`
+    : 'belum ada di dokumen';
+  // Pertumbuhan dihitung dari dua titik terakhir deret dokumen (bukan angka tetap).
+  const tumbuhArea = pakaiData
+    ? (() => {
+        const seri = dataArea?.nilai ?? [];
+        if (seri.length < 2) return null;
+        const awal = seri[seri.length - 2];
+        if (!awal) return null;
+        return Math.round(((seri[seri.length - 1] - awal) / Math.abs(awal)) * 1000) / 10;
+      })()
+    : 18.2;
+
+  const dataBatang: Array<number | null> | null = pakaiData ? nilai?.status ?? null : BATANG_DATA[modeBatang];
+
+  const sumberContoh = DONAT_DATA[modeDonat];
+  const dataSumber: { nama: string; nilai: number }[] | null = pakaiData
+    ? nilai?.sumber ?? null
+    : SUMBER_NAMA.map((nama, i) => ({ nama, nilai: sumberContoh.nilai[i] }));
+  const totalSumber = pakaiData ? nilai?.sumberTotal ?? '—' : sumberContoh.total;
+
+  const dataKategori: { nama: string; nilai: number; warna?: string }[] | null = pakaiData
+    ? nilai?.kategori ?? null
+    : modeKategori === 'Nilai'
+      ? KATEGORI_NILAI
+      : KATEGORI_UNIT;
+
+  const dataJam: NilaiAnalitikDeret | null = pakaiData
+    ? nilai?.jam ?? null
+    : {
+        label: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}`),
+        nilai: JAM_PESANAN[modeJam],
+      };
+
+  const dataBayar: { nama: string; nilai: number; warna?: string }[] | null = pakaiData
+    ? nilai?.bayar ?? null
+    : PEMBAYARAN[modeBayar];
+  const totalBayar = dataBayar ? dataBayar.reduce((a, b) => a + b.nilai, 0) : null;
+
+  const dataKonversi: NilaiAnalitikDeret | null = pakaiData ? nilai?.konversi ?? null : KONVERSI[modeKonversi];
+
+  // Tabel pesanan: baris dokumen bila ada; tanpa baris → badan tabel kosong.
+  const pesananTampil = pakaiData ? nilai?.pesanan ?? [] : semuaPesanan ? pesanan : pesanan.slice(0, 5);
+  const barisPesanan = pesananTampil.map((p) => ({
+    id: p.id,
+    nama: p.nama,
+    inisial: p.inisial,
+    tanggal: p.tanggal,
+    jumlah: p.jumlah,
+    status: p.status,
+    warna: (p as { warna?: string }).warna ?? WARNA_STATUS[String(p.status).toLowerCase()] ?? WARNA.biruMuda,
+  }));
 
   // Ukur wadah → tentukan skala huruf.
   useEffect(() => {
@@ -735,13 +901,33 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
         return c;
       };
 
-      ambil('area', areaRef.current)?.setOption(opsiArea(skala, modeArea), true);
-      ambil('batang', batangRef.current)?.setOption(opsiBatang(skala, modeBatang), true);
-      ambil('donat', donatRef.current)?.setOption(opsiDonat(skala, modeDonat), true);
-      ambil('kategori', kategoriRef.current)?.setOption(opsiKategori(skala, modeKategori), true);
-      ambil('jam', jamRef.current)?.setOption(opsiJam(skala, modeJam), true);
-      ambil('bayar', bayarRef.current)?.setOption(opsiBayar(skala, modeBayar), true);
-      ambil('konversi', konversiRef.current)?.setOption(opsiKonversi(skala, modeKonversi), true);
+      /** Pasang opsi, atau kosongkan grafiknya bila dokumen tidak punya angkanya. */
+      const pasang = (kunci: string, el: HTMLDivElement | null, opsi: any | null) => {
+        const c = ambil(kunci, el);
+        if (!c) return;
+        if (opsi) c.setOption(opsi, true);
+        else c.clear();
+      };
+
+      pasang(
+        'area',
+        areaRef.current,
+        dataArea ? opsiArea(skala, { ...dataArea, satuan: satuanArea, dariDokumen: pakaiData }) : null,
+      );
+      pasang('batang', batangRef.current, dataBatang ? opsiBatang(skala, dataBatang, pakaiData) : null);
+      pasang('donat', donatRef.current, dataSumber ? opsiDonat(skala, dataSumber) : null);
+      pasang(
+        'kategori',
+        kategoriRef.current,
+        dataKategori ? opsiKategori(skala, dataKategori, modeKategori, pakaiData) : null,
+      );
+      pasang('jam', jamRef.current, dataJam ? opsiJam(skala, dataJam, pakaiData) : null);
+      pasang('bayar', bayarRef.current, dataBayar ? opsiBayar(skala, dataBayar, pakaiData) : null);
+      pasang(
+        'konversi',
+        konversiRef.current,
+        dataKonversi ? opsiKonversi(skala, { ...dataKonversi, dariDokumen: pakaiData }) : null,
+      );
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
@@ -755,7 +941,9 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
       batal = true;
       pengamat?.disconnect();
     };
-  }, [skala, modeArea, modeBatang, modeDonat, modeKategori, modeJam, modeBayar, modeKonversi]);
+    // `nilai` WAJIB jadi dependensi: angka dokumen datang belakangan (async),
+    // tanpa ini grafik tetap memakai angka contoh walau kartunya sudah berganti.
+  }, [skala, nilai, pakaiData, modeArea, modeBatang, modeDonat, modeKategori, modeJam, modeBayar, modeKonversi]);
 
   useEffect(
     () => () => {
@@ -854,11 +1042,12 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
   /** Daftar yang bisa digulir di dalam kartu saat "Lihat semua" dibuka. */
   const daftar = penuh ? 'flex-1 min-h-0 overflow-y-auto gulir-tema pr-[0.2em]' : '';
 
-  const dataArea = AREA_DATA[modeArea];
-  const dataDonat = DONAT_DATA[modeDonat];
-  const pesananTampil = semuaPesanan ? pesanan : pesanan.slice(0, 5);
-  const dataBayar = PEMBAYARAN[modeBayar] ?? PEMBAYARAN['Bulan Ini'];
-  const totalBayar = dataBayar.reduce((a, b) => a + b.nilai, 0);
+  /**
+   * Chip pembanding (Harian/Bulan Lalu/Nilai…) hanya bermakna untuk tampilan
+   * contoh. Dokumen hanya memuat satu potret, jadi saat memakai angka dokumen
+   * chip disembunyikan — bukan dibiarkan menampilkan mode yang isinya kosong.
+   */
+  const chip = (elemen: React.ReactNode) => (pakaiData ? undefined : elemen);
 
   return (
     <div
@@ -873,7 +1062,13 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
       {/* ===== Baris 1: 4 kartu KPI ===== */}
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.7em] ${penuh ? 'baris-062' : ''}`}>
         {KPI.map((k) => {
-          const jalur = jalurSpark(k.seri);
+          // Tanpa deret dokumen, sparkline digambar DATAR abu-abu: tidak ada
+          // dasar untuk menggambar tren naik/turun (bukan angka karangan).
+          const datar = k.seri.length < 2;
+          const jalur = datar
+            ? { garis: 'M0,62 L100,62', area: 'M0,62 L100,62 L100,100 L0,100 Z' }
+            : jalurSpark(k.seri);
+          const warnaGaris = datar ? WARNA.teks3 : k.warna;
           const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
           return (
             <div key={k.label} className={kartu('gap-[0.35em]')} style={gayaKartu}>
@@ -889,13 +1084,30 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
                 </span>
               </div>
 
-              <span className="text-[1.5em] font-bold leading-none tabular-nums tracking-tight">{k.nilai}</span>
+              <span
+                className="text-[1.5em] font-bold leading-none tabular-nums tracking-tight"
+                style={k.kosong ? { color: WARNA.teks3 } : undefined}
+              >
+                {k.kosong ? '—' : k.nilai}
+              </span>
 
               <div className="flex items-center gap-[0.35em] text-[0.72em] font-semibold">
-                <span style={{ color: WARNA.hijau }}>{k.delta}</span>
-                <span className="font-normal truncate" style={{ color: WARNA.teks3 }}>
-                  {k.deltaTeks}
-                </span>
+                {k.kosong ? (
+                  <span className="font-normal" style={{ color: WARNA.teks3 }}>
+                    belum ada di dokumen
+                  </span>
+                ) : k.delta ? (
+                  <>
+                    <span style={{ color: k.naik === false ? WARNA.merah : WARNA.hijau }}>{k.delta}</span>
+                    <span className="font-normal truncate" style={{ color: WARNA.teks3 }}>
+                      {k.deltaTeks}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-normal" style={{ color: WARNA.teks3 }}>
+                    tanpa pembanding di dokumen
+                  </span>
+                )}
               </div>
 
               <svg
@@ -905,12 +1117,12 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               >
                 <defs>
                   <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={k.warna} stopOpacity="0.38" />
-                    <stop offset="100%" stopColor={k.warna} stopOpacity="0" />
+                    <stop offset="0%" stopColor={warnaGaris} stopOpacity={datar ? '0.18' : '0.38'} />
+                    <stop offset="100%" stopColor={warnaGaris} stopOpacity="0" />
                   </linearGradient>
                 </defs>
                 <path d={jalur.area} fill={`url(#${idGrad})`} />
-                <path d={jalur.garis} fill="none" stroke={k.warna} strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                <path d={jalur.garis} fill="none" stroke={warnaGaris} strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
               </svg>
             </div>
           );
@@ -921,54 +1133,89 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
       <div className={`grid grid-cols-1 lg:grid-cols-[2.05fr_1fr_1.05fr] gap-[0.7em] ${penuh ? 'baris-118' : ''}`}>
         {/* Ikhtisar Pendapatan */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Ikhtisar Pendapatan" aksi={<Pilih nilai={modeArea} opsi={['Harian', 'Mingguan']} onPilih={(v) => setModeArea(v as 'Harian' | 'Mingguan')} />} />
+          <Kepala
+            judul="Ikhtisar Pendapatan"
+            aksi={chip(<Pilih nilai={modeArea} opsi={['Harian', 'Mingguan']} onPilih={(v) => setModeArea(v as 'Harian' | 'Mingguan')} />)}
+          />
           <div className="flex items-end justify-between gap-[0.6em] shrink-0">
-            <div>
-              <div className="text-[1.15em] font-bold leading-none tabular-nums">{dataArea.total}</div>
-              <div className="text-[0.68em] mt-[0.25em]" style={{ color: WARNA.teks3 }}>
-                {dataArea.judul}
+            <div className="min-w-0">
+              <div className="text-[1.15em] font-bold leading-none tabular-nums truncate">{teksTotalArea}</div>
+              <div className="text-[0.68em] mt-[0.25em] truncate" style={{ color: WARNA.teks3 }}>
+                {rentangArea}
               </div>
             </div>
-            <span className="text-[0.7em] font-semibold" style={{ color: WARNA.hijau }}>
-              +18,2% vs periode lalu
-            </span>
+            {tumbuhArea != null && (
+              <span
+                className="text-[0.7em] font-semibold shrink-0"
+                style={{ color: tumbuhArea >= 0 ? WARNA.hijau : WARNA.merah }}
+              >
+                {tumbuhArea >= 0 ? '+' : ''}
+                {String(tumbuhArea).replace('.', ',')}% vs periode lalu
+              </span>
+            )}
           </div>
-          <div ref={areaRef} className={bidang('h-[10.5em]')} />
+          <div className={`relative ${bidang('h-[10.5em]')}`}>
+            <div ref={areaRef} className="absolute inset-0" />
+            {!dataArea && <Kosong />}
+          </div>
         </div>
 
         {/* Pesanan per Status */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Pesanan per Status" aksi={<Pilih nilai={modeBatang} opsi={['Bulan Ini', 'Bulan Lalu']} onPilih={(v) => setModeBatang(v as 'Bulan Ini' | 'Bulan Lalu')} />} />
-          <div ref={batangRef} className={bidang('h-[10.5em]')} />
+          <Kepala
+            judul="Pesanan per Status"
+            aksi={chip(
+              <Pilih nilai={modeBatang} opsi={['Bulan Ini', 'Bulan Lalu']} onPilih={(v) => setModeBatang(v as 'Bulan Ini' | 'Bulan Lalu')} />,
+            )}
+          />
+          <div className={`relative ${bidang('h-[10.5em]')}`}>
+            <div ref={batangRef} className="absolute inset-0" />
+            {!dataBatang && <Kosong />}
+          </div>
         </div>
 
         {/* Sumber Kunjungan */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Sumber Kunjungan" aksi={<Pilih nilai={modeDonat} opsi={['Bulan Ini', 'Bulan Lalu']} onPilih={(v) => setModeDonat(v as 'Bulan Ini' | 'Bulan Lalu')} />} />
-          <div className="flex-1 min-h-0 grid grid-cols-[minmax(5.2em,1fr)_minmax(6.2em,1.05fr)] gap-[0.5em] items-center">
-            <div className="relative w-full h-full min-h-[6.5em]">
-              <div ref={donatRef} className="absolute inset-0" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[1.02em] font-bold leading-none tabular-nums">{dataDonat.total}</span>
-                <span className="text-[0.6em] mt-[0.2em]" style={{ color: WARNA.teks3 }}>
-                  Total Kunjungan
-                </span>
+          <Kepala
+            judul={pakaiData ? nilai?.sumberJudul || 'Komposisi' : 'Sumber Kunjungan'}
+            aksi={chip(
+              <Pilih nilai={modeDonat} opsi={['Bulan Ini', 'Bulan Lalu']} onPilih={(v) => setModeDonat(v as 'Bulan Ini' | 'Bulan Lalu')} />,
+            )}
+          />
+          {dataSumber ? (
+            <div className="flex-1 min-h-0 grid grid-cols-[minmax(5.2em,1fr)_minmax(6.2em,1.05fr)] gap-[0.5em] items-center">
+              <div className="relative w-full h-full min-h-[6.5em]">
+                <div ref={donatRef} className="absolute inset-0" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[1.02em] font-bold leading-none tabular-nums">{totalSumber}</span>
+                  <span className="text-[0.6em] mt-[0.2em]" style={{ color: WARNA.teks3 }}>
+                    {pakaiData ? nilai?.sumberLabelTotal || 'Total' : 'Total Kunjungan'}
+                  </span>
+                </div>
               </div>
+              <ul className="flex flex-col gap-[0.32em] min-w-0">
+                {dataSumber.map((d, i) => (
+                  <li key={`${d.nama}-${i}`} className="flex items-center gap-[0.35em] text-[0.68em] min-w-0">
+                    <span
+                      className="w-[0.55em] h-[0.55em] rounded-full shrink-0"
+                      style={{ backgroundColor: WARNA_SUMBER[i % WARNA_SUMBER.length] }}
+                    />
+                    <span className="truncate" style={{ color: WARNA.teks2 }}>
+                      {d.nama}
+                    </span>
+                    <span className="ml-auto tabular-nums font-semibold shrink-0" style={{ color: WARNA.teks }}>
+                      {String(d.nilai).replace('.', ',')}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="flex flex-col gap-[0.32em] min-w-0">
-              {SUMBER_NAMA.map((nama, i) => (
-                <li key={nama} className="flex items-center gap-[0.35em] text-[0.68em] min-w-0">
-                  <span className="w-[0.55em] h-[0.55em] rounded-full shrink-0" style={{ backgroundColor: WARNA_SUMBER[i] }} />
-                  <span className="truncate" style={{ color: WARNA.teks2 }}>
-                    {nama}
-                  </span>
-                  <span className="ml-auto tabular-nums font-semibold shrink-0" style={{ color: WARNA.teks }}>
-                    {String(dataDonat.nilai[i]).replace('.', ',')}%
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          ) : (
+            <div className="relative flex-1 min-h-[6.5em]">
+              <div ref={donatRef} className="absolute inset-0" />
+              <Kosong />
+            </div>
+          )}
         </div>
       </div>
 
@@ -993,6 +1240,11 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               <span />
             </div>
             <div className={`flex-1 min-h-0 flex flex-col ${daftar}`}>
+              {pesananTampil.length === 0 && (
+                <p className="text-[0.68em] py-[0.6em]" style={{ color: WARNA.teks3 }}>
+                  Belum ada daftar pesanan di dokumen instansi.
+                </p>
+              )}
               {pesananTampil.map((p, i) => (
                 <div
                   key={`${p.id}-${i}`}
@@ -1074,7 +1326,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
         <div className="flex flex-col gap-[0.7em] min-h-0">
           <div className={`${kartu()} ${penuh ? 'baris-100' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Nilai Pesanan per Kategori"
+              judul={pakaiData ? nilai?.kategoriJudul || 'Nilai Pesanan per Kategori' : 'Nilai Pesanan per Kategori'}
               aksi={
                 <Pilih
                   nilai={modeKategori}
@@ -1084,11 +1336,12 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               }
             />
             <div ref={kategoriRef} className={bidang('h-[9.6em]')} />
+            {!dataKategori && <Kosong />}
           </div>
 
           <div className={`${kartu()} ${penuh ? 'baris-130' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Pesanan per Jam"
+              judul={pakaiData ? nilai?.jamJudul || 'Pesanan per Jam' : 'Pesanan per Jam'}
               aksi={
                 <Pilih
                   nilai={modeJam}
@@ -1098,6 +1351,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               }
             />
             <div ref={jamRef} className={bidang('h-[8.6em]')} />
+            {!dataJam && <Kosong />}
           </div>
         </div>
 
@@ -1105,7 +1359,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
         <div className="flex flex-col gap-[0.7em] min-h-0">
           <div className={`${kartu()} ${penuh ? 'baris-115' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Metode Pembayaran"
+              judul={pakaiData ? nilai?.bayarJudul || 'Komposisi' : 'Metode Pembayaran'}
               aksi={
                 <Pilih
                   nilai={modeBayar}
@@ -1115,17 +1369,20 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               }
             />
             <div className="flex items-baseline gap-[0.3em] shrink-0 mb-[0.3em]">
-              <span className="text-[1.1em] font-bold leading-none tabular-nums">{totalBayar.toLocaleString('id-ID')}</span>
+              <span className="text-[1.1em] font-bold leading-none tabular-nums">
+                {pakaiData ? nilai?.bayarTotal || '—' : (totalBayar ?? 0).toLocaleString('id-ID')}
+              </span>
               <span className="text-[0.62em]" style={{ color: WARNA.teks3 }}>
-                pesanan · {dataBayar.length} metode
+                {pakaiData ? nilai?.bayarLabel || 'komposisi' : `pesanan · ${dataBayar?.length ?? 0} metode`}
               </span>
             </div>
             <div ref={bayarRef} className={bidang('h-[9.4em]')} />
+            {!dataBayar && <Kosong />}
           </div>
 
           <div className={`${kartu()} ${penuh ? 'baris-100' : ''}`} style={gayaKartu}>
             <Kepala
-              judul="Tren Konversi"
+              judul={pakaiData ? nilai?.konversiJudul || 'Tren Konversi' : 'Tren Konversi'}
               aksi={
                 <Pilih
                   nilai={modeKonversi}
@@ -1135,6 +1392,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
               }
             />
             <div ref={konversiRef} className={bidang('h-[8.6em]')} />
+            {!dataKonversi && <Kosong />}
           </div>
         </div>
       </div>

@@ -23,7 +23,11 @@ import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
-import { nilaiDariWidgets } from '../services/templates/nilaiTemplate';
+import {
+  nilaiAnalitikDariWidgets,
+  nilaiDariWidgets,
+  nilaiTrafikDariWidgets,
+} from '../services/templates/nilaiTemplate';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 
 interface DashboardTemplatesPageProps {
@@ -190,6 +194,19 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * susunan kartu tidak mungkin melenceng — hanya angkanya yang berganti.
    */
   const nilaiAsli = useMemo(() => nilaiDariWidgets(asli?.widgets), [asli]);
+
+  /**
+   * Angka dokumen untuk template T3 (trafik). T3 punya kartu yang tidak ada di
+   * T1, jadi dipetakan sendiri — tetap ke slot yang sama seperti tampilan
+   * contoh, hanya angkanya yang berganti.
+   */
+  const nilaiTrafikAsli = useMemo(() => nilaiTrafikDariWidgets(asli?.widgets), [asli]);
+
+  /**
+   * Angka dokumen untuk template T2 (analitik). Kartunya berbeda dengan T1,
+   * jadi dipetakan sendiri ke slot yang sama seperti tampilan contoh.
+   */
+  const nilaiAnalitikAsli = useMemo(() => nilaiAnalitikDariWidgets(asli?.widgets), [asli]);
 
   /**
    * Dashboard BAYANGAN untuk mode presentasi pratinjau.
@@ -552,6 +569,10 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             {asli ? (
               aktif.id === 'tpl-ringkasan' ? (
                 <DashboardReferensi nilai={nilaiAsli} />
+              ) : aktif.id === 'tpl-analitik' ? (
+                <DashboardAnalitik nilai={nilaiAnalitikAsli} />
+              ) : aktif.id === 'tpl-trafik' ? (
+                <DashboardTrafik nilai={nilaiTrafikAsli} />
               ) : (
                 <DashboardCanvas
                   widgets={asli.widgets}

@@ -286,3 +286,511 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
 
   return hasil;
 }
+
+// ============================================================================
+// T2 — ANALITIK BISNIS HARIAN (DashboardAnalitik)
+// ============================================================================
+/**
+ * Jembatan DATA → TAMPILAN untuk template T2.
+ *
+ * T2 punya kartu yang tidak ada di T1 (pesanan per status, kategori, per jam,
+ * metode pembayaran, tren konversi), jadi `nilaiDariWidgets` tidak cukup: ia
+ * hanya mengambil grafik PERTAMA. Di sini setiap slot T2 dicocokkan dengan
+ * kartunya sendiri lewat JUDUL (judul selalu dipertahankan dari template oleh
+ * `isiTemplateDariRag`), sehingga angka tiap kartu berasal dari kartunya.
+ *
+ * Aturan yang sama seperti T1: kartu yang ditandai `dataKosong` TIDAK
+ * menyumbang angka apa pun — slotnya dibiarkan kosong oleh komponen, bukan
+ * diisi angka contoh.
+ */
+
+export interface NilaiAnalitikKpi {
+  label: string;
+  nilai: string;
+  satuan?: string;
+  /** '+12,5%' siap tampil; string kosong = dokumen tidak menyebut perubahan. */
+  delta: string;
+  deltaTeks: string;
+  naik: boolean;
+  seri: number[];
+}
+
+export interface NilaiAnalitikDeret {
+  label: string[];
+  nilai: number[];
+}
+
+export interface NilaiAnalitikBagian {
+  nama: string;
+  nilai: number;
+}
+
+export interface NilaiAnalitikBaris {
+  id: string;
+  nama: string;
+  inisial: string;
+  tanggal: string;
+  jumlah: string;
+  status: string;
+  warna?: string;
+}
+
+export interface NilaiAnalitik {
+  kpi?: NilaiAnalitikKpi[];
+  /** Grafik area "Ikhtisar Pendapatan" (deret pendapatan dari dokumen). */
+  pendapatan?: NilaiAnalitikDeret;
+  pendapatanSatuan?: string;
+  /** Rentang periode apa adanya dari label dokumen (mis. "Jan – Des"). */
+  pendapatanRentang?: string;
+  /** Batang pesanan per status, urut seperti kartu: selesai…dikembalikan. */
+  status?: Array<number | null>;
+  /** Cincin sumber kunjungan (persen, dihitung dari angka dokumen). */
+  sumber?: NilaiAnalitikBagian[];
+  sumberTotal?: string;
+  /** Judul kartu cincin mengikuti isi dokumen (mis. "Komposisi Air"). */
+  sumberJudul?: string;
+  kategoriJudul?: string;
+  jamJudul?: string;
+  konversiJudul?: string;
+  statusJudul?: string;
+  pendapatanJudul?: string;
+  /** Label kecil di bawah total cincin (template: "Total Kunjungan"). */
+  sumberLabelTotal?: string;
+  pesanan?: NilaiAnalitikBaris[];
+  kategori?: NilaiAnalitikBagian[];
+  jam?: NilaiAnalitikDeret;
+  bayar?: NilaiAnalitikBagian[];
+  bayarJudul?: string;
+  /** Total ringkas siap tampil (mis. "3.184,72 M"). */
+  bayarTotal?: string;
+  bayarLabel?: string;
+  konversi?: NilaiAnalitikDeret;
+}
+
+/** Urutan status pada kartu "Pesanan per Status" (sama dengan komponennya). */
+const URUTAN_STATUS = ['selesai', 'diproses', 'dikirim', 'dibatalkan', 'dikembalikan'];
+
+/** Angka + satuan apa adanya dari dokumen ("Rp 128.430", "25,9 Juta Rp"). */
+export const teksNilai = (jumlah: number, satuan?: string): string => {
+  const s = teks(satuan).trim();
+  const fmt = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+  const besar = /juta|miliar|milyar|triliun|ribu/i.exec(s)?.[0];
+  if (/rp|rupiah|idr/i.test(s)) {
+    // Rupiah besar diringkas supaya muat di kartu (3.184.720.000.000 -> 3.184,72 M).
+    if (!besar && jumlah >= 1e9) return `${fmt.format(jumlah / 1e9)} M`;
+    if (!besar && jumlah >= 1e6) return `${fmt.format(jumlah / 1e6)} jt`;
+    return `Rp ${fmt.format(jumlah)}${besar ? ` ${besar.toLowerCase()}` : ''}`;
+  }
+  return `${fmt.format(jumlah)}${s ? ` ${s}` : ''}`;
+};
+
+/** Deret berkategori (label sumbu X + seri pertama) dari sebuah kartu grafik. */
+const deretKartu = (w?: WidgetSpec): NilaiAnalitikDeret | undefined => {
+  const label = (w?.chart?.xAxis || []).map((x) => teks(x));
+  const nilai = (w?.chart?.series?.[0]?.data || []).map((x) => angka(x));
+  if (!label.length || !nilai.length) return undefined;
+  return { label, nilai };
+};
+
+/** Nilai mentah per kategori (bukan persen) — untuk batang & tabel. */
+const bagianKartu = (w?: WidgetSpec): NilaiAnalitikBagian[] | undefined => {
+  const label = (w?.chart?.xAxis || []).map((x) => teks(x));
+  const nilai = (w?.chart?.series?.[0]?.data || []).map((x) => angka(x));
+  if (!label.length || !nilai.length) return undefined;
+  return label.map((nama, i) => ({ nama, nilai: nilai[i] ?? 0 }));
+};
+
+/**
+ * Ubah widget hasil pengisian dokumen menjadi nilai untuk slot template T2.
+ * Kartu ber-`dataKosong` diabaikan; slot yang tidak punya sumber tetap kosong.
+ */
+export function nilaiAnalitikDariWidgets(widgets: WidgetSpec[] | undefined | null): NilaiAnalitik {
+  const semua = Array.isArray(widgets) ? widgets : [];
+  const daftar = semua.filter((w) => w && !w.dataKosong);
+  const hasil: NilaiAnalitik = {};
+
+  const judul = (w: WidgetSpec) => teks(w.title).toLowerCase();
+  /**
+   * Judul kartu saat memakai data dokumen: ambil dari NAMA SERI dokumen, karena
+   * isinya sering bukan lagi sesuai judul template (mis. kartu "Pesanan per Jam"
+   * berisi air terjual per bulan). Satuan dalam tanda kurung dibuang.
+   */
+  const judulSeri = (w?: WidgetSpec): string | undefined => {
+    const nama = (w?.chart?.series || [])
+      .map((sr) => teks(sr?.name))
+      .filter(Boolean)
+      .join(' vs ');
+    if (!nama) return undefined;
+    return nama.replace(/\s*\([^)]*\)\s*$/, '').trim() || undefined;
+  };
+  /** Hanya kartu yang benar-benar membawa deret angka. */
+  const bergrafik = daftar.filter((w) => Array.isArray(w.chart?.series) && w.chart!.series.length > 0);
+
+  // ── KPI: sampai 4 kartu pertama (label & angka dari dokumen) ───────────────
+  const kpi = daftar.filter((w) => w.type === 'kpi').slice(0, 4);
+  if (kpi.length) {
+    hasil.kpi = kpi.map((w) => {
+      const mentah = w.kpi?.delta;
+      const d = typeof mentah === 'number' && Number.isFinite(mentah) ? mentah : undefined;
+      const seri = (w.kpi?.sparkline || []).map((x) => angka(x)).filter((x) => Number.isFinite(x));
+      return {
+        label: teks(w.title),
+        nilai: rapiAngka(w.kpi?.value),
+        satuan: teks(w.kpi?.unit) || undefined,
+        delta:
+          d == null
+            ? ''
+            : `${d > 0 ? '+' : ''}${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(d)}%`,
+        deltaTeks: d == null ? '' : 'vs periode lalu',
+        naik: (d ?? 0) >= 0,
+        // Sparkline hanya bila dokumen menyertakan deretnya — tidak dikarang.
+        seri: seri.length >= 2 ? seri : [],
+      };
+    });
+  }
+
+  // ── Area "Ikhtisar Pendapatan" ─────────────────────────────────────────────
+  const wPendapatan =
+    bergrafik.find((w) => /ikhtisar|pendapatan|revenue|omzet/i.test(judul(w))) ?? bergrafik[0];
+  const pendapatan = deretKartu(wPendapatan);
+  if (pendapatan) {
+    hasil.pendapatan = pendapatan;
+    hasil.pendapatanSatuan = teks(wPendapatan?.chart?.unit).trim() || undefined;
+    hasil.pendapatanRentang = `${pendapatan.label[0]} – ${pendapatan.label[pendapatan.label.length - 1]}`;
+    hasil.pendapatanJudul = judulSeri(wPendapatan);
+  }
+
+  // ── Batang "Pesanan per Status" ────────────────────────────────────────────
+  const wStatus = bergrafik.find((w) => /status/i.test(judul(w)));
+  if (wStatus) {
+    const label = (wStatus.chart?.xAxis || []).map((x) => teks(x).toLowerCase());
+    const nilai = (wStatus.chart?.series?.[0]?.data || []).map((x) => angka(x));
+    // Urutan & warna batang milik template; angkanya dicocokkan per nama status.
+    const isi = URUTAN_STATUS.map((s) => {
+      const i = label.findIndex((l) => l.includes(s));
+      return i >= 0 ? nilai[i] ?? null : null;
+    });
+    if (isi.some((v) => v != null)) hasil.status = isi;
+    hasil.statusJudul = judulSeri(wStatus) || teks(wStatus?.title);
+  }
+
+  // ── Cincin "Sumber Kunjungan" (persen) & batang "Metode Pembayaran" ────────
+  const donat = daftar.filter((w) => w.type === 'donut' || w.type === 'pie');
+
+  const wSumber = donat.find((w) => /sumber|kunjungan|trafik|traffic|kanal|channel/i.test(judul(w)));
+  const sumber = bagianKartu(wSumber);
+  if (sumber) {
+    const total = sumber.reduce((a, b) => a + b.nilai, 0);
+    if (total > 0) {
+      hasil.sumber = sumber.map((d) => ({
+        nama: d.nama,
+        nilai: Math.round((d.nilai / total) * 1000) / 10,
+      }));
+      hasil.sumberTotal = teksNilai(total, wSumber?.chart?.unit);
+      // Judul mengikuti isi dokumen — kalau dokumen berisi komposisi air, jangan
+      // tetap berjudul "Sumber Kunjungan".
+      hasil.sumberJudul = judulSeri(wSumber) || teks(wSumber?.title) || 'Komposisi';
+      hasil.sumberLabelTotal = 'Total';
+    }
+  }
+
+  const wBayar = donat.find((w) => /bayar|pembayaran|payment/i.test(judul(w)));
+  const bayar = bagianKartu(wBayar);
+  if (bayar) {
+    hasil.bayar = bayar;
+    const totalBayar = bayar.reduce((a, b) => a + b.nilai, 0);
+    hasil.bayarJudul = judulSeri(wBayar) || teks(wBayar?.title) || 'Komposisi';
+    hasil.bayarTotal = teksNilai(totalBayar, wBayar?.chart?.unit);
+    hasil.bayarLabel = `komposisi · ${bayar.length} bagian`;
+  }
+
+  // ── Batang "Nilai Pesanan per Kategori" ────────────────────────────────────
+  const wKategori = bergrafik.find((w) => /kategori|category/i.test(judul(w)));
+  const kategori = bagianKartu(wKategori);
+  if (kategori) {
+    hasil.kategori = kategori;
+    hasil.kategoriJudul = judulSeri(wKategori) || teks(wKategori?.title);
+  }
+
+  // ── Batang "Pesanan per Jam" ───────────────────────────────────────────────
+  const wJam = bergrafik.find((w) => /per jam|\bjam\b|hour/i.test(judul(w)));
+  const jam = deretKartu(wJam);
+  if (jam) {
+    hasil.jam = jam;
+    hasil.jamJudul = judulSeri(wJam) || teks(wJam?.title);
+  }
+
+  // ── Garis "Tren Konversi" ──────────────────────────────────────────────────
+  const wKonversi = bergrafik.find((w) => /konversi|conversion/i.test(judul(w)));
+  const konversi = deretKartu(wKonversi);
+  if (konversi) {
+    hasil.konversi = konversi;
+    hasil.konversiJudul = judulSeri(wKonversi) || teks(wKonversi?.title);
+  }
+
+  // ── Tabel "Pesanan Terbaru" (hanya bila template punya kartu tabel) ────────
+  const tabel = daftar.find((w) => w.type === 'table' && Array.isArray(w.table?.rows) && w.table!.rows.length > 0);
+  if (tabel?.table) {
+    const kolom = tabel.table.columns || [];
+    const kunci = (pola: RegExp, cadangan?: number) =>
+      kolom.find((k) => pola.test(k.label))?.key ?? (cadangan == null ? undefined : kolom[cadangan]?.key);
+    const kNama = kunci(/pelanggan|nama|customer|uraian|keterangan/i, 0);
+    const kId = kunci(/\bid\b|kode|nomor|no\./i);
+    const kTanggal = kunci(/tanggal|tgl|periode|date/i);
+    const kJumlah = kunci(/jumlah|nilai|nominal|amount|total/i, 1);
+    const kStatus = kunci(/status/i);
+    const baris = (tabel.table.rows || []).slice(0, 8).map((r: any) => {
+      const nama = teks(r?.[kNama as string]);
+      const inisial = nama
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((x) => x[0]?.toUpperCase() ?? '')
+        .join('');
+      return {
+        id: teks(r?.[kId as string]),
+        nama,
+        inisial,
+        tanggal: teks(r?.[kTanggal as string]),
+        jumlah: teks(r?.[kJumlah as string]),
+        status: teks(r?.[kStatus as string]),
+      };
+    });
+    if (baris.length) hasil.pesanan = baris;
+  }
+
+  return hasil;
+}
+
+// ============================================================================
+// T3 — TRAFIK WEB & PERILAKU (DashboardTrafik)
+// ============================================================================
+/**
+ * Jembatan DATA → TAMPILAN untuk template T3.
+ *
+ * T3 punya sembilan kartu yang bentuknya khas (5 KPI bersparkline, batang
+ * bertumpuk sumber trafik, garis relevansi, komposisi usia, daftar halaman,
+ * batang perangkat, cincin perilaku, daftar OS, daftar frasa). Karena itu tiap
+ * slot dicocokkan dengan kartunya sendiri, bukan memakai `nilaiDariWidgets`
+ * (yang hanya mengambil grafik pertama).
+ *
+ * Aturan yang sama seperti T1/T2: kartu ber-`dataKosong` tidak menyumbang angka
+ * apa pun. Slot yang tidak punya sumber di dokumen TIDAK diisi angka contoh —
+ * komponen membiarkannya kosong.
+ */
+
+export interface NilaiTrafikKpi {
+  /** Label kartu dari dokumen; kosong = komponen memakai label template. */
+  label?: string;
+  /** Angka siap tampil (mis. "57%" atau "1.120"). */
+  nilai: string;
+  /** Perubahan dalam persen; undefined = dokumen tidak menyebut perubahan. */
+  delta?: number;
+  /** Deret sparkline dokumen; undefined = tidak ada deret. */
+  seri?: number[];
+}
+
+export interface NilaiTrafikSeri {
+  nama: string;
+  data: number[];
+}
+
+export interface NilaiTrafikUsia {
+  label: string;
+  penuh?: string;
+  persen: number;
+  jumlah?: number;
+}
+
+export interface NilaiTrafikHalaman {
+  path: string;
+  persen: number;
+  delta?: number;
+}
+
+export interface NilaiTrafikPerangkat {
+  nama: string;
+  persen: number;
+  jumlah?: number;
+}
+
+export interface NilaiTrafikPerilaku {
+  nama: string;
+  persen: number;
+}
+
+export interface NilaiTrafikOs {
+  nama: string;
+  persen: number;
+  delta?: number;
+  seri?: number[];
+}
+
+export interface NilaiTrafikFrasa {
+  teks: string;
+  persen: number;
+}
+
+export interface NilaiTrafik {
+  /** Sampai 5 kartu KPI, urut seperti kartu template. */
+  kpi?: NilaiTrafikKpi[];
+  /** Batang bertumpuk "Sumber Trafik": label sumbu + seri dari dokumen. */
+  sumber?: { label: string[]; seri: NilaiTrafikSeri[] };
+  sumberJudul?: string;
+  relevansiJudul?: string;
+  perangkatJudul?: string;
+  /** Garis "Dinamika Relevansi". */
+  relevansi?: { label?: string[]; data: number[] };
+  usia?: NilaiTrafikUsia[];
+  usiaTotal?: string;
+  usiaDelta?: number;
+  halaman?: NilaiTrafikHalaman[];
+  perangkat?: NilaiTrafikPerangkat[];
+  perangkatTotal?: string;
+  perilaku?: NilaiTrafikPerilaku[];
+  os?: NilaiTrafikOs[];
+  frasa?: NilaiTrafikFrasa[];
+}
+
+/** Akhiran satuan KPI mengikuti gaya template ("%", " mnt", atau kosong). */
+const akhiranSatuan = (satuan?: string): string => {
+  const s = teks(satuan).trim().toLowerCase();
+  if (!s) return '';
+  if (s === '%' || s === 'persen' || s === 'percent') return '%';
+  if (/^(menit|mnt|min|minute|minutes)$/.test(s)) return ' mnt';
+  if (/^(detik|dtk|sec|second|seconds)$/.test(s)) return ' dtk';
+  return '';
+};
+
+/** Angka KPI + satuan yang aman: persen tetap persen, angka polos diberi akhiran. */
+const nilaiKpiTrafik = (v: unknown, satuan?: string): string => {
+  const rapi = rapiAngka(v).trim();
+  if (!rapi) return '';
+  // Sudah membawa satuannya sendiri ("57%", "4,9 menit") → pakai apa adanya.
+  if (!/^[-+]?[\d.,]+$/.test(rapi)) return rapi;
+  return `${rapi}${akhiranSatuan(satuan)}`;
+};
+
+/**
+ * Ubah widget hasil pengisian dokumen menjadi nilai untuk slot template T3.
+ * Kartu ber-`dataKosong` diabaikan; slot tanpa sumber tetap kosong.
+ */
+export function nilaiTrafikDariWidgets(widgets: WidgetSpec[] | undefined | null): NilaiTrafik {
+  const daftar = (Array.isArray(widgets) ? widgets : []).filter((w) => w && !w.dataKosong);
+  const hasil: NilaiTrafik = {};
+  const judul = (w: WidgetSpec) => teks(w.title).toLowerCase();
+  const bergrafik = daftar.filter((w) => Array.isArray(w.chart?.series) && w.chart!.series.length > 0);
+  /** Judul kartu dari nama seri dokumen (isinya sering beda dari judul template). */
+  const judulSeri = (w?: WidgetSpec): string | undefined => {
+    const nama = (w?.chart?.series || [])
+      .map((sr) => teks(sr?.name))
+      .filter(Boolean)
+      .join(' vs ');
+    if (!nama) return undefined;
+    return nama.replace(/\s*\([^)]*\)\s*$/, '').trim() || undefined;
+  };
+
+  // ── 5 KPI bersparkline ─────────────────────────────────────────────────────
+  const kpi = daftar.filter((w) => w.type === 'kpi').slice(0, 5);
+  if (kpi.length) {
+    hasil.kpi = kpi.map((w) => {
+      const mentah = w.kpi?.delta;
+      const d = typeof mentah === 'number' && Number.isFinite(mentah) ? mentah : undefined;
+      const seri = (w.kpi?.sparkline || []).map((x) => angka(x)).filter((x) => Number.isFinite(x));
+      return {
+        label: teks(w.title),
+        nilai: nilaiKpiTrafik(w.kpi?.value, w.kpi?.unit),
+        delta: d,
+        // Sparkline hanya bila dokumen menyertakan deretnya — tidak dikarang.
+        seri: seri.length >= 2 ? seri : undefined,
+      };
+    });
+  }
+
+  // Total kunjungan dokumen — dipakai menurunkan jumlah per perangkat.
+  const kpiPengunjung = kpi.find(
+    (w) => /pengunjung|visitor|pengguna/i.test(judul(w)) && !/baru|new/i.test(judul(w)),
+  );
+  const totalKunjungan = kpiPengunjung ? angka(kpiPengunjung.kpi?.value) : 0;
+
+  // ── Batang bertumpuk "Sumber Trafik" ──────────────────────────────────────
+  const wSumber = bergrafik.find((w) => w.type === 'bar' || w.type === 'hbar');
+  if (wSumber?.chart) {
+    const label = (wSumber.chart.xAxis || []).map((x) => teks(x));
+    const seri = (wSumber.chart.series || [])
+      .map((s) => ({ nama: teks(s.name), data: (s.data || []).map((x) => angka(x)) }))
+      .filter((s) => s.data.length > 0);
+    if (seri.length) {
+      hasil.sumber = { label, seri };
+      hasil.sumberJudul = judulSeri(wSumber) || teks(wSumber.title);
+    }
+  }
+
+  // ── Garis "Dinamika Relevansi" ────────────────────────────────────────────
+  const wRelevansi = bergrafik.find((w) => w.type === 'line' || w.type === 'area');
+  if (wRelevansi?.chart) {
+    const seri = wRelevansi.chart.series[wRelevansi.chart.series.length - 1];
+    const data = (seri?.data || []).map((x) => angka(x));
+    if (data.length) {
+      const sumbu = (wRelevansi.chart.xAxis || []).map((x) => teks(x));
+      hasil.relevansi = { data, label: sumbu.length === data.length ? sumbu : undefined };
+      hasil.relevansiJudul = judulSeri(wRelevansi) || teks(wRelevansi.title);
+    }
+  }
+
+  // ── Donut "Jenis Perangkat" ───────────────────────────────────────────────
+  const donat = bergrafik.find((w) => w.type === 'donut' || w.type === 'pie');
+  if (donat?.chart) {
+    const nama = (donat.chart.xAxis || []).map((x) => teks(x));
+    const nilai = (donat.chart.series[0]?.data || []).map((x) => angka(x));
+    const total = nilai.reduce((a, b) => a + b, 0);
+    // Donut dokumen bisa berisi persen (69,7 / 29 / 1,3) atau jumlah kunjungan.
+    const sudahPersen = teks(donat.chart.unit).trim() === '%' || (total > 0 && Math.abs(total - 100) <= 1);
+    const isi = nama
+      .map((n, i) => ({
+        nama: n,
+        persen: sudahPersen ? nilai[i] ?? 0 : total > 0 ? Math.round(((nilai[i] ?? 0) / total) * 1000) / 10 : 0,
+      }))
+      .filter((x) => x.nama && x.persen > 0);
+    if (isi.length) {
+      hasil.perangkat = isi.map((x) => ({
+        ...x,
+        // Jumlah kunjungan hanya bila totalnya memang ada di dokumen.
+        jumlah: totalKunjungan > 0 ? Math.round((x.persen / 100) * totalKunjungan) : undefined,
+      }));
+      if (totalKunjungan > 0) hasil.perangkatTotal = new Intl.NumberFormat('id-ID').format(totalKunjungan);
+      hasil.perangkatJudul = judulSeri(donat) || teks(donat.title);
+    }
+  }
+
+  // ── Tabel "Halaman Populer" (hanya bila kartunya memang daftar halaman) ────
+  const tabel = daftar.find((w) => w.type === 'table' && Array.isArray(w.table?.rows) && w.table!.rows.length > 0);
+  if (tabel?.table) {
+    const kolom = tabel.table.columns || [];
+    const kNama = kolom[0]?.key;
+    const kAngka =
+      kolom.find((k) => /persen|porsi|kunjungan|jumlah|nilai/i.test(k.label))?.key ?? kolom[1]?.key;
+    const kDelta = kolom.find((k) => /delta|perubahan|tren/i.test(k.label))?.key;
+    const baris = (tabel.table.rows || [])
+      .slice(0, 10)
+      .map((r: any) => ({
+        path: teks(r?.[kNama as string]),
+        nilai: angka(r?.[kAngka as string]),
+        delta: kDelta ? angka(r?.[kDelta as string]) : undefined,
+      }))
+      .filter((x) => x.path && x.nilai > 0);
+    const berupaHalaman = /halaman|page|url|path/i.test(judul(tabel)) || baris.some((x) => x.path.startsWith('/'));
+    if (berupaHalaman && baris.length) {
+      const total = baris.reduce((a, b) => a + b.nilai, 0);
+      // Kolom bisa berisi persen (40,3) atau jumlah kunjungan (403).
+      const persen = total <= 100.5;
+      hasil.halaman = baris.map((x) => ({
+        path: x.path,
+        persen: persen ? Math.round(x.nilai * 10) / 10 : Math.round((x.nilai / total) * 1000) / 10,
+        delta: x.delta,
+      }));
+    }
+  }
+
+  return hasil;
+}
