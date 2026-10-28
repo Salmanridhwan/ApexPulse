@@ -110,7 +110,7 @@ const PERILAKU = [
 const OS = [
   { nama: 'Windows', persen: 40, delta: 0, warna: WARNA.biru },
   { nama: 'Google Android', persen: 31, delta: 2, warna: WARNA.kuning },
-  { nama: 'Mac OS', persen: 17, delta: 1, warna: WARNA.oranye },
+  { nama: 'Mac OS', persen: 17, delta: 1, warna: WARNA.ungu },
   { nama: 'iOS', persen: 9, delta: -4, warna: WARNA.merah },
   { nama: 'Linux', persen: 3, delta: 1, warna: WARNA.abu },
 ];
@@ -390,106 +390,100 @@ const opsiPerangkat = (s: number) => {
   };
 };
 
-/** Faktor perilaku: kolom komposisi 100% (mengisi tinggi kartu). */
+/** Faktor perilaku: cincin (gaya donat yang sudah dipakai di template). */
 const opsiPerilaku = (s: number) => ({
-  animationDuration: 700,
+  animationDuration: 800,
   animationEasing: 'cubicOut' as const,
-  grid: { left: 0, right: 0, top: 0, bottom: 0 },
   tooltip: {
     ...tooltipDasar(s),
     trigger: 'item',
-    formatter: (p: any) => `${p.marker} ${p.seriesName}<br/><b>${p.value}%</b> dari 100`,
+    formatter: (p: any) => `${p.marker} ${p.name}<br/><b>${p.value}%</b> dari skor 100`,
   },
-  xAxis: { type: 'category', data: ['kanal'], show: false },
-  yAxis: { type: 'value', max: 100, show: false },
-  series: PERILAKU.map((p, i) => ({
-    name: p.nama,
-    type: 'bar',
-    stack: 'kanal',
-    barWidth: '86%',
-    data: [p.persen],
-    itemStyle: {
-      color: {
-        type: 'linear',
-        x: 0,
-        y: 0,
-        x2: 0,
-        y2: 1,
-        colorStops: [
-          { offset: 0, color: p.warna },
-          { offset: 1, color: `${p.warna}cc` },
-        ],
+  series: [
+    {
+      type: 'pie',
+      radius: ['63%', '96%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      labelLine: { show: false },
+      itemStyle: {
+        borderColor: WARNA.kartu,
+        borderWidth: 3 * s,
+        borderRadius: 6 * s,
+        shadowColor: 'rgba(0,0,0,0.5)',
+        shadowBlur: 8 * s,
       },
-      borderRadius:
-        i === 0 ? [0, 0, 7 * s, 7 * s] : i === PERILAKU.length - 1 ? [7 * s, 7 * s, 0, 0] : 0,
-      borderColor: WARNA.kartu,
-      borderWidth: i === 0 ? 0 : 2 * s,
+      emphasis: { scale: true, scaleSize: 6 * s, itemStyle: { shadowBlur: 18 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
+      data: PERILAKU.map((p) => ({ name: p.nama, value: p.persen, itemStyle: { color: p.warna } })),
     },
-    label: {
-      show: true,
-      position: 'inside',
-      color: '#0b0d12',
-      fontSize: 9.2 * s,
-      fontWeight: 'bold',
-      formatter: '{c}%',
-    },
-    emphasis: { itemStyle: { shadowBlur: 10 * s, shadowColor: 'rgba(0,0,0,0.45)' } },
-  })),
+  ],
 });
 
-/** Sistem operasi: batang mendatar dengan label persen + panah tren berwarna. */
+/** Sistem operasi: area bertumpuk 30 hari (gaya area yang sudah dipakai di template). */
 const opsiOS = (s: number) => {
-  const urut = [...OS].reverse();
-  const maks = Math.max(...OS.map((o) => o.persen));
+  const hari = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+  const dasar = OS.map((o) => o.persen);
+  const arah = [0, 2.4, 0.6, -2.6, 0.6];
+  const mentah = hari.map((_, i) =>
+    dasar.map((b, j) => Math.max(1, (b + (arah[j] * i) / 29) * (1 + 0.05 * Math.sin((i + j * 3) / 3.6)))),
+  );
+  const deret = dasar.map((_, j) =>
+    mentah.map((baris) => {
+      const total = baris.reduce((a, b) => a + b, 0);
+      return Math.round((baris[j] / total) * 1000) / 10;
+    }),
+  );
   return {
-    animationDuration: 750,
+    animationDuration: 800,
     animationEasing: 'cubicOut' as const,
-    grid: { left: 2, right: 78 * s, top: 4, bottom: 2, containLabel: true },
+    grid: { left: 0, right: 2, top: 6, bottom: 16 * s, containLabel: true },
     tooltip: {
       ...tooltipDasar(s),
-      trigger: 'item',
-      formatter: (p: any) => {
-        const d = urut[p.dataIndex].delta;
-        const tren = d === 0 ? 'tetap' : `${d > 0 ? 'naik' : 'turun'} ${Math.abs(d)}%`;
-        return `${p.marker} ${p.name}<br/><b>${p.value}%</b> kunjungan · ${tren}`;
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: 'rgba(255,255,255,0.28)', type: 'dashed' } },
+      formatter: (ps: any[]) => {
+        const isi = [...ps].reverse().map((p) => `${p.marker} ${p.seriesName} <b>${String(p.value).replace('.', ',')}%</b>`);
+        return `Hari ${ps[0].axisValue}<br/>${isi.join('<br/>')}`;
       },
     },
-    xAxis: { type: 'value', max: Math.ceil(maks * 1.14), show: false },
-    yAxis: {
+    xAxis: {
       type: 'category',
-      data: urut.map((o) => o.nama),
-      axisLine: { show: false },
+      boundaryGap: false,
+      data: hari,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
       axisTick: { show: false },
-      axisLabel: { color: WARNA.teks2, fontSize: 9.4 * s, margin: 5 * s },
+      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, interval: 5, margin: 5 * s },
     },
-    series: [
-      {
-        type: 'bar',
-        barWidth: '48%',
-        data: urut.map((o) => ({
-          value: o.persen,
-          itemStyle: { color: gradasi(o.warna), borderRadius: [0, 4 * s, 4 * s, 0] },
-        })),
-        showBackground: true,
-        backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
-        label: {
-          show: true,
-          position: 'right',
-          distance: 6 * s,
-          rich: {
-            nilai: { color: WARNA.teks, fontSize: 9.4 * s, fontWeight: 'bold' },
-            naik: { color: WARNA.hijau, fontSize: 8.6 * s, fontWeight: 'bold', padding: [0, 0, 0, 5 * s] },
-            turun: { color: WARNA.merah, fontSize: 8.6 * s, fontWeight: 'bold', padding: [0, 0, 0, 5 * s] },
-          },
-          formatter: (p: any) => {
-            const d = urut[p.dataIndex].delta;
-            if (d === 0) return `{nilai|${p.value}%}`;
-            return `{nilai|${p.value}%}{${d > 0 ? 'naik' : 'turun'}|${d > 0 ? '▲' : '▼'}${Math.abs(d)}%}`;
-          },
+    yAxis: {
+      type: 'value',
+      max: 100,
+      show: false,
+      splitLine: { show: false },
+    },
+    series: OS.map((o, j) => ({
+      name: o.nama,
+      type: 'line',
+      stack: 'os',
+      smooth: 0.35,
+      symbol: 'none',
+      lineStyle: { width: 1.2 * s, color: o.warna },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: `${o.warna}88` },
+            { offset: 1, color: `${o.warna}33` },
+          ],
         },
-        emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.22)' } },
       },
-    ],
+      emphasis: { focus: 'series' },
+      data: deret[j],
+    })),
   };
 };
 
@@ -866,28 +860,28 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
             judul="Faktor Perilaku"
             warna={WARNA.hijau}
             sub="Porsi kanal · skor 100"
-            aksi={
-              <span
-                className="shrink-0 rounded-full px-[0.4em] py-[0.08em] text-[0.62em] font-bold tabular-nums"
-                style={{ color: WARNA.hijau, backgroundColor: `${WARNA.hijau}1f` }}
-              >
-                100
-              </span>
-            }
           />
-          <div className="flex-1 min-h-0 flex gap-[0.7em]">
-            <div ref={perilakuRef} className="h-full w-[40%] shrink-0" />
+          <div className="flex-1 min-h-0 flex gap-[0.6em]">
+            <div className="relative h-full w-[46%] shrink-0">
+              <div ref={perilakuRef} className="h-full w-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[1.35em] font-bold leading-none tabular-nums">100</span>
+                <span className="text-[0.55em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
+                  skor
+                </span>
+              </div>
+            </div>
             <ul className="flex-1 min-w-0 flex flex-col justify-around gap-[0.2em]">
               {PERILAKU.map((p) => (
                 <li key={p.nama} className="min-w-0">
                   <div className="flex items-center gap-[0.3em] text-[0.65em]">
-                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: p.warna }} />
+                    <span className="w-[0.45em] h-[0.45em] rounded-[0.12em] shrink-0" style={{ backgroundColor: p.warna }} />
                     <span className="truncate" style={{ color: WARNA.teks2 }}>
                       {p.nama}
                     </span>
                     <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
                   </div>
-                  <div className="text-[0.58em] mt-[0.05em]" style={{ color: WARNA.teks3 }}>
+                  <div className="text-[0.56em] mt-[0.05em] pl-[0.75em]" style={{ color: WARNA.teks3 }}>
                     {p.jumlah} dari 100
                   </div>
                 </li>
@@ -896,10 +890,30 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
           </div>
         </div>
 
-        {/* Sistem Operasi — batang mendatar + tren */}
+        {/* Sistem Operasi — area bertumpuk + legenda chip */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan & perubahan" />
-          <div ref={osRef} className="w-full flex-1 min-h-[7.2em]" />
+          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan 30 hari" />
+          <div ref={osRef} className="w-full flex-1 min-h-[6.4em]" />
+          <ul className="shrink-0 flex flex-wrap items-center gap-x-[0.7em] gap-y-[0.15em] mt-[0.35em]">
+            {OS.map((o) => (
+              <li key={o.nama} className="flex items-center gap-[0.25em] text-[0.6em] min-w-0">
+                <span className="w-[0.4em] h-[0.4em] rounded-full shrink-0" style={{ backgroundColor: o.warna }} />
+                <span className="truncate" style={{ color: WARNA.teks2 }}>
+                  {o.nama}
+                </span>
+                <span className="tabular-nums font-semibold shrink-0">{o.persen}%</span>
+                {o.delta !== 0 && (
+                  <span
+                    className="tabular-nums shrink-0 font-semibold"
+                    style={{ color: o.delta > 0 ? WARNA.hijau : WARNA.merah }}
+                  >
+                    {o.delta > 0 ? '▲' : '▼'}
+                    {Math.abs(o.delta)}%
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Frasa Pencarian */}
