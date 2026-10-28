@@ -425,10 +425,12 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 <span className="text-line-strong text-xs">·</span>
                 <span className="text-[11px] text-ink-3">Tampilan referensi, satu halaman</span>
                 <span className="text-line-strong text-xs">·</span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-warn font-medium">
-                  <Sparkles className="w-3 h-3" />
-                  Angka ilustrasi
-                </span>
+                {!asli && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-warn font-medium">
+                    <Sparkles className="w-3 h-3" />
+                    Angka ilustrasi
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -501,6 +503,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 </span>
                 {!asli && !memuatAsli && st?.status !== 'proses' && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
+              {asli && (
+                <button
+                  onClick={() => void pakai()}
+                  disabled={memuat}
+                  data-testid="simpan-dari-pratinjau"
+                  title="Simpan pratinjau ini menjadi dashboard milik instansi"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
+                >
+                  {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
+                  <span>{memuat ? 'Menyimpan…' : 'Simpan sebagai dashboard'}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -533,31 +547,6 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             value={{ mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] }}
           >
           <div className={`tema-${aktif.tema || 'oranye'} rounded-card border border-line overflow-hidden bg-canvas`} data-theme="dark">
-            <div className="px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface border-b border-line">
-              <div className="min-w-0 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-pos shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-ink">Pratinjau dengan data asli</p>
-                  <p className="text-[11px] text-ink-3 leading-relaxed">
-                    {asli.terisi}/{asli.widgets.length} kartu berisi angka dari dokumen instansi
-                    {asli.kosong > 0
-                      ? ` · ${asli.kosong} kartu belum ada di dokumen (ditandai kosong)`
-                      : ''}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => void pakai()}
-                  disabled={memuat}
-                  data-testid="simpan-dari-pratinjau"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
-                >
-                  {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
-                  <span>{memuat ? 'Menyimpan…' : 'Simpan sebagai dashboard'}</span>
-                </button>
-              </div>
-            </div>
             {aktif.id === 'tpl-ringkasan' ? (
               <div className="p-3 sm:p-4">
                 <DashboardReferensi nilai={nilaiAsli} />
