@@ -162,15 +162,24 @@ const jalurSpark = (seri: number[]) => {
   const min = Math.min(...seri);
   const max = Math.max(...seri);
   const span = max - min || 1;
-  const titik = seri.map((v, i) => {
-    const x = (i / (seri.length - 1)) * 100;
-    const y = 100 - ((v - min) / span) * 88 - 6;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  return {
-    garis: `M${titik.join('L')}`,
-    area: `M0,100L${titik.join('L')}L100,100Z`,
-  };
+  const titik = seri.map((v, i) => ({
+    x: (i / (seri.length - 1)) * 100,
+    y: 100 - ((v - min) / span) * 88 - 6,
+  }));
+  // Kurva halus (Catmull-Rom -> bezier) supaya sparkline tidak kaku.
+  let d = `M${titik[0].x.toFixed(1)},${titik[0].y.toFixed(1)}`;
+  for (let i = 0; i < titik.length - 1; i += 1) {
+    const p0 = titik[i - 1] ?? titik[i];
+    const p1 = titik[i];
+    const p2 = titik[i + 1];
+    const p3 = titik[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return { garis: d, area: `${d}L100,100L0,100Z` };
 };
 
 /**
@@ -205,10 +214,11 @@ const Legenda: React.FC<{
 /** Gaya dasar grafik: huruf, garis, dan padding ikut `skala` (em setara). */
 const gayaDasar = (s: number) => ({
   tooltip: {
-    backgroundColor: '#1f2126',
-    borderColor: WARNA.garis,
+    backgroundColor: 'rgba(24,26,30,0.96)',
+    borderColor: 'rgba(255,255,255,0.14)',
     borderWidth: 1,
-    padding: [6 * s, 10 * s],
+    padding: [7 * s, 11 * s],
+    extraCssText: `border-radius:${8 * s}px; box-shadow:0 ${6 * s}px ${18 * s}px rgba(0,0,0,0.5); backdrop-filter:blur(6px);`,
     textStyle: { color: WARNA.teks, fontSize: 11 * s },
   },
   sumbu: {
@@ -246,11 +256,23 @@ const opsiBar = (s: number) => {
     series: [
       {
         type: 'bar',
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(255,255,255,0.03)', borderRadius: [4 * s, 4 * s, 0, 0] },
         data: PENDAPATAN_BULANAN.map((v, i) => ({
           value: v,
           itemStyle: {
-            color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.34)',
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.62)' },
+                { offset: 1, color: i === puncak ? 'rgba(255,138,31,0.55)' : 'rgba(255,138,31,0.16)' },
+              ],
+            },
             borderRadius: [4 * s, 4 * s, 0, 0],
+            shadowColor: i === puncak ? 'rgba(255,138,31,0.55)' : 'rgba(255,138,31,0.18)',
+            shadowBlur: (i === puncak ? 14 : 6) * s,
+            shadowOffsetY: 2 * s,
           },
           // Batang terakhir (bulan tertinggi) diberi label angkanya supaya
           // nilainya langsung terbaca, bukan cuma warna beda.
@@ -278,12 +300,13 @@ const opsiBar = (s: number) => {
         // dengan batangnya (tanpa pergeseran), jadi tidak ada angka karangan.
         name: 'Tren',
         type: 'line',
-        smooth: false,
+        smooth: 0.2,
         symbol: 'circle',
-        symbolSize: 5.5 * s,
+        symbolSize: 6 * s,
         data: GARIS_PENDAPATAN,
-        lineStyle: { width: 2 * s, color: '#38bdf8' },
-        itemStyle: { color: '#38bdf8', borderColor: WARNA.latar, borderWidth: 1.6 * s },
+        lineStyle: { width: 2.2 * s, color: '#38bdf8', shadowColor: 'rgba(56,189,248,0.6)', shadowBlur: 12 * s, shadowOffsetY: 3 * s },
+        itemStyle: { color: '#38bdf8', borderColor: '#0a0a0b', borderWidth: 1.8 * s },
+        emphasis: { scale: 1.5 },
         // Nilainya sama dengan batang, jadi tooltip cukup sekali (dari batang).
         tooltip: { show: false },
         z: 3,
@@ -306,7 +329,14 @@ const opsiDonat = (s: number) => ({
       avoidLabelOverlap: false,
       label: { show: false },
       labelLine: { show: false },
-      itemStyle: { borderColor: WARNA.kartu, borderWidth: 3 * s, borderRadius: 4 * s },
+      itemStyle: {
+        borderColor: WARNA.kartu,
+        borderWidth: 3 * s,
+        borderRadius: 6 * s,
+        shadowColor: 'rgba(0,0,0,0.5)',
+        shadowBlur: 8 * s,
+      },
+      emphasis: { scale: true, scaleSize: 6 * s, itemStyle: { shadowBlur: 18 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
       data: RINCIAN_BEBAN.map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
     },
   ],
@@ -315,10 +345,11 @@ const opsiDonat = (s: number) => ({
 const opsiArea = (s: number) => {
   const dasar = gayaDasar(s);
   return {
-    grid: { left: 4, right: 6, top: 10 * s, bottom: 2, containLabel: true },
+    grid: { left: 4, right: 12 * s, top: 12 * s, bottom: 2, containLabel: true },
     tooltip: {
       ...dasar.tooltip,
       trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: 'rgba(255,138,31,0.45)', type: 'dashed', width: 1 } },
       formatter: (p: any) => `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">Hari ${p[0].dataIndex + 1}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
     },
     xAxis: {
@@ -336,19 +367,42 @@ const opsiArea = (s: number) => {
     series: [
       {
         type: 'line',
-        smooth: true,
+        smooth: 0.35,
         symbol: 'circle',
-        symbolSize: 0,
+        symbolSize: 6 * s,
+        showSymbol: false,
         data: ARUS_KAS,
-        lineStyle: { width: 2.5 * s, color: WARNA.oranye },
-        itemStyle: { color: WARNA.oranye },
+        lineStyle: { width: 2.6 * s, color: WARNA.oranye, shadowColor: 'rgba(255,138,31,0.55)', shadowBlur: 14 * s, shadowOffsetY: 4 * s },
+        itemStyle: { color: WARNA.oranye, borderColor: '#0a0a0b', borderWidth: 2 * s },
+        emphasis: { scale: 1.6 },
+        markPoint: {
+          symbol: 'circle',
+          symbolSize: 9 * s,
+          itemStyle: { color: '#fff', borderColor: WARNA.oranye, borderWidth: 3 * s, shadowBlur: 10 * s, shadowColor: 'rgba(255,138,31,0.9)' },
+          label: {
+            show: true,
+            // Titik tertinggi ada di ujung kanan: label ditaruh di kiri titik
+            // supaya tidak terpotong tepi kartu.
+            position: 'left',
+            distance: 8 * s,
+            color: WARNA.teks,
+            fontSize: 9 * s,
+            fontWeight: 'bold',
+            backgroundColor: 'rgba(16,16,18,0.9)',
+            borderRadius: 4 * s,
+            padding: [2 * s, 5 * s],
+            formatter: (p: any) => `Rp ${String(p.value).replace('.', ',')} M`,
+          },
+          data: [{ type: 'max', name: 'Tertinggi' }],
+        },
         areaStyle: {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(255,138,31,0.42)' },
-              { offset: 1, color: 'rgba(255,138,31,0.02)' },
+              { offset: 0, color: 'rgba(255,138,31,0.46)' },
+              { offset: 0.55, color: 'rgba(255,138,31,0.15)' },
+              { offset: 1, color: 'rgba(255,138,31,0.01)' },
             ],
           },
         },
