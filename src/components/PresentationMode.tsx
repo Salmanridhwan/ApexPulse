@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Maximize2, Minimize2, Presentation, Sparkles, X } from 'lucide-react';
+import { Maximize2, Minimize2, Sparkles, X } from 'lucide-react';
 import type { Dashboard } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
 
@@ -82,10 +82,6 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       {/* ===== Bilah atas ===== */}
       <header className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 bg-surface border-b border-line">
         <div className="min-w-0 flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-chip text-[11px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-brand/20">
-            <Presentation className="w-3.5 h-3.5" />
-            Mode Presentasi
-          </span>
           <div className="min-w-0">
             <h1 className="text-sm sm:text-base font-extrabold text-ink truncate" title={dashboard.title}>
               {dashboard.title}
