@@ -115,6 +115,22 @@ const OS = [
   { nama: 'Linux', persen: 3, delta: 1, warna: WARNA.abu },
 ];
 
+const DERET_OS = (() => {
+  const arah = [0, 2.4, 0.6, -2.6, 0.6];
+  const mentah = Array.from({ length: 30 }, (_, i) =>
+    OS.map((o, j) => Math.max(1, (o.persen + (arah[j] * i) / 29) * (1 + 0.05 * Math.sin((i + j * 3) / 3.6)))),
+  );
+  const normal = mentah.map((b) => {
+    const t = b.reduce((x, y) => x + y, 0);
+    return b.map((v) => Math.round((v / t) * 1000) / 10);
+  });
+  return OS.map((o, j) => {
+    const seri = normal.map((b) => b[j]);
+    const f = o.persen / seri[seri.length - 1];
+    return seri.map((v) => Math.round(v * f * 10) / 10);
+  });
+})();
+
 const FRASA = [
   { teks: '#landingpage', persen: 35 },
   { teks: '#ilustrasi kreatif', persen: 25 },
@@ -420,73 +436,6 @@ const opsiPerilaku = (s: number) => ({
   ],
 });
 
-/** Sistem operasi: area bertumpuk 30 hari (gaya area yang sudah dipakai di template). */
-const opsiOS = (s: number) => {
-  const hari = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
-  const dasar = OS.map((o) => o.persen);
-  const arah = [0, 2.4, 0.6, -2.6, 0.6];
-  const mentah = hari.map((_, i) =>
-    dasar.map((b, j) => Math.max(1, (b + (arah[j] * i) / 29) * (1 + 0.05 * Math.sin((i + j * 3) / 3.6)))),
-  );
-  const deret = dasar.map((_, j) =>
-    mentah.map((baris) => {
-      const total = baris.reduce((a, b) => a + b, 0);
-      return Math.round((baris[j] / total) * 1000) / 10;
-    }),
-  );
-  return {
-    animationDuration: 800,
-    animationEasing: 'cubicOut' as const,
-    grid: { left: 0, right: 2, top: 6, bottom: 16 * s, containLabel: true },
-    tooltip: {
-      ...tooltipDasar(s),
-      trigger: 'axis',
-      axisPointer: { type: 'line', lineStyle: { color: 'rgba(255,255,255,0.28)', type: 'dashed' } },
-      formatter: (ps: any[]) => {
-        const isi = [...ps].reverse().map((p) => `${p.marker} ${p.seriesName} <b>${String(p.value).replace('.', ',')}%</b>`);
-        return `Hari ${ps[0].axisValue}<br/>${isi.join('<br/>')}`;
-      },
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: hari,
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
-      axisTick: { show: false },
-      axisLabel: { color: WARNA.teks3, fontSize: 8.4 * s, interval: 5, margin: 5 * s },
-    },
-    yAxis: {
-      type: 'value',
-      max: 100,
-      show: false,
-      splitLine: { show: false },
-    },
-    series: OS.map((o, j) => ({
-      name: o.nama,
-      type: 'line',
-      stack: 'os',
-      smooth: 0.35,
-      symbol: 'none',
-      lineStyle: { width: 1.2 * s, color: o.warna },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: `${o.warna}88` },
-            { offset: 1, color: `${o.warna}33` },
-          ],
-        },
-      },
-      emphasis: { focus: 'series' },
-      data: deret[j],
-    })),
-  };
-};
-
 interface DashboardTrafikProps {
   /** true = isi seluruh tinggi wadah (mode presentasi / layar penuh). */
   penuh?: boolean;
@@ -505,7 +454,6 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
   const usiaRef = useRef<HTMLDivElement | null>(null);
   const perangkatRef = useRef<HTMLDivElement | null>(null);
   const perilakuRef = useRef<HTMLDivElement | null>(null);
-  const osRef = useRef<HTMLDivElement | null>(null);
   const instans = useRef<Record<string, any>>({});
   const menuRef = useRef<HTMLSpanElement | null>(null);
 
@@ -548,12 +496,11 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
       ambil('usia', usiaRef.current)?.setOption(opsiUsia(skala), true);
       ambil('perangkat', perangkatRef.current)?.setOption(opsiPerangkat(skala), true);
       ambil('perilaku', perilakuRef.current)?.setOption(opsiPerilaku(skala), true);
-      ambil('os', osRef.current)?.setOption(opsiOS(skala), true);
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
       });
-      [trafikRef, relevansiRef, usiaRef, perangkatRef, perilakuRef, osRef].forEach(
+      [trafikRef, relevansiRef, usiaRef, perangkatRef, perilakuRef].forEach(
         (r) => r.current && pengamat?.observe(r.current),
       );
     });
@@ -885,29 +832,53 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
           </div>
         </div>
 
-        {/* Sistem Operasi — area bertumpuk + legenda chip */}
+        {/* Sistem Operasi — satu baris per OS + sparkline 30 hari */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan 30 hari" />
-          <div ref={osRef} className="w-full flex-1 min-h-[6.4em]" />
-          <ul className="shrink-0 flex flex-wrap items-center gap-x-[0.7em] gap-y-[0.15em] mt-[0.35em]">
-            {OS.map((o) => (
-              <li key={o.nama} className="flex items-center gap-[0.25em] text-[0.6em] min-w-0">
-                <span className="w-[0.4em] h-[0.4em] rounded-full shrink-0" style={{ backgroundColor: o.warna }} />
-                <span className="truncate" style={{ color: WARNA.teks2 }}>
-                  {o.nama}
-                </span>
-                <span className="tabular-nums font-semibold shrink-0">{o.persen}%</span>
-                {o.delta !== 0 && (
-                  <span
-                    className="tabular-nums shrink-0 font-semibold"
-                    style={{ color: o.delta > 0 ? WARNA.hijau : WARNA.merah }}
+          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan · 30 hari" />
+          <ul className="flex-1 min-h-0 flex flex-col justify-between gap-[0.28em]">
+            {OS.map((o, j) => {
+              const jalur = jalurSpark(DERET_OS[j]);
+              const naik = o.delta > 0;
+              return (
+                <li key={o.nama} className="min-w-0">
+                  <div className="flex items-center gap-[0.3em] text-[0.65em]">
+                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: o.warna }} />
+                    <span className="truncate" style={{ color: WARNA.teks2 }}>
+                      {o.nama}
+                    </span>
+                    <span className="ml-auto tabular-nums font-semibold shrink-0">{o.persen}%</span>
+                    <span
+                      className="tabular-nums shrink-0 text-[0.88em] font-semibold w-[2.1em] text-right"
+                      style={{ color: o.delta === 0 ? WARNA.teks3 : naik ? WARNA.hijau : WARNA.merah }}
+                    >
+                      {o.delta === 0 ? '—' : `${naik ? '▲' : '▼'}${Math.abs(o.delta)}%`}
+                    </span>
+                  </div>
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="w-full h-[1.05em] mt-[0.08em]"
+                    aria-hidden="true"
                   >
-                    {o.delta > 0 ? '▲' : '▼'}
-                    {Math.abs(o.delta)}%
-                  </span>
-                )}
-              </li>
-            ))}
+                    <defs>
+                      <linearGradient id={`spark-os-${j}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={o.warna} stopOpacity="0.42" />
+                        <stop offset="100%" stopColor={o.warna} stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={jalur.area} fill={`url(#spark-os-${j})`} />
+                    <path
+                      d={jalur.garis}
+                      fill="none"
+                      stroke={o.warna}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                </li>
+              );
+            })}
           </ul>
         </div>
 
