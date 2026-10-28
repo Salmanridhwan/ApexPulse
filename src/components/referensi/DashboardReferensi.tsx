@@ -110,11 +110,12 @@ const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'O
 const PENDAPATAN_BULANAN = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4, 22.3, 23.0, 23.7];
 
 /**
- * Garis target bulanan di atas batang (gabungan batang + garis seperti
- * referensi). Target dibuat naik bertahap sehingga titik-titiknya duduk di atas
- * batang realisasi — selisihnya langsung terbaca sebagai capaian bulan itu.
+ * Garis pada grafik batang memakai NILAI YANG SAMA dengan batangnya — garis
+ * hanya menelusuri puncak tiap batang (bukan angka karangan), seperti pada
+ * referensi. Titiknya digeser sedikit ke atas lewat `symbolOffset` supaya tidak
+ * tertutup batang.
  */
-const TARGET_BULANAN = [15.0, 15.8, 16.6, 17.4, 18.2, 19.0, 19.8, 20.6, 21.4, 22.2, 23.0, 23.8];
+const GARIS_PENDAPATAN = PENDAPATAN_BULANAN;
 
 const RINCIAN_BEBAN = [
   { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
@@ -243,15 +244,18 @@ const opsiBar = (s: number) => {
         z: 2,
       },
       {
-        // Garis target: titik di atas tiap batang, mengikuti referensi.
-        name: 'Target',
+        // Garis menelusuri puncak batang: nilai & posisi titik sama persis
+        // dengan batangnya (tanpa pergeseran), jadi tidak ada angka karangan.
+        name: 'Tren',
         type: 'line',
-        smooth: true,
+        smooth: false,
         symbol: 'circle',
-        symbolSize: 5 * s,
-        data: TARGET_BULANAN,
-        lineStyle: { width: 2.2 * s, color: '#38bdf8' },
-        itemStyle: { color: '#38bdf8', borderColor: WARNA.latar, borderWidth: 1.4 * s },
+        symbolSize: 5.5 * s,
+        data: GARIS_PENDAPATAN,
+        lineStyle: { width: 2 * s, color: '#38bdf8' },
+        itemStyle: { color: '#38bdf8', borderColor: WARNA.latar, borderWidth: 1.6 * s },
+        // Nilainya sama dengan batang, jadi tooltip cukup sekali (dari batang).
+        tooltip: { show: false },
         z: 3,
       },
     ],
@@ -524,8 +528,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           </div>
           <Legenda
             item={[
-              { warna: WARNA.oranye, label: 'Realisasi 2025' },
-              { warna: '#38bdf8', label: 'Target bulanan', garis: true },
+              { warna: WARNA.oranye, label: 'Pendapatan 2025' },
+              { warna: '#38bdf8', label: 'Garis tren', garis: true },
             ]}
           />
           <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
