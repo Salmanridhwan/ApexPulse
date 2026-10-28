@@ -15,6 +15,7 @@ import {
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardCanvas } from '../components/DashboardCanvas';
+import { KanvasTemaContext } from '../theme';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
@@ -316,21 +317,30 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           )}
         </div>
 
-        {/* Kanvas — dirender PERSIS seperti workspace (mode pratinjau).
+        {/* Kanvas — dirender PERSIS seperti workspace (mode pratinjau), tetapi
+            memakai TEMA KHUSUS "gelap + oranye" (referensi pemilik produk).
+            `data-theme="dark"` membuat komponen yang memakai varian `dark:` ikut
+            gelap, sedangkan `tema-oranye` menimpa token warna jadi oranye.
+            `KanvasTemaContext` meneruskan mode & aksen ke ECharts (yang tidak
+            bisa membaca CSS variable).
             `key` di provider mereset seleksi lintas-chart saat template berganti. */}
-        <ChartSelectionProvider key={aktif.id}>
-          <ActiveChartFilterChip />
-          <DashboardCanvas
-            widgets={widgetPratinjau}
-            preview
-            onEditWidget={() => {}}
-            onManualCorrection={() => {}}
-            onDeleteWidget={() => {}}
-            onDuplicateWidget={() => {}}
-            onReorderWidgets={() => {}}
-            onResizeWidget={() => {}}
-          />
-        </ChartSelectionProvider>
+        <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
+          <KanvasTemaContext.Provider value={{ mode: 'dark', aksen: '#ff8a1f' }}>
+            <ChartSelectionProvider key={aktif.id}>
+              <ActiveChartFilterChip />
+              <DashboardCanvas
+                widgets={widgetPratinjau}
+                preview
+                onEditWidget={() => {}}
+                onManualCorrection={() => {}}
+                onDeleteWidget={() => {}}
+                onDuplicateWidget={() => {}}
+                onReorderWidgets={() => {}}
+                onResizeWidget={() => {}}
+              />
+            </ChartSelectionProvider>
+          </KanvasTemaContext.Provider>
+        </div>
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
           <BarChart3 className="w-3 h-3 mt-0.5 shrink-0" />

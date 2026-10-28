@@ -280,7 +280,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             </p>
           </div>
         ) : (
-          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} />
+          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} />
         )}
       </div>
     </div>

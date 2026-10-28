@@ -53,11 +53,27 @@ export const PALET_GELAP = [
   '#f472b6', '#a3e635', '#38bdf8', '#fb923c', '#e879f9', '#94a3b8',
 ];
 
-/** Palet chart per mode tema. */
-export function chartTheme(mode: 'light' | 'dark', latarKartu?: string) {
-  const dasar = mode === 'dark'
+/**
+ * Palet chart per mode tema.
+ *
+ * `aksen` dipakai untuk TEMA KHUSUS SATU BIDANG (mis. pratinjau template "gelap
+ * + oranye"): seri utama, warna aksen, dan garis tebal ikut warna itu. Tanpa
+ * `aksen`, palet mengikuti tema aplikasi seperti biasa.
+ */
+export function chartTheme(mode: 'light' | 'dark', latarKartu?: string, aksen?: string) {
+  const bawaan = mode === 'dark'
     ? { series: PALET_GELAP, accent: '#3d8bff', accentSoft: '#7fb0ff', track: '#2b2f36', tick: '#7f8792', muted: '#8b93a1', strong: '#f4f5f7', text2: '#b6bdc8', grid: '#242830', tipBg: '#f4f5f7', tooltipInk: '#0b0c0e', surface: '#111316', heatLow: '#1a1e24' }
     : { series: PALET_TERANG, accent: '#0057ff', accentSoft: '#7fa6ff', track: '#e2e6ec', tick: '#5b6470', muted: '#6b7280', strong: '#0b0c0e', text2: '#414b57', grid: '#e6e8ec', tipBg: '#0b0c0e', tooltipInk: '#f7f8fa', surface: '#ffffff', heatLow: '#e8efff' };
+
+  const dasar = aksen
+    ? {
+        ...bawaan,
+        // Seri utama (indeks 0) selalu warna acuan → ikut aksen bidang.
+        series: [aksen, ...bawaan.series.slice(1)],
+        accent: aksen,
+        accentSoft: aksen,
+      }
+    : bawaan;
 
   // Kartu berlatar pilihan pengguna: warna teks & garis chart diturunkan dari
   // latar itu, kalau tidak label sumbu/legenda jadi tak terbaca (mis. teks abu

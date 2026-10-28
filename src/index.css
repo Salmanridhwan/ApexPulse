@@ -996,3 +996,78 @@
     color: var(--color-brand-ink);
   }
 }
+
+/* ============================================================================
+   TEMA "GELAP + ORANYE" — KHUSUS PRATINJAU TEMPLATE DASHBOARD
+   ----------------------------------------------------------------------------
+   Referensi dari pemilik produk: dashboard fintech gelap dengan satu aksen
+   oranye, kartu abu-gelap bergaris tipis, sudut membulat 14px, dan angka besar
+   sebagai fokus. Tema ini HANYA berlaku di dalam elemen ber-class `tema-oranye`
+   (pratinjau template), bukan seluruh aplikasi.
+
+   Semua komponen dashboard membaca token CSS, jadi cukup menimpa token di sini;
+   ECharts tidak bisa membaca CSS variable — warnanya diteruskan lewat
+   `KanvasTemaContext` (lihat `theme.ts` + `chartTheme`).
+   ============================================================================ */
+.tema-oranye {
+  color-scheme: dark;
+
+  --color-canvas: #0a0a0b;
+  --color-surface: #141518;
+  --color-surface-2: #1b1d21;
+
+  --color-line: #26282d;
+  --color-line-strong: #34373d;
+
+  --color-ink: #f5f6f7;
+  --color-ink-2: #b7bdc6;
+  --color-ink-3: #98a0aa;
+
+  --color-brand: #ff8a1f;
+  --color-brand-ink: #ffb066;
+  --color-brand-soft: #2a1a0b;
+  --color-brand-solid: #ff8a1f;
+  --color-on-brand: #161006;
+
+  --color-pos: #22c55e;
+  --color-neg: #ef4444;
+  --color-warn: #f5a524;
+
+  --color-solid: #f5f6f7;
+  --color-on-solid: #14100b;
+
+  --radius-card: 14px;
+
+  /* Token kanvas "tegas" agar kartu & bingkai kanvas ikut gelap. */
+  --tegas-accent: #ff8a1f;
+  --tegas-ink: #f5f6f7;
+  --tegas-canvas: #0a0a0b;
+  --tegas-line: #26282d;
+  --tegas-card: #141518;
+
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Kartu di tema ini hampir rata: garis tipis, tanpa bayangan keras saat hover. */
+.tema-oranye .card-tegas:hover {
+  border-color: var(--color-line-strong);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Detail gaya tema oranye: sudut lebih membulat & bilah aksen lebih tegas. */
+.tema-oranye .card-tegas {
+  border-radius: 14px;
+}
+.tema-oranye .accent-bar {
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Garis sparkline KPI di tema oranye dibuat sedikit lebih tebal & pekat supaya
+   terbaca di atas latar hampir hitam (pada tema terang tidak perlu). */
+.tema-oranye .kpi-spark-line {
+  stroke-width: 2.2px !important;
+  opacity: 1 !important;
+}

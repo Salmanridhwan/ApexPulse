@@ -12,6 +12,13 @@ interface WidgetRendererProps {
   urutan?: number;
   /** Mode padat (dashboard satu halaman) — diteruskan ke grafik & tabel. */
   padat?: boolean;
+  /**
+   * Mode pratinjau template. Di pratinjau, sparkline contoh boleh tampil walau
+   * deretnya bukan dari dokumen (seluruh pratinjau memang berlabel "angka
+   * contoh"). Di dashboard nyata aturan lama tetap: sparkline hanya untuk
+   * deret dokumen (`dokumen-seri`).
+   */
+  preview?: boolean;
 }
 
 /** Tipe yang dirender lewat ChartEcharts. */
@@ -37,7 +44,7 @@ const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
   return h;
 };
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false }) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false, preview = false }) => {
   if (TIPE_CHART.includes(widget.type)) {
     const seed = seedWarna(widget, urutan);
     const seri = widget.chart?.series || [];
@@ -94,7 +101,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
           target={widget.kpi?.target}
           targetLabel={widget.kpi?.targetLabel}
           tampilkanTarget
-          sparkline={widget.kpi?.sparklineAsal === 'dokumen-seri' ? widget.kpi?.sparkline : undefined}
+          sparkline={widget.kpi?.sparklineAsal === 'dokumen-seri' || (preview && (widget.kpi?.sparkline?.length ?? 0) > 1) ? widget.kpi?.sparkline : undefined}
           isCorrected={widget.manualCorrection?.isCorrected}
           title={widget.title}
           style={widget.style}

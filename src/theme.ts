@@ -1,3 +1,5 @@
+import { createContext, useContext, useEffect, useState } from 'react';
+
 export type ThemeMode = 'light' | 'dark';
 
 const KEY = 'aiones-theme';
@@ -28,10 +30,25 @@ export function applyTheme(mode: ThemeMode): void {
   }
 }
 
-import { useEffect, useState } from 'react';
+/**
+ * TEMA KHUSUS SATU BIDANG (scoped theme).
+ *
+ * Beberapa bagian aplikasi perlu tampil dengan tema sendiri tanpa mengubah tema
+ * global — contohnya pratinjau template dashboard yang memakai gaya "gelap +
+ * oranye". ECharts tidak bisa membaca CSS variable, jadi mode & warna aksen
+ * grafik harus diteruskan lewat React context ini.
+ */
+export interface KanvasTema {
+  mode: ThemeMode;
+  /** Warna aksen grafik (hex). Bila diisi, seri utama memakai warna ini. */
+  aksen?: string;
+}
+
+export const KanvasTemaContext = createContext<KanvasTema | null>(null);
 
 /** Mode tema aktif (reaktif terhadap perubahan atribut data-theme pada <html>). */
 export function useThemeMode(): ThemeMode {
+  const paksa = useContext(KanvasTemaContext);
   const baca = (): ThemeMode =>
     document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   const [mode, setMode] = useState<ThemeMode>(baca);
@@ -40,5 +57,10 @@ export function useThemeMode(): ThemeMode {
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => obs.disconnect();
   }, []);
-  return mode;
+  return paksa?.mode ?? mode;
+}
+
+/** Aksen grafik khusus bidang (undefined = ikut palet tema aplikasi). */
+export function useAksenKanvas(): string | undefined {
+  return useContext(KanvasTemaContext)?.aksen;
 }

@@ -3,7 +3,7 @@ import type { ECharts, EChartsOption } from 'echarts';
 import { Table2, BarChart3 } from 'lucide-react';
 import { useChartSelection } from './ChartSelection';
 import { RingGauge3D } from './RingGauge3D';
-import { useThemeMode } from '../../theme';
+import { useAksenKanvas, useThemeMode } from '../../theme';
 import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
 import { terapkanGaya } from './widgetStyle';
 import { WidgetType, type WidgetStyle } from '../../types';
@@ -150,6 +150,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   const chartInstanceRef = useRef<ECharts | null>(null);
   const { selected, setSelected } = useChartSelection();
   const themeMode = useThemeMode();
+  /** Aksen khusus bidang (mis. pratinjau template gelap-oranye); undefined = ikut tema. */
+  const aksenKanvas = useAksenKanvas();
   const [showData, setShowData] = useState(false);
 
   const { normalizedSeries, displayUnit } = useMemo(
@@ -218,7 +220,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
-      const T = chartTheme(themeMode, style?.kartu);
+      const T = chartTheme(themeMode, style?.kartu, aksenKanvas);
       const { xView, seriesView, heatCols, heatRows, heatMatriks, treemapView, radarView, funnelView, pieView } = view;
 
       const chartData: ChartData = {
@@ -308,7 +310,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {
@@ -375,6 +377,17 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
     };
   }, [view, type, displayUnit, treemapData, links, points, boxRaw, waterfall, radarData, geoData, ganttData]);
 
+  /** Total cincin — ditampilkan di lubang tengah donut (null bila tak ada data). */
+  const totalDonut = (() => {
+    if (type !== 'donut') return null;
+    // Komposisi persen: jumlahnya selalu 100 → angka di tengah tidak bermakna.
+    if ((displayUnit || '').trim() === '%') return null;
+    const nilai = view.pieView.map((d) => Number(d.value) || 0);
+    if (nilai.length === 0) return null;
+    const jumlah = nilai.reduce((a, b) => a + b, 0);
+    return jumlah === 0 ? null : jumlah;
+  })();
+
   const toggleDataButton = (
     <button
       type="button"
@@ -439,6 +452,25 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       {!padat && <div className="flex justify-end mb-1">{toggleDataButton}</div>}
       <div className={`relative flex-1 ${padat ? 'min-h-0' : 'min-h-[190px]'}`}>
         <div ref={chartRef} className={`absolute inset-0 ${showData ? 'invisible' : ''}`} />
+        {/**
+         * Cincin (donut) diberi TOTAL di lubang tengahnya — mengikuti dashboard
+         * keuangan pada referensi desain. Ditulis sebagai lapisan HTML (bukan
+         * `graphic` ECharts) supaya teks tetap tajam dan pasti terlihat di atas
+         * seri; posisinya mengikuti titik tengah cincin (35% saat ada legenda).
+         */}
+        {type === 'donut' && !showData && totalDonut !== null && (
+          <div
+            data-testid="donut-total"
+            className="pointer-events-none absolute inset-x-0 text-center"
+            style={{ top: showLegend ? '35%' : '50%', transform: 'translateY(-50%)' }}
+          >
+            <div className="text-[15px] font-bold leading-none text-ink tabular-nums">
+              {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(totalDonut)}
+              {displayUnit ? <span className="ml-0.5 text-[10px] font-medium text-ink-3">{displayUnit}</span> : null}
+            </div>
+            <div className="mt-0.5 text-[10px] text-ink-3">Total</div>
+          </div>
+        )}
         {showData && tabelView}
       </div>
     </div>

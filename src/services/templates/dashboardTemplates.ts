@@ -136,25 +136,37 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   tujuan:
     'Memberi pimpinan gambaran menyeluruh dalam satu layar: capaian utama, penyimpangan, dan kesimpulan — tanpa membuka laporan.',
   caraPenyampaian:
-    'Ringkasan satu halaman: 6 KPI besar di paling atas, satu grafik tren pendapatan vs beban, lalu narasi kesimpulan. Selesai dibaca di bawah dua menit.',
+    'Ringkasan satu halaman: 6 KPI besar di paling atas, grafik tren pendapatan vs beban berdampingan dengan cincin komposisi, lalu narasi kesimpulan. Selesai dibaca di bawah dua menit.',
   deskripsi: 'Satu layar untuk pimpinan: capaian utama, penyimpangan, dan kesimpulan.',
   fokus: ['Capaian utama', 'Penyimpangan', 'Kesimpulan'],
   aksen: '#1fa6cc',
   judulDashboard: 'Ringkasan Eksekutif (Contoh)',
   deskripsiDashboard:
-    'Template ringkasan satu halaman (8 kartu): 6 KPI utama, grafik tren pendapatan vs beban, dan narasi kesimpulan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template ringkasan satu halaman (9 kartu): 6 KPI utama, grafik tren pendapatan vs beban, cincin komposisi pendapatan, dan narasi kesimpulan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
-    kpi('Pendapatan Usaha', 'Realisasi periode berjalan', '128,4', 'Miliar Rp', 6.8, 'vs target', [110, 113, 116, 120, 124, 128.4], 120, 'Target'),
-    kpi('Laba Bersih', 'Setelah seluruh beban usaha', '23,7', 'Miliar Rp', 4.2, 'YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
-    kpi('Beban Operasional', 'Terhadap pagu yang ditetapkan', '96,2', 'Miliar Rp', -1.4, 'dari pagu', [99, 98.4, 97.8, 97.1, 96.8, 96.2], 98, 'Pagu'),
-    kpi('Realisasi Anggaran', 'Serapan belanja periode ini', 87.5, '%', 3.1, 'dari triwulan lalu', [78, 80, 82, 84, 86, 87.5], 90, 'Target'),
-    kpi('Indeks Kepuasan Layanan', 'Skala 0-100', 82.4, 'poin', undefined, 'naik 1,8 poin', [78, 79, 80, 81, 81.8, 82.4], 85, 'Target'),
-    kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', undefined, 'turun 4 dari semester lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
+    kpi('Pendapatan Usaha', 'Realisasi periode ini', '128,4', 'Miliar Rp', 6.8, 'vs target', [110, 113, 116, 120, 124, 128.4]),
+    kpi('Laba Bersih', 'Setelah beban usaha', '23,7', 'Miliar Rp', 4.2, 'YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
+    kpi('Beban Operasional', 'Terhadap pagu', '96,2', 'Miliar Rp', -1.4, 'dari pagu', [99, 98.4, 97.8, 97.1, 96.8, 96.2]),
+    kpi('Realisasi Anggaran', 'Serapan belanja', 87.5, '%', 3.1, 'dari triwulan lalu', [78, 80, 82, 84, 86, 87.5]),
+    kpi('Indeks Kepuasan Layanan', 'Skala 0–100', 82.4, 'poin', undefined, 'naik 1,8 poin', [78, 79, 80, 81, 81.8, 82.4]),
+    kpi('Temuan Audit Terbuka', 'Belum ditutup', 12, 'temuan', undefined, 'turun 4 dari semester lalu', [22, 20, 18, 16, 14, 12]),
 
-    grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 12, h: 4 }, BULAN, [
+    // Baris kedua mengikuti pola "grafik besar + cincin komposisi" seperti
+    // dashboard keuangan pada referensi: tren di kiri (2/3), komposisi di kanan (1/3).
+    grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 8, h: 4 }, BULAN, [
       { name: 'Pendapatan', data: [98, 101, 104, 107, 110, 113, 116, 119, 122, 124, 126, 128.4] },
       { name: 'Beban', data: [88, 90, 91, 92, 93, 94, 94.6, 95, 95.4, 95.8, 96, 96.2], kind: 'line' },
     ], 'Miliar Rp'),
+    w('donut', 'Komposisi Pendapatan', 'Nilai tiap sumber, miliar rupiah', { w: 4, h: 4 }, {
+      chart: {
+        xAxis: ['Air minum', 'Sambungan baru', 'Non-air', 'Lain-lain'],
+        // Nilai absolut (bukan persen) supaya TOTAL di tengah cincin bermakna:
+        // jumlahnya sama dengan KPI "Pendapatan Usaha" (128,4 miliar).
+        series: [{ name: 'Pendapatan', data: [92.4, 18, 11.6, 6.4] }],
+        unit: 'Miliar Rp',
+        showLegend: true,
+      },
+    }),
 
     narasi('Kesimpulan Eksekutif', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 3 },
       'Contoh kesimpulan: kinerja periode ini berada pada kondisi sehat. Pendapatan melampaui target, beban operasional terjaga di bawah pagu, ' +
