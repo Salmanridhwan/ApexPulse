@@ -437,7 +437,21 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
           {/* Toolbar bawah — tombol pakai template */}
           <div className="border-t border-line px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface-2 rounded-b-card">
-            <div className="flex items-center gap-1.5 min-w-0">
+            {/* Tombol simpan diletakkan paling kiri baris ini. */}
+            <div className="flex items-center gap-2 min-w-0">
+              {asli && (
+                <button
+                  onClick={() => void pakai()}
+                  disabled={memuat}
+                  data-testid="simpan-dari-pratinjau"
+                  title="Simpan pratinjau ini menjadi dashboard milik instansi"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 shrink-0"
+                >
+                  {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
+                  <span>{memuat ? 'Menyimpan…' : 'Simpan sebagai dashboard'}</span>
+                </button>
+              )}
+              <div className="flex items-center gap-1.5 min-w-0">
               {st?.status === 'siap' ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-pos shrink-0" />
               ) : st?.status === 'proses' || memuatAsli ? (
@@ -450,6 +464,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                   ? `${progres.terisi}/${progres.total} kartu terisi · ${detik} dtk · ${progres.judul || 'menyiapkan…'}`
                   : statusTeks}
               </span>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -503,18 +518,6 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 </span>
                 {!asli && !memuatAsli && st?.status !== 'proses' && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
-              {asli && (
-                <button
-                  onClick={() => void pakai()}
-                  disabled={memuat}
-                  data-testid="simpan-dari-pratinjau"
-                  title="Simpan pratinjau ini menjadi dashboard milik instansi"
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60"
-                >
-                  {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
-                  <span>{memuat ? 'Menyimpan…' : 'Simpan sebagai dashboard'}</span>
-                </button>
-              )}
             </div>
           </div>
 
