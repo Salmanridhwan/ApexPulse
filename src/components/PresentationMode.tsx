@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import type { Dashboard } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
@@ -58,14 +58,27 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
     };
   }, []);
 
-  // Esc keluar dari presentasi.
+  /**
+   * Keluar dari presentasi SEKALIGUS keluar dari layar penuh. Tanpa ini, menekan
+   * ✕ hanya menutup overlay sementara browser tetap di mode layar penuh.
+   */
+  const keluar = useCallback(() => {
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen?.();
+    } catch {
+      /* abaikan: browser bisa menolak bila bukan gestur user */
+    }
+    onExit();
+  }, [onExit]);
+
+  // Esc keluar dari presentasi (sekaligus layar penuh).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onExit();
+      if (e.key === 'Escape') keluar();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onExit]);
+  }, [keluar]);
 
   return (
     <div className="fixed inset-0 z-[60] bg-canvas flex flex-col overflow-hidden">
@@ -88,7 +101,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
             </span>
           )}
           <button
-            onClick={onExit}
+            onClick={keluar}
             title="Keluar presentasi (Esc)"
             aria-label="Keluar presentasi"
             className="p-2 text-ink-2 bg-surface hover:bg-surface-2 hover:text-ink border border-line rounded-control transition-colors"
