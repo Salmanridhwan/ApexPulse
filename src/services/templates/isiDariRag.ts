@@ -207,6 +207,22 @@ function punyaDataValid(w: WidgetSpec): boolean {
   return false;
 }
 
+/**
+ * Kelas bentuk tampilan: seluruh jenis grafik dianggap satu kelas karena datanya
+ * sama-sama deret berkategori (xAxis + series), jadi bentuk template boleh dipakai
+ * apa pun jawaban dokumen (batang, garis, donat, …). Kelas berbeda hanya untuk
+ * tabel, narasi, dan KPI — di situ datanya tidak bisa ditukar.
+ */
+function kelasBentuk(t: string): string {
+  if (t === 'table') return 'tabel';
+  if (t === 'narasi') return 'narasi';
+  if (t === 'kpi' || t === 'bullet-target') return 'kpi';
+  return 'grafik';
+}
+
+/** Bentuk yang hanya butuh SATU deret (pai/donat/treemap) tidak bisa menelan dua deret. */
+const BUTUH_SATU_DERET = ['pie', 'donut', 'treemap', 'funnel', 'gauge', 'radar'];
+
 /** Buang SELURUH muatan angka contoh dari kartu template (sisakan kerangka: id, judul, grid, tipe). */
 function kerangka(w: WidgetSpec): WidgetSpec {
   const sisa: WidgetSpec = { ...w };
@@ -273,9 +289,9 @@ async function kumpulan<T, R>(
 /**
  * Isi seluruh kartu template dari dokumen RAG.
  *
- * Kartu yang berhasil diisi memakai JUDUL INDIKATOR NYATA dari dokumen (supaya
- * tidak ada kartu berlabel lain padahal isinya metrik berbeda); judul kartu
- * template asli dicatat di subjudul sebagai penanda asal.
+ * Kartu yang berhasil diisi TETAP memakai judul, subjudul, urutan, ukuran, dan
+ * bentuk tampilan dari template — hanya angkanya yang berasal dari dokumen. Dengan
+ * begitu dashboard hasil "Gunakan template" tampil sama dengan pratinjau template.
  */
 export async function isiTemplateDariRag(
   template: DashboardTemplate,
@@ -374,7 +390,6 @@ export async function isiTemplateDariRag(
 
     if (valid) {
       const d: any = hasil!.data;
-      const judulDokumen: string = d.title || w.title;
       const kpi: any = d.kpi ? { ...d.kpi } : undefined;
       // Buang angka turunan yang TIDAK bersandar dokumen: sparkline sintetis
       // (`turunan-nilai`) membuat delta jadi konstanta yang sama untuk semua kartu
@@ -385,19 +400,32 @@ export async function isiTemplateDariRag(
         delete kpi.sparkline;
         delete kpi.sparklineAsal;
       }
+      /**
+       * KARTU HARUS TETAP SEPERTI TEMPLATE: id, urutan, lebar/tinggi (grid), judul,
+       * subjudul, dan bentuk tampilan diambil dari template. Dokumen hanya menyumbang
+       * ANGKA (kpi/chart/table/narasi). Bentuk dari dokumen hanya dipakai bila
+       * keluarganya berbeda — kalau masih sekeluarga (batang↔garis↔area), bentuk
+       * template yang menang supaya dashboard hasilnya sama dengan pratinjau.
+       */
+      const tipeDokumen = (d.type as WidgetSpec['type']) || w.type;
+      const jumlahDeret = Array.isArray((d as any)?.chart?.series) ? (d as any).chart.series.length : 0;
+      const bentukTemplateBisa =
+        kelasBentuk(String(w.type)) !== 'grafik' || !BUTUH_SATU_DERET.includes(String(w.type))
+          ? true
+          : jumlahDeret <= 1;
+      const tipeFinal =
+        kelasBentuk(String(tipeDokumen)) === kelasBentuk(String(w.type)) && bentukTemplateBisa
+          ? w.type
+          : tipeDokumen;
       keluar = {
         ...kerangka(w),
         ...d,
         id: w.id,
         grid: w.grid,
-        type: (d.type as WidgetSpec['type']) || w.type,
-        title: judulDokumen,
+        type: tipeFinal,
+        title: w.title,
+        subtitle: w.subtitle,
         kpi,
-        // Judul kartu template asli dipertahankan sebagai penanda asal bila beda.
-        subtitle:
-          judulDokumen && judulDokumen !== w.title
-            ? `Dari template: ${w.title}`
-            : d.subtitle || w.subtitle,
         confidence: 'sumber',
         citations: Array.isArray(d.citations) ? d.citations : [],
         dataKosong: false,

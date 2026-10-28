@@ -238,7 +238,11 @@ test('kartu dicari ulang memakai ISTILAH DOKUMEN lewat kamus', async () => {
   };
   const hasil = await isiTemplateDariRag(tpl, { ...dasar, rag: kamus, batasMs: 120_000, konkurensi: 1 });
   assert.equal(hasil.terisi, 1, 'kartu terisi setelah istilah dokumen dipakai');
-  assert.equal(hasil.widgets[0].title, 'Komposisi Beban 2024 (Laba Rugi)', 'judul dari dokumen');
+  // Judul kartu TETAP milik template (permintaan: hasil real harus sesuai template);
+  // angkanya yang diambil dari dokumen.
+  assert.equal(hasil.widgets[0].title, 'Komposisi Biaya Operasional', 'judul tetap milik template');
+  assert.equal(hasil.widgets[0].type, 'pie', 'bentuk tetap milik template');
+  assert.deepEqual(hasil.widgets[0].chart?.series?.[0]?.data, [1905640, 968450], 'angka dari dokumen');
   assert.ok(n >= 3, `ditolak dulu baru berhasil (panggilan: ${n})`);
 });
 
