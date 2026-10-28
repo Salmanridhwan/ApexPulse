@@ -233,7 +233,7 @@ const opsiDonat = (s: number, data: { nama: string; nilai: number; warna: string
   series: [
     {
       type: 'pie',
-      radius: ['64%', '92%'],
+      radius: ['70%', '98%'],
       center: ['50%', '50%'],
       avoidLabelOverlap: false,
       label: { show: false },
@@ -406,8 +406,9 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
     [],
   );
 
-  const kartu = (tambahan = '') =>
-    `rounded-[0.9em] p-[0.85em] ${penuh ? 'h-full flex flex-col min-h-0' : ''} ${tambahan}`;
+  // Kartu SELALU mengisi tinggi barisnya (galeri maupun presentasi). Dengan
+  // begitu cincin ikut memanjang dan tidak menyisakan ruang kosong di bawah.
+  const kartu = (tambahan = '') => `rounded-[0.9em] p-[0.85em] h-full flex flex-col min-h-0 ${tambahan}`;
 
   const gayaKartu = { backgroundColor: W.kartu, border: `1px solid ${W.garis}` };
 
@@ -482,17 +483,21 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
           </p>
           {/* Legenda di SAMPING cincin (bukan di bawah) supaya cincin dapat ruang
               penuh dan tampil lebih besar, seperti referensi. */}
-          <div className={penuh ? 'flex-1 min-h-0 mt-[0.3em] flex items-center gap-[0.5em]' : 'mt-[0.3em] flex items-center gap-[0.5em]'}>
-            <div className={`relative ${penuh ? 'flex-1 min-w-0 h-full' : 'shrink-0 w-[7.6em] h-[7.6em]'}`}>
-              <div ref={segmenRef} className="w-full h-full" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[0.86em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
-                <span className="text-[0.62em] mt-[0.1em]" style={{ color: W.teks3 }}>
-                  Total
-                </span>
+          {/* Blok grafik mengisi SELURUH sisa tinggi kartu (absolute inset-0) supaya
+              cincin benar-benar memakai ruang yang tersedia — tidak menyisakan
+              ruang kosong di bawah. */}
+          <div className="relative flex-1 min-h-[8.5em] mt-[0.2em]">
+            <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
+              <div className="relative flex-[1.45] min-w-0">
+                <div ref={segmenRef} className="w-full h-full" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[0.9em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
+                  <span className="text-[0.62em] mt-[0.1em]" style={{ color: W.teks3 }}>
+                    Total
+                  </span>
+                </div>
               </div>
-            </div>
-            <ul className="flex-1 min-w-0 space-y-[0.4em]">
+              <ul className="flex-1 min-w-0 self-center space-y-[0.5em]">
               {SEGMEN.map((r) => (
                 <li key={r.nama} className="flex items-start gap-[0.35em] text-[0.7em]">
                   <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0 mt-[0.3em]" style={{ backgroundColor: r.warna }} />
@@ -505,8 +510,9 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
                     </p>
                   </div>
                 </li>
-              ))}
-            </ul>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -566,31 +572,33 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
           <p className="text-[0.75em] shrink-0" style={{ color: W.teks3 }}>
             Porsi nilai transaksi
           </p>
-          <div className={penuh ? 'flex-1 min-h-0 mt-[0.3em] flex items-center gap-[0.5em]' : 'mt-[0.3em] flex items-center gap-[0.5em]'}>
-            <div className={`relative ${penuh ? 'flex-1 min-w-0 h-full' : 'shrink-0 w-[6.6em] h-[6.6em]'}`}>
-              <div ref={bayarRef} className="w-full h-full" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[0.8em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
-                <span className="text-[0.6em] mt-[0.1em]" style={{ color: W.teks3 }}>
-                  Total
-                </span>
+          <div className="relative flex-1 min-h-[7.5em] mt-[0.2em]">
+            <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
+              <div className="relative flex-[1.35] min-w-0">
+                <div ref={bayarRef} className="w-full h-full" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[0.82em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
+                  <span className="text-[0.6em] mt-[0.1em]" style={{ color: W.teks3 }}>
+                    Total
+                  </span>
+                </div>
               </div>
+              <ul className="flex-1 min-w-0 self-center space-y-[0.55em]">
+                {PEMBAYARAN.map((r) => (
+                  <li key={r.nama} className="flex items-start gap-[0.35em] text-[0.7em]">
+                    <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0 mt-[0.3em]" style={{ backgroundColor: r.warna }} />
+                    <div className="min-w-0">
+                      <p className="truncate leading-tight" style={{ color: W.teks2 }}>
+                        {r.nama}
+                      </p>
+                      <p className="tabular-nums leading-tight" style={{ color: W.teks3 }}>
+                        {r.nominal} · {String(r.nilai).replace('.', ',')}%
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="flex-1 min-w-0 space-y-[0.45em]">
-              {PEMBAYARAN.map((r) => (
-                <li key={r.nama} className="flex items-start gap-[0.35em] text-[0.7em]">
-                  <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0 mt-[0.3em]" style={{ backgroundColor: r.warna }} />
-                  <div className="min-w-0">
-                    <p className="truncate leading-tight" style={{ color: W.teks2 }}>
-                      {r.nama}
-                    </p>
-                    <p className="tabular-nums leading-tight" style={{ color: W.teks3 }}>
-                      {r.nominal} · {String(r.nilai).replace('.', ',')}%
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
 
