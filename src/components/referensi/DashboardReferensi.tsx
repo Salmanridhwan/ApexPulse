@@ -431,9 +431,15 @@ const opsiArea = (s: number, arus?: number[], label?: string[]) => {
             backgroundColor: 'rgba(16,16,18,0.9)',
             borderRadius: 4 * s,
             padding: [2 * s, 5 * s],
-            formatter: (p: any) => `Rp ${String(p.value).replace('.', ',')} M`,
+            // Nilai diambil dari deret (bukan p.value) karena markPoint memakai coord.
+            formatter: () =>
+              `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(
+                Number(nilaiArus[nilaiArus.length - 1]),
+              )} M`,
           },
-          data: [{ type: 'max', name: 'Tertinggi' }],
+          // Titik + angka selalu di ujung KANAN garis (nilai terbaru), seperti
+          // template — bukan di titik tertinggi yang bisa jatuh di kiri.
+          data: [{ coord: [nilaiArus.length - 1, nilaiArus[nilaiArus.length - 1]] }],
         },
         areaStyle: {
           color: {
