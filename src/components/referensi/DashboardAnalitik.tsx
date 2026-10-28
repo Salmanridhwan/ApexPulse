@@ -539,26 +539,52 @@ const opsiJam = (s: number, mode: string) => {
 };
 
 /** Metode pembayaran (cincin). */
+/** Metode pembayaran (batang mendatar berperingkat — bukan pie). */
 const opsiBayar = (s: number, mode: string) => {
   const dasar = gayaDasar(s);
   const data = PEMBAYARAN[mode] ?? PEMBAYARAN['Bulan Ini'];
+  const total = data.reduce((a, b) => a + b.nilai, 0);
+  const urut = [...data].reverse();
+  const maks = Math.max(...data.map((d) => d.nilai));
   return {
-    animationDuration: 800,
+    animationDuration: 750,
+    animationEasing: 'cubicOut' as const,
+    grid: { left: 2, right: 62 * s, top: 4, bottom: 2, containLabel: true },
     tooltip: {
       ...dasar,
       trigger: 'item',
-      formatter: (p: any) => `${p.marker} ${p.name}<br/><b>${p.value} pesanan</b> (${p.percent}%)`,
+      formatter: (p: any) =>
+        `${p.marker} ${p.name}<br/><b>${p.value} pesanan</b> · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
+    },
+    xAxis: { type: 'value', max: maks, show: false },
+    yAxis: {
+      type: 'category',
+      data: urut.map((d) => d.nama),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: WARNA.teks2, fontSize: 9.4 * s, margin: 6 * s },
     },
     series: [
       {
-        type: 'pie',
-        radius: ['62%', '92%'],
-        center: ['50%', '50%'],
-        label: { show: false },
-        labelLine: { show: false },
-        itemStyle: { borderColor: WARNA.kartu, borderWidth: 3 * s, borderRadius: 5 * s, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 8 * s },
-        emphasis: { scale: true, scaleSize: 5 * s, itemStyle: { shadowBlur: 16 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
-        data: data.map((d) => ({ name: d.nama, value: d.nilai, itemStyle: { color: d.warna } })),
+        type: 'bar',
+        barWidth: '54%',
+        data: urut.map((d) => ({
+          value: d.nilai,
+          itemStyle: { color: gradasiBatangArah(d.warna, s), borderRadius: [0, 4 * s, 4 * s, 0] },
+        })),
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          distance: 6 * s,
+          color: WARNA.teks2,
+          fontSize: 8.8 * s,
+          fontWeight: 'bold',
+          formatter: (p: any) =>
+            `${p.value} · ${((Number(p.value) / total) * 100).toFixed(1).replace('.', ',')}%`,
+        },
+        emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.25)' } },
       },
     ],
   };
@@ -1088,33 +1114,13 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({ penuh = fa
                 />
               }
             />
-            <div className="flex-1 min-h-0 flex flex-col">
-              <div className="relative w-full flex-1 min-h-[5em]">
-                <div ref={bayarRef} className="absolute inset-0" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[1.05em] font-bold leading-none tabular-nums">
-                    {totalBayar.toLocaleString('id-ID')}
-                  </span>
-                  <span className="text-[0.58em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
-                    pesanan
-                  </span>
-                </div>
-              </div>
-              <ul className="w-full shrink-0 flex flex-col gap-[0.16em] mt-[0.25em]">
-                {dataBayar.map((d) => (
-                  <li key={d.nama} className="flex items-center gap-[0.3em] text-[0.62em] min-w-0">
-                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: d.warna }} />
-                    <span className="truncate" style={{ color: WARNA.teks2 }}>
-                      {d.nama}
-                    </span>
-                    <span className="ml-auto tabular-nums shrink-0" style={{ color: WARNA.teks3 }}>
-                      {Math.round((d.nilai / totalBayar) * 1000) / 10}%
-                    </span>
-                    <span className="tabular-nums font-semibold shrink-0 w-[2.2em] text-right">{d.nilai}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="flex items-baseline gap-[0.3em] shrink-0 mb-[0.3em]">
+              <span className="text-[1.1em] font-bold leading-none tabular-nums">{totalBayar.toLocaleString('id-ID')}</span>
+              <span className="text-[0.62em]" style={{ color: WARNA.teks3 }}>
+                pesanan · {dataBayar.length} metode
+              </span>
             </div>
+            <div ref={bayarRef} className={bidang('h-[9.4em]')} />
           </div>
 
           <div className={`${kartu()} ${penuh ? 'baris-100' : ''}`} style={gayaKartu}>
