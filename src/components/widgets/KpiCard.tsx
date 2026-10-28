@@ -186,7 +186,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
     sparkline && sparkline.length > 1 ? sparkPaths(sparkline) : null;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden" style={{ containerType: 'inline-size' }}>
       {/* Teks memakai bagian atas kartu. Grafik tren TIDAK lagi jadi lapisan latar:
           pada versi lama grafik setinggi 52% ditimpa baris delta/target sehingga garisnya
           menembus label. Sekarang grafik menempati barisnya sendiri di dasar kartu. */}
@@ -200,7 +200,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({
             className={`kpi-enter ${angkaKelas} leading-none font-bold tracking-tight tabular-nums ${
               isCorrected ? 'text-warn' : 'text-ink'
             }`}
-            style={isCorrected ? undefined : gayaAngka}
+            style={{
+              ...(isCorrected ? {} : gayaAngka),
+              fontSize: hero ? 'clamp(1.15rem, 20cqw, 2.75rem)' : 'clamp(0.95rem, 15.5cqw, 2rem)',
+            }}
           >
             {value}
           </span>

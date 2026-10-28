@@ -102,7 +102,36 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       if (!el) return;
       setLayarLebar(window.innerWidth >= 1024);
       const atas = el.getBoundingClientRect().top;
-      setTinggiTersedia(Math.max(0, Math.round(window.innerHeight - atas - 12)));
+      /**
+       * Batas bawah diambil dari INDUK yang bisa digulir (mis. <main class="overflow-y-auto">),
+       * bukan `window.innerHeight`. Kalau memakai jendela, tinggi yang dipakai bisa lebih besar
+       * dari ruang yang benar-benar terlihat sehingga muncul gulir 10–20 px di kanan.
+       */
+      let induk: HTMLElement | null = el.parentElement;
+      while (induk && induk !== document.body) {
+        const gaya = getComputedStyle(induk);
+        if (/(auto|scroll)/.test(gaya.overflowY) && induk.clientHeight > 0) break;
+        induk = induk.parentElement;
+      }
+      /**
+       * Batas bawah SELALU dasar jendela. Kalau memakai tinggi induk yang bisa digulir,
+       * nilai itu ikut membesar ketika isi meluber (lingkaran setan: makin meluber makin
+       * tinggi), sehingga kanvas tidak pernah mengecil. Padding bawah leluhur dikurangkan
+       * di bawah supaya <main class="p-6"> tidak memunculkan gulir 24 px.
+       */
+      const batasBawah = window.innerHeight;
+      /**
+       * Padding bawah leluhur (mis. <main class="p-6">) ikut menambah tinggi isi induk,
+       * jadi harus dikurangkan — kalau tidak, tetap muncul gulir setinggi padding itu.
+       */
+      let padBawah = 0;
+      for (let n: HTMLElement | null = el.parentElement; n && n !== induk; n = n.parentElement) {
+        padBawah += parseFloat(getComputedStyle(n).paddingBottom) || 0;
+      }
+      // 8px cadangan supaya pembulatan subpiksel tidak memunculkan gulir.
+      setTinggiTersedia(
+        Math.max(0, Math.round(Math.min(batasBawah, window.innerHeight) - atas - padBawah - 8))
+      );
     };
     ukur();
     const tunda = window.setTimeout(ukur, 350);
@@ -125,7 +154,11 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    * Pisahkan KPI dari kartu lain: KPI selalu satu baris tersendiri di atas,
    * sisanya dipas-kan di grid 12 kolom seperti biasa.
    */
-  const widgetsKpi = useMemo(() => widgets.filter((w) => w.type === 'kpi'), [widgets]);
+  /**
+   * KPI maksimal 6 kartu (aturan produk) — kartu ke-7 dan seterusnya dibuang dari
+   * baris KPI supaya angkanya tidak terpotong dan tetap satu baris seperti template.
+   */
+  const widgetsKpi = useMemo(() => widgets.filter((w) => w.type === 'kpi').slice(0, 6), [widgets]);
   const widgetsLain = useMemo(() => widgets.filter((w) => w.type !== 'kpi'), [widgets]);
 
   /** Baris untuk kartu non-KPI (grafik, tabel, narasi, ...). */

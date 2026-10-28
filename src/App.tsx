@@ -1166,115 +1166,77 @@ export default function App() {
                 </React.Suspense>
               ) : (
                 <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-                  {/* Visual Header & Toolbar Card */}
+                  {/* Kepala ringkas ala template: judul + chip + aksi dalam satu baris */}
                   {activeDashboard && !isPresentationMode && (
-                    <div className="mb-5 card border-l-[3px]" style={{ borderLeftColor: 'var(--tegas-accent)' }}>
-                      {/* Baris atas: info dashboard */}
-                      <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          {/* Judul dashboard — dipindah dari navbar; navbar cukup "Workspace" */}
-                          {activeDashboard.title && (
-                            <h1
-                              className="text-xl sm:text-2xl font-black text-ink tracking-[-0.02em] truncate mb-1"
-                              title={activeDashboard.title}
-                            >
-                              {activeDashboard.title}
-                            </h1>
-                          )}
-                          {/* Label sektor */}
-                          {currentTenant?.sector && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3 mb-1.5">
-                              <Building2 className="w-3 h-3" />
-                              {currentTenant.sector}
-                              {currentTenant.city && <> · {currentTenant.city}</>}
-                            </span>
-                          )}
-                          {/* Metadata baris bawah */}
-                          <div className="flex flex-wrap items-center gap-2 mt-2">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
-                              <LayoutGrid className="w-3 h-3 text-ink-3" />
-                              {activeDashboard.widgets.length} widget
-                            </span>
-                            <span className="text-line-strong text-xs">·</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-ink-3">
-                              <Clock className="w-3 h-3" />
-                              {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </span>
-
-                          </div>
-                        </div>
+                    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <div className="min-w-0 flex items-center gap-2.5">
+                        <span
+                          className="w-[6px] h-[6px] rounded-full shrink-0"
+                          style={{ backgroundColor: 'var(--tegas-accent)' }}
+                          aria-hidden="true"
+                        />
+                        <h1
+                          className="text-[15px] sm:text-base font-bold text-ink tracking-[-0.01em] truncate"
+                          title={activeDashboard.title}
+                        >
+                          {activeDashboard.title || 'Dashboard'}
+                        </h1>
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[10.5px] font-semibold text-ink-2 bg-surface-2 border border-line px-1.5 py-[1px] rounded-chip whitespace-nowrap">
+                          <LayoutGrid className="w-3 h-3 text-ink-3" />
+                          {activeDashboard.widgets.length} widget
+                        </span>
+                        <span className="hidden md:inline text-[10.5px] text-ink-3 whitespace-nowrap">
+                          {new Date(activeDashboard.updatedAt).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
                       </div>
 
-                      {/* Divider + Toolbar bawah */}
-                      <div className="border-t border-line px-4 sm:px-5 py-2.5 flex items-center justify-between gap-2 bg-surface-2 rounded-b-card">
-                        {/* Kiri: instansi + judul dashboard aktif */}
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <FileCheck className="w-3.5 h-3.5 text-ink-3 shrink-0" />
-                          <span className="text-[11px] text-ink-3 font-medium truncate">
-                            {currentTenant?.name || 'Dashboard aktif'}
-                          </span>
-                          {activeDashboard.title && (
-                            <>
-                              <span className="text-line-strong text-xs shrink-0">·</span>
-                              <span
-                                className="text-[11px] text-ink-2 font-semibold truncate"
-                                title={activeDashboard.title}
-                              >
-                                {activeDashboard.title}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Kanan: tombol aksi */}
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setIsImportOpen(true)}
-                            title="Ubah berkas Excel/CSV menjadi widget dashboard"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                          >
-                            <FileSpreadsheet className="w-3 h-3 text-ink-3" />
-                            Impor Data
-                          </button>
-                          <button
-                            onClick={() => setIsCatalogOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                          >
-                            <Plus className="w-3 h-3 text-ink-3" />
-                            Tambah Widget
-                          </button>
-                          <button
-                            onClick={() => setIsGlobalStyleOpen(true)}
-                            disabled={!activeDashboard?.widgets?.length}
-                            title={
-                              activeDashboard?.widgets?.length
-                                ? 'Atur warna & font untuk seluruh widget dashboard'
-                                : 'Belum ada widget di dashboard ini'
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            <Palette className="w-3 h-3 text-ink-3" />
-                            Gaya Semua
-                          </button>
-                          <button
-                            onClick={() => setIsShareOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors"
-                          >
-                            <Share2 className="w-3 h-3" />
-                            Bagikan
-                          </button>
-                        </div>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <button
+                          onClick={() => setIsImportOpen(true)}
+                          title="Ubah berkas Excel/CSV menjadi widget dashboard"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-ink-3" />
+                          <span className="hidden sm:inline">Impor Data</span>
+                        </button>
+                        <button
+                          onClick={() => setIsCatalogOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                        >
+                          <Plus className="w-3 h-3 text-ink-3" />
+                          <span className="hidden sm:inline">Tambah Widget</span>
+                        </button>
+                        <button
+                          onClick={() => setIsGlobalStyleOpen(true)}
+                          disabled={!activeDashboard?.widgets?.length}
+                          title={
+                            activeDashboard?.widgets?.length
+                              ? 'Atur warna & font untuk seluruh widget dashboard'
+                              : 'Belum ada widget di dashboard ini'
+                          }
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Palette className="w-3 h-3 text-ink-3" />
+                          <span className="hidden sm:inline">Gaya Semua</span>
+                        </button>
+                        <button
+                          onClick={() => setIsShareOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          <span className="hidden sm:inline">Bagikan</span>
+                        </button>
                       </div>
                     </div>
                   )}
 
                   {/* Filter dashboard internal (view-only, ala Tableau) */}
                   {activeDashboard && (activeDashboard.widgets?.length || 0) > 0 && (
-                    <div className="mb-4">
+                    <div className="mb-2.5">
                       <GlobalFiltersBar
                         filters={viewFilters}
                         onChange={setViewFilters}
