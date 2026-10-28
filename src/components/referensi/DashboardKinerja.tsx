@@ -149,7 +149,9 @@ const dasar = (s: number) => ({
  * Legenda ringkas tiap grafik: penanda warna + label, rata kanan tepat di atas
  * bidang grafik. `garis` dipakai untuk seri garis (penanda berbentuk garis).
  */
-const Legenda: React.FC<{ item: Array<{ warna: string; label: string; garis?: boolean }> }> = ({ item }) => (
+const Legenda: React.FC<{
+  item: Array<{ warna: string; label: string; garis?: boolean; nilai?: string }>;
+}> = ({ item }) => (
   <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
     {item.map((x) => (
       <li key={x.label} className="inline-flex items-center gap-[0.35em] text-[0.72em] font-medium" style={{ color: W.teks2 }}>
@@ -158,7 +160,12 @@ const Legenda: React.FC<{ item: Array<{ warna: string; label: string; garis?: bo
         ) : (
           <span className="w-[0.62em] h-[0.62em] rounded-[0.2em] shrink-0" style={{ backgroundColor: x.warna }} />
         )}
-        {x.label}
+        <span>{x.label}</span>
+        {x.nilai ? (
+          <span className="tabular-nums font-semibold" style={{ color: W.teks }}>
+            {x.nilai}
+          </span>
+        ) : null}
       </li>
     ))}
   </ul>
@@ -552,7 +559,15 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
             </div>
             <Receipt className="w-[1.1em] h-[1.1em] shrink-0" style={{ color: W.emas }} />
           </div>
-          <Legenda item={[{ warna: W.emas, label: 'Pendapatan per kategori' }]} />
+          <Legenda
+            item={[
+              {
+                warna: W.emas,
+                label: 'Pendapatan per kategori',
+                nilai: `Rp ${String(KATEGORI.reduce((a, k) => a + k.nilai, 0).toFixed(1)).replace('.', ',')} jt`,
+              },
+            ]}
+          />
           <div ref={kategoriRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[9.5em]'} />
         </div>
       </div>

@@ -117,6 +117,9 @@ const PENDAPATAN_BULANAN = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4
  */
 const GARIS_PENDAPATAN = PENDAPATAN_BULANAN;
 
+/** Total setahun — dipakai sebagai detail di legenda grafik batang. */
+const TOTAL_PENDAPATAN = PENDAPATAN_BULANAN.reduce((a, b) => a + b, 0);
+
 const RINCIAN_BEBAN = [
   { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
   { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA.teal },
@@ -171,7 +174,9 @@ const jalurSpark = (seri: number[]) => {
  * Legenda ringkas untuk tiap grafik: sederet penanda warna + label, rata kanan
  * tepat di atas bidang grafik supaya tidak menabrak judul maupun angka utama.
  */
-const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: boolean; garis?: boolean }> }> = ({ item }) => (
+const Legenda: React.FC<{
+  item: Array<{ warna: string; label: string; redup?: boolean; garis?: boolean; nilai?: string }>;
+}> = ({ item }) => (
   <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
     {item.map((x) => (
       <li key={x.label} className="inline-flex items-center gap-[0.35em] text-[0.72em] font-medium" style={{ color: WARNA.teks2 }}>
@@ -183,7 +188,12 @@ const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: bo
             style={{ backgroundColor: x.warna, opacity: x.redup ? 0.6 : 1 }}
           />
         )}
-        {x.label}
+        <span>{x.label}</span>
+        {x.nilai ? (
+          <span className="tabular-nums font-semibold" style={{ color: WARNA.teks }}>
+            {x.nilai}
+          </span>
+        ) : null}
       </li>
     ))}
   </ul>
@@ -542,9 +552,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           </div>
           <Legenda
             item={[
-              { warna: WARNA.oranye, label: 'Pendapatan 2025', redup: true },
-              { warna: WARNA.oranye, label: 'Desember (tertinggi)' },
-              { warna: '#38bdf8', label: 'Garis tren', garis: true },
+              {
+                warna: WARNA.oranye,
+                label: 'Pendapatan 2025',
+                redup: true,
+                nilai: `Rp ${String(TOTAL_PENDAPATAN.toFixed(1)).replace('.', ',')} M`,
+              },
+              { warna: WARNA.oranye, label: 'Desember (tertinggi)', nilai: 'Rp 23,7 M' },
+              { warna: '#38bdf8', label: 'Garis tren', garis: true, nilai: 'nilai = batang' },
             ]}
           />
           <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
