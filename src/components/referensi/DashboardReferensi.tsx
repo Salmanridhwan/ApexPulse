@@ -22,15 +22,18 @@ import { loadEcharts } from '../widgets/echartsSetup';
  * dengan daftar legenda, daftar transaksi, grafik area arus kas, batang progres
  * target, dan strip insight di bawah.
  *
- * Dua mode pakai:
- * - `penuh` = false → dipakai di galeri template (tinggi mengikuti isi, ada jarak
- *   antar baris). Dipakai sebagai pratinjau di halaman.
- * - `penuh` = true  → dipakai MODE PRESENTASI: seluruh baris membagi tinggi layar
- *   (`flex-1`), grafik ikut memanjang, jadi tidak ada ruang kosong di bawah.
+ * UKURAN RESPONSIF
+ * Semua ukuran di dalam komponen ini memakai satuan `em`, dan ukuran huruf akar
+ * dihitung dari besar wadah (`skala`). Jadi di layar 1920 teks ikut membesar
+ * (tidak terasa kecil), sementara di 1366 tetap terbaca. Grafik ECharts memakai
+ * `skala` yang sama untuk ukuran huruf sumbu, ketebalan garis, dan lebar batang.
  *
- * Catatan penting: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen
- * instansi. Komponen ini hanya untuk pratinjau tampilan, tidak dipakai untuk
- * dashboard berisi data dokumen.
+ * Dua mode pakai:
+ * - `penuh` = false → galeri template (tinggi mengikuti isi).
+ * - `penuh` = true  → MODE PRESENTASI: baris membagi tinggi layar, grafik
+ *   memanjang, tanpa ruang kosong.
+ *
+ * Catatan: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen instansi.
  */
 
 const WARNA = {
@@ -152,6 +155,124 @@ const jalurSpark = (seri: number[]) => {
   };
 };
 
+/** Gaya dasar grafik: huruf, garis, dan padding ikut `skala` (em setara). */
+const gayaDasar = (s: number) => ({
+  tooltip: {
+    backgroundColor: '#1f2126',
+    borderColor: WARNA.garis,
+    borderWidth: 1,
+    padding: [6 * s, 10 * s],
+    textStyle: { color: WARNA.teks, fontSize: 11 * s },
+  },
+  sumbu: {
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: WARNA.teks3, fontSize: 10 * s },
+  },
+});
+
+const opsiBar = (s: number) => {
+  const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
+  const dasar = gayaDasar(s);
+  return {
+    grid: { left: 4, right: 8, top: 14 * s, bottom: 2, containLabel: true },
+    tooltip: {
+      ...dasar.tooltip,
+      trigger: 'axis',
+      formatter: (p: any) => {
+        const d = p[0];
+        return `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${d.name} 2025</div><b>Rp ${String(d.value).replace('.', ',')} M</b>`;
+      },
+    },
+    xAxis: { type: 'category', data: BULAN, ...dasar.sumbu },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
+      axisLabel: { color: WARNA.teks3, fontSize: 10 * s, formatter: '{value} M' },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: PENDAPATAN_BULANAN.map((v, i) => ({
+          value: v,
+          itemStyle: {
+            color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.34)',
+            borderRadius: [4 * s, 4 * s, 0, 0],
+          },
+        })),
+        // Batang dibatasi lebarnya supaya tidak melebar aneh di layar ultrawide.
+        barMaxWidth: 26 * s,
+        barWidth: '46%',
+      },
+    ],
+  };
+};
+
+const opsiDonat = (s: number) => ({
+  tooltip: {
+    ...gayaDasar(s).tooltip,
+    trigger: 'item',
+    formatter: (p: any) => `${p.name}: <b>${p.value}%</b>`,
+  },
+  series: [
+    {
+      type: 'pie',
+      radius: ['62%', '92%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      labelLine: { show: false },
+      itemStyle: { borderColor: WARNA.kartu, borderWidth: 3 * s, borderRadius: 4 * s },
+      data: RINCIAN_BEBAN.map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
+    },
+  ],
+});
+
+const opsiArea = (s: number) => {
+  const dasar = gayaDasar(s);
+  return {
+    grid: { left: 4, right: 6, top: 10 * s, bottom: 2, containLabel: true },
+    tooltip: {
+      ...dasar.tooltip,
+      trigger: 'axis',
+      formatter: (p: any) => `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">Hari ${p[0].dataIndex + 1}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: ARUS_KAS.map((_, i) => `${i + 1}`),
+      ...dasar.sumbu,
+      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, interval: 6 },
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
+      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, formatter: '{value} M' },
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 0,
+        data: ARUS_KAS,
+        lineStyle: { width: 2.5 * s, color: WARNA.oranye },
+        itemStyle: { color: WARNA.oranye },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(255,138,31,0.42)' },
+              { offset: 1, color: 'rgba(255,138,31,0.02)' },
+            ],
+          },
+        },
+      },
+    ],
+  };
+};
+
 interface DashboardReferensiProps {
   /**
    * true = isi seluruh tinggi wadah (mode presentasi / layar penuh): baris
@@ -161,15 +282,84 @@ interface DashboardReferensiProps {
 }
 
 export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false }) => {
-  // Interaksi tombol (dipakai juga oleh dashboard nyata nanti):
-  // "Lihat semua" membuka seluruh transaksi, "Lihat Laporan Rinci" membuka
-  // panel rincian. Keduanya hanya mengubah tampilan, tidak memanggil RAG.
+  // Interaksi tombol: "Lihat semua" membuka seluruh transaksi, "Lihat Laporan
+  // Rinci" membuka panel rincian. Keduanya hanya mengubah tampilan.
   const [semuaTransaksi, setSemuaTransaksi] = useState(false);
   const [laporanRinci, setLaporanRinci] = useState(false);
 
+  /**
+   * `skala` = besar huruf akar (em). Dihitung dari ukuran wadah supaya seluruh
+   * isi ikut membesar di layar besar, tanpa mengubah tata letak baris.
+   */
+  const [skala, setSkala] = useState(1);
+
+  const akarRef = useRef<HTMLDivElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
   const donutRef = useRef<HTMLDivElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
+  const instans = useRef<Record<string, any>>({});
+
+  // Ukur wadah → tentukan skala huruf.
+  useEffect(() => {
+    if (!penuh) {
+      setSkala(1);
+      return;
+    }
+    const el = akarRef.current;
+    if (!el) return;
+    const hitung = () => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const s = Math.min(r.width / 1500, r.height / 840);
+      setSkala(Math.min(2.2, Math.max(0.95, Number(s.toFixed(3)))));
+    };
+    hitung();
+    const ro = new ResizeObserver(hitung);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [penuh]);
+
+  // Gambar ulang grafik saat skala berubah (huruf & tebal garis ikut menyesuaikan).
+  useEffect(() => {
+    let batal = false;
+    let pengamat: ResizeObserver | null = null;
+
+    void loadEcharts().then((ec) => {
+      if (batal) return;
+
+      const ambil = (kunci: string, el: HTMLDivElement | null) => {
+        if (!el) return null;
+        const lama = instans.current[kunci];
+        if (lama && !lama.isDisposed?.()) return lama;
+        const c = ec.init(el);
+        instans.current[kunci] = c;
+        return c;
+      };
+
+      ambil('bar', barRef.current)?.setOption(opsiBar(skala), true);
+      ambil('donut', donutRef.current)?.setOption(opsiDonat(skala), true);
+      ambil('area', areaRef.current)?.setOption(opsiArea(skala), true);
+
+      pengamat = new ResizeObserver(() => {
+        Object.values(instans.current).forEach((c: any) => c?.resize?.());
+      });
+      [barRef, donutRef, areaRef].forEach((r) => r.current && pengamat?.observe(r.current));
+    });
+
+    return () => {
+      batal = true;
+      pengamat?.disconnect();
+    };
+  }, [skala]);
+
+  // Bersihkan grafik saat komponen dilepas.
+  useEffect(
+    () => () => {
+      Object.values(instans.current).forEach((c: any) => c?.dispose?.());
+      instans.current = {};
+    },
+    [],
+  );
 
   // Esc menutup panel rincian.
   useEffect(() => {
@@ -184,162 +374,22 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
     return () => window.removeEventListener('keydown', onKey, true);
   }, [laporanRinci]);
 
-  useEffect(() => {
-    let batal = false;
-    const dibuat: Array<{ dispose: () => void; resize: () => void }> = [];
-    let pengamat: ResizeObserver | null = null;
-
-    void loadEcharts().then((ec) => {
-      if (batal) return;
-
-      // ── Grafik batang pendapatan bulanan ──────────────────────────────────
-      if (barRef.current) {
-        const c = ec.init(barRef.current);
-        const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
-        c.setOption({
-          grid: { left: 4, right: 8, top: 16, bottom: 2, containLabel: true },
-          tooltip: {
-            trigger: 'axis',
-            backgroundColor: '#1f2126',
-            borderColor: WARNA.garis,
-            borderWidth: 1,
-            padding: [6, 10],
-            textStyle: { color: WARNA.teks, fontSize: 11 },
-            formatter: (p: any) => {
-              const d = p[0];
-              return `<div style="font-size:10px;color:${WARNA.teks3}">${d.name} 2025</div><b>Rp ${String(d.value).replace('.', ',')} M</b>`;
-            },
-          },
-          xAxis: {
-            type: 'category',
-            data: BULAN,
-            axisLine: { show: false },
-            axisTick: { show: false },
-            axisLabel: { color: WARNA.teks3, fontSize: 10 },
-          },
-          yAxis: {
-            type: 'value',
-            splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
-            axisLabel: { color: WARNA.teks3, fontSize: 10, formatter: '{value} M' },
-          },
-          series: [
-            {
-              type: 'bar',
-              data: PENDAPATAN_BULANAN.map((v, i) => ({
-                value: v,
-                itemStyle: {
-                  color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.34)',
-                  borderRadius: [4, 4, 0, 0],
-                },
-              })),
-              barWidth: '52%',
-            },
-          ],
-        });
-        dibuat.push(c);
-      }
-
-      // ── Cincin rincian beban ──────────────────────────────────────────────
-      if (donutRef.current) {
-        const c = ec.init(donutRef.current);
-        c.setOption({
-          tooltip: {
-            trigger: 'item',
-            backgroundColor: '#1f2126',
-            borderColor: WARNA.garis,
-            borderWidth: 1,
-            textStyle: { color: WARNA.teks, fontSize: 11 },
-            formatter: (p: any) => `${p.name}: <b>${p.value}%</b>`,
-          },
-          series: [
-            {
-              type: 'pie',
-              radius: ['62%', '92%'],
-              center: ['50%', '50%'],
-              avoidLabelOverlap: false,
-              label: { show: false },
-              labelLine: { show: false },
-              itemStyle: { borderColor: WARNA.kartu, borderWidth: 3, borderRadius: 4 },
-              data: RINCIAN_BEBAN.map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
-            },
-          ],
-        });
-        dibuat.push(c);
-      }
-
-      // ── Area arus kas ─────────────────────────────────────────────────────
-      if (areaRef.current) {
-        const c = ec.init(areaRef.current);
-        c.setOption({
-          grid: { left: 4, right: 6, top: 10, bottom: 2, containLabel: true },
-          tooltip: {
-            trigger: 'axis',
-            backgroundColor: '#1f2126',
-            borderColor: WARNA.garis,
-            borderWidth: 1,
-            textStyle: { color: WARNA.teks, fontSize: 11 },
-            formatter: (p: any) => `<div style="font-size:10px;color:${WARNA.teks3}">Hari ${p[0].dataIndex + 1}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
-          },
-          xAxis: {
-            type: 'category',
-            boundaryGap: false,
-            data: ARUS_KAS.map((_, i) => `${i + 1}`),
-            axisLine: { show: false },
-            axisTick: { show: false },
-            axisLabel: { color: WARNA.teks3, fontSize: 9, interval: 6 },
-          },
-          yAxis: {
-            type: 'value',
-            splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
-            axisLabel: { color: WARNA.teks3, fontSize: 9, formatter: '{value} M' },
-          },
-          series: [
-            {
-              type: 'line',
-              smooth: true,
-              symbol: 'circle',
-              symbolSize: 0,
-              data: ARUS_KAS,
-              lineStyle: { width: 2.5, color: WARNA.oranye },
-              itemStyle: { color: WARNA.oranye },
-              areaStyle: {
-                color: {
-                  type: 'linear',
-                  x: 0, y: 0, x2: 0, y2: 1,
-                  colorStops: [
-                    { offset: 0, color: 'rgba(255,138,31,0.42)' },
-                    { offset: 1, color: 'rgba(255,138,31,0.02)' },
-                  ],
-                },
-              },
-            },
-          ],
-        });
-        dibuat.push(c);
-      }
-
-      pengamat = new ResizeObserver(() => dibuat.forEach((c) => c.resize()));
-      [barRef, donutRef, areaRef].forEach((r) => r.current && pengamat?.observe(r.current));
-    });
-
-    return () => {
-      batal = true;
-      pengamat?.disconnect();
-      dibuat.forEach((c) => c.dispose());
-    };
-  }, []);
-
-  /** Kartu dasar: gelap, garis tipis, sudut 14px. `penuh` → mengisi tinggi baris. */
+  /** Kartu dasar: gelap, garis tipis, sudut membulat (ikut skala). */
   const kartu = (tambahan = '') =>
-    `rounded-[14px] p-3.5 ${penuh ? 'h-full flex flex-col min-h-0' : ''} ${tambahan}`;
+    `rounded-[1.1em] p-[0.95em] ${penuh ? 'h-full flex flex-col min-h-0' : ''} ${tambahan}`;
 
   return (
     <div
-      className={penuh ? 'h-full w-full flex flex-col gap-3 p-3 sm:p-4 overflow-hidden' : 'rounded-[18px] p-4 sm:p-6'}
-      style={{ backgroundColor: WARNA.latar, color: WARNA.teks }}
+      ref={akarRef}
+      className={
+        penuh
+          ? 'h-full w-full flex flex-col gap-[0.8em] p-[0.85em] overflow-hidden'
+          : 'rounded-[1.4em] p-[1.2em]'
+      }
+      style={{ backgroundColor: WARNA.latar, color: WARNA.teks, fontSize: `${(13 * skala).toFixed(2)}px` }}
     >
       {/* ===== Baris 1: 4 kartu KPI ===== */}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${penuh ? 'flex-[0.95] min-h-0' : 'mb-3'}`}>
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'flex-[0.95] min-h-0' : 'mb-[0.8em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
           const bagus = naik === k.naikBagus;
@@ -347,31 +397,31 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           const warna = bagus ? WARNA.hijau : WARNA.merah;
           const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
           return (
-            <div key={k.label} className={kartu('gap-2')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium leading-tight" style={{ color: WARNA.teks3 }}>
+            <div key={k.label} className={kartu('gap-[0.55em]')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+              <div className="flex items-start justify-between gap-[0.5em]">
+                <span className="text-[0.82em] font-medium leading-tight" style={{ color: WARNA.teks3 }}>
                   {k.label}
                 </span>
                 <span
-                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full"
+                  className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
                   style={{ border: '1px solid rgba(255,138,31,0.35)', backgroundColor: 'rgba(255,138,31,0.10)', color: WARNA.oranye }}
                 >
-                  <k.Ikon className="w-3.5 h-3.5" />
+                  <k.Ikon className="w-[1em] h-[1em]" />
                 </span>
               </div>
 
-              <div className="flex items-baseline gap-1 flex-wrap">
-                <span className="text-[19px] font-bold leading-none tabular-nums tracking-tight">{k.nilai}</span>
+              <div className="flex items-baseline gap-[0.35em] flex-wrap">
+                <span className="text-[1.55em] font-bold leading-none tabular-nums tracking-tight">{k.nilai}</span>
                 {k.satuan && (
-                  <span className="text-[10px] font-medium" style={{ color: WARNA.teks3 }}>
+                  <span className="text-[0.72em] font-medium" style={{ color: WARNA.teks3 }}>
                     {k.satuan}
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                <span className="inline-flex items-center gap-0.5" style={{ color: warna }}>
-                  {naik ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              <div className="flex items-center gap-[0.4em] text-[0.76em] font-semibold">
+                <span className="inline-flex items-center gap-[0.15em]" style={{ color: warna }}>
+                  {naik ? <ArrowUpRight className="w-[1em] h-[1em]" /> : <ArrowDownRight className="w-[1em] h-[1em]" />}
                   {naik ? '+' : ''}
                   {String(k.delta).replace('.', ',')}%
                 </span>
@@ -383,7 +433,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               <svg
                 viewBox="0 0 100 100"
                 preserveAspectRatio="none"
-                className={penuh ? 'w-full flex-1 min-h-[22px] mt-0.5' : 'w-full h-9 mt-0.5'}
+                className={penuh ? 'w-full flex-1 min-h-[1.6em] mt-[0.3em]' : 'w-full h-[2.6em] mt-[0.3em]'}
                 aria-hidden
               >
                 <defs>
@@ -401,45 +451,49 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       </div>
 
       {/* ===== Baris 2: grafik batang + cincin ===== */}
-      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-3 ${penuh ? 'flex-[1.3] min-h-0' : 'mb-3'}`}>
-        <div className={`lg:col-span-2 ${kartu()}`} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-start justify-between gap-3 mb-1 shrink-0">
+      <div
+        className={`grid grid-cols-1 gap-[0.8em] ${
+          penuh ? 'lg:grid-cols-[1.55fr_1fr] flex-[1.3] min-h-0' : 'lg:grid-cols-3 mb-[0.8em]'
+        }`}
+      >
+        <div className={`${penuh ? '' : 'lg:col-span-2'} ${kartu()}`} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+          <div className="flex items-start justify-between gap-[0.7em] mb-[0.3em] shrink-0">
             <div>
-              <h3 className="text-[12.5px] font-semibold">Ikhtisar Pendapatan</h3>
-              <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
+              <h3 className="text-[0.98em] font-semibold">Ikhtisar Pendapatan</h3>
+              <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
                 Pendapatan usaha per bulan, 2025
               </p>
             </div>
             <div className="text-right">
-              <div className="text-[15px] font-bold leading-none tabular-nums">Rp 23,69 M</div>
-              <div className="text-[10px] mt-0.5 inline-flex items-center gap-0.5" style={{ color: WARNA.hijau }}>
-                <ArrowUpRight className="w-3 h-3" /> 8,2% vs 2024
+              <div className="text-[1.15em] font-bold leading-none tabular-nums">Rp 23,69 M</div>
+              <div className="text-[0.78em] mt-[0.2em] inline-flex items-center gap-[0.15em]" style={{ color: WARNA.hijau }}>
+                <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> 8,2% vs 2024
               </div>
             </div>
           </div>
-          <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[168px]'} />
+          <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
           <div className="shrink-0">
-            <h3 className="text-[12.5px] font-semibold">Rincian Beban</h3>
-            <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
+            <h3 className="text-[0.98em] font-semibold">Rincian Beban</h3>
+            <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
               Komposisi beban operasional
             </p>
           </div>
-          <div className={penuh ? 'relative flex-1 min-h-0 mt-1' : 'relative mt-1'}>
-            <div ref={donutRef} className={penuh ? 'w-full h-full' : 'w-full h-[132px]'} />
+          <div className={penuh ? 'relative flex-1 min-h-0 mt-[0.3em]' : 'relative mt-[0.3em]'}>
+            <div ref={donutRef} className={penuh ? 'w-full h-full' : 'w-full h-[8.2em]'} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[13px] font-bold leading-none tabular-nums">12,35 M</span>
-              <span className="text-[9px] mt-0.5" style={{ color: WARNA.teks3 }}>
+              <span className="text-[1em] font-bold leading-none tabular-nums">12,35 M</span>
+              <span className="text-[0.7em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
                 Total
               </span>
             </div>
           </div>
-          <ul className={`mt-1.5 space-y-1 shrink-0 ${penuh ? 'max-h-[46%] overflow-hidden' : ''}`}>
+          <ul className={`mt-[0.5em] space-y-[0.35em] shrink-0 ${penuh ? 'max-h-[46%] overflow-hidden' : ''}`}>
             {RINCIAN_BEBAN.map((r) => (
-              <li key={r.nama} className="flex items-center gap-2 text-[10.5px]">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
+              <li key={r.nama} className="flex items-center gap-[0.55em] text-[0.8em]">
+                <span className="w-[0.55em] h-[0.55em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
                 <span className="flex-1 truncate" style={{ color: WARNA.teks2 }}>
                   {r.nama}
                 </span>
@@ -453,37 +507,42 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       </div>
 
       {/* ===== Baris 3: transaksi + arus kas + target ===== */}
-      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-3 ${penuh ? 'flex-[1.05] min-h-0' : 'mb-3'}`}>
+      <div
+        className={`grid grid-cols-1 gap-[0.8em] ${
+          penuh ? 'lg:grid-cols-[1fr_1.05fr_0.95fr] flex-[1.05] min-h-0' : 'lg:grid-cols-3 mb-[0.8em]'
+        }`}
+      >
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-center justify-between mb-2 shrink-0">
-            <h3 className="text-[12.5px] font-semibold">Transaksi Terbaru</h3>
+          <div className="flex items-center justify-between mb-[0.6em] shrink-0">
+            <h3 className="text-[0.98em] font-semibold">Transaksi Terbaru</h3>
             <button
               type="button"
               onClick={() => setSemuaTransaksi((v) => !v)}
               aria-expanded={semuaTransaksi}
               title={semuaTransaksi ? 'Ringkas daftar transaksi' : 'Tampilkan seluruh transaksi'}
-              className="text-[10px] inline-flex items-center gap-0.5 rounded px-1 -mx-1 py-0.5 transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
+              className="text-[0.76em] inline-flex items-center gap-[0.2em] rounded px-[0.3em] -mx-[0.3em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
               style={{ color: WARNA.oranye }}
             >
-              {semuaTransaksi ? 'Ringkas' : 'Lihat semua'} <ArrowRight className={`w-3 h-3 transition-transform ${semuaTransaksi ? 'rotate-90' : ''}`} />
+              {semuaTransaksi ? 'Ringkas' : 'Lihat semua'}
+              <ArrowRight className={`w-[0.95em] h-[0.95em] transition-transform ${semuaTransaksi ? 'rotate-90' : ''}`} />
             </button>
           </div>
-          <ul className={`space-y-2 ${penuh ? 'flex-1 min-h-0 overflow-auto' : ''}`}>
+          <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto' : ''}`}>
             {(semuaTransaksi ? [...TRANSAKSI, ...TRANSAKSI_LAIN] : TRANSAKSI).map((t) => (
-              <li key={t.nama} className="flex items-center gap-2.5">
+              <li key={t.nama} className="flex items-center gap-[0.6em]">
                 <span
-                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full"
+                  className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
                   style={{ backgroundColor: WARNA.kartu2, color: t.naik ? WARNA.hijau : WARNA.merah }}
                 >
-                  <t.Ikon className="w-3.5 h-3.5" />
+                  <t.Ikon className="w-[1em] h-[1em]" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium truncate">{t.nama}</p>
-                  <p className="text-[9.5px] truncate" style={{ color: WARNA.teks3 }}>
+                  <p className="text-[0.84em] font-medium truncate">{t.nama}</p>
+                  <p className="text-[0.74em] truncate" style={{ color: WARNA.teks3 }}>
                     {t.ket}
                   </p>
                 </div>
-                <span className="text-[10.5px] font-semibold tabular-nums shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
+                <span className="text-[0.8em] font-semibold tabular-nums shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
                   {t.nilai} jt
                 </span>
               </li>
@@ -492,41 +551,41 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-start justify-between gap-2 mb-1 shrink-0">
+          <div className="flex items-start justify-between gap-[0.5em] mb-[0.3em] shrink-0">
             <div>
-              <h3 className="text-[12.5px] font-semibold">Arus Kas</h3>
-              <p className="text-[10.5px]" style={{ color: WARNA.teks3 }}>
+              <h3 className="text-[0.98em] font-semibold">Arus Kas</h3>
+              <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
                 29 hari terakhir
               </p>
             </div>
-            <span className="text-[10px] font-semibold" style={{ color: WARNA.hijau }}>
+            <span className="text-[0.78em] font-semibold" style={{ color: WARNA.hijau }}>
               +18,4%
             </span>
           </div>
-          <div ref={areaRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[126px]'} />
+          <div ref={areaRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[8em]'} />
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <h3 className="text-[12.5px] font-semibold mb-2 shrink-0">Progres Target</h3>
-          <ul className={`space-y-2.5 ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
+          <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
+          <ul className={`space-y-[0.7em] ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
             {TARGET.map((t) => (
               <li key={t.nama}>
-                <div className="flex items-center justify-between text-[10.5px] mb-1">
+                <div className="flex items-center justify-between text-[0.8em] mb-[0.3em]">
                   <span style={{ color: WARNA.teks2 }}>{t.nama}</span>
                   <span className="font-semibold tabular-nums">{t.capai}%</span>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: WARNA.kartu2 }}>
+                <div className="h-[0.42em] rounded-full overflow-hidden" style={{ backgroundColor: WARNA.kartu2 }}>
                   <div className="h-full rounded-full" style={{ width: `${t.capai}%`, backgroundColor: t.warna }} />
                 </div>
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex items-center gap-2 text-[10px] shrink-0" style={{ color: WARNA.teks3 }}>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: WARNA.hijau }} /> di atas target
+          <div className="mt-[0.9em] flex items-center gap-[0.6em] text-[0.74em] shrink-0" style={{ color: WARNA.teks3 }}>
+            <span className="inline-flex items-center gap-[0.3em]">
+              <span className="w-[0.4em] h-[0.4em] rounded-full" style={{ backgroundColor: WARNA.hijau }} /> di atas target
             </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: WARNA.merah }} /> perlu perhatian
+            <span className="inline-flex items-center gap-[0.3em]">
+              <span className="w-[0.4em] h-[0.4em] rounded-full" style={{ backgroundColor: WARNA.merah }} /> perlu perhatian
             </span>
           </div>
         </div>
@@ -534,19 +593,19 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
       {/* ===== Strip insight ===== */}
       <div
-        className="rounded-[14px] p-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0"
+        className="rounded-[1.1em] p-[0.95em] flex flex-wrap items-center justify-between gap-[0.7em] shrink-0"
         style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
       >
-        <div className="min-w-0 flex items-start gap-2.5">
+        <div className="min-w-0 flex items-start gap-[0.6em]">
           <span
-            className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-[10px]"
+            className="shrink-0 inline-flex items-center justify-center w-[2.2em] h-[2.2em] rounded-[0.75em]"
             style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffb347)`, color: '#1a1206' }}
           >
-            <TrendingUp className="w-4 h-4" />
+            <TrendingUp className="w-[1.05em] h-[1.05em]" />
           </span>
           <div className="min-w-0">
-            <p className="text-[12px] font-semibold">Insight Keuangan</p>
-            <p className="text-[10.5px] leading-relaxed" style={{ color: WARNA.teks3 }}>
+            <p className="text-[0.92em] font-semibold">Insight Keuangan</p>
+            <p className="text-[0.8em] leading-relaxed" style={{ color: WARNA.teks3 }}>
               Pendapatan tumbuh 8,2% sementara beban turun 3,4% — margin bersih naik ke 32,1%. Perhatian pada
               realisasi investasi yang baru 57% dari target.
             </p>
@@ -556,18 +615,18 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           type="button"
           onClick={() => setLaporanRinci(true)}
           title="Buka laporan rinci (angka contoh)"
-          className="inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[11px] font-bold shrink-0 transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+          className="inline-flex items-center gap-[0.35em] rounded-[0.75em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold shrink-0 transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
         >
           Lihat Laporan Rinci
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-[0.95em] h-[0.95em]" />
         </button>
       </div>
 
-      {/* ===== Panel Laporan Rinci (dibuka tombol di atas) ===== */}
+      {/* ===== Panel Laporan Rinci ===== */}
       {laporanRinci && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-[0.8em]"
           style={{ backgroundColor: 'rgba(0,0,0,0.72)' }}
           onClick={() => setLaporanRinci(false)}
           role="dialog"
@@ -575,14 +634,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           aria-label="Laporan rinci"
         >
           <div
-            className="w-full max-w-[760px] max-h-[88vh] overflow-auto rounded-[16px] p-4 sm:p-5"
+            className="w-full max-w-[46em] max-h-[88vh] overflow-auto rounded-[1.2em] p-[1.1em]"
             style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-start justify-between gap-[0.7em] mb-[0.8em]">
               <div>
-                <h3 className="text-[14px] font-bold leading-tight">Laporan Rinci Keuangan</h3>
-                <p className="text-[10.5px] mt-0.5" style={{ color: WARNA.teks3 }}>
+                <h3 className="text-[1.05em] font-bold leading-tight">Laporan Rinci Keuangan</h3>
+                <p className="text-[0.78em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
                   Periode Mei 2025 · angka contoh (bukan data dokumen)
                 </p>
               </div>
@@ -591,22 +650,21 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 onClick={() => setLaporanRinci(false)}
                 title="Tutup (Esc)"
                 aria-label="Tutup laporan"
-                className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors hover:brightness-125"
+                className="shrink-0 inline-flex items-center justify-center w-[1.9em] h-[1.9em] rounded-full transition-colors hover:brightness-125"
                 style={{ border: `1px solid ${WARNA.garis}`, color: WARNA.teks2 }}
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-[1em] h-[1em]" />
               </button>
             </div>
 
-            {/* Ringkasan KPI */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-[0.5em] mb-[1em]">
               {KPI.map((k) => (
-                <div key={k.label} className="rounded-[10px] p-2.5" style={{ backgroundColor: WARNA.kartu2 }}>
-                  <p className="text-[9.5px] leading-tight" style={{ color: WARNA.teks3 }}>
+                <div key={k.label} className="rounded-[0.7em] p-[0.6em]" style={{ backgroundColor: WARNA.kartu2 }}>
+                  <p className="text-[0.72em] leading-tight" style={{ color: WARNA.teks3 }}>
                     {k.label}
                   </p>
-                  <p className="text-[13px] font-bold tabular-nums mt-1">{k.nilai}</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: k.delta >= 0 === k.naikBagus ? WARNA.hijau : WARNA.merah }}>
+                  <p className="text-[1em] font-bold tabular-nums mt-[0.25em]">{k.nilai}</p>
+                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: (k.delta >= 0) === k.naikBagus ? WARNA.hijau : WARNA.merah }}>
                     {k.delta >= 0 ? '+' : ''}
                     {String(k.delta).replace('.', ',')}% {k.deltaTeks}
                   </p>
@@ -614,27 +672,26 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               ))}
             </div>
 
-            {/* Rincian beban */}
-            <p className="text-[11.5px] font-semibold mb-1.5">Rincian Beban Operasional</p>
-            <table className="w-full text-[10.5px] mb-4">
+            <p className="text-[0.88em] font-semibold mb-[0.4em]">Rincian Beban Operasional</p>
+            <table className="w-full text-[0.8em] mb-[1em]">
               <thead>
                 <tr style={{ color: WARNA.teks3 }}>
-                  <th className="text-left font-medium pb-1">Komponen</th>
-                  <th className="text-right font-medium pb-1">Porsi</th>
-                  <th className="text-right font-medium pb-1">Nominal</th>
+                  <th className="text-left font-medium pb-[0.3em]">Komponen</th>
+                  <th className="text-right font-medium pb-[0.3em]">Porsi</th>
+                  <th className="text-right font-medium pb-[0.3em]">Nominal</th>
                 </tr>
               </thead>
               <tbody>
                 {RINCIAN_BEBAN.map((r) => (
                   <tr key={r.nama} style={{ borderTop: `1px solid ${WARNA.garis}` }}>
-                    <td className="py-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: r.warna }} />
+                    <td className="py-[0.35em]">
+                      <span className="inline-flex items-center gap-[0.4em]">
+                        <span className="w-[0.5em] h-[0.5em] rounded-full" style={{ backgroundColor: r.warna }} />
                         {r.nama}
                       </span>
                     </td>
-                    <td className="py-1.5 text-right tabular-nums">{String(r.nilai).replace('.', ',')}%</td>
-                    <td className="py-1.5 text-right tabular-nums font-semibold">
+                    <td className="py-[0.35em] text-right tabular-nums">{String(r.nilai).replace('.', ',')}%</td>
+                    <td className="py-[0.35em] text-right tabular-nums font-semibold">
                       {((12347 * r.nilai) / 100 / 1000).toFixed(2).replace('.', ',')} M
                     </td>
                   </tr>
@@ -642,12 +699,11 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               </tbody>
             </table>
 
-            {/* Transaksi lengkap */}
-            <p className="text-[11.5px] font-semibold mb-1.5">Transaksi Terbaru</p>
-            <ul className="space-y-1.5">
+            <p className="text-[0.88em] font-semibold mb-[0.4em]">Transaksi Terbaru</p>
+            <ul className="space-y-[0.35em]">
               {[...TRANSAKSI, ...TRANSAKSI_LAIN].map((t) => (
-                <li key={t.nama} className="flex items-center justify-between gap-2 text-[10.5px]" style={{ borderTop: `1px solid ${WARNA.garis}` }}>
-                  <span className="py-1.5">
+                <li key={t.nama} className="flex items-center justify-between gap-[0.5em] text-[0.8em]" style={{ borderTop: `1px solid ${WARNA.garis}` }}>
+                  <span className="py-[0.35em]">
                     {t.nama} <span style={{ color: WARNA.teks3 }}>· {t.ket}</span>
                   </span>
                   <span className="tabular-nums font-semibold shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
@@ -657,11 +713,11 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               ))}
             </ul>
 
-            <div className="flex justify-end mt-4">
+            <div className="flex justify-end mt-[1em]">
               <button
                 type="button"
                 onClick={() => setLaporanRinci(false)}
-                className="rounded-[10px] px-3 py-1.5 text-[11px] font-bold"
+                className="rounded-[0.7em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold"
                 style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
               >
                 Tutup
