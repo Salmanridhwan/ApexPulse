@@ -101,7 +101,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * dilakukan.
    */
   const [galat, setGalat] = useState<string | null>(null);
-  /** Mode presentasi pratinjau (layar penuh, satu slide per layar). */
+  /** Mode presentasi pratinjau (layar penuh, seluruh dashboard dalam satu halaman). */
   const [presentasi, setPresentasi] = useState(false);
 
   const aktif = useMemo(
@@ -284,7 +284,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 onClick={() => setPresentasi(true)}
                 disabled={memuat || widgetPratinjau.length === 0}
                 data-testid="presentasi-template"
-                title="Buka mode presentasi: satu slide per layar, bisa pakai tombol panah"
+                title="Buka mode presentasi: seluruh dashboard dalam satu layar penuh"
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Presentation className="w-4 h-4" />
