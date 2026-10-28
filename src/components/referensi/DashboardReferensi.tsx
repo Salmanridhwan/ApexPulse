@@ -120,6 +120,9 @@ const GARIS_PENDAPATAN = PENDAPATAN_BULANAN;
 /** Total setahun — dipakai sebagai detail di legenda grafik batang. */
 const TOTAL_PENDAPATAN = PENDAPATAN_BULANAN.reduce((a, b) => a + b, 0);
 
+/** Indeks bulan dengan pendapatan tertinggi (Desember). */
+const PUNCAK = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
+
 const RINCIAN_BEBAN = [
   { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
   { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA.teal },
@@ -562,7 +565,29 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               { warna: '#38bdf8', label: 'Garis tren', garis: true, nilai: 'nilai = batang' },
             ]}
           />
-          <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
+          {/* Rincian angka SEMUA bulan, supaya nilainya terbaca tanpa hover. */}
+          <ul className="flex flex-wrap items-center justify-start gap-x-[0.85em] gap-y-[0.15em] shrink-0 mb-[0.35em]">
+            {BULAN.map((b, i) => (
+              <li
+                key={b}
+                className="inline-flex items-center gap-[0.28em] text-[0.64em]"
+                style={{ color: i === PUNCAK ? WARNA.oranye : WARNA.teks3 }}
+              >
+                <span
+                  className="w-[0.4em] h-[0.4em] rounded-full shrink-0"
+                  style={{ backgroundColor: i === PUNCAK ? WARNA.oranye : 'rgba(255,138,31,0.55)' }}
+                />
+                {b}
+                <span className="tabular-nums font-semibold" style={{ color: i === PUNCAK ? WARNA.oranye : WARNA.teks2 }}>
+                  {String(PENDAPATAN_BULANAN[i]).replace('.', ',')}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div
+            ref={barRef}
+            className={penuh ? 'w-full flex-1 min-h-[8.5em]' : 'w-full h-[10.5em]'}
+          />
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
