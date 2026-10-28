@@ -394,7 +394,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       style={{ backgroundColor: WARNA.latar, color: WARNA.teks, fontSize: `${(13 * skala).toFixed(2)}px` }}
     >
       {/* ===== Baris 1: 4 kartu KPI ===== */}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'flex-[0.95] min-h-0' : 'mb-[0.8em]'}`}>
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
           const bagus = naik === k.naikBagus;
@@ -458,7 +458,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       {/* ===== Baris 2: grafik batang + cincin ===== */}
       <div
         className={`grid grid-cols-1 gap-[0.8em] ${
-          penuh ? 'lg:grid-cols-[1.55fr_1fr] flex-[1.3] min-h-0' : 'lg:grid-cols-3 mb-[0.8em]'
+          penuh ? 'lg:grid-cols-[1.55fr_1fr] baris-130' : 'lg:grid-cols-3 mb-[0.8em]'
         }`}
       >
         <div className={`${penuh ? '' : 'lg:col-span-2'} ${kartu()}`} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
@@ -492,7 +492,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               tidak menyisakan ruang kosong di bawah. */}
           <div className="relative flex-1 min-h-[7.5em] mt-[0.2em]">
             <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
-              <div className="relative flex-[1.4] min-w-0">
+              <div className="relative grafik-140">
                 <div ref={donutRef} className="w-full h-full" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[0.95em] font-bold leading-none tabular-nums">12,35 M</span>
@@ -522,7 +522,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       {/* ===== Baris 3: transaksi + arus kas + target ===== */}
       <div
         className={`grid grid-cols-1 gap-[0.8em] ${
-          penuh ? 'lg:grid-cols-[1fr_1.05fr_0.95fr] flex-[1.05] min-h-0' : 'lg:grid-cols-3 mb-[0.8em]'
+          penuh ? 'lg:grid-cols-[1fr_1.05fr_0.95fr] baris-105' : 'lg:grid-cols-3 mb-[0.8em]'
         }`}
       >
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>

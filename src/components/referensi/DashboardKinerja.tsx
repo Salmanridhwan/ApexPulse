@@ -419,7 +419,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
       style={{ backgroundColor: W.latar, color: W.teks, fontSize: `${(13 * skala).toFixed(2)}px` }}
     >
       {/* ===== Baris 1: 6 KPI ===== */}
-      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-[0.7em] ${penuh ? 'flex-[0.82] min-h-0' : 'mb-[0.7em]'}`}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-[0.7em] ${penuh ? 'baris-082' : 'mb-[0.7em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta.startsWith('+');
           const jalur = jalurArea(k.seri);
@@ -458,7 +458,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
       {/* ===== Baris 2: tren · segmen · kategori ===== */}
       <div
         className={`grid grid-cols-1 gap-[0.7em] ${
-          penuh ? 'lg:grid-cols-[1.25fr_0.9fr_1fr] flex-[1.3] min-h-0' : 'lg:grid-cols-3 mb-[0.7em]'
+          penuh ? 'lg:grid-cols-[1.25fr_0.9fr_1fr] baris-130' : 'lg:grid-cols-3 mb-[0.7em]'
         }`}
       >
         <div className={kartu()} style={gayaKartu}>
@@ -488,7 +488,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
               ruang kosong di bawah. */}
           <div className="relative flex-1 min-h-[8.5em] mt-[0.2em]">
             <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
-              <div className="relative flex-[1.45] min-w-0">
+              <div className="relative grafik-145">
                 <div ref={segmenRef} className="w-full h-full" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[0.9em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
@@ -531,7 +531,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
       </div>
 
       {/* ===== Baris 3: 6 metrik ringkas ===== */}
-      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-[0.7em] ${penuh ? 'flex-[0.6] min-h-0' : 'mb-[0.7em]'}`}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-[0.7em] ${penuh ? 'baris-060' : 'mb-[0.7em]'}`}>
         {METRIK.map((m) => (
           <div key={m.label} className={`${kartu('justify-center gap-[0.3em] py-[0.75em]')}`} style={gayaKartu}>
             <div className="flex items-center gap-[0.3em] min-w-0">
@@ -551,7 +551,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
       {/* ===== Baris 4: peta panas · metode bayar · tahun berjalan ===== */}
       <div
         className={`grid grid-cols-1 gap-[0.7em] ${
-          penuh ? 'lg:grid-cols-[1.2fr_0.85fr_1fr] flex-[1.15] min-h-0' : 'lg:grid-cols-3'
+          penuh ? 'lg:grid-cols-[1.2fr_0.85fr_1fr] baris-115' : 'lg:grid-cols-3'
         }`}
       >
         <div className={kartu()} style={gayaKartu}>
@@ -574,7 +574,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
           </p>
           <div className="relative flex-1 min-h-[7.5em] mt-[0.2em]">
             <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
-              <div className="relative flex-[1.35] min-w-0">
+              <div className="relative grafik-135">
                 <div ref={bayarRef} className="w-full h-full" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[0.82em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
