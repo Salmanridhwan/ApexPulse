@@ -23,6 +23,7 @@ import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
+import { nilaiDariWidgets } from '../services/templates/nilaiTemplate';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 
 interface DashboardTemplatesPageProps {
@@ -182,6 +183,13 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         : '4 KPI · 3 grafik · daftar · progres';
 
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
+
+  /**
+   * Angka dokumen yang dipetakan ke slot template. Pratinjau data asli memakai
+   * komponen replika template yang SAMA dengan contoh, jadi desain, warna, dan
+   * susunan kartu tidak mungkin melenceng — hanya angkanya yang berganti.
+   */
+  const nilaiAsli = useMemo(() => nilaiDariWidgets(asli?.widgets), [asli]);
 
   /**
    * Dashboard BAYANGAN untuk mode presentasi pratinjau.
@@ -550,17 +558,23 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 </button>
               </div>
             </div>
-            <DashboardCanvas
-              widgets={asli.widgets}
-              onEditWidget={() => {}}
-              onManualCorrection={() => {}}
-              onDeleteWidget={() => {}}
-              onDuplicateWidget={() => {}}
-              onReorderWidgets={() => {}}
-              onResizeWidget={() => {}}
-              preview
-              readOnly
-            />
+            {aktif.id === 'tpl-ringkasan' ? (
+              <div className="p-3 sm:p-4">
+                <DashboardReferensi nilai={nilaiAsli} />
+              </div>
+            ) : (
+              <DashboardCanvas
+                widgets={asli.widgets}
+                onEditWidget={() => {}}
+                onManualCorrection={() => {}}
+                onDeleteWidget={() => {}}
+                onDuplicateWidget={() => {}}
+                onReorderWidgets={() => {}}
+                onResizeWidget={() => {}}
+                preview
+                readOnly
+              />
+            )}
           </div>
           </KanvasTemaContext.Provider>
         ) : (

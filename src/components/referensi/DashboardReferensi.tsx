@@ -13,11 +13,12 @@ import {
   X,
 } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
+import type { NilaiBeban, NilaiTemplate, NilaiTransaksi, NilaiTarget } from '../../services/templates/nilaiTemplate';
 
 /**
  * DASHBOARD REFERENSI — replika tampilan acuan pemilik produk.
  *
- * Referensi: dashboard keuangan "gelap + satu aksen oranye" — 4 kartu KPI
+ * Referensi: dashboard keuangan "gelap + satu aksen oranye" — 4 kartu KPI_CONTOH
  * (ikon bulat + sparkline), grafik batang pendapatan, cincin rincian beban
  * dengan daftar legenda, daftar transaksi, grafik area arus kas, batang progres
  * target, dan strip insight di bawah.
@@ -35,6 +36,13 @@ import { loadEcharts } from '../widgets/echartsSetup';
  *
  * Catatan: SELURUH ANGKA DI SINI CONTOH (dummy), bukan dari dokumen instansi.
  */
+
+const INSIGHT_CONTOH =
+  'Pendapatan tumbuh 8,2% sementara beban turun 3,4% — margin bersih naik ke 32,1%. Perhatian pada realisasi investasi yang baru 57% dari target.';
+let INSIGHT = INSIGHT_CONTOH;
+
+/** Ikon cadangan bila nilai dari dokumen tidak menyebut ikon. */
+const IKON_KPI = [Wallet, TrendingUp, TrendingDown, PiggyBank];
 
 const WARNA = {
   latar: '#0a0a0b',
@@ -63,7 +71,8 @@ interface Kpi {
   Ikon: React.ComponentType<{ className?: string }>;
 }
 
-const KPI: Kpi[] = [
+let KPI: Kpi[];
+const KPI_CONTOH: Kpi[] = [
   {
     label: 'Total Saldo Kas',
     nilai: '48.750',
@@ -106,8 +115,10 @@ const KPI: Kpi[] = [
   },
 ];
 
-const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const PENDAPATAN_BULANAN = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4, 22.3, 23.0, 23.7];
+let BULAN: string[];
+const BULAN_CONTOH = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+let PENDAPATAN_BULANAN: number[];
+const PENDAPATAN_CONTOH = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4, 22.3, 23.0, 23.7];
 
 /**
  * Garis pada grafik batang memakai NILAI YANG SAMA dengan batangnya — garis
@@ -115,15 +126,16 @@ const PENDAPATAN_BULANAN = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4
  * referensi. Titiknya digeser sedikit ke atas lewat `symbolOffset` supaya tidak
  * tertutup batang.
  */
-const GARIS_PENDAPATAN = PENDAPATAN_BULANAN;
+let garis: number[];
 
 /** Total setahun — dipakai sebagai detail di legenda grafik batang. */
-const TOTAL_PENDAPATAN = PENDAPATAN_BULANAN.reduce((a, b) => a + b, 0);
+let TOTAL_PENDAPATAN = 0;
 
 /** Indeks bulan dengan pendapatan tertinggi (Desember). */
-const PUNCAK = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
+let PUNCAK = 0;
 
-const RINCIAN_BEBAN = [
+let RINCIAN_BEBAN: NilaiBeban[];
+const BEBAN_CONTOH = [
   { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
   { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA.teal },
   { nama: 'Pegawai', nilai: 19.8, warna: WARNA.ungu },
@@ -131,16 +143,18 @@ const RINCIAN_BEBAN = [
   { nama: 'Lain-lain', nilai: 14.2, warna: WARNA.merah },
 ];
 
-const ARUS_KAS = [3.2, 3.6, 3.4, 4.1, 4.6, 4.3, 5.0, 5.4, 5.1, 5.8, 6.2, 5.9, 6.4, 6.9, 6.6, 7.2, 7.6, 7.3, 7.9, 8.4, 8.1, 8.7, 9.1, 8.8, 9.4, 9.8, 9.5, 10.1, 10.6];
+let ARUS_KAS: number[];
+const ARUS_CONTOH = [3.2, 3.6, 3.4, 4.1, 4.6, 4.3, 5.0, 5.4, 5.1, 5.8, 6.2, 5.9, 6.4, 6.9, 6.6, 7.2, 7.6, 7.3, 7.9, 8.4, 8.1, 8.7, 9.1, 8.8, 9.4, 9.8, 9.5, 10.1, 10.6];
 
-const TRANSAKSI = [
+let TRANSAKSI: NilaiTransaksi[];
+const TRANSAKSI_CONTOH = [
   { nama: 'Pembayaran pelanggan', ket: 'Wilayah Jakarta Selatan', nilai: '+1,24', naik: true, Ikon: Droplets },
   { nama: 'Pemeliharaan jaringan', ket: 'Zona 3 · vendor', nilai: '-486', naik: false, Ikon: CreditCard },
   { nama: 'Setoran kas ke bank', ket: 'Rekening operasional', nilai: '+2,10', naik: true, Ikon: Landmark },
   { nama: 'Gaji & tunjangan', ket: 'Periode Mei 2025', nilai: '-3,72', naik: false, Ikon: Wallet },
 ];
 
-const TRANSAKSI_LAIN = [
+const TRANSAKSI_LAIN_CONTOH = [
   { nama: 'Pembelian bahan kimia', ket: 'Instalasi pengolahan', nilai: '-214', naik: false, Ikon: CreditCard },
   { nama: 'Tagihan listrik', ket: 'Pompa & IPA', nilai: '-1,08', naik: false, Ikon: Wallet },
   { nama: 'Pendapatan sambungan baru', ket: 'Wilayah Jakarta Barat', nilai: '+3,46', naik: true, Ikon: Droplets },
@@ -151,7 +165,8 @@ const TRANSAKSI_LAIN = [
  * Progres target. Warna batang = status capaian, dan statusnya ditulis di
  * bawah tiap batang supaya tidak ada legenda yang menggantung tanpa pasangan.
  */
-const TARGET = [
+let TARGET: NilaiTarget[];
+const TARGET_CONTOH = [
   { nama: 'Target Pendapatan', capai: 86, status: 'mendekati target', warna: WARNA.oranye },
   { nama: 'Efisiensi Beban', capai: 92, status: 'sesuai target', warna: WARNA.hijau },
   { nama: 'Target Laba Bersih', capai: 57, status: 'perlu perhatian', warna: WARNA.merah },
@@ -228,8 +243,14 @@ const gayaDasar = (s: number) => ({
   },
 });
 
-const opsiBar = (s: number) => {
-  const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
+const opsiBar = (
+  s: number,
+  data?: { bulan?: string[]; pendapatan?: number[]; garis?: number[] }
+) => {
+  const bulan = data?.bulan?.length ? data.bulan : BULAN_CONTOH;
+  const pendapatan = data?.pendapatan?.length ? data.pendapatan : PENDAPATAN_CONTOH;
+  const garis = data?.garis?.length ? data.garis : pendapatan;
+  const puncak = pendapatan.indexOf(Math.max(...pendapatan));
   const dasar = gayaDasar(s);
   return {
     grid: { left: 4, right: 20 * s, top: 22 * s, bottom: 2, containLabel: true },
@@ -245,7 +266,7 @@ const opsiBar = (s: number) => {
           )
           .join(''),
     },
-    xAxis: { type: 'category', data: BULAN, ...dasar.sumbu },
+    xAxis: { type: 'category', data: bulan, ...dasar.sumbu },
     yAxis: {
       type: 'value',
       // sedikit ruang di atas batang tertinggi supaya label angkanya muat
@@ -258,7 +279,7 @@ const opsiBar = (s: number) => {
         type: 'bar',
         showBackground: true,
         backgroundStyle: { color: 'rgba(255,255,255,0.03)', borderRadius: [4 * s, 4 * s, 0, 0] },
-        data: PENDAPATAN_BULANAN.map((v, i) => ({
+        data: pendapatan.map((v, i) => ({
           value: v,
           itemStyle: {
             color: {
@@ -303,7 +324,7 @@ const opsiBar = (s: number) => {
         smooth: 0.2,
         symbol: 'circle',
         symbolSize: 6 * s,
-        data: GARIS_PENDAPATAN,
+        data: garis,
         lineStyle: { width: 2.2 * s, color: '#38bdf8', shadowColor: 'rgba(56,189,248,0.6)', shadowBlur: 12 * s, shadowOffsetY: 3 * s },
         itemStyle: { color: '#38bdf8', borderColor: '#0a0a0b', borderWidth: 1.8 * s },
         emphasis: { scale: 1.5 },
@@ -315,7 +336,8 @@ const opsiBar = (s: number) => {
   };
 };
 
-const opsiDonat = (s: number) => ({
+const opsiDonat = (s: number, beban?: NilaiBeban[]) => ({
+  __beban: beban && beban.length ? beban : BEBAN_CONTOH,
   tooltip: {
     ...gayaDasar(s).tooltip,
     trigger: 'item',
@@ -337,12 +359,13 @@ const opsiDonat = (s: number) => ({
         shadowBlur: 8 * s,
       },
       emphasis: { scale: true, scaleSize: 6 * s, itemStyle: { shadowBlur: 18 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
-      data: RINCIAN_BEBAN.map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
+      data: (beban && beban.length ? beban : BEBAN_CONTOH).map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
     },
   ],
 });
 
-const opsiArea = (s: number) => {
+const opsiArea = (s: number, arus?: number[]) => {
+  const nilaiArus = arus?.length ? arus : ARUS_CONTOH;
   const dasar = gayaDasar(s);
   return {
     grid: { left: 4, right: 12 * s, top: 12 * s, bottom: 2, containLabel: true },
@@ -355,7 +378,7 @@ const opsiArea = (s: number) => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: ARUS_KAS.map((_, i) => `${i + 1}`),
+      data: nilaiArus.map((_, i) => `${i + 1}`),
       ...dasar.sumbu,
       axisLabel: { color: WARNA.teks3, fontSize: 9 * s, interval: 6 },
     },
@@ -371,7 +394,7 @@ const opsiArea = (s: number) => {
         symbol: 'circle',
         symbolSize: 6 * s,
         showSymbol: false,
-        data: ARUS_KAS,
+        data: nilaiArus,
         lineStyle: { width: 2.6 * s, color: WARNA.oranye, shadowColor: 'rgba(255,138,31,0.55)', shadowBlur: 14 * s, shadowOffsetY: 4 * s },
         itemStyle: { color: WARNA.oranye, borderColor: '#0a0a0b', borderWidth: 2 * s },
         emphasis: { scale: 1.6 },
@@ -413,13 +436,42 @@ const opsiArea = (s: number) => {
 
 interface DashboardReferensiProps {
   /**
+   * Nilai dari dokumen instansi. Bila diisi, ANGKA pada template diganti dengan
+   * angka dokumen — susunan, warna, dan bentuk kartu tetap persis seperti contoh.
+   * Slot yang tidak ada nilainya memakai angka contoh supaya tampilan utuh.
+   */
+  nilai?: NilaiTemplate;
+  /**
    * true = isi seluruh tinggi wadah (mode presentasi / layar penuh): baris
    * dibagi dengan `flex-1` dan grafik memanjang, tidak ada ruang kosong.
    */
   penuh?: boolean;
 }
 
-export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false }) => {
+export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false, nilai }) => {
+  // Terapkan nilai dokumen ke slot template SEBELUM render/opsi grafik dibuat.
+  // (Konstanta di atas bersifat modul karena dipakai juga oleh pembentuk opsi
+  // grafik di luar komponen; jadi nilai aktif ditulis di sini.)
+  const KPI: Kpi[] = (nilai?.kpi?.length ? nilai.kpi : KPI_CONTOH).map(
+    (k, i) => ({ ...k, Ikon: k.Ikon ?? IKON_KPI[i % IKON_KPI.length] }) as Kpi
+  );
+  const BULAN: string[] = nilai?.batang?.label?.length ? nilai.batang.label : BULAN_CONTOH;
+  const PENDAPATAN_BULANAN: number[] = nilai?.batang?.nilai?.length
+    ? nilai.batang.nilai
+    : PENDAPATAN_CONTOH;
+  const garis = PENDAPATAN_BULANAN;
+  const TOTAL_PENDAPATAN = PENDAPATAN_BULANAN.reduce((a, b) => a + b, 0);
+  const PUNCAK = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
+  const RINCIAN_BEBAN: NilaiBeban[] = nilai?.cincin?.length ? nilai.cincin : BEBAN_CONTOH;
+  const ARUS_KAS: number[] = nilai?.area?.length ? nilai.area : ARUS_CONTOH;
+  const TRANSAKSI: NilaiTransaksi[] = nilai?.transaksi?.length ? nilai.transaksi : TRANSAKSI_CONTOH;
+  const TARGET: NilaiTarget[] = nilai?.target?.length ? nilai.target : TARGET_CONTOH;
+  const INSIGHT = nilai?.insight?.trim() ? nilai.insight : INSIGHT_CONTOH;
+  // Total di lubang cincin & label puncak ikut nilai dokumen.
+  const CINCIN_TOTAL = nilai?.cincinTotal?.trim() || '12,35 M';
+  const PUNCAK_NILAI = PENDAPATAN_BULANAN[PUNCAK] ?? 0;
+  const PUNCAK_LABEL = `${BULAN[PUNCAK] ?? ''} (tertinggi)`.trim();
+
   // Interaksi tombol: "Lihat semua" membuka seluruh transaksi, "Lihat Laporan
   // Rinci" membuka panel rincian. Keduanya hanya mengubah tampilan.
   const [semuaTransaksi, setSemuaTransaksi] = useState(false);
@@ -474,9 +526,9 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         return c;
       };
 
-      ambil('bar', barRef.current)?.setOption(opsiBar(skala), true);
-      ambil('donut', donutRef.current)?.setOption(opsiDonat(skala), true);
-      ambil('area', areaRef.current)?.setOption(opsiArea(skala), true);
+      ambil('bar', barRef.current)?.setOption(opsiBar(skala, { bulan: BULAN, pendapatan: PENDAPATAN_BULANAN, garis: garis }), true);
+      ambil('donut', donutRef.current)?.setOption(opsiDonat(skala, RINCIAN_BEBAN), true);
+      ambil('area', areaRef.current)?.setOption(opsiArea(skala, ARUS_KAS), true);
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
@@ -527,7 +579,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       }
       style={{ backgroundColor: WARNA.latar, color: WARNA.teks, fontSize: `${(13 * skala).toFixed(2)}px` }}
     >
-      {/* ===== Baris 1: 4 kartu KPI ===== */}
+      {/* ===== Baris 1: 4 kartu KPI_CONTOH ===== */}
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
@@ -604,7 +656,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               </p>
             </div>
             <div className="text-right">
-              <div className="text-[1.15em] font-bold leading-none tabular-nums">Rp 23,69 M</div>
+              <div className="text-[1.15em] font-bold leading-none tabular-nums">Rp {String(PUNCAK_NILAI).replace('.', ',')} M</div>
               <div className="text-[0.78em] mt-[0.2em] inline-flex items-center gap-[0.15em]" style={{ color: WARNA.hijau }}>
                 <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> 8,2% vs 2024
               </div>
@@ -618,7 +670,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 redup: true,
                 nilai: `Rp ${String(TOTAL_PENDAPATAN.toFixed(1)).replace('.', ',')} M`,
               },
-              { warna: WARNA.oranye, label: 'Desember (tertinggi)', nilai: 'Rp 23,7 M' },
+              { warna: WARNA.oranye, label: PUNCAK_LABEL, nilai: `Rp ${String(PUNCAK_NILAI).replace('.', ',')} M` },
             ]}
           />
           <div
@@ -643,7 +695,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               <div className="relative grafik-140">
                 <div ref={donutRef} className="w-full h-full" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[0.95em] font-bold leading-none tabular-nums">12,35 M</span>
+                  <span className="text-[0.95em] font-bold leading-none tabular-nums">{CINCIN_TOTAL}</span>
                   <span className="text-[0.66em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
                     Total
                   </span>
@@ -689,7 +741,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             </button>
           </div>
           <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto gulir-tema pr-[0.2em]' : ''}`}>
-            {(semuaTransaksi ? [...TRANSAKSI, ...TRANSAKSI_LAIN] : TRANSAKSI).map((t) => (
+            {(semuaTransaksi ? [...TRANSAKSI_CONTOH, ...TRANSAKSI_LAIN_CONTOH] : TRANSAKSI_CONTOH).map((t) => (
               <li key={t.nama} className="flex items-center gap-[0.6em]">
                 <span
                   className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
@@ -764,8 +816,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           <div className="min-w-0">
             <p className="text-[0.92em] font-semibold">Insight Keuangan</p>
             <p className="text-[0.8em] leading-relaxed" style={{ color: WARNA.teks3 }}>
-              Pendapatan tumbuh 8,2% sementara beban turun 3,4% — margin bersih naik ke 32,1%. Perhatian pada
-              realisasi investasi yang baru 57% dari target.
+              {INSIGHT}
             </p>
           </div>
         </div>
@@ -859,7 +910,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
             <p className="text-[0.88em] font-semibold mb-[0.4em]">Transaksi Terbaru</p>
             <ul className="space-y-[0.35em]">
-              {[...TRANSAKSI, ...TRANSAKSI_LAIN].map((t) => (
+              {[...TRANSAKSI_CONTOH, ...TRANSAKSI_LAIN_CONTOH].map((t) => (
                 <li key={t.nama} className="flex items-center justify-between gap-[0.5em] text-[0.8em]" style={{ borderTop: `1px solid ${WARNA.garis}` }}>
                   <span className="py-[0.35em]">
                     {t.nama} <span style={{ color: WARNA.teks3 }}>· {t.ket}</span>
