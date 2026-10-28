@@ -254,15 +254,18 @@ const opsiBar = (s: number) => {
           },
           // Batang terakhir (bulan tertinggi) diberi label angkanya supaya
           // nilainya langsung terbaca, bukan cuma warna beda.
+          // Angka tiap bulan ditulis di ATAS batangnya (bukan daftar di legenda).
           label: {
-            show: i === puncak,
-            // Di atas batang, dengan ruang atas dari `yAxis.max` supaya utuh.
+            show: true,
             position: 'top',
             distance: 8 * s,
-            color: WARNA.teks,
-            fontSize: 9.5 * s,
-            fontWeight: 'bold',
-            formatter: () => `Rp ${String(v).replace('.', ',')} M`,
+            color: i === puncak ? WARNA.teks : WARNA.teks2,
+            fontSize: (i === puncak ? 9.5 : 8.8) * s,
+            fontWeight: i === puncak ? 'bold' : 'normal',
+            backgroundColor: 'rgba(10,10,11,0.72)',
+            borderRadius: 3 * s,
+            padding: [1 * s, 3 * s],
+            formatter: () => String(v).replace('.', ','),
           },
         })),
         // Batang dibatasi lebarnya supaya tidak melebar aneh di layar ultrawide.
@@ -565,25 +568,6 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               { warna: '#38bdf8', label: 'Garis tren', garis: true, nilai: 'nilai = batang' },
             ]}
           />
-          {/* Rincian angka SEMUA bulan, supaya nilainya terbaca tanpa hover. */}
-          <ul className="flex flex-wrap items-center justify-start gap-x-[0.85em] gap-y-[0.15em] shrink-0 mb-[0.35em]">
-            {BULAN.map((b, i) => (
-              <li
-                key={b}
-                className="inline-flex items-center gap-[0.28em] text-[0.64em]"
-                style={{ color: i === PUNCAK ? WARNA.oranye : WARNA.teks3 }}
-              >
-                <span
-                  className="w-[0.4em] h-[0.4em] rounded-full shrink-0"
-                  style={{ backgroundColor: i === PUNCAK ? WARNA.oranye : 'rgba(255,138,31,0.55)' }}
-                />
-                {b}
-                <span className="tabular-nums font-semibold" style={{ color: i === PUNCAK ? WARNA.oranye : WARNA.teks2 }}>
-                  {String(PENDAPATAN_BULANAN[i]).replace('.', ',')}
-                </span>
-              </li>
-            ))}
-          </ul>
           <div
             ref={barRef}
             className={penuh ? 'w-full flex-1 min-h-[8.5em]' : 'w-full h-[10.5em]'}
