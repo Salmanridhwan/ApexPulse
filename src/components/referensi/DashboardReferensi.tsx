@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  X,
 } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
 
@@ -122,6 +123,13 @@ const TRANSAKSI = [
   { nama: 'Gaji & tunjangan', ket: 'Periode Mei 2025', nilai: '-3,72', naik: false, Ikon: Wallet },
 ];
 
+const TRANSAKSI_LAIN = [
+  { nama: 'Pembelian bahan kimia', ket: 'Instalasi pengolahan', nilai: '-214', naik: false, Ikon: CreditCard },
+  { nama: 'Tagihan listrik', ket: 'Pompa & IPA', nilai: '-1,08', naik: false, Ikon: Wallet },
+  { nama: 'Pendapatan sambungan baru', ket: 'Wilayah Jakarta Barat', nilai: '+3,46', naik: true, Ikon: Droplets },
+  { nama: 'Bagi hasil kas daerah', ket: 'Setoran triwulan I', nilai: '+1,75', naik: true, Ikon: Landmark },
+];
+
 const TARGET = [
   { nama: 'Target Pendapatan', capai: 86, warna: WARNA.oranye },
   { nama: 'Efisiensi Beban', capai: 92, warna: WARNA.hijau },
@@ -153,9 +161,28 @@ interface DashboardReferensiProps {
 }
 
 export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false }) => {
+  // Interaksi tombol (dipakai juga oleh dashboard nyata nanti):
+  // "Lihat semua" membuka seluruh transaksi, "Lihat Laporan Rinci" membuka
+  // panel rincian. Keduanya hanya mengubah tampilan, tidak memanggil RAG.
+  const [semuaTransaksi, setSemuaTransaksi] = useState(false);
+  const [laporanRinci, setLaporanRinci] = useState(false);
+
   const barRef = useRef<HTMLDivElement | null>(null);
   const donutRef = useRef<HTMLDivElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
+
+  // Esc menutup panel rincian.
+  useEffect(() => {
+    if (!laporanRinci) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setLaporanRinci(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [laporanRinci]);
 
   useEffect(() => {
     let batal = false;
@@ -430,12 +457,19 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
           <div className="flex items-center justify-between mb-2 shrink-0">
             <h3 className="text-[12.5px] font-semibold">Transaksi Terbaru</h3>
-            <span className="text-[10px] inline-flex items-center gap-0.5" style={{ color: WARNA.oranye }}>
-              Lihat semua <ArrowRight className="w-3 h-3" />
-            </span>
+            <button
+              type="button"
+              onClick={() => setSemuaTransaksi((v) => !v)}
+              aria-expanded={semuaTransaksi}
+              title={semuaTransaksi ? 'Ringkas daftar transaksi' : 'Tampilkan seluruh transaksi'}
+              className="text-[10px] inline-flex items-center gap-0.5 rounded px-1 -mx-1 py-0.5 transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
+              style={{ color: WARNA.oranye }}
+            >
+              {semuaTransaksi ? 'Ringkas' : 'Lihat semua'} <ArrowRight className={`w-3 h-3 transition-transform ${semuaTransaksi ? 'rotate-90' : ''}`} />
+            </button>
           </div>
-          <ul className={`space-y-2 ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
-            {TRANSAKSI.map((t) => (
+          <ul className={`space-y-2 ${penuh ? 'flex-1 min-h-0 overflow-auto' : ''}`}>
+            {(semuaTransaksi ? [...TRANSAKSI, ...TRANSAKSI_LAIN] : TRANSAKSI).map((t) => (
               <li key={t.nama} className="flex items-center gap-2.5">
                 <span
                   className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full"
@@ -520,13 +554,122 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         </div>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[11px] font-bold shrink-0"
+          onClick={() => setLaporanRinci(true)}
+          title="Buka laporan rinci (angka contoh)"
+          className="inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[11px] font-bold shrink-0 transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
         >
           Lihat Laporan Rinci
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* ===== Panel Laporan Rinci (dibuka tombol di atas) ===== */}
+      {laporanRinci && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.72)' }}
+          onClick={() => setLaporanRinci(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Laporan rinci"
+        >
+          <div
+            className="w-full max-w-[760px] max-h-[88vh] overflow-auto rounded-[16px] p-4 sm:p-5"
+            style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-[14px] font-bold leading-tight">Laporan Rinci Keuangan</h3>
+                <p className="text-[10.5px] mt-0.5" style={{ color: WARNA.teks3 }}>
+                  Periode Mei 2025 · angka contoh (bukan data dokumen)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLaporanRinci(false)}
+                title="Tutup (Esc)"
+                aria-label="Tutup laporan"
+                className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors hover:brightness-125"
+                style={{ border: `1px solid ${WARNA.garis}`, color: WARNA.teks2 }}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Ringkasan KPI */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              {KPI.map((k) => (
+                <div key={k.label} className="rounded-[10px] p-2.5" style={{ backgroundColor: WARNA.kartu2 }}>
+                  <p className="text-[9.5px] leading-tight" style={{ color: WARNA.teks3 }}>
+                    {k.label}
+                  </p>
+                  <p className="text-[13px] font-bold tabular-nums mt-1">{k.nilai}</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: k.delta >= 0 === k.naikBagus ? WARNA.hijau : WARNA.merah }}>
+                    {k.delta >= 0 ? '+' : ''}
+                    {String(k.delta).replace('.', ',')}% {k.deltaTeks}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Rincian beban */}
+            <p className="text-[11.5px] font-semibold mb-1.5">Rincian Beban Operasional</p>
+            <table className="w-full text-[10.5px] mb-4">
+              <thead>
+                <tr style={{ color: WARNA.teks3 }}>
+                  <th className="text-left font-medium pb-1">Komponen</th>
+                  <th className="text-right font-medium pb-1">Porsi</th>
+                  <th className="text-right font-medium pb-1">Nominal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {RINCIAN_BEBAN.map((r) => (
+                  <tr key={r.nama} style={{ borderTop: `1px solid ${WARNA.garis}` }}>
+                    <td className="py-1.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: r.warna }} />
+                        {r.nama}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{String(r.nilai).replace('.', ',')}%</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold">
+                      {((12347 * r.nilai) / 100 / 1000).toFixed(2).replace('.', ',')} M
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Transaksi lengkap */}
+            <p className="text-[11.5px] font-semibold mb-1.5">Transaksi Terbaru</p>
+            <ul className="space-y-1.5">
+              {[...TRANSAKSI, ...TRANSAKSI_LAIN].map((t) => (
+                <li key={t.nama} className="flex items-center justify-between gap-2 text-[10.5px]" style={{ borderTop: `1px solid ${WARNA.garis}` }}>
+                  <span className="py-1.5">
+                    {t.nama} <span style={{ color: WARNA.teks3 }}>· {t.ket}</span>
+                  </span>
+                  <span className="tabular-nums font-semibold shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
+                    {t.nilai} jt
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex justify-end mt-4">
+              <button
+                type="button"
+                onClick={() => setLaporanRinci(false)}
+                className="rounded-[10px] px-3 py-1.5 text-[11px] font-bold"
+                style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
