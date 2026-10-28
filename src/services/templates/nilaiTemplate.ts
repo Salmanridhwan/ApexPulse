@@ -73,6 +73,21 @@ const angka = (v: unknown): number => {
   return 0;
 };
 
+/** Angka dokumen diseragamkan ke gaya Indonesia (450.00 → 450,00). */
+const rapiAngka = (v: unknown): string => {
+  const mentah = typeof v === 'string' ? v.trim() : v;
+  if (typeof mentah === 'number' && Number.isFinite(mentah)) {
+    return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(mentah);
+  }
+  const t = String(mentah ?? '');
+  const n = angka(t);
+  if (!t || !Number.isFinite(n)) return t;
+  // hanya rapikan bila teksnya memang angka murni (boleh titik/koma pemisah)
+  return /^[-+]?[\d.,]+$/.test(t)
+    ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(n)
+    : t;
+};
+
 const teks = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
 
 /** Persen capaian → warna & keterangan status, sama seperti contoh template. */
@@ -98,10 +113,11 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
       const seri = (w.kpi?.sparkline || []).map((x: number) => angka(x)).filter((x: number) => Number.isFinite(x));
       return {
         label: teks(w.title),
-        nilai: teks(w.kpi?.value),
+        nilai: rapiAngka(w.kpi?.value),
         satuan: teks(w.kpi?.unit) || undefined,
         delta: d,
-        deltaTeks: teks(w.kpi?.deltaLabel) || 'vs periode sebelumnya',
+        // Label TETAP seperti template — hanya angkanya yang boleh berubah.
+        deltaTeks: 'vs bulan lalu',
         // Naik = hijau, turun = merah (sama seperti contoh template).
         naikBagus: d >= 0,
         seri: seri.length >= 2 ? seri : [0, 0],
@@ -166,20 +182,29 @@ export function nilaiDariWidgets(widgets: WidgetSpec[] | undefined | null): Nila
   }
 
   // ── Progres target ────────────────────────────────────────────────────────
+  // Bentuk kartu template SELALU tiga baris. Dokumen kadang hanya menyebut satu
+  // capaian; baris yang tidak ada angkanya tetap ditampilkan dengan nilai 0
+  // (batang kosong) supaya tinggi & susunan kartu sama dengan contoh.
+  const LABEL_TARGET = ['Target Pendapatan', 'Efisiensi Beban', 'Target Laba Bersih'];
   const target = daftar.find((w) => w.type === 'bullet-target');
   const daftarTarget = target?.kpi?.targets || [];
+  const isiTarget: NilaiTarget[] = [];
   if (daftarTarget.length) {
-    hasil.target = daftarTarget.slice(0, 3).map((t) => {
-      const persen = Math.max(0, Math.min(100, angka(t.persen)));
-      const s = statusTarget(persen);
-      return { nama: teks(t.label), capai: persen, status: s.status, warna: s.warna };
-    });
+    for (const t of daftarTarget.slice(0, 3)) {
+      const persen = Math.round(Math.max(0, Math.min(100, angka(t.persen))));
+      const st = statusTarget(persen);
+      isiTarget.push({ nama: teks(t.label), capai: persen, status: st.status, warna: st.warna });
+    }
   } else if (target?.kpi?.value != null) {
-    const persen = Math.max(0, Math.min(100, angka(target.kpi.value)));
-    const s = statusTarget(persen);
-    hasil.target = [
-      { nama: teks(target.title) || 'Capaian target', capai: persen, status: s.status, warna: s.warna },
-    ];
+    const persen = Math.round(Math.max(0, Math.min(100, angka(target.kpi.value))));
+    const st = statusTarget(persen);
+    isiTarget.push({ nama: LABEL_TARGET[0], capai: persen, status: st.status, warna: st.warna });
+  }
+  if (isiTarget.length) {
+    while (isiTarget.length < 3) {
+      isiTarget.push({ nama: LABEL_TARGET[isiTarget.length], capai: 0, status: 'perlu perhatian', warna: '#ef4444' });
+    }
+    hasil.target = isiTarget;
   }
 
   // ── Insight ───────────────────────────────────────────────────────────────

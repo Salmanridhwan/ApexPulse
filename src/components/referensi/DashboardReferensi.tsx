@@ -470,7 +470,21 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
   // Total di lubang cincin & label puncak ikut nilai dokumen.
   const CINCIN_TOTAL = nilai?.cincinTotal?.trim() || '12,35 M';
   const PUNCAK_NILAI = PENDAPATAN_BULANAN[PUNCAK] ?? 0;
-  const PUNCAK_LABEL = `${BULAN[PUNCAK] ?? ''} (tertinggi)`.trim();
+  const PUNCAK_LABEL = 'Desember (tertinggi)';
+  // Angka turunan dihitung dari data (bukan ditulis tetap), supaya saat memakai
+  // data dokumen tidak ada angka contoh yang tertinggal.
+  const PERTUMBUHAN = (() => {
+    const n = PENDAPATAN_BULANAN.length;
+    if (n < 2) return 0;
+    const a = PENDAPATAN_BULANAN[n - 2] || 0;
+    const b = PENDAPATAN_BULANAN[n - 1] || 0;
+    return a ? Math.round(((b - a) / Math.abs(a)) * 1000) / 10 : 0;
+  })();
+  const ARUS_AWAL = ARUS_KAS[0] ?? 0;
+  const ARUS_AKHIR = ARUS_KAS[ARUS_KAS.length - 1] ?? 0;
+  const ARUS_TUMBUH = ARUS_AWAL
+    ? Math.round(((ARUS_AKHIR - ARUS_AWAL) / Math.abs(ARUS_AWAL)) * 1000) / 10
+    : 0;
 
   // Interaksi tombol: "Lihat semua" membuka seluruh transaksi, "Lihat Laporan
   // Rinci" membuka panel rincian. Keduanya hanya mengubah tampilan.
@@ -658,7 +672,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
             <div className="text-right">
               <div className="text-[1.15em] font-bold leading-none tabular-nums">Rp {String(PUNCAK_NILAI).replace('.', ',')} M</div>
               <div className="text-[0.78em] mt-[0.2em] inline-flex items-center gap-[0.15em]" style={{ color: WARNA.hijau }}>
-                <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> 8,2% vs 2024
+                <ArrowUpRight className="w-[0.95em] h-[0.95em]" /> {String(PERTUMBUHAN).replace('.', ',')}% vs 2024
               </div>
             </div>
           </div>
@@ -771,8 +785,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 29 hari terakhir
               </p>
             </div>
-            <span className="text-[0.78em] font-semibold" style={{ color: WARNA.hijau }}>
-              +18,4%
+            <span className="text-[0.78em] font-semibold" style={{ color: ARUS_TUMBUH >= 0 ? WARNA.hijau : WARNA.merah }}>
+              {ARUS_TUMBUH >= 0 ? '+' : ''}{String(ARUS_TUMBUH).replace('.', ',')}%
             </span>
           </div>
           <Legenda item={[{ warna: WARNA.oranye, label: 'Arus kas bersih' }]} />
