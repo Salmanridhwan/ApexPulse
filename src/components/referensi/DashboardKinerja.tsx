@@ -145,19 +145,31 @@ const dasar = (s: number) => ({
   },
 });
 
+/**
+ * Legenda ringkas tiap grafik: penanda warna + label, rata kanan tepat di atas
+ * bidang grafik. `garis` dipakai untuk seri garis (penanda berbentuk garis).
+ */
+const Legenda: React.FC<{ item: Array<{ warna: string; label: string; garis?: boolean }> }> = ({ item }) => (
+  <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
+    {item.map((x) => (
+      <li key={x.label} className="inline-flex items-center gap-[0.32em] text-[0.68em]" style={{ color: W.teks3 }}>
+        {x.garis ? (
+          <span className="w-[0.95em] h-[0.16em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
+        ) : (
+          <span className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0" style={{ backgroundColor: x.warna }} />
+        )}
+        {x.label}
+      </li>
+    ))}
+  </ul>
+);
+
 const opsiTren = (s: number) => {
   const d = dasar(s);
   return {
+    // top diberi ruang untuk label titik puncak (markPoint) supaya tidak
+    // menabrak legenda di atas grafik.
     grid: { left: 4, right: 10, top: 26 * s, bottom: 2, containLabel: true },
-    legend: {
-      show: true,
-      top: 0,
-      right: 0,
-      itemWidth: 10 * s,
-      itemHeight: 4 * s,
-      textStyle: { color: W.teks3, fontSize: 10 * s },
-      data: ['Minggu ini', 'Minggu lalu'],
-    },
     tooltip: {
       ...d.tooltip,
       trigger: 'axis',
@@ -168,7 +180,7 @@ const opsiTren = (s: number) => {
     xAxis: { type: 'category', data: HARI, ...d.sumbu },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: W.garis, type: 'dashed' } },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
       axisLabel: { color: W.teks3, fontSize: 10 * s, formatter: 'Rp {value}' },
     },
     series: [
@@ -254,7 +266,15 @@ const opsiKategori = (s: number) => {
       axisPointer: { type: 'shadow' },
       formatter: (p: any[]) => `${p[0].name}: <b>Rp ${String(p[0].value).replace('.', ',')} jt</b>`,
     },
-    xAxis: { type: 'value', show: false },
+    // Sumbu nilai tidak ditampilkan, tetapi garis bantu vertikalnya tetap tampil
+    // (kalau `show:false`, ECharts ikut menyembunyikan splitLine).
+    xAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { show: false },
+      splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
+    },
     yAxis: {
       type: 'category',
       inverse: true,
@@ -473,6 +493,12 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
               +29,9%
             </span>
           </div>
+          <Legenda
+            item={[
+              { warna: W.biru, label: 'Minggu ini', garis: true },
+              { warna: '#64748b', label: 'Minggu lalu', garis: true },
+            ]}
+          />
           <div ref={trenRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[9.5em]'} />
         </div>
 
@@ -526,6 +552,7 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
             </div>
             <Receipt className="w-[1.1em] h-[1.1em] shrink-0" style={{ color: W.emas }} />
           </div>
+          <Legenda item={[{ warna: W.emas, label: 'Pendapatan per kategori' }]} />
           <div ref={kategoriRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[9.5em]'} />
         </div>
       </div>
@@ -630,7 +657,8 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
             ))}
           </div>
 
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={penuh ? 'w-full flex-1 min-h-[1.5em] mt-[0.2em]' : 'w-full h-[3em] mt-[0.2em]'} aria-hidden>
+          <Legenda item={[{ warna: W.hijau, label: 'Tren pendapatan YTD', garis: true }]} />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={penuh ? 'w-full flex-1 min-h-[1.5em]' : 'w-full h-[3em]'} aria-hidden>
             <defs>
               <linearGradient id="kj-ytd" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={W.hijau} stopOpacity="0.38" />

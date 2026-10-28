@@ -159,6 +159,24 @@ const jalurSpark = (seri: number[]) => {
   };
 };
 
+/**
+ * Legenda ringkas untuk tiap grafik: sederet penanda warna + label, rata kanan
+ * tepat di atas bidang grafik supaya tidak menabrak judul maupun angka utama.
+ */
+const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: boolean }> }> = ({ item }) => (
+  <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
+    {item.map((x) => (
+      <li key={x.label} className="inline-flex items-center gap-[0.32em] text-[0.68em]" style={{ color: WARNA.teks3 }}>
+        <span
+          className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0"
+          style={{ backgroundColor: x.warna, opacity: x.redup ? 0.45 : 1 }}
+        />
+        {x.label}
+      </li>
+    ))}
+  </ul>
+);
+
 /** Gaya dasar grafik: huruf, garis, dan padding ikut `skala` (em setara). */
 const gayaDasar = (s: number) => ({
   tooltip: {
@@ -191,7 +209,7 @@ const opsiBar = (s: number) => {
     xAxis: { type: 'category', data: BULAN, ...dasar.sumbu },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
       axisLabel: { color: WARNA.teks3, fontSize: 10 * s, formatter: '{value} M' },
     },
     series: [
@@ -250,7 +268,7 @@ const opsiArea = (s: number) => {
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: WARNA.garis, type: 'dashed' } },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
       axisLabel: { color: WARNA.teks3, fontSize: 9 * s, formatter: '{value} M' },
     },
     series: [
@@ -476,6 +494,12 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               </div>
             </div>
           </div>
+          <Legenda
+            item={[
+              { warna: WARNA.oranye, label: 'Bulan tertinggi' },
+              { warna: WARNA.oranye, label: 'Bulan lain', redup: true },
+            ]}
+          />
           <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
         </div>
 
@@ -526,14 +550,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         }`}
       >
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-center justify-between gap-[0.4em] mb-[0.6em] shrink-0">
+          <div className="flex items-center justify-between gap-[0.25em] mb-[0.6em] shrink-0">
             <h3 className="text-[0.98em] font-semibold truncate min-w-0">Transaksi Terbaru</h3>
             <button
               type="button"
               onClick={() => setSemuaTransaksi((v) => !v)}
               aria-expanded={semuaTransaksi}
               title={semuaTransaksi ? 'Ringkas daftar transaksi' : 'Tampilkan seluruh transaksi'}
-              className="shrink-0 whitespace-nowrap text-[0.76em] inline-flex items-center gap-[0.2em] rounded px-[0.3em] -mx-[0.3em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
+              className="shrink-0 whitespace-nowrap text-[0.74em] inline-flex items-center gap-[0.15em] rounded px-[0.1em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
               style={{ color: WARNA.oranye }}
             >
               {semuaTransaksi ? 'Ringkas' : 'Lihat semua'}
@@ -575,11 +599,17 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               +18,4%
             </span>
           </div>
+          <Legenda item={[{ warna: WARNA.oranye, label: 'Arus kas bersih' }]} />
           <div ref={areaRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[8em]'} />
         </div>
 
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
+          <div className="flex items-center justify-between gap-[0.5em] mb-[0.6em] shrink-0">
+            <h3 className="text-[0.98em] font-semibold">Progres Target</h3>
+            <Legenda
+              item={Array.from(new Map(TARGET.map((t) => [t.status, { warna: t.warna, label: t.status }])).values())}
+            />
+          </div>
           <ul className={`space-y-[0.7em] ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
             {TARGET.map((t) => (
               <li key={t.nama}>
