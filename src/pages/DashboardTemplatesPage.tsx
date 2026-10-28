@@ -542,35 +542,33 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             rincian beban, daftar transaksi, area arus kas, progres target, dan
             strip insight. Susunannya sengaja tidak memakai DashboardCanvas agar
             bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
-        {asli ? (
+        {/* SATU wadah untuk contoh maupun data asli. Bingkai, latar, dan
+            padding-nya sama persis, jadi yang berubah hanya angka di dalamnya. */}
+        <div className={`tema-${aktif.tema || 'oranye'} rounded-card p-1.5 -m-1.5`} data-theme="dark">
           <KanvasTemaContext.Provider
-            value={{ mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] }}
+            value={asli ? { mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] } : null}
           >
-          <div className={`tema-${aktif.tema || 'oranye'} rounded-card border border-line overflow-hidden bg-canvas`} data-theme="dark">
-            {aktif.id === 'tpl-ringkasan' ? (
-              <div className="p-3 sm:p-4">
+            {asli ? (
+              aktif.id === 'tpl-ringkasan' ? (
                 <DashboardReferensi nilai={nilaiAsli} />
-              </div>
+              ) : (
+                <DashboardCanvas
+                  widgets={asli.widgets}
+                  onEditWidget={() => {}}
+                  onManualCorrection={() => {}}
+                  onDeleteWidget={() => {}}
+                  onDuplicateWidget={() => {}}
+                  onReorderWidgets={() => {}}
+                  onResizeWidget={() => {}}
+                  preview
+                  readOnly
+                />
+              )
             ) : (
-              <DashboardCanvas
-                widgets={asli.widgets}
-                onEditWidget={() => {}}
-                onManualCorrection={() => {}}
-                onDeleteWidget={() => {}}
-                onDuplicateWidget={() => {}}
-                onReorderWidgets={() => {}}
-                onResizeWidget={() => {}}
-                preview
-                readOnly
-              />
+              <KomponenPratinjau />
             )}
-          </div>
           </KanvasTemaContext.Provider>
-        ) : (
-          <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
-            <KomponenPratinjau />
-          </div>
-        )}
+        </div>
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
           <BarChart3 className="w-3 h-3 mt-0.5 shrink-0" />
