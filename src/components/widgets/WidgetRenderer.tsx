@@ -6,6 +6,58 @@ import { KpiCard } from './KpiCard';
 import { NarasiCard } from './NarasiCard';
 import { pasanganUntuk } from './paletPasangan';
 
+/** Warna & keterangan status capaian target (sama seperti pratinjau template). */
+const WARNA_TARGET: Record<string, string> = {
+  sesuai: 'var(--color-pos)',
+  mendekati: 'var(--color-brand)',
+  perhatian: 'var(--color-neg)',
+};
+const TEKS_TARGET: Record<string, string> = {
+  sesuai: 'sesuai target',
+  mendekati: 'mendekati target',
+  perhatian: 'perlu perhatian',
+};
+
+/**
+ * Beberapa bar progres target dalam satu kartu (gaya "Progres Target" template).
+ * Nilai di atas 100% dipotong untuk lebar bar, tetapi angkanya tetap ditulis apa
+ * adanya supaya tidak menyesatkan.
+ */
+function TargetList({
+  targets,
+}: {
+  targets: NonNullable<WidgetSpec['kpi']>['targets'];
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col justify-center gap-2 overflow-hidden">
+      {(targets || []).map((t) => {
+        const warna = WARNA_TARGET[t.status] || 'var(--color-brand)';
+        return (
+          <div key={t.label} className="min-w-0">
+            <div className="flex items-baseline justify-between gap-1.5 mb-0.5">
+              <span className="text-[10.5px] font-semibold text-ink-2 truncate leading-tight" title={t.label}>
+                {t.label}
+              </span>
+              <span className="text-[11px] font-bold tabular-nums shrink-0 leading-tight" style={{ color: warna }}>
+                {t.persen}%
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-line)' }}>
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${Math.max(0, Math.min(100, t.persen))}%`, background: warna }}
+              />
+            </div>
+            <span className="text-[9.5px] font-medium leading-tight" style={{ color: warna }}>
+              • {TEKS_TARGET[t.status] || ''}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface WidgetRendererProps {
   widget: WidgetSpec;
   /** Posisi kartu di kanvas (opsional) — menggeser hue awal grafik. */
@@ -63,7 +115,13 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
         series={seriBerwarna}
         unit={widget.chart?.unit}
         stacked={widget.chart?.stacked}
-        showLegend={padat ? false : widget.chart?.showLegend}
+        // Legenda disembunyikan di kanvas satu halaman KECUALI untuk cincin/loncat:
+        // tanpa legenda, potongan komposisi tidak bisa diidentifikasi sama sekali.
+        showLegend={
+          padat
+            ? (widget.type === 'donut' || widget.type === 'pie') && (widget.chart?.showLegend ?? true)
+            : widget.chart?.showLegend
+        }
         min={widget.chart?.min}
         max={widget.chart?.max}
         heatmapData={widget.heatmap?.data}
@@ -125,6 +183,12 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
       );
 
     case 'bullet-target':
+      // Kartu "Progres Target" pada template memuat BEBERAPA target sekaligus
+      // (pendapatan, efisiensi beban, laba bersih). Kalau datanya berisi daftar
+      // target, tampilkan baris progres — bukan satu angka besar.
+      if (widget.kpi?.targets?.length) {
+        return <TargetList targets={widget.kpi.targets} />;
+      }
       return (
         <KpiCard
           variant={(widget.grid?.w ?? 0) >= 6 ? 'hero' : 'compact'}

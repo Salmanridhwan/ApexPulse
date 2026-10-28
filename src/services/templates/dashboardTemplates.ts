@@ -36,6 +36,12 @@ export interface DashboardTemplate {
   fokus: string[];
   /** Warna aksen kartu (hex) — dipakai di UI galeri. */
   aksen: string;
+  /**
+   * Kunci tema visual (kelas CSS `.tema-<kunci>` di index.css). Dashboard yang
+   * dibuat dari template ini memakai tema tersebut, sehingga hasil nyatanya
+   * berlatar, berwarna kartu, dan beraksen sama dengan pratinjau.
+   */
+  tema: string;
   /** Judul dashboard yang dibuat saat template dipakai. */
   judulDashboard: string;
   deskripsiDashboard: string;
@@ -130,41 +136,69 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   deskripsi: 'Satu layar untuk pimpinan: KPI, tren, komposisi, transaksi, arus kas, dan progres target.',
   fokus: ['Saldo & laba', 'Tren pendapatan', 'Komposisi beban', 'Arus kas', 'Progres target'],
   aksen: '#1fa6cc',
+  tema: 'oranye',
   judulDashboard: 'Ringkasan Eksekutif (Contoh)',
   deskripsiDashboard:
-    'Tampilan contoh mengikuti referensi desain: 4 KPI berikon, grafik batang pendapatan, cincin rincian beban, transaksi terbaru, area arus kas, progres target, dan strip insight. Seluruh angka ilustrasi.',
+    'Empat KPI berikon, grafik batang pendapatan, cincin rincian beban dengan total di tengah, daftar transaksi terbaru, area arus kas, tiga bar progres target, dan strip insight — seluruhnya dalam satu layar. Seluruh angka ilustrasi.',
   widgets: [
-    kpi('Pendapatan Usaha', 'Realisasi periode ini', '128,4', 'Miliar Rp', 6.8, 'vs target', [110, 113, 116, 120, 124, 128.4]),
-    kpi('Laba Bersih', 'Setelah beban usaha', '23,7', 'Miliar Rp', 4.2, 'YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
-    kpi('Beban Operasional', 'Terhadap pagu', '96,2', 'Miliar Rp', -1.4, 'dari pagu', [99, 98.4, 97.8, 97.1, 96.8, 96.2]),
-    kpi('Realisasi Anggaran', 'Serapan belanja', 87.5, '%', 3.1, 'dari triwulan lalu', [78, 80, 82, 84, 86, 87.5]),
-    kpi('Indeks Kepuasan Layanan', 'Skala 0–100', 82.4, 'poin', undefined, 'naik 1,8 poin', [78, 79, 80, 81, 81.8, 82.4]),
-    kpi('Temuan Audit Terbuka', 'Belum ditutup', 12, 'temuan', undefined, 'turun 4 dari semester lalu', [22, 20, 18, 16, 14, 12]),
+    // ── Baris 1: empat KPI berikon + sparkline (persis susunan pratinjau) ──
+    { ...kpi('Total Saldo Kas', 'Saldo kas & bank', '48.750', 'juta Rp', 12.4, 'vs bulan lalu', [39.1, 40.4, 42, 43.8, 46.2, 48.75]), ikon: 'wallet' },
+    { ...kpi('Pendapatan Usaha', 'Realisasi tahun berjalan', '23.685', 'juta Rp', 8.2, 'vs tahun lalu', [18.4, 19.2, 20.1, 21.4, 22.6, 23.685]), ikon: 'trending-up' },
+    { ...kpi('Beban Operasional', 'Terhadap pagu', '12.347', 'juta Rp', -3.4, 'vs tahun lalu', [13.9, 13.4, 13.1, 12.9, 12.6, 12.347]), ikon: 'trending-down' },
+    { ...kpi('Laba Bersih', 'Setelah beban usaha', '11.337', 'juta Rp', 6.1, 'vs tahun lalu', [8.4, 8.9, 9.6, 10.2, 10.8, 11.337]), ikon: 'coins' },
 
-    // Baris kedua mengikuti pola "grafik besar + cincin komposisi" seperti
-    // dashboard keuangan pada referensi: tren di kiri (2/3), komposisi di kanan (1/3).
-    grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 8, h: 4 }, BULAN, [
-      { name: 'Pendapatan', data: [98, 101, 104, 107, 110, 113, 116, 119, 122, 124, 126, 128.4] },
-      { name: 'Beban', data: [88, 90, 91, 92, 93, 94, 94.6, 95, 95.4, 95.8, 96, 96.2], kind: 'line' },
-    ], 'Miliar Rp'),
-    w('donut', 'Komposisi Pendapatan', 'Nilai tiap sumber, miliar rupiah', { w: 4, h: 4 }, {
+    // ── Baris 2: grafik batang pendapatan (2/3) + cincin komposisi beban (1/3) ──
+    grafik('bar', 'Ikhtisar Pendapatan', 'Pendapatan usaha per bulan, satuan miliar rupiah', { w: 8, h: 4 }, BULAN,
+      [{ name: 'Pendapatan', data: [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4, 22.3, 23, 23.7] }],
+      'Miliar Rp', { showLegend: false }),
+    w('donut', 'Rincian Beban', 'Komposisi beban operasional', { w: 4, h: 4 }, {
       chart: {
-        xAxis: ['Air minum', 'Sambungan baru', 'Non-air', 'Lain-lain'],
-        // Nilai absolut (bukan persen) supaya TOTAL di tengah cincin bermakna:
-        // jumlahnya sama dengan KPI "Pendapatan Usaha" (128,4 miliar).
-        series: [{ name: 'Pendapatan', data: [92.4, 18, 11.6, 6.4] }],
+        xAxis: ['Operasional', 'Pemeliharaan', 'Pegawai', 'Investasi', 'Lain-lain'],
+        // Nilai absolut (miliar) supaya total di tengah cincin bermakna: 12,35.
+        series: [{ name: 'Beban', data: [3.2, 2.85, 2.45, 2.1, 1.75] }],
         unit: 'Miliar Rp',
         showLegend: true,
       },
     }),
 
-    narasi('Kesimpulan Eksekutif', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 3 },
-      'Contoh kesimpulan: kinerja periode ini berada pada kondisi sehat. Pendapatan melampaui target, beban operasional terjaga di bawah pagu, ' +
-      'dan serapan anggaran berjalan sesuai jadwal. Perhatian utama ada pada 12 temuan audit yang belum ditutup dan capaian dua unit yang masih di bawah target.',
+    // ── Baris 3: daftar transaksi, arus kas, dan progres target ──
+    w('table', 'Transaksi Terbaru', 'Tiga transaksi terakhir', { w: 4, h: 5 }, {
+      table: {
+        columns: [
+          { key: 'keterangan', label: 'Keterangan', format: 'text' },
+          { key: 'jumlah', label: 'Jumlah', format: 'text' },
+        ],
+        rows: [
+          { keterangan: 'Pembayaran pelanggan', jumlah: '+1,24 jt' },
+          { keterangan: 'Pemeliharaan jaringan', jumlah: '-486 jt' },
+          { keterangan: 'Setoran kas ke bank', jumlah: '+2,10 jt' },
+        ],
+      },
+    }),
+    grafik('area', 'Arus Kas', 'Arus kas bersih 29 hari terakhir', { w: 4, h: 5 },
+      ['1', '4', '7', '10', '13', '16', '19', '22', '25', '29'],
+      [{ name: 'Arus kas bersih', data: [3.2, 4.1, 5.4, 6.8, 7.2, 9.4, 11.2, 13.6, 16.4, 19.6] }],
+      'Miliar Rp', { showLegend: false }),
+    w('bullet-target', 'Progres Target', 'Capaian terhadap target periode', { w: 4, h: 5 }, {
+      kpi: {
+        value: 86,
+        unit: '%',
+        deltaLabel: 'Capaian target',
+        targets: [
+          { label: 'Target Pendapatan', persen: 86, status: 'mendekati' },
+          { label: 'Efisiensi Beban', persen: 92, status: 'sesuai' },
+          { label: 'Target Laba Bersih', persen: 57, status: 'perhatian' },
+        ],
+      },
+    }),
+
+    // ── Baris 4: strip insight ──
+    narasi('Insight Keuangan', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 3 },
+      'Pendapatan tumbuh 8,2% sementara beban turun 3,4% — margin bersih naik ke 32,1%. Perhatian utama pada realisasi investasi yang baru 57% dari target.',
       [
-        'Pendapatan 107% dari target; laba bersih tumbuh 4,2%.',
-        'Serapan anggaran 87,5% — perlu percepatan agar target 90% tercapai.',
-        'Temuan audit terbuka turun dari 22 menjadi 12.',
+        'Pendapatan tumbuh 8,2%; beban turun 3,4%.',
+        'Margin bersih naik ke 32,1%.',
+        'Realisasi investasi baru 57% dari target — perlu percepatan.',
       ]),
   ],
 };
@@ -182,6 +216,7 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   deskripsi: 'Papan analitik: 4 KPI, tren pendapatan, status pesanan, sumber kunjungan, tabel, kategori, per jam, pembayaran, konversi.',
   fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Nilai per kategori', 'Metode pembayaran'],
   aksen: '#3b82f6',
+  tema: 'analitik',
   judulDashboard: 'Analitik Bisnis Harian (Contoh)',
   deskripsiDashboard:
     'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, batang nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi. Seluruh angka ilustrasi.',
@@ -257,6 +292,7 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   deskripsi: 'Papan trafik: 5 KPI, sumber trafik, relevansi, usia, halaman, perangkat, perilaku, OS, frasa pencarian.',
   fokus: ['Sumber trafik', 'Perilaku pengunjung', 'Usia & perangkat', 'Halaman populer', 'Frasa pencarian'],
   aksen: '#22d3ee',
+  tema: 'trafik',
   judulDashboard: 'Trafik Web & Perilaku (Contoh)',
   deskripsiDashboard:
     'Tampilan contoh mengikuti referensi ketiga: 5 KPI bersparkline, batang sumber trafik, garis relevansi, komposisi usia, halaman populer, cincin perangkat, alat ukur perilaku, sistem operasi, dan frasa pencarian. Seluruh angka ilustrasi.',

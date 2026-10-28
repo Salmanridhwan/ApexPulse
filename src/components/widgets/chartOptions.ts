@@ -191,6 +191,12 @@ export interface ChartData {
   /** Nama map ECharts yang sudah di-register (untuk type 'map'). */
   mapRegistered?: boolean;
   /**
+   * Aksen tema template (hex). Bila diisi, kanvas menyesuaikan diri dengan
+   * pratinjau template: batang satu warna + angka di atasnya, dan cincin
+   * menampilkan total di tengah.
+   */
+  temaAksen?: string;
+  /**
    * Geseran palet untuk widget ini (stabil, dari id/judul widget). Membuat
    * grafik satu-seri di dashboard tidak semuanya berwarna biru.
    */
@@ -314,6 +320,8 @@ export function buildChartOption(
   T: ChartTheme
 ): EChartsOption {
   const { xAxis: xView, series: seriesView, unit, stacked, showLegend = true } = data;
+  /** Aksen tema template (kosong = tema aplikasi biasa). */
+  const aksen = data.temaAksen;
   // Geseran palet per widget: dipakai semua tipe chart supaya tak ada dashboard
   // yang seluruh grafiknya dimulai dari warna yang sama.
   const seed = data.warnaSeed ?? 0;
@@ -812,12 +820,23 @@ export function buildChartOption(
   // ── Pie & Donut ────────────────────────────────────────────────────────────
   if (type === 'pie' || type === 'donut') {
     const donutView = xView.map((label, idx) => ({ name: label, value: seriesView[0]?.data[idx] || 0 }));
+    const totalDonat = donutView.reduce((n, d) => n + (Number(d.value) || 0), 0);
     return {
       tooltip: {
         trigger: 'item', ...tooltipDasar,
         formatter: (p: any) => `${p.name}: <b>${fmtAngka(p.value)}${satuan(displayUnit)}</b> (${p.percent}%)`,
       },
-      legend: showLegend ? { bottom: 0, icon: 'circle', textStyle: { fontSize: 11, color: T.muted } } : undefined,
+      legend: showLegend
+        ? {
+            bottom: 0,
+            icon: 'circle',
+            type: 'scroll' as const,
+            itemWidth: 7,
+            itemHeight: 7,
+            itemGap: 8,
+            textStyle: { fontSize: 9.5, color: T.text2 },
+          }
+        : undefined,
       series: [
         {
           name: displayUnit || 'Nilai',
@@ -1202,7 +1221,9 @@ export function buildChartOption(
           ? 'bar'
           : type;
     // Chart berkelompok (2 seri Target/Realisasi) dan combo: warna mengikuti seri.
-    const perKategori = perKategoriDasar;
+    // Di tema template (aksen diisi) batang dibuat SATU warna aksen seperti
+    // pratinjau template — bukan pelangi per kategori.
+    const perKategori = aksen ? false : perKategoriDasar;
     return {
       name: s.name,
       type: tipeSeri,
@@ -1213,10 +1234,17 @@ export function buildChartOption(
       symbolSize: 6,
       data: s.data,
       barMaxWidth: 18,
+      // Angka di atas batang: pratinjau template menampilkan nilai tiap bulan,
+      // jadi kanvas nyatanya harus sama (hanya untuk tema template).
+      label: (tipeSeri === 'bar' && aksen
+        ? { show: true, position: 'top', fontSize: 10, color: T.text2, formatter: (p: any) => fmtAngka(p.value) }
+        : undefined) as any,
       itemStyle: {
         color: perKategori
           ? ((p: any) => paletTema[(p?.dataIndex ?? 0) % paletTema.length])
-          : baseColor,
+          : aksen && !seriGanda
+            ? aksen
+            : baseColor,
         borderRadius: tipeSeri === 'bar' ? (isHbar ? [0, 4, 4, 0] : [4, 4, 0, 0]) : 0,
       },
       lineStyle: { width: 2.5, color: baseColor },

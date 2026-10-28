@@ -64,3 +64,16 @@ export function useThemeMode(): ThemeMode {
 export function useAksenKanvas(): string | undefined {
   return useContext(KanvasTemaContext)?.aksen;
 }
+
+/**
+ * Aksen grafik per tema dashboard (dipakai dashboard hasil template).
+ *
+ * ECharts tidak bisa membaca CSS variable, jadi warna seri utama diteruskan
+ * sebagai nilai hex lewat `KanvasTemaContext`. Kuncinya sama dengan nama kelas
+ * CSS `.tema-<kunci>` di index.css.
+ */
+export const AKSEN_TEMA: Record<string, string> = {
+  oranye: '#ff8a1f',
+  analitik: '#3b82f6',
+  trafik: '#22d3ee',
+};

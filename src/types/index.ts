@@ -222,6 +222,11 @@ export interface WidgetSpec {
   title: string;
   subtitle?: string;
   category?: string;
+  /**
+   * Nama ikon (lucide) yang ditampilkan di kepala kartu — dipakai template supaya
+   * kartu KPI punya penanda visual seperti pratinjaunya (mis. `wallet`, `trending-up`).
+   */
+  ikon?: string;
   confidence: ConfidenceLevel;
   grid: WidgetGrid;
   /**
@@ -255,6 +260,16 @@ export interface WidgetSpec {
     sparkline?: number[];
     /** Asal grafik tren: seri dokumen, turunan dari delta, atau turunan dari nilai saja. */
     sparklineAsal?: 'dokumen-seri' | 'turunan-delta' | 'turunan-nilai';
+    /**
+     * Beberapa target sekaligus (kartu "Progres Target" pada template): tiap baris
+     * punya label, capaian persen, dan status warna. Dipakai tipe `bullet-target`
+     * agar satu kartu bisa memuat tiga progres seperti pratinjau template.
+     */
+    targets?: Array<{
+      label: string;
+      persen: number;
+      status: 'sesuai' | 'mendekati' | 'perhatian';
+    }>;
   };
   chart?: {
     xAxis: string[];
@@ -359,6 +374,15 @@ export interface Dashboard {
   title: string;
   description: string;
   sector: BumdSector;
+  /**
+   * TEMA VISUAL dashboard (opsional).
+   *
+   * Dashboard yang dibuat dari template membawa tema template-nya — `oranye`,
+   * `analitik`, atau `trafik` — sehingga hasil nyatanya tampil dengan latar, warna
+   * kartu, dan aksen yang sama seperti pratinjau template (permintaan pengguna:
+   * "desain dan warnanya sama persis"). Kosong = ikut tema aplikasi.
+   */
+  tema?: string;
   widgets: WidgetSpec[];
   globalFilters: GlobalFilters;
   createdAt: string;

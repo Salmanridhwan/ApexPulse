@@ -33,6 +33,7 @@ import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
+import { AKSEN_TEMA, KanvasTemaContext } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
@@ -1128,7 +1129,21 @@ export default function App() {
                   />
                 </React.Suspense>
               ) : (
-                <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+                <main
+                  className={`flex-1 w-full ${
+                    activeDashboard?.tema ? `tema-${activeDashboard.tema} bg-canvas` : ''
+                  }`}
+                >
+                  {/* Tema template (bila ada) membungkus seluruh isi kanvas supaya
+                      latar, kartu, dan aksen sama dengan pratinjau template. */}
+                  <KanvasTemaContext.Provider
+                    value={
+                      activeDashboard?.tema
+                        ? { mode: 'dark', aksen: AKSEN_TEMA[activeDashboard.tema] }
+                        : null
+                    }
+                  >
+                  <div className="max-w-7xl w-full mx-auto p-4 sm:p-6">
                   {/* Kepala ringkas ala template: judul + chip + aksi dalam satu baris */}
                   {activeDashboard && !isPresentationMode && (
                     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -1227,6 +1242,8 @@ export default function App() {
                     onOpenChat={() => setIsChatOpen(true)}
                   />
                   </ChartSelectionProvider>
+                  </div>
+                  </KanvasTemaContext.Provider>
                 </main>
               )}
             </>

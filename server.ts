@@ -1221,6 +1221,9 @@ const app = express();
       title: req.body.title || 'Dashboard Baru',
       description: req.body.description || 'Dashboard kustom BUMD',
       sector: req.body.sector || 'pdam',
+      // Tema visual opsional (dipakai dashboard hasil template agar tampil sama
+      // dengan pratinjau template). Tanpa tema, dashboard ikut tema aplikasi.
+      ...(req.body.tema ? { tema: String(req.body.tema) } : {}),
       widgets: req.body.widgets || [],
       globalFilters: req.body.globalFilters || {
         periode: '2026-Q1',
@@ -1488,6 +1491,9 @@ const app = express();
         'Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.'
       ),
       sector: tenant.sector,
+      // Tema template dibawa ke dashboard nyata: latar, warna kartu, dan aksen
+      // harus sama dengan pratinjau yang dilihat pengguna.
+      tema: template.tema,
       widgets,
       globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
       createdAt: new Date().toISOString(),

@@ -227,6 +227,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         xAxis: xView,
         series: seriesView,
         unit: displayUnit,
+        // Aksen tema template diteruskan ke pembuat opsi: ECharts tidak membaca CSS variable.
+        temaAksen: aksenKanvas,
         stacked,
         showLegend,
         min,
@@ -466,7 +468,11 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           >
             <div className="text-[15px] font-bold leading-none text-ink tabular-nums">
               {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(totalDonut)}
-              {displayUnit ? <span className="ml-0.5 text-[10px] font-medium text-ink-3">{displayUnit}</span> : null}
+              {displayUnit ? (
+                <span className="ml-0.5 text-[9px] font-medium text-ink-3">
+                  {displayUnit.replace(/^Miliar\s*Rp$/i, 'M').replace(/^Juta\s*Rp$/i, 'jt').replace(/^Miliar$/i, 'M')}
+                </span>
+              ) : null}
             </div>
             <div className="mt-0.5 text-[10px] text-ink-3">Total</div>
           </div>

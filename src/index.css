@@ -1086,6 +1086,115 @@
   color: var(--color-ink);
 }
 
+/* ============================================================================
+   TEMA TEMPLATE LAIN — dipakai dashboard NYATA hasil "Pratinjau dengan data asli".
+   ----------------------------------------------------------------------------
+   Pratinjau template memakai komponen replika dengan paletnya sendiri. Supaya
+   dashboard yang benar-benar dibuat tampil SAMA (latar, kartu, aksen, warna
+   grafik), tema yang sama ditanamkan ke dashboard (`Dashboard.tema`) lalu kelas
+   `.tema-<kunci>` dipasang di sekitar kanvas. Semua komponen membaca token CSS,
+   jadi cukup menimpa token di sini.
+   ============================================================================ */
+
+/* T2 — Analitik Bisnis Harian: navy gelap + aksen biru. */
+.tema-analitik {
+  color-scheme: dark;
+
+  --color-canvas: #080b12;
+  --color-surface: #0f1520;
+  --color-surface-2: #151d2b;
+
+  --color-line: #1e2735;
+  --color-line-strong: #2b374a;
+
+  --color-ink: #f2f6fc;
+  --color-ink-2: #a9b6c9;
+  --color-ink-3: #8d9aad;
+
+  --color-brand: #3b82f6;
+  --color-brand-ink: #7db0ff;
+  --color-brand-soft: #0e1c33;
+  --color-brand-solid: #3b82f6;
+  --color-on-brand: #06101f;
+
+  --color-pos: #22c55e;
+  --color-neg: #ef4444;
+  --color-warn: #f5a524;
+
+  --color-solid: #f2f6fc;
+  --color-on-solid: #0b111c;
+
+  --radius-card: 14px;
+
+  --tegas-accent: #3b82f6;
+  --tegas-ink: #f2f6fc;
+  --tegas-canvas: #080b12;
+  --tegas-line: #1e2735;
+  --tegas-card: #0f1520;
+
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* T3 — Trafik Web & Perilaku: gelap-netral + aksen cyan. */
+.tema-trafik {
+  color-scheme: dark;
+
+  --color-canvas: #0b0d12;
+  --color-surface: #12151d;
+  --color-surface-2: #171b25;
+
+  --color-line: #1f2531;
+  --color-line-strong: #2b3242;
+
+  --color-ink: #f2f5f9;
+  --color-ink-2: #9aa3b2;
+  --color-ink-3: #8792a3;
+
+  --color-brand: #22d3ee;
+  --color-brand-ink: #6ee7f9;
+  --color-brand-soft: #0a2530;
+  --color-brand-solid: #22d3ee;
+  --color-on-brand: #04141a;
+
+  --color-pos: #22c55e;
+  --color-neg: #ef4444;
+  --color-warn: #eab308;
+
+  --color-solid: #f2f5f9;
+  --color-on-solid: #0b0d12;
+
+  --radius-card: 14px;
+
+  --tegas-accent: #22d3ee;
+  --tegas-ink: #f2f5f9;
+  --tegas-canvas: #0b0d12;
+  --tegas-line: #1f2531;
+  --tegas-card: #12151d;
+
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Kartu rata tanpa bayangan keras saat disentuh, sama seperti tema oranye. */
+.tema-analitik .card-tegas,
+.tema-trafik .card-tegas {
+  border-radius: 14px;
+}
+
+.tema-analitik .card-tegas:hover,
+.tema-trafik .card-tegas:hover {
+  border-color: var(--color-line-strong);
+  box-shadow: none;
+  transform: none;
+}
+
+.tema-analitik .accent-bar,
+.tema-trafik .accent-bar {
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+}
+
 /* Kartu di tema ini hampir rata: garis tipis, tanpa bayangan keras saat hover. */
 .tema-oranye .card-tegas:hover {
   border-color: var(--color-line-strong);

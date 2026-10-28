@@ -1,13 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Activity,
   AlertTriangle,
+  Banknote,
+  CircleDollarSign,
+  Coins,
   Copy,
   Database,
   Edit2,
+  Gauge,
   MoreVertical,
+  Percent,
+  ShieldAlert,
+  Target,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   UserCheck,
+  Users,
+  Wallet,
 } from 'lucide-react';
 import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -23,6 +35,34 @@ const LABEL_TIPE: Record<string, string> = {
   histogram: 'Histogram', boxplot: 'Box', combo: 'Combo', map: 'Peta',
   gantt: 'Gantt', heatmap: 'Heatmap', gauge: 'Gauge', kpi: 'KPI',
 };
+
+
+/**
+ * Peta nama ikon (string di data widget) → komponen lucide.
+ *
+ * Disimpan sebagai NAMA, bukan komponen, karena widget diserialisasi ke database.
+ * Nama tak dikenal jatuh ke `Target` supaya kartu tidak kosong.
+ */
+const PETA_IKON: Record<string, React.ComponentType<{ className?: string }>> = {
+  wallet: Wallet,
+  'trending-up': TrendingUp,
+  'trending-down': TrendingDown,
+  coins: Coins,
+  target: Target,
+  gauge: Gauge,
+  users: Users,
+  'shield-alert': ShieldAlert,
+  banknote: Banknote,
+  activity: Activity,
+  percent: Percent,
+  dollar: CircleDollarSign,
+};
+
+/** Render ikon kartu berdasarkan nama di data widget. */
+function ikonKartu(nama: string) {
+  const Ikon = PETA_IKON[nama] ?? Target;
+  return <Ikon className="w-3.5 h-3.5" />;
+}
 
 interface WidgetCardProps {
   widget: WidgetSpec;
@@ -128,6 +168,21 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         }
       >
         <div className="min-w-0">
+          {/* Ikon kartu (khusus template): kotak kecil beraksen di atas judul,
+              meniru pratinjau template agar kanvas nyata terlihat sama. */}
+          {widget.ikon && (
+            <span
+              className={
+                padat
+                  ? 'inline-flex items-center justify-center w-[18px] h-[18px] rounded-[5px] mb-1'
+                  : 'inline-flex items-center justify-center w-6 h-6 rounded-[7px] mb-1.5'
+              }
+              style={{ backgroundColor: 'var(--color-brand-soft)', color: 'var(--color-brand)' }}
+              aria-hidden="true"
+            >
+              {ikonKartu(widget.ikon)}
+            </span>
+          )}
           <h3
             className={
               padat

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import type { Dashboard } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
+import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
 
 interface PresentationModeProps {
   dashboard: Dashboard;
@@ -81,7 +82,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   }, [keluar]);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-canvas flex flex-col overflow-hidden">
+    <div
+      className={`fixed inset-0 z-[60] bg-canvas flex flex-col overflow-hidden ${
+        dashboard.tema ? `tema-${dashboard.tema}` : ''
+      }`}
+    >
+      <KanvasTemaContext.Provider
+        value={dashboard.tema ? { mode: 'dark', aksen: AKSEN_TEMA[dashboard.tema] } : null}
+      >
       {/* ===== Bilah atas ===== */}
       <header className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 bg-surface border-b border-line">
         <div className="min-w-0 flex items-center gap-3">
@@ -128,6 +136,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
           />
         )}
       </main>
+      </KanvasTemaContext.Provider>
     </div>
   );
 };
