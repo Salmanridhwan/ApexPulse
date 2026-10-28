@@ -861,24 +861,24 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
             warna={WARNA.hijau}
             sub="Porsi kanal · skor 100"
           />
-          <div className="flex-1 min-h-0 flex gap-[0.6em]">
-            <div className="relative h-full w-[46%] shrink-0">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="relative flex-1 min-h-0">
               <div ref={perilakuRef} className="h-full w-full" />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[1.35em] font-bold leading-none tabular-nums">100</span>
-                <span className="text-[0.55em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
+                <span className="text-[1.45em] font-bold leading-none tabular-nums">100</span>
+                <span className="text-[0.56em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
                   skor
                 </span>
               </div>
             </div>
-            <ul className="flex-1 min-w-0 flex flex-col justify-center gap-[0.42em]">
+            <ul className="shrink-0 flex items-center justify-between gap-[0.35em] mt-[0.35em]">
               {PERILAKU.map((p) => (
-                <li key={p.nama} className="min-w-0 flex items-center gap-[0.3em] text-[0.68em]">
-                  <span className="w-[0.46em] h-[0.46em] rounded-[0.12em] shrink-0" style={{ backgroundColor: p.warna }} />
+                <li key={p.nama} className="flex items-center gap-[0.28em] text-[0.64em] min-w-0">
+                  <span className="w-[0.44em] h-[0.44em] rounded-[0.1em] shrink-0" style={{ backgroundColor: p.warna }} />
                   <span className="truncate" style={{ color: WARNA.teks2 }}>
                     {p.nama}
                   </span>
-                  <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
+                  <span className="tabular-nums font-semibold shrink-0">{p.persen}%</span>
                 </li>
               ))}
             </ul>
