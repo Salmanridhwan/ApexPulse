@@ -133,10 +133,14 @@ const TRANSAKSI_LAIN = [
   { nama: 'Bagi hasil kas daerah', ket: 'Setoran triwulan I', nilai: '+1,75', naik: true, Ikon: Landmark },
 ];
 
+/**
+ * Progres target. Warna batang = status capaian, dan statusnya ditulis di
+ * bawah tiap batang supaya tidak ada legenda yang menggantung tanpa pasangan.
+ */
 const TARGET = [
-  { nama: 'Target Pendapatan', capai: 86, warna: WARNA.oranye },
-  { nama: 'Efisiensi Beban', capai: 92, warna: WARNA.hijau },
-  { nama: 'Target Laba Bersih', capai: 57, warna: WARNA.ungu },
+  { nama: 'Target Pendapatan', capai: 86, status: 'mendekati target', warna: WARNA.oranye },
+  { nama: 'Efisiensi Beban', capai: 92, status: 'sesuai target', warna: WARNA.hijau },
+  { nama: 'Target Laba Bersih', capai: 57, status: 'perlu perhatian', warna: WARNA.merah },
 ];
 
 /** Jalur SVG sparkline (viewBox 0..100) — area + garis, seperti referensi. */
@@ -577,17 +581,13 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 <div className="h-[0.42em] rounded-full overflow-hidden" style={{ backgroundColor: WARNA.kartu2 }}>
                   <div className="h-full rounded-full" style={{ width: `${t.capai}%`, backgroundColor: t.warna }} />
                 </div>
+                <div className="flex items-center gap-[0.3em] mt-[0.25em] text-[0.72em]" style={{ color: t.warna }}>
+                  <span className="w-[0.4em] h-[0.4em] rounded-full shrink-0" style={{ backgroundColor: t.warna }} />
+                  {t.status}
+                </div>
               </li>
             ))}
           </ul>
-          <div className="mt-[0.9em] flex items-center gap-[0.6em] text-[0.74em] shrink-0" style={{ color: WARNA.teks3 }}>
-            <span className="inline-flex items-center gap-[0.3em]">
-              <span className="w-[0.4em] h-[0.4em] rounded-full" style={{ backgroundColor: WARNA.hijau }} /> di atas target
-            </span>
-            <span className="inline-flex items-center gap-[0.3em]">
-              <span className="w-[0.4em] h-[0.4em] rounded-full" style={{ backgroundColor: WARNA.merah }} /> perlu perhatian
-            </span>
-          </div>
         </div>
       </div>
 
