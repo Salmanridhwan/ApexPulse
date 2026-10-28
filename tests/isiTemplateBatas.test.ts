@@ -11,7 +11,8 @@ import type { DashboardTemplate } from '../src/services/templates/dashboardTempl
 const template = {
   id: 'tpl-uji',
   nama: 'Uji',
-  sektor: 'bank',
+  tujuan: '',
+  caraPenyampaian: '',
   deskripsi: '',
   fokus: [],
   aksen: '#123456',

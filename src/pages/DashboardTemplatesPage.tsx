@@ -3,16 +3,17 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
-  Building2,
   Check,
   Clock,
   Database,
+  Eye,
   LayoutGrid,
   LayoutTemplate,
   Loader2,
   Sparkles,
+  Target,
 } from 'lucide-react';
-import { BumdSector, ProgresIsiTemplate, Tenant } from '../types';
+import { ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
@@ -36,16 +37,6 @@ interface DashboardTemplatesPageProps {
   ) => Promise<{ terisi: number; kosong: number; total: number }>;
 }
 
-/** Label sektor untuk ditampilkan di tab. */
-const LABEL_SEKTOR: Record<BumdSector, string> = {
-  pdam: 'PDAM (Air Minum)',
-  bank: 'Bank Daerah (BPD/BPR)',
-  pasar: 'Pasar Rakyat',
-  rsud: 'Rumah Sakit (RSUD)',
-  transportasi: 'Transportasi Daerah',
-  aneka_usaha: 'Aneka Usaha / Pariwisata',
-};
-
 /** Ringkas komposisi widget: "4 KPI · 11 Grafik · 1 Tabel · 1 Narasi". */
 const komposisi = (t: DashboardTemplate): string => {
   const hitung = (tipe: string[]) => t.widgets.filter((w) => tipe.includes(w.type)).length;
@@ -66,36 +57,34 @@ const komposisi = (t: DashboardTemplate): string => {
 };
 
 /**
- * Halaman "Template Dashboard": pratinjau template per sektor BUMD yang ditampilkan
- * PERSIS seperti kanvas workspace.
+ * Halaman "Template Dashboard": galeri template UMUM.
  *
- * Tab di bagian atas memilih template mana yang dilihat; di bawahnya kanvas penuh
- * dirender apa adanya (KPI, grafik, tabel, narasi) dengan susunan & ukuran yang sama
- * seperti dashboard sungguhan. Widget di sini belum nyata, jadi kanvas berjalan dalam
- * mode `preview` (tanpa menu ⋯ dan tanpa drag/resize).
+ * Template tidak dipisahkan per sektor BUMD. Tiap template adalah satu KONSEP
+ * penyajian yang ditentukan oleh tujuannya: untuk apa dashboard dipakai, dan
+ * bagaimana isinya disampaikan (ringkasan satu layar, papan pemantauan, laporan
+ * naratif, perbandingan, komposisi & sebaran, papan status). Susunan widget tiap
+ * template mengikuti cara penyampaiannya, jadi template berbeda terasa berbeda.
  *
- * PENTING: seluruh angka di sini DATA DUMMY (bukan hasil pembacaan dokumen). Halaman
- * memberi label jelas agar tidak disangka berasal dari dokumen resmi.
+ * Instansi apa pun boleh memakai template mana pun; angka selalu diambil dari
+ * dokumen instansi yang sedang login.
+ *
+ * PENTING: seluruh angka di pratinjau DATA DUMMY (bukan hasil pembacaan dokumen).
+ * Halaman memberi label jelas agar tidak disangka berasal dari dokumen resmi.
  */
 export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   currentTenant,
   onUseTemplate,
   progres,
 }) => {
-  // Tab aktif. Default: template sektor instansi aktif (kalau ada), jika tidak template pertama.
-  const [aktifId, setAktifId] = useState<string>(() => {
-    const relevan = currentTenant
-      ? DASHBOARD_TEMPLATES.find((t) => t.sektor === currentTenant.sector)
-      : undefined;
-    return (relevan ?? DASHBOARD_TEMPLATES[0]).id;
-  });
+  // Template aktif untuk dipratinjau. Default: template pertama.
+  const [aktifId, setAktifId] = useState<string>(() => DASHBOARD_TEMPLATES[0].id);
 
   /** Status pengambilan angka dari dokumen saat tombol "Pakai Template Ini" ditekan. */
   const [memuat, setMemuat] = useState(false);
   /**
-   * Detik berjalan selama pengisian. Pengisian 18 kartu bisa 2–4 menit; tanpa
-   * penghitung, halaman terlihat menggantung dan pengguna menutupnya di tengah
-   * jalan (kartu jadi kosong).
+   * Detik berjalan selama pengisian. Pengisian belasan kartu bisa beberapa menit;
+   * tanpa penghitung, halaman terlihat menggantung dan pengguna menutupnya di
+   * tengah jalan (kartu jadi kosong).
    */
   const [detik, setDetik] = useState(0);
   useEffect(() => {
@@ -122,8 +111,6 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
-  const relevan = currentTenant?.sector === aktif.sektor;
-
   const pakai = async () => {
     if (memuat) return;
     setMemuat(true);
@@ -149,12 +136,12 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             <h2 className="text-sm font-bold text-ink flex items-center gap-2 flex-wrap">
               <span>Template Dashboard</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-line text-ink-2 font-semibold">
-                {DASHBOARD_TEMPLATES.length} sektor
+                {DASHBOARD_TEMPLATES.length} template
               </span>
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
-              Pratinjau dashboard siap pakai per sektor. Tekan <strong>Pakai Template Ini</strong>,
-              angkanya diambil dari dokumen instansi Anda.
+              Tiap template punya tujuan dan cara penyampaian sendiri. Pilih yang sesuai, tekan{' '}
+              <strong>Pakai Template Ini</strong>, angkanya diambil dari dokumen instansi Anda.
             </p>
             <p className="text-[10.5px] text-brand-ink mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
@@ -166,44 +153,79 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           </div>
         </div>
 
-        {/* Tab pilihan template — satu tab per sektor BUMD */}
+        {/* Galeri template — kartu datar, tanpa efek hover */}
         <div
-          role="tablist"
-          aria-label="Pilih template dashboard"
-          className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 border-b border-line"
+          role="list"
+          aria-label="Galeri template dashboard"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5"
         >
           {DASHBOARD_TEMPLATES.map((t) => {
             const terpilih = t.id === aktif.id;
-            const iniSektorAnda = currentTenant?.sector === t.sektor;
             return (
-              <button
+              <div
                 key={t.id}
-                role="tab"
-                aria-selected={terpilih}
-                data-testid={`tab-template-${t.sektor}`}
-                onClick={() => setAktifId(t.id)}
-                className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-t-control text-xs font-semibold border-b-2 transition-colors ${
-                  terpilih
-                    ? 'border-brand text-brand-ink bg-brand/10'
-                    : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
+                role="listitem"
+                data-testid={`kartu-template-${t.id}`}
+                className={`rounded-card border bg-surface p-4 flex flex-col ${
+                  terpilih ? 'border-brand' : 'border-line'
                 }`}
-                style={terpilih ? { borderBottomColor: t.aksen } : undefined}
-                title={t.nama}
+                style={{ borderTopWidth: 3, borderTopColor: t.aksen }}
               >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: t.aksen }}
-                  aria-hidden="true"
-                />
-                <span className="whitespace-nowrap">{LABEL_SEKTOR[t.sektor]}</span>
-                {iniSektorAnda && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-chip bg-brand/15 text-brand-ink border border-brand/30">
-                    <Check className="w-2.5 h-2.5" />
-                    Sektor Anda
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <h3 className="text-[13px] font-bold text-ink leading-snug">{t.nama}</h3>
+                  {terpilih && (
+                    <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-chip bg-brand/15 text-brand-ink border border-brand/30">
+                      <Check className="w-2.5 h-2.5" />
+                      Dilihat
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-ink-2 leading-relaxed flex items-start gap-1.5 mb-2">
+                  <Target className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
+                  <span>
+                    <span className="font-semibold text-ink-3">Tujuan: </span>
+                    {t.tujuan}
                   </span>
-                )}
-                <span className="text-[9.5px] font-medium text-ink-3">{t.widgets.length}</span>
-              </button>
+                </p>
+                <p className="text-[11px] text-ink-2 leading-relaxed flex items-start gap-1.5 mb-2.5">
+                  <BarChart3 className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
+                  <span>
+                    <span className="font-semibold text-ink-3">Cara penyampaian: </span>
+                    {t.caraPenyampaian}
+                  </span>
+                </p>
+
+                <div className="flex flex-wrap gap-1 mb-2.5">
+                  {t.fokus.map((f) => (
+                    <span
+                      key={f}
+                      className="text-[9.5px] font-semibold text-ink-2 bg-surface-2 border border-line px-1.5 py-0.5 rounded-chip"
+                    >
+                      {f}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-auto flex items-center justify-between gap-2 pt-2 border-t border-line">
+                  <span className="text-[10px] text-ink-3 font-medium">
+                    {t.widgets.length} widget · {komposisi(t)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAktifId(t.id)}
+                    data-testid={`lihat-template-${t.id}`}
+                    className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-control border ${
+                      terpilih
+                        ? 'bg-brand/15 text-brand-ink border-brand/30'
+                        : 'bg-surface-2 text-ink-2 border-line'
+                    }`}
+                  >
+                    <Eye className="w-3 h-3" />
+                    {terpilih ? 'Sedang dilihat' : 'Lihat pratinjau'}
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -216,19 +238,13 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-chip text-on-brand mb-1.5"
                 style={{ background: aktif.aksen }}
               >
-                <Building2 className="w-3 h-3" />
-                {LABEL_SEKTOR[aktif.sektor]}
+                <LayoutTemplate className="w-3 h-3" />
+                {aktif.nama}
               </span>
-              {relevan && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-chip bg-brand/15 text-brand-ink border border-brand/30 mb-1.5 ml-1.5">
-                  <Check className="w-3 h-3" />
-                  Sesuai sektor instansi Anda
-                </span>
-              )}
               <h1 className="text-lg sm:text-xl font-extrabold text-ink tracking-tight mb-1">
                 {aktif.judulDashboard}
               </h1>
-              <p className="text-xs text-ink-2 leading-relaxed max-w-3xl">{aktif.deskripsi}</p>
+              <p className="text-xs text-ink-2 leading-relaxed max-w-3xl">{aktif.deskripsiDashboard}</p>
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
                   <LayoutGrid className="w-3 h-3 text-ink-3" />
@@ -260,7 +276,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             <button
               onClick={pakai}
               disabled={memuat || !currentTenant}
-              data-testid={`pakai-template-${aktif.sektor}`}
+              data-testid={`pakai-template-${aktif.id}`}
               className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {memuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutTemplate className="w-4 h-4" />}
@@ -283,7 +299,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         </div>
 
         {/* Kanvas — dirender PERSIS seperti workspace (mode pratinjau).
-            `key` di provider mereset seleksi lintas-chart saat tab berpindah. */}
+            `key` di provider mereset seleksi lintas-chart saat template berganti. */}
         <ChartSelectionProvider key={aktif.id}>
           <ActiveChartFilterChip />
           <DashboardCanvas

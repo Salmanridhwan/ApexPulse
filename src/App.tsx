@@ -474,7 +474,6 @@ export default function App() {
         body: JSON.stringify({
           tenantId: currentTenant.id,
           templateId: template.id,
-          sector: template.sektor,
           jobId,
         }),
       });

@@ -1299,7 +1299,10 @@ const app = express();
       const hasil = await isiTemplateDariRag(
         { ...template, widgets: dasar },
         {
-          sector: (req.body?.sector || tenant.sector || template.sektor) as BumdSector,
+          // Template kini TIDAK terikat sektor. Sektor hanya dipakai untuk
+          // menyesuaikan istilah saat menyusun pertanyaan ke dokumen, jadi
+          // selalu ikut instansi yang sedang login.
+          sector: (req.body?.sector || tenant.sector) as BumdSector,
           instansi: tenant.name,
           kbId,
           rag: ragClient,
@@ -1335,7 +1338,7 @@ const app = express();
           /Angka bersifat contoh[^.]*\./i,
           'Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.'
         ),
-        sector: template.sektor,
+        sector: tenant.sector,
         widgets: hasil.widgets,
         globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
         createdAt: new Date().toISOString(),
@@ -1348,7 +1351,7 @@ const app = express();
         userName: session.name,
         action: 'Buat Dashboard dari Template',
         target: newDash.title,
-        details: `Template ${template.sektor}: ${hasil.terisi} kartu terisi dari dokumen, ${hasil.kosong} kartu belum ada di dokumen.`,
+        details: `Template ${template.nama}: ${hasil.terisi} kartu terisi dari dokumen, ${hasil.kosong} kartu belum ada di dokumen.`,
       });
 
       return res.status(201).json({
