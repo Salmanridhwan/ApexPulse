@@ -313,8 +313,24 @@ const progresTemplate = new Map<
  * Versi basis pengetahuan instansi. Berubah setiap kali dokumen disinkronkan, jadi
  * pratinjau template yang dibuat sebelum dokumen baru masuk otomatis dianggap basi.
  */
-function versiKbTenant(tenant: any): string {
-  return String(tenant?.kbTersinkronPada || tenant?.kbDiperbaruiPada || '0');
+/**
+ * Sidik jari susunan template: id, tipe, judul, dan ukuran tiap kartu. Dipakai
+ * supaya pratinjau yang tersimpan dari susunan template LAMA otomatis dianggap
+ * basi ketika desain template diubah — tanpa ini, pengguna tetap melihat
+ * pratinjau bergaya lama walau templatenya sudah diganti.
+ */
+function tandaTemplate(template: any): string {
+  const inti = (template?.widgets || [])
+    .map((w: any) => `${w?.id}:${w?.type}:${w?.title}:${w?.grid?.w}x${w?.grid?.h}`)
+    .join('|');
+  let h = 5381;
+  for (let i = 0; i < inti.length; i += 1) h = ((h * 33) ^ inti.charCodeAt(i)) >>> 0;
+  return `${template?.id || 'tpl'}-${h.toString(36)}`;
+}
+
+function versiKbTenant(tenant: any, template?: any): string {
+  const dasar = String(tenant?.kbTersinkronPada || tenant?.kbDiperbaruiPada || '0');
+  return template ? `${dasar}#${tandaTemplate(template)}` : dasar;
 }
 
 /**
@@ -329,7 +345,7 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
     tenantId: tenant.id,
     templateId: template.id,
     kbId,
-    versiKb: versiKbTenant(tenant),
+    versiKb: versiKbTenant(tenant, template),
     total: dasar.length,
     pekerja: async (onProgres) => {
       const hasil = await isiTemplateDariRag(
@@ -1373,7 +1389,7 @@ const app = express();
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
-    const versi = versiKbTenant(tenant);
+    const versi = versiKbTenant(tenant, template);
     const entri = ambilPratinjau(tenant.id, template.id, kbId);
     const siap = masihBerlaku(entri, versi);
 
@@ -1428,7 +1444,7 @@ const app = express();
     return res.json({
       templates: DASHBOARD_TEMPLATES.map((t) => {
         const e = entri.find((x) => x.templateId === t.id && x.kbId === kbId);
-        const siap = masihBerlaku(e ?? null, versi);
+        const siap = masihBerlaku(e ?? null, versiKbTenant(tenant, t));
         return {
           templateId: t.id,
           status: siap ? 'siap' : e?.status ?? 'belum',
@@ -1454,7 +1470,7 @@ const app = express();
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
-    const versi = versiKbTenant(tenant);
+    const versi = versiKbTenant(tenant, template);
     const entri = ambilPratinjau(tenant.id, template.id, kbId);
 
     /**

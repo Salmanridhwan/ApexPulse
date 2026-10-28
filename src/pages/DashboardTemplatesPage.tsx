@@ -22,6 +22,7 @@ import { DashboardAnalitik } from '../components/referensi/DashboardAnalitik';
 import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
+import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
 import { DashboardCanvas } from '../components/DashboardCanvas';
 
 interface DashboardTemplatesPageProps {
@@ -520,7 +521,10 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             strip insight. Susunannya sengaja tidak memakai DashboardCanvas agar
             bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
         {asli ? (
-          <div className="rounded-card border border-line overflow-hidden bg-canvas">
+          <KanvasTemaContext.Provider
+            value={{ mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] }}
+          >
+          <div className={`tema-${aktif.tema || 'oranye'} rounded-card border border-line overflow-hidden bg-canvas`} data-theme="dark">
             <div className="px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface border-b border-line">
               <div className="min-w-0 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-pos shrink-0 mt-0.5" />
@@ -558,6 +562,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               readOnly
             />
           </div>
+          </KanvasTemaContext.Provider>
         ) : (
           <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
             <KomponenPratinjau />
