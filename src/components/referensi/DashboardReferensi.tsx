@@ -861,10 +861,10 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
       {/* ===== Strip insight ===== */}
       <div
-        className="rounded-[1.1em] p-[0.95em] flex flex-wrap items-center justify-between gap-[0.7em] shrink-0"
+        className="rounded-[1.1em] p-[0.95em] flex items-center justify-between gap-[0.7em] shrink-0"
         style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
       >
-        <div className="min-w-0 flex items-start gap-[0.6em]">
+        <div className="flex-1 min-w-0 flex items-start gap-[0.6em]">
           <span
             className="shrink-0 inline-flex items-center justify-center w-[2.2em] h-[2.2em] rounded-[0.75em]"
             style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffb347)`, color: '#1a1206' }}
@@ -873,7 +873,16 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           </span>
           <div className="min-w-0">
             <p className="text-[0.92em] font-semibold">Insight Keuangan</p>
-            <p className="text-[0.8em] leading-relaxed" style={{ color: WARNA.teks3 }}>
+            <p
+              className="text-[0.8em] leading-relaxed"
+              style={{
+                color: WARNA.teks3,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
               {INSIGHT || 'Belum ada insight keuangan di dokumen instansi.'}
             </p>
           </div>
@@ -881,8 +890,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         <button
           type="button"
           onClick={() => setLaporanRinci(true)}
-          title="Buka laporan rinci (angka contoh)"
-          className="inline-flex items-center gap-[0.35em] rounded-[0.75em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold shrink-0 transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+          title={pakaiData ? 'Buka laporan rinci berisi angka dokumen' : 'Buka laporan rinci (angka contoh)'}
+          className="ml-auto inline-flex items-center gap-[0.35em] rounded-[0.75em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold shrink-0 whitespace-nowrap transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
         >
           Lihat Laporan Rinci
