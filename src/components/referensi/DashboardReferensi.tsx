@@ -597,9 +597,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
-          const jalur = jalurSpark(k.seri);
-          // Aturan warna: naik = hijau, menurun = merah (apa pun arah "bagus"-nya).
-          const warna = naik ? WARNA.hijau : WARNA.merah;
+          // Delta 0% (dokumen tidak menyebut perubahan) → sparkline DATAR abu-abu:
+          // tidak ada dasar untuk menggambar tren naik/turun.
+          const datar = !k.seri || k.seri.length < 2 || k.delta === 0;
+          const jalur = datar
+            ? { garis: 'M0,62 L100,62', area: 'M0,62 L100,62 L100,100 L0,100 Z' }
+            : jalurSpark(k.seri);
+          // Aturan warna: naik = hijau, menurun = merah, tanpa data = abu.
+          const warna = datar ? '#6b7280' : naik ? WARNA.hijau : WARNA.merah;
           const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
           return (
             <div key={k.label} className={kartu('gap-[0.55em]')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
@@ -626,9 +631,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
               <div className="flex items-center gap-[0.4em] text-[0.76em] font-semibold">
                 <span className="inline-flex items-center gap-[0.15em]" style={{ color: warna }}>
-                  {naik ? <ArrowUpRight className="w-[1em] h-[1em]" /> : <ArrowDownRight className="w-[1em] h-[1em]" />}
-                  {naik ? '+' : ''}
-                  {String(k.delta).replace('.', ',')}%
+                  {datar ? (
+                    <span className="w-[0.9em] text-center leading-none">–</span>
+                  ) : naik ? (
+                    <ArrowUpRight className="w-[1em] h-[1em]" />
+                  ) : (
+                    <ArrowDownRight className="w-[1em] h-[1em]" />
+                  )}
+                  {datar ? '0' : `${naik ? '+' : ''}${String(k.delta).replace('.', ',')}`}%
                 </span>
                 <span className="font-normal" style={{ color: WARNA.teks3 }}>
                   {k.deltaTeks}
@@ -887,9 +897,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                     {k.label}
                   </p>
                   <p className="text-[1em] font-bold tabular-nums mt-[0.25em]">{k.nilai}</p>
-                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: k.delta >= 0 ? WARNA.hijau : WARNA.merah }}>
-                    {k.delta >= 0 ? '+' : ''}
-                    {String(k.delta).replace('.', ',')}% {k.deltaTeks}
+                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: k.delta === 0 ? '#6b7280' : k.delta > 0 ? WARNA.hijau : WARNA.merah }}>
+                    {k.delta === 0 ? '0' : `${k.delta > 0 ? '+' : ''}${String(k.delta).replace('.', ',')}`}% {k.deltaTeks}
                   </p>
                 </div>
               ))}
