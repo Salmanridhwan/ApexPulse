@@ -14,9 +14,7 @@ import {
 } from 'lucide-react';
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
-import { DashboardCanvas } from '../components/DashboardCanvas';
-import { KanvasTemaContext } from '../theme';
-import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
+import { DashboardReferensi } from '../components/referensi/DashboardReferensi';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 
@@ -252,17 +250,19 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                   </span>
                 ))}
               </div>
+              {/* Chip susunan: pratinjau kini memakai tampilan referensi, jadi
+                  jumlahnya ditulis apa adanya (bukan dari daftar widget). */}
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
                   <LayoutGrid className="w-3 h-3 text-ink-3" />
-                  {aktif.widgets.length} widget
+                  4 KPI · 3 grafik · daftar · progres
                 </span>
                 <span className="text-line-strong text-xs">·</span>
-                <span className="text-[11px] text-ink-3">{komposisi(aktif)}</span>
+                <span className="text-[11px] text-ink-3">Tampilan referensi, satu halaman</span>
                 <span className="text-line-strong text-xs">·</span>
                 <span className="inline-flex items-center gap-1 text-[11px] text-warn font-medium">
                   <Sparkles className="w-3 h-3" />
-                  Angka contoh
+                  Angka ilustrasi
                 </span>
               </div>
             </div>
@@ -317,29 +317,13 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           )}
         </div>
 
-        {/* Kanvas — dirender PERSIS seperti workspace (mode pratinjau), tetapi
-            memakai TEMA KHUSUS "gelap + oranye" (referensi pemilik produk).
-            `data-theme="dark"` membuat komponen yang memakai varian `dark:` ikut
-            gelap, sedangkan `tema-oranye` menimpa token warna jadi oranye.
-            `KanvasTemaContext` meneruskan mode & aksen ke ECharts (yang tidak
-            bisa membaca CSS variable).
-            `key` di provider mereset seleksi lintas-chart saat template berganti. */}
+        {/* Pratinjau memakai TAMPILAN REFERENSI (replika): dashboard gelap dengan
+            satu aksen oranye — 4 KPI berikon & sparkline, grafik batang, cincin
+            rincian beban, daftar transaksi, area arus kas, progres target, dan
+            strip insight. Susunannya sengaja tidak memakai DashboardCanvas agar
+            bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
         <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
-          <KanvasTemaContext.Provider value={{ mode: 'dark', aksen: '#ff8a1f' }}>
-            <ChartSelectionProvider key={aktif.id}>
-              <ActiveChartFilterChip />
-              <DashboardCanvas
-                widgets={widgetPratinjau}
-                preview
-                onEditWidget={() => {}}
-                onManualCorrection={() => {}}
-                onDeleteWidget={() => {}}
-                onDuplicateWidget={() => {}}
-                onReorderWidgets={() => {}}
-                onResizeWidget={() => {}}
-              />
-            </ChartSelectionProvider>
-          </KanvasTemaContext.Provider>
+          <DashboardReferensi />
         </div>
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
@@ -359,6 +343,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
+          konten={<DashboardReferensi />}
         />
       )}
     </div>

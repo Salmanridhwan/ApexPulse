@@ -16,6 +16,12 @@ interface PresentationModeProps {
    * Kartu juga tidak menampilkan menu ⋯ karena widget belum nyata.
    */
   pratinjau?: boolean;
+  /**
+   * Isi pengganti kanvas. Dipakai galeri template yang menampilkan TAMPILAN
+   * REFERENSI (bukan widget kanvas biasa): presentasi menampilkan tampilan itu
+   * apa adanya di layar penuh.
+   */
+  konten?: React.ReactNode;
 }
 
 /**
@@ -35,6 +41,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   tenantName,
   onExit,
   pratinjau = false,
+  konten,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -113,7 +120,8 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       </header>
 
       {/* ===== Seluruh dashboard dalam satu halaman ===== */}
-      <main className="flex-1 min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-auto">
+        {konten ?? (
         <DashboardCanvas
           widgets={dashboard.widgets}
           satuHalaman
@@ -126,6 +134,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
           onReorderWidgets={() => {}}
           onResizeWidget={() => {}}
         />
+        )}
       </main>
     </div>
   );
