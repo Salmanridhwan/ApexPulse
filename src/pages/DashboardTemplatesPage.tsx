@@ -3,10 +3,8 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
-  Check,
   Clock,
   Database,
-  Eye,
   LayoutGrid,
   LayoutTemplate,
   Loader2,
@@ -153,79 +151,37 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           </div>
         </div>
 
-        {/* Galeri template — kartu datar, tanpa efek hover */}
+        {/* Tab pilihan template — satu tab per template (bukan per sektor) */}
         <div
-          role="list"
-          aria-label="Galeri template dashboard"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5"
+          role="tablist"
+          aria-label="Pilih template dashboard"
+          className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 border-b border-line"
         >
           {DASHBOARD_TEMPLATES.map((t) => {
             const terpilih = t.id === aktif.id;
             return (
-              <div
+              <button
                 key={t.id}
-                role="listitem"
-                data-testid={`kartu-template-${t.id}`}
-                className={`rounded-card border bg-surface p-4 flex flex-col ${
-                  terpilih ? 'border-brand' : 'border-line'
+                role="tab"
+                aria-selected={terpilih}
+                data-testid={`tab-template-${t.id}`}
+                onClick={() => setAktifId(t.id)}
+                className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-t-control text-xs font-semibold border-b-2 transition-colors ${
+                  terpilih
+                    ? 'border-brand text-brand-ink bg-brand/10'
+                    : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
                 }`}
-                style={{ borderTopWidth: 3, borderTopColor: t.aksen }}
+                style={terpilih ? { borderBottomColor: t.aksen } : undefined}
+                title={`${t.nama} — ${t.tujuan}`}
               >
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <h3 className="text-[13px] font-bold text-ink leading-snug">{t.nama}</h3>
-                  {terpilih && (
-                    <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-chip bg-brand/15 text-brand-ink border border-brand/30">
-                      <Check className="w-2.5 h-2.5" />
-                      Dilihat
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-ink-2 leading-relaxed flex items-start gap-1.5 mb-2">
-                  <Target className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
-                  <span>
-                    <span className="font-semibold text-ink-3">Tujuan: </span>
-                    {t.tujuan}
-                  </span>
-                </p>
-                <p className="text-[11px] text-ink-2 leading-relaxed flex items-start gap-1.5 mb-2.5">
-                  <BarChart3 className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
-                  <span>
-                    <span className="font-semibold text-ink-3">Cara penyampaian: </span>
-                    {t.caraPenyampaian}
-                  </span>
-                </p>
-
-                <div className="flex flex-wrap gap-1 mb-2.5">
-                  {t.fokus.map((f) => (
-                    <span
-                      key={f}
-                      className="text-[9.5px] font-semibold text-ink-2 bg-surface-2 border border-line px-1.5 py-0.5 rounded-chip"
-                    >
-                      {f}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-auto flex items-center justify-between gap-2 pt-2 border-t border-line">
-                  <span className="text-[10px] text-ink-3 font-medium">
-                    {t.widgets.length} widget · {komposisi(t)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAktifId(t.id)}
-                    data-testid={`lihat-template-${t.id}`}
-                    className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-control border ${
-                      terpilih
-                        ? 'bg-brand/15 text-brand-ink border-brand/30'
-                        : 'bg-surface-2 text-ink-2 border-line'
-                    }`}
-                  >
-                    <Eye className="w-3 h-3" />
-                    {terpilih ? 'Sedang dilihat' : 'Lihat pratinjau'}
-                  </button>
-                </div>
-              </div>
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ background: t.aksen }}
+                  aria-hidden="true"
+                />
+                <span className="whitespace-nowrap">{t.nama}</span>
+                <span className="text-[9.5px] font-medium text-ink-3">{t.widgets.length}</span>
+              </button>
             );
           })}
         </div>
@@ -245,6 +201,30 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 {aktif.judulDashboard}
               </h1>
               <p className="text-xs text-ink-2 leading-relaxed max-w-3xl">{aktif.deskripsiDashboard}</p>
+              <p className="text-[11px] text-ink-2 leading-relaxed max-w-3xl mt-2 flex items-start gap-1.5">
+                <Target className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
+                <span>
+                  <span className="font-semibold text-ink-3">Tujuan: </span>
+                  {aktif.tujuan}
+                </span>
+              </p>
+              <p className="text-[11px] text-ink-2 leading-relaxed max-w-3xl mt-1 flex items-start gap-1.5">
+                <BarChart3 className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
+                <span>
+                  <span className="font-semibold text-ink-3">Cara penyampaian: </span>
+                  {aktif.caraPenyampaian}
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {aktif.fokus.map((f) => (
+                  <span
+                    key={f}
+                    className="text-[9.5px] font-semibold text-ink-2 bg-surface-2 border border-line px-1.5 py-0.5 rounded-chip"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
                   <LayoutGrid className="w-3 h-3 text-ink-3" />
