@@ -209,7 +209,7 @@ const opsiBar = (s: number) => {
   const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
   const dasar = gayaDasar(s);
   return {
-    grid: { left: 4, right: 8, top: 14 * s, bottom: 2, containLabel: true },
+    grid: { left: 4, right: 8, top: 16 * s, bottom: 2, containLabel: true },
     tooltip: {
       ...dasar.tooltip,
       trigger: 'axis',
@@ -236,6 +236,19 @@ const opsiBar = (s: number) => {
           itemStyle: {
             color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.34)',
             borderRadius: [4 * s, 4 * s, 0, 0],
+          },
+          // Batang terakhir (bulan tertinggi) diberi label angkanya supaya
+          // nilainya langsung terbaca, bukan cuma warna beda.
+          label: {
+            show: i === puncak,
+            // Ditulis DI DALAM batang (atas) supaya tidak pernah terpotong tepi
+            // grafik dan tidak menimpa titik garis.
+            position: 'insideTop',
+            distance: 7 * s,
+            color: '#1a1206',
+            fontSize: 9.5 * s,
+            fontWeight: 'bold',
+            formatter: () => `Rp ${String(v).replace('.', ',')} M`,
           },
         })),
         // Batang dibatasi lebarnya supaya tidak melebar aneh di layar ultrawide.
@@ -528,7 +541,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           </div>
           <Legenda
             item={[
-              { warna: WARNA.oranye, label: 'Pendapatan 2025' },
+              { warna: WARNA.oranye, label: 'Pendapatan 2025', redup: true },
+              { warna: WARNA.oranye, label: 'Desember (tertinggi)' },
               { warna: '#38bdf8', label: 'Garis tren', garis: true },
             ]}
           />
