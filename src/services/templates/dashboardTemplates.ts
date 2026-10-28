@@ -8,8 +8,12 @@ import { WidgetSpec, WidgetType } from '../../types';
  *   - `caraPenyampaian` : bagaimana isinya disajikan (ringkasan satu layar,
  *                         papan pemantauan, laporan naratif, perbandingan tabel,
  *                         komposisi & sebaran, papan status).
- * Susunan widget tiap template mengikuti cara penyampaiannya, sehingga template
- * dengan tujuan berbeda terasa berbeda saat dibuka — bukan sekadar ganti judul.
+ *
+ * JUMLAH KARTU DIBATASI (maksimal 8 per template).
+ * Dashboard tampil sebagai SATU halaman penuh tanpa scroll. Dengan 18 kartu,
+ * satu layar hanya menyisakan ~35px per grafik — tidak terbaca. Karena itu tiap
+ * template disusun paling banyak 8 kartu (±4 baris), sehingga grafik tetap besar
+ * di layar 1080p. Kartu yang hanya mengulang informasi yang sama dibuang.
  *
  * Template tidak terikat sektor: angka selalu diambil dari dokumen instansi yang
  * sedang login (lihat `isiTemplateDariRag`), apa pun sektornya.
@@ -40,7 +44,6 @@ export interface DashboardTemplate {
 
 /** Label bulan netral untuk deret contoh. */
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const TW = ['TW1', 'TW2', 'TW3', 'TW4'];
 const HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 let urutan = 0;
@@ -124,7 +127,7 @@ const narasi = (
 ): WidgetSpec => w('narasi', title, subtitle, grid, { narasi: { text, bulletPoints } });
 
 // ============================================================================
-// 1. RINGKASAN EKSEKUTIF — satu layar, dibaca cepat
+// 1. RINGKASAN EKSEKUTIF — satu layar, dibaca cepat (8 kartu)
 // ============================================================================
 const TEMPLATE_RINGKASAN: DashboardTemplate = {
   id: 'tpl-ringkasan',
@@ -132,13 +135,13 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   tujuan:
     'Memberi pimpinan gambaran menyeluruh dalam satu layar: capaian utama, penyimpangan, dan kesimpulan — tanpa membuka laporan.',
   caraPenyampaian:
-    'Ringkasan satu halaman: 6 KPI besar di paling atas, 3 grafik kunci, tabel rekap, lalu narasi kesimpulan. Selesai dibaca di bawah dua menit.',
+    'Ringkasan satu halaman: 6 KPI besar di paling atas, satu grafik tren pendapatan vs beban, lalu narasi kesimpulan. Selesai dibaca di bawah dua menit.',
   deskripsi: 'Satu layar untuk pimpinan: capaian utama, penyimpangan, dan kesimpulan.',
   fokus: ['Capaian utama', 'Penyimpangan', 'Kesimpulan'],
   aksen: '#1fa6cc',
   judulDashboard: 'Ringkasan Eksekutif (Contoh)',
   deskripsiDashboard:
-    'Template ringkasan satu halaman (12 widget): 6 KPI utama, 4 grafik kunci, tabel rekap, dan narasi kesimpulan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template ringkasan satu halaman (8 kartu): 6 KPI utama, grafik tren pendapatan vs beban, dan narasi kesimpulan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Pendapatan Usaha', 'Realisasi periode berjalan', '128,4', 'Miliar Rp', 6.8, '+6,8% vs target', [110, 113, 116, 120, 124, 128.4], 120, 'Target'),
     kpi('Laba Bersih', 'Setelah seluruh beban usaha', '23,7', 'Miliar Rp', 4.2, '+4,2% YoY', [19, 20, 21, 21.8, 22.6, 23.7]),
@@ -147,38 +150,11 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
     kpi('Indeks Kepuasan Layanan', 'Skala 0-100', 82.4, 'poin', 1.8, '+1,8 poin', [78, 79, 80, 81, 81.8, 82.4], 85, 'Target'),
     kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', -4, '-4 dari semester lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
 
-    grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 8, h: 4 }, BULAN, [
+    grafik('line', 'Tren Pendapatan & Beban', 'Bulanan, satuan miliar rupiah', { w: 12, h: 4 }, BULAN, [
       { name: 'Pendapatan', data: [98, 101, 104, 107, 110, 113, 116, 119, 122, 124, 126, 128.4] },
       { name: 'Beban', data: [88, 90, 91, 92, 93, 94, 94.6, 95, 95.4, 95.8, 96, 96.2], kind: 'line' },
     ], 'Miliar Rp'),
-    w('donut', 'Komposisi Pendapatan', 'Porsi tiap sumber pendapatan', { w: 4, h: 4 }, {
-      chart: {
-        xAxis: ['Layanan Utama', 'Layanan Pendukung', 'Kerja Sama', 'Lain-lain'],
-        series: [{ name: 'Porsi', data: [64, 18, 12, 6] }],
-        unit: '%',
-        showLegend: true,
-      },
-    }),
-    grafik('bar', 'Capaian Kinerja per Unit', 'Persentase terhadap target', { w: 6, h: 4 },
-      ['Unit A', 'Unit B', 'Unit C', 'Unit D', 'Unit E'],
-      [{ name: 'Capaian (%)', data: [108, 97, 112, 89, 101] }], '%', { showLegend: false }),
-    w('gauge', 'Skor Kinerja Keseluruhan', 'Gabungan indikator utama', { w: 6, h: 4 }, {
-      chart: { xAxis: ['Skor'], series: [{ name: 'Skor', data: [92.6] }], unit: 'poin', min: 0, max: 100, showLegend: false },
-    }),
 
-    tabel('Rekap Indikator Utama', 'Ringkas: target, realisasi, status', { w: 12, h: 3 }, [
-      { key: 'indikator', label: 'Indikator' },
-      { key: 'satuan', label: 'Satuan' },
-      { key: 'target', label: 'Target', format: 'number' },
-      { key: 'realisasi', label: 'Realisasi', format: 'number' },
-      { key: 'status', label: 'Status' },
-    ], [
-      { indikator: 'Pendapatan usaha', satuan: 'Miliar Rp', target: 120, realisasi: 128.4, status: 'Melampaui' },
-      { indikator: 'Laba bersih', satuan: 'Miliar Rp', target: 22, realisasi: 23.7, status: 'Melampaui' },
-      { indikator: 'Serapan anggaran', satuan: '%', target: 90, realisasi: 87.5, status: 'Mendekati' },
-      { indikator: 'Kepuasan layanan', satuan: 'poin', target: 85, realisasi: 82.4, status: 'Mendekati' },
-      { indikator: 'Temuan audit terbuka', satuan: 'temuan', target: 0, realisasi: 12, status: 'Perlu tindakan' },
-    ]),
     narasi('Kesimpulan Eksekutif', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 3 },
       'Contoh kesimpulan: kinerja periode ini berada pada kondisi sehat. Pendapatan melampaui target, beban operasional terjaga di bawah pagu, ' +
       'dan serapan anggaran berjalan sesuai jadwal. Perhatian utama ada pada 12 temuan audit yang belum ditutup dan capaian dua unit yang masih di bawah target.',
@@ -191,7 +167,7 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 2. PEMANTAUAN OPERASIONAL — papan pemantauan harian
+// 2. PEMANTAUAN OPERASIONAL — papan pemantauan harian (8 kartu)
 // ============================================================================
 const TEMPLATE_PEMANTAUAN: DashboardTemplate = {
   id: 'tpl-pemantauan',
@@ -199,24 +175,21 @@ const TEMPLATE_PEMANTAUAN: DashboardTemplate = {
   tujuan:
     'Memantau kegiatan harian dan menangkap penyimpangan lebih awal, sebelum menjadi masalah besar.',
   caraPenyampaian:
-    'Papan pemantauan: KPI status cepat di atas, tren tujuh hari, heatmap beban per unit, dan daftar isu yang perlu ditindak hari ini.',
+    'Papan pemantauan: KPI status cepat di atas, tren tujuh hari, heatmap beban per unit, lalu daftar isu yang perlu ditindak hari ini.',
   deskripsi: 'Papan harian: status cepat, tren tujuh hari, dan daftar isu.',
   fokus: ['Volume layanan', 'Ketepatan waktu', 'Beban unit', 'Isu harian'],
   aksen: '#22c55e',
   judulDashboard: 'Pemantauan Operasional (Contoh)',
   deskripsiDashboard:
-    'Template pemantauan harian (10 widget): 4 KPI status, tren tujuh hari, heatmap beban per unit, dan daftar isu. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template pemantauan harian (8 kartu): 4 KPI status, tren tujuh hari, heatmap beban per unit, dan daftar isu. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Volume Layanan Hari Ini', 'Transaksi/pelanggan dilayani', '12.480', 'transaksi', 2.4, '+2,4% vs kemarin', [11200, 11600, 11900, 12100, 12300, 12480]),
     kpi('Waktu Layanan Rata-rata', 'Semakin rendah semakin baik', 6.8, 'menit', -0.6, '-0,6 menit', [8.2, 7.9, 7.6, 7.3, 7.1, 6.8], 7, 'Standar'),
     kpi('Pekerjaan Selesai', 'Terhadap total pekerjaan masuk', 96.2, '%', 1.2, '+1,2% vs kemarin', [92, 93, 94, 94.8, 95.4, 96.2], 95, 'Target'),
     kpi('Gangguan Aktif', 'Laporan belum tertangani', 7, 'laporan', -3, '-3 dari kemarin', [16, 14, 12, 10, 9, 7], 0, 'Target'),
 
-    grafik('line', 'Volume Layanan 7 Hari Terakhir', 'Pola harian untuk melihat lonjakan', { w: 8, h: 4 }, HARI,
+    grafik('line', 'Volume Layanan 7 Hari Terakhir', 'Pola harian untuk melihat lonjakan', { w: 6, h: 4 }, HARI,
       [{ name: 'Transaksi', data: [10800, 11400, 11900, 12100, 12300, 9600, 7200] }], 'transaksi', { showLegend: false }),
-    w('gauge', 'Ketepatan Waktu Penyelesaian', 'Pekerjaan selesai sesuai tenggat', { w: 4, h: 4 }, {
-      chart: { xAxis: ['SLA'], series: [{ name: 'SLA', data: [94.1] }], unit: '%', min: 0, max: 100, showLegend: false },
-    }),
     w('heatmap', 'Beban Kerja per Unit per Hari', 'Semakin gelap semakin padat', { w: 6, h: 4 }, {
       heatmap: {
         rows: ['Unit A', 'Unit B', 'Unit C', 'Unit D'],
@@ -230,9 +203,6 @@ const TEMPLATE_PEMANTAUAN: DashboardTemplate = {
         unit: 'pekerjaan',
       },
     }),
-    grafik('bar', 'Pekerjaan Selesai per Unit', 'Kemarin, satuan pekerjaan', { w: 6, h: 4 },
-      ['Unit A', 'Unit B', 'Unit C', 'Unit D', 'Unit E'],
-      [{ name: 'Selesai', data: [48, 43, 58, 33, 46] }], 'pekerjaan', { showLegend: false }),
 
     tabel('Isu yang Perlu Tindakan', 'Diurutkan dari yang paling mendesak', { w: 12, h: 3 }, [
       { key: 'isu', label: 'Isu' },
@@ -257,7 +227,7 @@ const TEMPLATE_PEMANTAUAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 3. LAPORAN KINERJA BERKALA — laporan naratif siap cetak
+// 3. LAPORAN KINERJA BERKALA — laporan naratif siap cetak (8 kartu)
 // ============================================================================
 const TEMPLATE_LAPORAN: DashboardTemplate = {
   id: 'tpl-laporan',
@@ -265,13 +235,13 @@ const TEMPLATE_LAPORAN: DashboardTemplate = {
   tujuan:
     'Menyusun laporan kinerja bulanan/triwulanan yang siap dibaca dan dicetak, lengkap dengan capaian terhadap target.',
   caraPenyampaian:
-    'Laporan naratif: tabel rekap indikator lebih dominan, grafik tren triwulanan, uraian capaian vs target, lalu kesimpulan tertulis.',
+    'Laporan naratif: KPI capaian di atas, tabel rekap indikator yang dominan, dua grafik tren triwulanan, lalu uraian capaian tertulis.',
   deskripsi: 'Laporan bulanan/triwulanan: tabel rekap, tren, dan uraian capaian.',
   fokus: ['Capaian vs target', 'Tren triwulanan', 'Uraian program', 'Kesimpulan'],
   aksen: '#6366f1',
   judulDashboard: 'Laporan Kinerja Berkala (Contoh)',
   deskripsiDashboard:
-    'Template laporan berkala (10 widget): 4 KPI capaian, tabel rekap indikator, tren triwulanan, dan uraian capaian. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template laporan berkala (8 kartu): 4 KPI capaian, tabel rekap indikator, dua grafik tren, dan uraian capaian. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Capaian Target Kinerja', 'Rata-rata seluruh indikator', 97.3, '%', 2.4, '+2,4% dari periode lalu', [88, 90, 92, 94, 96, 97.3], 100, 'Target'),
     kpi('Nilai Evaluasi Kinerja', 'Skala 0-100', 86.5, 'poin', 3.2, '+3,2 poin', [78, 80, 82, 83.5, 85, 86.5], 85, 'Target'),
@@ -292,24 +262,17 @@ const TEMPLATE_LAPORAN: DashboardTemplate = {
       { indikator: 'Kepuasan layanan', satuan: 'poin', target: 85, realisasi: 82.4, capaian: 96.9, status: 'Mendekati' },
       { indikator: 'Temuan audit tertutup', satuan: '%', target: 90, realisasi: 78.5, capaian: 87.2, status: 'Perlu tindakan' },
     ]),
-    grafik('line', 'Tren Capaian Triwulanan', 'Perbandingan antar triwulan', { w: 8, h: 4 }, TW,
+    grafik('line', 'Tren Capaian Triwulanan', 'Perbandingan target dan realisasi', { w: 6, h: 4 },
+      ['TW1', 'TW2', 'TW3', 'TW4'],
       [
         { name: 'Target', data: [95, 97, 99, 100] },
         { name: 'Realisasi', data: [91, 94, 96.5, 97.3], kind: 'line' },
-      ], '%'),
-    grafik('bar', 'Target vs Realisasi per Program', 'Empat program utama', { w: 4, h: 4 },
-      ['Program A', 'Program B', 'Program C', 'Program D'],
-      [
-        { name: 'Target', data: [100, 100, 100, 100], kind: 'bar' },
-        { name: 'Realisasi', data: [104, 96, 99, 88], kind: 'bar' },
       ], '%'),
     grafik('combo', 'Realisasi Anggaran & Capaian Fisik', 'Bulanan: rupiah dan persen', { w: 6, h: 4 }, BULAN,
       [
         { name: 'Realisasi (Miliar Rp)', data: [18, 20, 22, 23, 24, 25, 24, 26, 27, 28, 27, 29], kind: 'bar', yAxisIndex: 0 },
         { name: 'Capaian fisik (%)', data: [12, 18, 26, 33, 41, 48, 56, 63, 71, 78, 84, 87.5], kind: 'line', yAxisIndex: 1 },
       ], 'campuran'),
-    grafik('area', 'Tren Beban Operasional', 'Bulanan, satuan miliar rupiah', { w: 6, h: 4 }, BULAN,
-      [{ name: 'Beban', data: [88, 90, 91, 92, 93, 94, 94.6, 95, 95.4, 95.8, 96, 96.2] }], 'Miliar Rp', { showLegend: false }),
 
     narasi('Uraian Capaian & Kendala', 'Bahan narasi laporan tertulis', { w: 12, h: 3 },
       'Contoh uraian: capaian kinerja periode ini 97,3% dari target, naik 2,4% dibanding periode sebelumnya. Pendapatan dan laba bersih melampaui target, ' +
@@ -324,7 +287,7 @@ const TEMPLATE_LAPORAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 4. ANGGARAN & REALISASI — perbandingan pagu vs serapan
+// 4. ANGGARAN & REALISASI — perbandingan pagu vs serapan (8 kartu)
 // ============================================================================
 const TEMPLATE_ANGGARAN: DashboardTemplate = {
   id: 'tpl-anggaran',
@@ -332,13 +295,13 @@ const TEMPLATE_ANGGARAN: DashboardTemplate = {
   tujuan:
     'Membandingkan pagu anggaran dengan realisasi sehingga sisa dan kecepatan serapan terlihat jelas per program.',
   caraPenyampaian:
-    'Perbandingan: tabel rinci per program, bar pagu vs realisasi, waterfall penyerapan, dan garis progres serapan bulanan.',
+    'Perbandingan: KPI pagu/serapan di atas, tabel rinci per program, bar pagu vs realisasi, lalu catatan keputusan.',
   deskripsi: 'Pagu vs realisasi: tabel per program, selisih, dan progres serapan.',
   fokus: ['Pagu & realisasi', 'Sisa anggaran', 'Serapan per program', 'Progres bulanan'],
   aksen: '#f59e0b',
   judulDashboard: 'Anggaran & Realisasi (Contoh)',
   deskripsiDashboard:
-    'Template anggaran (10 widget): 4 KPI pagu/serapan, tabel rinci per program, bar perbandingan, waterfall, dan progres serapan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template anggaran (8 kartu): 4 KPI pagu/serapan, tabel rinci per program, bar perbandingan, dan catatan anggaran. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Pagu Anggaran', 'Total alokasi periode ini', '320,0', 'Miliar Rp', 0, 'Tetap', [320, 320, 320, 320, 320, 320]),
     kpi('Realisasi Anggaran', 'Belanja sudah terealisasi', '268,4', 'Miliar Rp', 5.6, '+5,6% dari bulan lalu', [190, 205, 220, 236, 252, 268.4], 288, 'Target'),
@@ -357,7 +320,7 @@ const TEMPLATE_ANGGARAN: DashboardTemplate = {
       { program: 'Pengembangan layanan', pagu: 60, realisasi: 45.8, serapan: 76.3, status: 'Perlu percepatan' },
       { program: 'Peningkatan SDM', pagu: 40, realisasi: 35, serapan: 87.5, status: 'Sesuai jadwal' },
     ]),
-    grafik('bar', 'Pagu vs Realisasi per Program', 'Satuan miliar rupiah', { w: 7, h: 4 },
+    grafik('bar', 'Pagu vs Realisasi per Program', 'Satuan miliar rupiah', { w: 6, h: 4 },
       ['Operasional', 'Pemeliharaan', 'Pengembangan', 'SDM'],
       [
         { name: 'Pagu', data: [140, 80, 60, 40], kind: 'bar' },
@@ -366,24 +329,6 @@ const TEMPLATE_ANGGARAN: DashboardTemplate = {
     w('gauge', 'Serapan Anggaran Keseluruhan', 'Terhadap pagu 320 miliar', { w: 5, h: 4 }, {
       chart: { xAxis: ['Serapan'], series: [{ name: 'Serapan', data: [83.9] }], unit: '%', min: 0, max: 100, showLegend: false },
     }),
-    w('waterfall', 'Alur Penyerapan Anggaran', 'Dari pagu ke sisa', { w: 6, h: 4 }, {
-      chart: {
-        xAxis: ['Pagu', 'Terserap', 'Sisa'],
-        series: [{ name: 'Miliar Rp', data: [320, -268.4, 51.6] }],
-        waterfall: [
-          { name: 'Pagu', value: 320 },
-          { name: 'Terserap', value: -268.4 },
-          { name: 'Sisa', value: 51.6 },
-        ],
-        unit: 'Miliar Rp',
-        showLegend: false,
-      },
-    }),
-    grafik('line', 'Progres Serapan Bulanan', 'Kumulatif terhadap target', { w: 6, h: 4 }, BULAN,
-      [
-        { name: 'Realisasi', data: [18, 38, 60, 82, 105, 130, 154, 180, 205, 230, 250, 268.4] },
-        { name: 'Target', data: [20, 42, 64, 88, 112, 136, 160, 184, 208, 232, 256, 288], kind: 'line' },
-      ], 'Miliar Rp'),
 
     narasi('Catatan Anggaran', 'Yang perlu diputuskan pimpinan', { w: 12, h: 3 },
       'Contoh catatan: serapan 83,9% masih di bawah target 90%. Dua program (pemeliharaan aset dan pengembangan layanan) tertinggal karena pengadaan belum selesai. ' +
@@ -397,7 +342,7 @@ const TEMPLATE_ANGGARAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 5. PELANGGAN & LAYANAN — komposisi dan sebaran
+// 5. PELANGGAN & LAYANAN — komposisi dan sebaran (8 kartu)
 // ============================================================================
 const TEMPLATE_PELANGGAN: DashboardTemplate = {
   id: 'tpl-pelanggan',
@@ -405,13 +350,13 @@ const TEMPLATE_PELANGGAN: DashboardTemplate = {
   tujuan:
     'Memahami siapa yang dilayani, bagaimana sebarannya, dan seberapa baik mutu layanan yang dirasakan.',
   caraPenyampaian:
-    'Komposisi & sebaran: donut segmen pelanggan, peta wilayah, tren kepuasan, dan daftar keluhan terbanyak — cocok untuk presentasi.',
+    'Komposisi & sebaran: KPI pelanggan di atas, donut segmen, peta wilayah, tabel keluhan, lalu catatan layanan — cocok untuk presentasi.',
   deskripsi: 'Komposisi pelanggan, sebaran wilayah, dan mutu layanan.',
   fokus: ['Jumlah pelanggan', 'Segmen', 'Sebaran wilayah', 'Keluhan'],
   aksen: '#ec4899',
   judulDashboard: 'Pelanggan & Layanan (Contoh)',
   deskripsiDashboard:
-    'Template pelanggan & layanan (10 widget): 4 KPI, komposisi segmen, sebaran wilayah, tren kepuasan, dan daftar keluhan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template pelanggan & layanan (8 kartu): 4 KPI, komposisi segmen, sebaran wilayah, rincian keluhan, dan catatan layanan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Jumlah Pelanggan', 'Pelanggan aktif terlayani', '148.650', 'pelanggan', 2.2, '+3.200 pelanggan baru', [140200, 142100, 143900, 145800, 147200, 148650]),
     kpi('Pelanggan Baru', 'Penambahan periode ini', '3.200', 'pelanggan', 8.4, '+8,4% dari periode lalu', [2100, 2300, 2500, 2700, 2950, 3200], 3000, 'Target'),
@@ -438,11 +383,6 @@ const TEMPLATE_PELANGGAN: DashboardTemplate = {
         ],
       },
     }),
-    grafik('line', 'Tren Kepuasan Layanan', 'Indeks kepuasan per bulan', { w: 6, h: 4 }, BULAN,
-      [{ name: 'Indeks', data: [76, 77, 78, 78.6, 79.4, 80.1, 80.6, 81.2, 81.6, 82, 82.2, 82.4] }], 'poin', { showLegend: false }),
-    grafik('hbar', 'Keluhan Terbanyak', 'Jumlah laporan per jenis', { w: 6, h: 4 },
-      ['Aliran terganggu', 'Tekanan rendah', 'Meter bermasalah', 'Tagihan tidak sesuai', 'Antrean layanan'],
-      [{ name: 'Laporan', data: [142, 98, 76, 54, 38] }], 'laporan', { showLegend: false }),
 
     tabel('Rincian Keluhan & Penyelesaian', 'Per jenis keluhan', { w: 12, h: 3 }, [
       { key: 'jenis', label: 'Jenis keluhan' },
@@ -468,7 +408,7 @@ const TEMPLATE_PELANGGAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 6. RISIKO, KEPATUHAN & AUDIT — papan status
+// 6. RISIKO, KEPATUHAN & AUDIT — papan status (8 kartu)
 // ============================================================================
 const TEMPLATE_RISIKO: DashboardTemplate = {
   id: 'tpl-risiko',
@@ -476,13 +416,13 @@ const TEMPLATE_RISIKO: DashboardTemplate = {
   tujuan:
     'Memantau risiko, temuan audit, dan tindak lanjutnya agar masalah yang sama tidak berulang.',
   caraPenyampaian:
-    'Papan status: matriks risiko, daftar temuan dengan tenggat, progres tindak lanjut, dan indikator kepatuhan — dibaca sebagai daftar kerja.',
+    'Papan status: KPI temuan di atas, matriks risiko, status tindak lanjut, daftar temuan bertenggat, lalu catatan kepatuhan.',
   deskripsi: 'Matriks risiko, daftar temuan audit, dan progres tindak lanjut.',
   fokus: ['Temuan audit', 'Tindak lanjut', 'Risiko tinggi', 'Kepatuhan'],
   aksen: '#ef4444',
   judulDashboard: 'Risiko, Kepatuhan & Audit (Contoh)',
   deskripsiDashboard:
-    'Template risiko & audit (10 widget): 4 KPI, matriks risiko, daftar temuan, progres tindak lanjut, dan tren temuan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
+    'Template risiko & audit (8 kartu): 4 KPI, matriks risiko, status tindak lanjut, daftar temuan, dan catatan kepatuhan. Angka bersifat contoh dan dapat diganti dengan data resmi.',
   widgets: [
     kpi('Temuan Audit Terbuka', 'Belum ditindaklanjuti', 12, 'temuan', -4, '-4 dari periode lalu', [22, 20, 18, 16, 14, 12], 0, 'Target'),
     kpi('Tindak Lanjut Selesai', 'Terhadap total rekomendasi', 78.5, '%', 6.2, '+6,2% dari periode lalu', [58, 62, 66, 70, 74, 78.5], 90, 'Target'),
@@ -504,14 +444,6 @@ const TEMPLATE_RISIKO: DashboardTemplate = {
     grafik('bar', 'Status Tindak Lanjut', 'Rekomendasi audit per status', { w: 6, h: 4 },
       ['Selesai', 'Berjalan', 'Belum mulai', 'Lewat tenggat'],
       [{ name: 'Rekomendasi', data: [94, 18, 8, 4] }], 'rekomendasi', { showLegend: false }),
-    grafik('line', 'Tren Temuan per Triwulan', 'Temuan baru dan yang ditutup', { w: 6, h: 4 }, TW,
-      [
-        { name: 'Temuan baru', data: [14, 11, 9, 7] },
-        { name: 'Ditutup', data: [6, 9, 12, 13], kind: 'line' },
-      ], 'temuan'),
-    w('gauge', 'Progres Penutupan Temuan', 'Terhadap seluruh temuan', { w: 6, h: 4 }, {
-      chart: { xAxis: ['Progres'], series: [{ name: 'Progres', data: [78.5] }], unit: '%', min: 0, max: 100, showLegend: false },
-    }),
 
     tabel('Daftar Temuan Audit', 'Diurutkan dari tenggat terdekat', { w: 12, h: 3 }, [
       { key: 'temuan', label: 'Temuan' },

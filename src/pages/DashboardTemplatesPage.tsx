@@ -18,7 +18,6 @@ import { DashboardCanvas } from '../components/DashboardCanvas';
 import { ChartSelectionProvider, ActiveChartFilterChip } from '../components/widgets/ChartSelection';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
-import { narasiInsight, susunSlide, VERSI_PRESENTASI } from '../services/presentasi/slide';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
@@ -117,29 +116,24 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   /**
    * Dashboard BAYANGAN untuk mode presentasi pratinjau.
    *
-   * Slide disusun dari widget template (bukan dari server) dan tiap widget diberi
-   * narasi ringkas yang dihitung dari angkanya sendiri — bukan dari dokumen. Karena
-   * itu `PresentationMode` dipanggil dengan `pratinjau` supaya tidak memanggil RAG.
+   * Presentasi kini menampilkan SATU halaman utuh (tanpa slide), jadi cukup
+   * dibungkus sebagai Dashboard biasa. Angkanya tetap contoh — `PresentationMode`
+   * dipanggil dengan `pratinjau` supaya diberi penanda dan tanpa panggilan RAG.
    */
-  const dashPratinjau = useMemo<Dashboard>(() => {
-    const widgets = widgetPratinjau.map((w) => ({ ...w, insight: w.insight || narasiInsight(w) }));
-    return {
+  const dashPratinjau = useMemo<Dashboard>(
+    () => ({
       id: `tpl-pratinjau-${aktif.id}`,
       tenantId: currentTenant?.id ?? '',
       title: aktif.judulDashboard,
       description: aktif.deskripsiDashboard,
       sector: (currentTenant?.sector ?? 'aneka_usaha') as BumdSector,
-      widgets,
+      widgets: widgetPratinjau,
       globalFilters: { periode: 'Contoh', unitKerja: 'Semua', kategori: 'Semua' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      presentasi: {
-        slides: susunSlide(widgets),
-        disusunAt: new Date().toISOString(),
-        versi: VERSI_PRESENTASI,
-      },
-    };
-  }, [aktif, widgetPratinjau, currentTenant]);
+    }),
+    [aktif, widgetPratinjau, currentTenant]
+  );
 
   const pakai = async () => {
     if (memuat) return;
@@ -347,14 +341,13 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         </p>
       </div>
 
-      {/* Mode presentasi pratinjau — layar penuh, satu slide per layar.
-          `pratinjau` membuat komponen ini TIDAK memanggil RAG (angka contoh). */}
+      {/* Mode presentasi pratinjau — layar penuh, seluruh dashboard dalam satu
+          halaman (tanpa slide). `pratinjau` menandai angkanya angka contoh. */}
       {presentasi && (
         <PresentationMode
           dashboard={dashPratinjau}
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
-          onUpdate={() => {}}
           pratinjau
         />
       )}
