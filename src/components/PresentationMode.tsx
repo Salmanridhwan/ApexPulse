@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Maximize2, Minimize2, Sparkles, X } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Sparkles, X } from 'lucide-react';
 import type { Dashboard } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
 
@@ -27,10 +27,10 @@ interface PresentationModeProps {
 /**
  * MODE PRESENTASI — satu dashboard = SATU halaman utuh, tanpa slide.
  *
- * Sebelumnya presentasi memecah dashboard menjadi beberapa slide. Pengguna
- * meminta konsep itu dibuang: dashboard sudah satu kesatuan, jadi presentasi
- * hanya menampilkan SELURUH dashboard di layar penuh — persis seperti kanvas,
- * semua kartu terlihat sekaligus, tanpa navigasi slide dan tanpa scroll.
+ * Bilah atas hanya memuat judul, penanda pratinjau, dan satu tombol ikon ✕
+ * untuk keluar (Esc juga berlaku). Tombol layar penuh sengaja tidak ada:
+ * presentasi langsung meminta layar penuh saat dibuka, dan tombol keluar sudah
+ * cukup satu.
  *
  * Tata letak satu layar dikerjakan `DashboardCanvas` (`satuHalaman`), sehingga
  * aturan tingginya sama dengan tampilan dashboard biasa — tidak ada dua cara
@@ -43,30 +43,20 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   pratinjau = false,
   konten,
 }) => {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const masukFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.();
-      }
-    } catch {
-      /* browser menolak (mis. bukan gestur user) — abaikan, overlay tetap tampil */
-    }
-  }, []);
-
-  // Minta layar penuh sekali saat masuk, lalu ikuti perubahan dari tombol browser.
+  // Minta layar penuh sekali saat masuk (tanpa tombol; kalau browser menolak,
+  // overlay tetap tampil penuh satu layar).
   useEffect(() => {
-    void masukFullscreen();
-    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFs);
+    try {
+      if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.();
+    } catch {
+      /* browser menolak (mis. bukan gestur user) — abaikan */
+    }
     const overflowLama = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('fullscreenchange', onFs);
       document.body.style.overflow = overflowLama;
     };
-  }, [masukFullscreen]);
+  }, []);
 
   // Esc keluar dari presentasi.
   useEffect(() => {
@@ -98,19 +88,12 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
             </span>
           )}
           <button
-            onClick={() => (isFullscreen ? document.exitFullscreen?.() : masukFullscreen())}
-            title="Layar penuh"
-            className="p-2 text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-          <button
             onClick={onExit}
             title="Keluar presentasi (Esc)"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors"
+            aria-label="Keluar presentasi"
+            className="p-2 text-ink-2 bg-surface hover:bg-surface-2 hover:text-ink border border-line rounded-control transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Keluar</span>
+            <X className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -118,18 +101,18 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       {/* ===== Seluruh dashboard dalam satu halaman ===== */}
       <main className={`flex-1 min-h-0 ${konten ? 'overflow-hidden' : 'overflow-auto'}`}>
         {konten ?? (
-        <DashboardCanvas
-          widgets={dashboard.widgets}
-          satuHalaman
-          readOnly
-          preview={pratinjau}
-          onEditWidget={() => {}}
-          onManualCorrection={() => {}}
-          onDeleteWidget={() => {}}
-          onDuplicateWidget={() => {}}
-          onReorderWidgets={() => {}}
-          onResizeWidget={() => {}}
-        />
+          <DashboardCanvas
+            widgets={dashboard.widgets}
+            satuHalaman
+            readOnly
+            preview={pratinjau}
+            onEditWidget={() => {}}
+            onManualCorrection={() => {}}
+            onDeleteWidget={() => {}}
+            onDuplicateWidget={() => {}}
+            onReorderWidgets={() => {}}
+            onResizeWidget={() => {}}
+          />
         )}
       </main>
     </div>
