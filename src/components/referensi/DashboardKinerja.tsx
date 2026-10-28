@@ -480,31 +480,34 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
           <p className="text-[0.75em] shrink-0" style={{ color: W.teks3 }}>
             Porsi tiap jenis pelanggan
           </p>
-          <div className={penuh ? 'relative flex-1 min-h-0 mt-[0.3em]' : 'relative mt-[0.3em]'}>
-            <div ref={segmenRef} className={penuh ? 'w-full h-full' : 'w-full h-[7.4em]'} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[0.9em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
-              <span className="text-[0.65em] mt-[0.1em]" style={{ color: W.teks3 }}>
-                Total
-              </span>
+          {/* Legenda di SAMPING cincin (bukan di bawah) supaya cincin dapat ruang
+              penuh dan tampil lebih besar, seperti referensi. */}
+          <div className={penuh ? 'flex-1 min-h-0 mt-[0.3em] flex items-center gap-[0.5em]' : 'mt-[0.3em] flex items-center gap-[0.5em]'}>
+            <div className={`relative ${penuh ? 'flex-1 min-w-0 h-full' : 'shrink-0 w-[7.6em] h-[7.6em]'}`}>
+              <div ref={segmenRef} className="w-full h-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[0.86em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
+                <span className="text-[0.62em] mt-[0.1em]" style={{ color: W.teks3 }}>
+                  Total
+                </span>
+              </div>
             </div>
+            <ul className="flex-1 min-w-0 space-y-[0.4em]">
+              {SEGMEN.map((r) => (
+                <li key={r.nama} className="flex items-start gap-[0.35em] text-[0.7em]">
+                  <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0 mt-[0.3em]" style={{ backgroundColor: r.warna }} />
+                  <div className="min-w-0">
+                    <p className="truncate leading-tight" style={{ color: W.teks2 }}>
+                      {r.nama}
+                    </p>
+                    <p className="tabular-nums leading-tight" style={{ color: W.teks3 }}>
+                      {r.nominal} · {String(r.nilai).replace('.', ',')}%
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="mt-[0.4em] space-y-[0.25em] shrink-0">
-            {SEGMEN.map((r) => (
-              <li key={r.nama} className="flex items-center gap-[0.4em] text-[0.72em]">
-                <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
-                <span className="flex-1 truncate" style={{ color: W.teks2 }}>
-                  {r.nama}
-                </span>
-                <span className="tabular-nums shrink-0" style={{ color: W.teks3 }}>
-                  {r.nominal}
-                </span>
-                <span className="tabular-nums font-semibold shrink-0 w-[2.6em] text-right">
-                  {String(r.nilai).replace('.', ',')}%
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className={kartu()} style={gayaKartu}>
@@ -563,31 +566,32 @@ export const DashboardKinerja: React.FC<Props> = ({ penuh = false }) => {
           <p className="text-[0.75em] shrink-0" style={{ color: W.teks3 }}>
             Porsi nilai transaksi
           </p>
-          <div className={penuh ? 'relative flex-1 min-h-0 mt-[0.3em]' : 'relative mt-[0.3em]'}>
-            <div ref={bayarRef} className={penuh ? 'w-full h-full' : 'w-full h-[7em]'} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[0.9em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
-              <span className="text-[0.65em] mt-[0.1em]" style={{ color: W.teks3 }}>
-                Total
-              </span>
+          <div className={penuh ? 'flex-1 min-h-0 mt-[0.3em] flex items-center gap-[0.5em]' : 'mt-[0.3em] flex items-center gap-[0.5em]'}>
+            <div className={`relative ${penuh ? 'flex-1 min-w-0 h-full' : 'shrink-0 w-[6.6em] h-[6.6em]'}`}>
+              <div ref={bayarRef} className="w-full h-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[0.8em] font-bold leading-none tabular-nums">Rp 245,6 jt</span>
+                <span className="text-[0.6em] mt-[0.1em]" style={{ color: W.teks3 }}>
+                  Total
+                </span>
+              </div>
             </div>
+            <ul className="flex-1 min-w-0 space-y-[0.45em]">
+              {PEMBAYARAN.map((r) => (
+                <li key={r.nama} className="flex items-start gap-[0.35em] text-[0.7em]">
+                  <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0 mt-[0.3em]" style={{ backgroundColor: r.warna }} />
+                  <div className="min-w-0">
+                    <p className="truncate leading-tight" style={{ color: W.teks2 }}>
+                      {r.nama}
+                    </p>
+                    <p className="tabular-nums leading-tight" style={{ color: W.teks3 }}>
+                      {r.nominal} · {String(r.nilai).replace('.', ',')}%
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="mt-[0.4em] space-y-[0.25em] shrink-0">
-            {PEMBAYARAN.map((r) => (
-              <li key={r.nama} className="flex items-center gap-[0.4em] text-[0.72em]">
-                <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
-                <span className="flex-1 truncate" style={{ color: W.teks2 }}>
-                  {r.nama}
-                </span>
-                <span className="tabular-nums shrink-0" style={{ color: W.teks3 }}>
-                  {r.nominal}
-                </span>
-                <span className="tabular-nums font-semibold shrink-0 w-[2.6em] text-right">
-                  {String(r.nilai).replace('.', ',')}%
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className={kartu('gap-[0.4em]')} style={gayaKartu}>

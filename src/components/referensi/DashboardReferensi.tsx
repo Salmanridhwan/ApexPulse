@@ -485,28 +485,32 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               Komposisi beban operasional
             </p>
           </div>
-          <div className={penuh ? 'relative flex-1 min-h-0 mt-[0.3em]' : 'relative mt-[0.3em]'}>
-            <div ref={donutRef} className={penuh ? 'w-full h-full' : 'w-full h-[8.2em]'} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[1em] font-bold leading-none tabular-nums">12,35 M</span>
-              <span className="text-[0.7em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
-                Total
-              </span>
+          {/* Legenda di SAMPING cincin supaya cincin dapat ruang penuh (lebih besar),
+              mengikuti referensi — bukan ditumpuk di bawah. */}
+          <div className={penuh ? 'flex-1 min-h-0 mt-[0.3em] flex items-center gap-[0.5em]' : 'mt-[0.3em] flex items-center gap-[0.5em]'}>
+            <div className={`relative ${penuh ? 'flex-1 min-w-0 h-full' : 'shrink-0 w-[7.2em] h-[7.2em]'}`}>
+              <div ref={donutRef} className="w-full h-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[0.92em] font-bold leading-none tabular-nums">12,35 M</span>
+                <span className="text-[0.66em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
+                  Total
+                </span>
+              </div>
             </div>
+            <ul className="flex-1 min-w-0 space-y-[0.4em]">
+              {RINCIAN_BEBAN.map((r) => (
+                <li key={r.nama} className="flex items-center gap-[0.4em] text-[0.76em]">
+                  <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
+                  <span className="flex-1 truncate" style={{ color: WARNA.teks2 }}>
+                    {r.nama}
+                  </span>
+                  <span className="tabular-nums font-semibold shrink-0" style={{ color: WARNA.teks }}>
+                    {String(r.nilai).replace('.', ',')}%
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className={`mt-[0.5em] space-y-[0.35em] shrink-0 ${penuh ? 'max-h-[46%] overflow-hidden' : ''}`}>
-            {RINCIAN_BEBAN.map((r) => (
-              <li key={r.nama} className="flex items-center gap-[0.55em] text-[0.8em]">
-                <span className="w-[0.55em] h-[0.55em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
-                <span className="flex-1 truncate" style={{ color: WARNA.teks2 }}>
-                  {r.nama}
-                </span>
-                <span className="tabular-nums font-semibold" style={{ color: WARNA.teks }}>
-                  {String(r.nilai).replace('.', ',')}%
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       </div>
 
@@ -517,14 +521,14 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         }`}
       >
         <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-center justify-between mb-[0.6em] shrink-0">
-            <h3 className="text-[0.98em] font-semibold">Transaksi Terbaru</h3>
+          <div className="flex items-center justify-between gap-[0.4em] mb-[0.6em] shrink-0">
+            <h3 className="text-[0.98em] font-semibold truncate min-w-0">Transaksi Terbaru</h3>
             <button
               type="button"
               onClick={() => setSemuaTransaksi((v) => !v)}
               aria-expanded={semuaTransaksi}
               title={semuaTransaksi ? 'Ringkas daftar transaksi' : 'Tampilkan seluruh transaksi'}
-              className="text-[0.76em] inline-flex items-center gap-[0.2em] rounded px-[0.3em] -mx-[0.3em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
+              className="shrink-0 whitespace-nowrap text-[0.76em] inline-flex items-center gap-[0.2em] rounded px-[0.3em] -mx-[0.3em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
               style={{ color: WARNA.oranye }}
             >
               {semuaTransaksi ? 'Ringkas' : 'Lihat semua'}
