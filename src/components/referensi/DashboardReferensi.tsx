@@ -531,9 +531,9 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}>
         {KPI.map((k) => {
           const naik = k.delta >= 0;
-          const bagus = naik === k.naikBagus;
           const jalur = jalurSpark(k.seri);
-          const warna = bagus ? WARNA.hijau : WARNA.merah;
+          // Aturan warna: naik = hijau, menurun = merah (apa pun arah "bagus"-nya).
+          const warna = naik ? WARNA.hijau : WARNA.merah;
           const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
           return (
             <div key={k.label} className={kartu('gap-[0.55em]')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
@@ -822,7 +822,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                     {k.label}
                   </p>
                   <p className="text-[1em] font-bold tabular-nums mt-[0.25em]">{k.nilai}</p>
-                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: (k.delta >= 0) === k.naikBagus ? WARNA.hijau : WARNA.merah }}>
+                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: k.delta >= 0 ? WARNA.hijau : WARNA.merah }}>
                     {k.delta >= 0 ? '+' : ''}
                     {String(k.delta).replace('.', ',')}% {k.deltaTeks}
                   </p>
