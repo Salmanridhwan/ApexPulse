@@ -390,62 +390,108 @@ const opsiPerangkat = (s: number) => {
   };
 };
 
-const opsiGauge = (s: number) => ({
-  animationDuration: 900,
-  series: [
-    {
-      type: 'gauge',
-      startAngle: 215,
-      endAngle: -35,
-      min: 0,
-      max: 100,
-      radius: '96%',
-      center: ['50%', '62%'],
-      progress: {
-        show: true,
-        width: 10 * s,
-        roundCap: true,
-        itemStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 1,
-            y2: 0,
-            colorStops: [
-              { offset: 0, color: WARNA.cyan },
-              { offset: 1, color: WARNA.biru },
-            ],
-          },
-          shadowColor: 'rgba(59,130,246,0.75)',
-          shadowBlur: 14 * s,
-        },
+/** Faktor perilaku: kolom komposisi 100% (mengisi tinggi kartu). */
+const opsiPerilaku = (s: number) => ({
+  animationDuration: 700,
+  animationEasing: 'cubicOut' as const,
+  grid: { left: 0, right: 0, top: 0, bottom: 0 },
+  tooltip: {
+    ...tooltipDasar(s),
+    trigger: 'item',
+    formatter: (p: any) => `${p.marker} ${p.seriesName}<br/><b>${p.value}%</b> dari 100`,
+  },
+  xAxis: { type: 'category', data: ['kanal'], show: false },
+  yAxis: { type: 'value', max: 100, show: false },
+  series: PERILAKU.map((p, i) => ({
+    name: p.nama,
+    type: 'bar',
+    stack: 'kanal',
+    barWidth: '86%',
+    data: [p.persen],
+    itemStyle: {
+      color: {
+        type: 'linear',
+        x: 0,
+        y: 0,
+        x2: 0,
+        y2: 1,
+        colorStops: [
+          { offset: 0, color: p.warna },
+          { offset: 1, color: `${p.warna}cc` },
+        ],
       },
-      axisLine: { lineStyle: { width: 10 * s, color: [[1, 'rgba(255,255,255,0.08)']] } },
-      pointer: { show: false },
-      axisTick: {
-        show: true,
-        distance: -14 * s,
-        length: 4 * s,
-        splitNumber: 5,
-        lineStyle: { color: 'rgba(255,255,255,0.16)', width: 1 },
-      },
-      splitLine: { show: false },
-      axisLabel: { show: false },
-      anchor: { show: false },
-      title: { show: false },
-      detail: {
-        valueAnimation: true,
-        fontSize: 21 * s,
-        fontWeight: 'bold',
-        color: WARNA.teks,
-        offsetCenter: [0, '-4%'],
-        formatter: '{value}',
-      },
-      data: [{ value: 100 }],
+      borderRadius:
+        i === 0 ? [0, 0, 7 * s, 7 * s] : i === PERILAKU.length - 1 ? [7 * s, 7 * s, 0, 0] : 0,
+      borderColor: WARNA.kartu,
+      borderWidth: i === 0 ? 0 : 2 * s,
     },
-  ],
+    label: {
+      show: true,
+      position: 'inside',
+      color: '#0b0d12',
+      fontSize: 9.2 * s,
+      fontWeight: 'bold',
+      formatter: '{c}%',
+    },
+    emphasis: { itemStyle: { shadowBlur: 10 * s, shadowColor: 'rgba(0,0,0,0.45)' } },
+  })),
 });
+
+/** Sistem operasi: batang mendatar dengan label persen + panah tren berwarna. */
+const opsiOS = (s: number) => {
+  const urut = [...OS].reverse();
+  const maks = Math.max(...OS.map((o) => o.persen));
+  return {
+    animationDuration: 750,
+    animationEasing: 'cubicOut' as const,
+    grid: { left: 2, right: 78 * s, top: 4, bottom: 2, containLabel: true },
+    tooltip: {
+      ...tooltipDasar(s),
+      trigger: 'item',
+      formatter: (p: any) => {
+        const d = urut[p.dataIndex].delta;
+        const tren = d === 0 ? 'tetap' : `${d > 0 ? 'naik' : 'turun'} ${Math.abs(d)}%`;
+        return `${p.marker} ${p.name}<br/><b>${p.value}%</b> kunjungan · ${tren}`;
+      },
+    },
+    xAxis: { type: 'value', max: Math.ceil(maks * 1.14), show: false },
+    yAxis: {
+      type: 'category',
+      data: urut.map((o) => o.nama),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: WARNA.teks2, fontSize: 9.4 * s, margin: 5 * s },
+    },
+    series: [
+      {
+        type: 'bar',
+        barWidth: '48%',
+        data: urut.map((o) => ({
+          value: o.persen,
+          itemStyle: { color: gradasi(o.warna), borderRadius: [0, 4 * s, 4 * s, 0] },
+        })),
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(255,255,255,0.045)', borderRadius: [0, 4 * s, 4 * s, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          distance: 6 * s,
+          rich: {
+            nilai: { color: WARNA.teks, fontSize: 9.4 * s, fontWeight: 'bold' },
+            naik: { color: WARNA.hijau, fontSize: 8.6 * s, fontWeight: 'bold', padding: [0, 0, 0, 5 * s] },
+            turun: { color: WARNA.merah, fontSize: 8.6 * s, fontWeight: 'bold', padding: [0, 0, 0, 5 * s] },
+          },
+          formatter: (p: any) => {
+            const d = urut[p.dataIndex].delta;
+            if (d === 0) return `{nilai|${p.value}%}`;
+            return `{nilai|${p.value}%}{${d > 0 ? 'naik' : 'turun'}|${d > 0 ? '▲' : '▼'}${Math.abs(d)}%}`;
+          },
+        },
+        emphasis: { itemStyle: { shadowBlur: 12 * s, shadowColor: 'rgba(255,255,255,0.22)' } },
+      },
+    ],
+  };
+};
 
 interface DashboardTrafikProps {
   /** true = isi seluruh tinggi wadah (mode presentasi / layar penuh). */
@@ -464,7 +510,8 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
   const relevansiRef = useRef<HTMLDivElement | null>(null);
   const usiaRef = useRef<HTMLDivElement | null>(null);
   const perangkatRef = useRef<HTMLDivElement | null>(null);
-  const gaugeRef = useRef<HTMLDivElement | null>(null);
+  const perilakuRef = useRef<HTMLDivElement | null>(null);
+  const osRef = useRef<HTMLDivElement | null>(null);
   const instans = useRef<Record<string, any>>({});
   const menuRef = useRef<HTMLSpanElement | null>(null);
 
@@ -506,12 +553,15 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
       ambil('relevansi', relevansiRef.current)?.setOption(opsiRelevansi(skala, rentang), true);
       ambil('usia', usiaRef.current)?.setOption(opsiUsia(skala), true);
       ambil('perangkat', perangkatRef.current)?.setOption(opsiPerangkat(skala), true);
-      ambil('gauge', gaugeRef.current)?.setOption(opsiGauge(skala), true);
+      ambil('perilaku', perilakuRef.current)?.setOption(opsiPerilaku(skala), true);
+      ambil('os', osRef.current)?.setOption(opsiOS(skala), true);
 
       pengamat = new ResizeObserver(() => {
         Object.values(instans.current).forEach((c: any) => c?.resize?.());
       });
-      [trafikRef, relevansiRef, usiaRef, perangkatRef, gaugeRef].forEach((r) => r.current && pengamat?.observe(r.current));
+      [trafikRef, relevansiRef, usiaRef, perangkatRef, perilakuRef, osRef].forEach(
+        (r) => r.current && pengamat?.observe(r.current),
+      );
     });
 
     return () => {
@@ -810,60 +860,46 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({ penuh = false 
           </ul>
         </div>
 
-        {/* Faktor Perilaku — alat ukur + batang kanal */}
+        {/* Faktor Perilaku — komposisi 100% + rincian kanal */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Faktor Perilaku" warna={WARNA.hijau} sub="Skor keseluruhan (0–100)" />
-          <div className="relative w-full shrink-0" style={{ height: penuh ? '5.4em' : '4.9em' }}>
-            <div ref={gaugeRef} className="absolute inset-0" />
+          <Kepala
+            judul="Faktor Perilaku"
+            warna={WARNA.hijau}
+            sub="Porsi kanal · skor 100"
+            aksi={
+              <span
+                className="shrink-0 rounded-full px-[0.4em] py-[0.08em] text-[0.62em] font-bold tabular-nums"
+                style={{ color: WARNA.hijau, backgroundColor: `${WARNA.hijau}1f` }}
+              >
+                100
+              </span>
+            }
+          />
+          <div className="flex-1 min-h-0 flex gap-[0.7em]">
+            <div ref={perilakuRef} className="h-full w-[40%] shrink-0" />
+            <ul className="flex-1 min-w-0 flex flex-col justify-around gap-[0.2em]">
+              {PERILAKU.map((p) => (
+                <li key={p.nama} className="min-w-0">
+                  <div className="flex items-center gap-[0.3em] text-[0.65em]">
+                    <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: p.warna }} />
+                    <span className="truncate" style={{ color: WARNA.teks2 }}>
+                      {p.nama}
+                    </span>
+                    <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
+                  </div>
+                  <div className="text-[0.58em] mt-[0.05em]" style={{ color: WARNA.teks3 }}>
+                    {p.jumlah} dari 100
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="shrink-0 flex flex-col gap-[0.26em] mt-[0.2em]">
-            {PERILAKU.map((p) => (
-              <li key={p.nama} className="min-w-0">
-                <div className="flex items-center gap-[0.3em] text-[0.63em] mb-[0.1em]">
-                  <span className="w-[0.4em] h-[0.4em] rounded-full shrink-0" style={{ backgroundColor: p.warna }} />
-                  <span className="truncate" style={{ color: WARNA.teks2 }}>
-                    {p.nama}
-                  </span>
-                  <span className="ml-auto tabular-nums font-semibold shrink-0">{p.persen}%</span>
-                </div>
-                <div className="h-[0.22em] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${p.persen}%`, background: `linear-gradient(90deg, ${p.warna}66, ${p.warna})` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
 
-        {/* Sistem Operasi */}
+        {/* Sistem Operasi — batang mendatar + tren */}
         <div className={kartu()} style={gayaKartu}>
-          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan" />
-          <div className="flex h-[0.5em] rounded-full overflow-hidden shrink-0 mb-[0.5em] gap-[0.08em]">
-            {OS.map((o) => (
-              <span key={o.nama} style={{ width: `${o.persen}%`, backgroundColor: o.warna }} title={`${o.nama} · ${o.persen}%`} />
-            ))}
-          </div>
-          <ul className={`flex-1 min-h-0 flex flex-col justify-between gap-[0.22em] ${daftar}`}>
-            {OS.map((o) => (
-              <li key={o.nama} className="flex items-center gap-[0.3em] text-[0.65em] min-w-0">
-                <span className="w-[0.45em] h-[0.45em] rounded-full shrink-0" style={{ backgroundColor: o.warna }} />
-                <span className="truncate" style={{ color: WARNA.teks2 }}>
-                  {o.nama}
-                </span>
-                <span className="ml-auto tabular-nums font-semibold shrink-0">{o.persen}%</span>
-                <span
-                  className="inline-flex items-center gap-[0.05em] shrink-0 text-[0.92em] font-semibold w-[2.2em] justify-end"
-                  style={{ color: o.delta > 0 ? WARNA.hijau : o.delta < 0 ? WARNA.merah : 'transparent' }}
-                >
-                  {o.delta > 0 && <ArrowUpRight className="w-[0.8em] h-[0.8em]" />}
-                  {o.delta < 0 && <ArrowDownRight className="w-[0.8em] h-[0.8em]" />}
-                  {o.delta !== 0 ? `${Math.abs(o.delta)}%` : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <Kepala judul="Sistem Operasi" warna={WARNA.oranye} sub="Porsi kunjungan & perubahan" />
+          <div ref={osRef} className="w-full flex-1 min-h-[7.2em]" />
         </div>
 
         {/* Frasa Pencarian */}

@@ -253,7 +253,7 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   tujuan:
     'Memantau trafik situs dan perilaku pengunjung: rasio pentalan, kedalaman halaman, waktu di situs, pengunjung baru, sumber trafik, dinamika relevansi, komposisi usia, halaman populer, jenis perangkat, sistem operasi, dan frasa pencarian.',
   caraPenyampaian:
-    'Gaya gelap-netral dengan lima warna kategori: lima kartu KPI bersparkline, grafik batang bertumpuk sumber trafik 31 hari dengan legenda di samping, garis dinamika relevansi, komposisi usia, daftar halaman populer, cincin jenis perangkat, alat ukur faktor perilaku, komposisi sistem operasi, dan daftar frasa pencarian.',
+    'Gaya gelap-netral dengan lima warna kategori: lima kartu KPI bersparkline, grafik batang bertumpuk sumber trafik 31 hari dengan legenda di samping, garis dinamika relevansi, komposisi usia, daftar halaman populer, batang jenis perangkat, kolom komposisi faktor perilaku, batang sistem operasi bertanda tren, dan daftar frasa pencarian.',
   deskripsi: 'Papan trafik: 5 KPI, sumber trafik, relevansi, usia, halaman, perangkat, perilaku, OS, frasa pencarian.',
   fokus: ['Sumber trafik', 'Perilaku pengunjung', 'Usia & perangkat', 'Halaman populer', 'Frasa pencarian'],
   aksen: '#22d3ee',
