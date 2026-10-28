@@ -152,11 +152,11 @@ const dasar = (s: number) => ({
 const Legenda: React.FC<{ item: Array<{ warna: string; label: string; garis?: boolean }> }> = ({ item }) => (
   <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
     {item.map((x) => (
-      <li key={x.label} className="inline-flex items-center gap-[0.32em] text-[0.68em]" style={{ color: W.teks3 }}>
+      <li key={x.label} className="inline-flex items-center gap-[0.35em] text-[0.72em] font-medium" style={{ color: W.teks2 }}>
         {x.garis ? (
-          <span className="w-[0.95em] h-[0.16em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
+          <span className="w-[1em] h-[0.2em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
         ) : (
-          <span className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0" style={{ backgroundColor: x.warna }} />
+          <span className="w-[0.62em] h-[0.62em] rounded-[0.2em] shrink-0" style={{ backgroundColor: x.warna }} />
         )}
         {x.label}
       </li>

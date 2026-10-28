@@ -174,13 +174,13 @@ const jalurSpark = (seri: number[]) => {
 const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: boolean; garis?: boolean }> }> = ({ item }) => (
   <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
     {item.map((x) => (
-      <li key={x.label} className="inline-flex items-center gap-[0.32em] text-[0.68em]" style={{ color: WARNA.teks3 }}>
+      <li key={x.label} className="inline-flex items-center gap-[0.35em] text-[0.72em] font-medium" style={{ color: WARNA.teks2 }}>
         {x.garis ? (
-          <span className="w-[0.95em] h-[0.16em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
+          <span className="w-[1em] h-[0.2em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
         ) : (
           <span
-            className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0"
-            style={{ backgroundColor: x.warna, opacity: x.redup ? 0.45 : 1 }}
+            className="w-[0.62em] h-[0.62em] rounded-[0.2em] shrink-0"
+            style={{ backgroundColor: x.warna, opacity: x.redup ? 0.6 : 1 }}
           />
         )}
         {x.label}
@@ -209,7 +209,7 @@ const opsiBar = (s: number) => {
   const puncak = PENDAPATAN_BULANAN.indexOf(Math.max(...PENDAPATAN_BULANAN));
   const dasar = gayaDasar(s);
   return {
-    grid: { left: 4, right: 8, top: 16 * s, bottom: 2, containLabel: true },
+    grid: { left: 4, right: 20 * s, top: 22 * s, bottom: 2, containLabel: true },
     tooltip: {
       ...dasar.tooltip,
       trigger: 'axis',
@@ -225,6 +225,8 @@ const opsiBar = (s: number) => {
     xAxis: { type: 'category', data: BULAN, ...dasar.sumbu },
     yAxis: {
       type: 'value',
+      // sedikit ruang di atas batang tertinggi supaya label angkanya muat
+      max: 28,
       splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
       axisLabel: { color: WARNA.teks3, fontSize: 10 * s, formatter: '{value} M' },
     },
@@ -241,11 +243,10 @@ const opsiBar = (s: number) => {
           // nilainya langsung terbaca, bukan cuma warna beda.
           label: {
             show: i === puncak,
-            // Ditulis DI DALAM batang (atas) supaya tidak pernah terpotong tepi
-            // grafik dan tidak menimpa titik garis.
-            position: 'insideTop',
-            distance: 7 * s,
-            color: '#1a1206',
+            // Di atas batang, dengan ruang atas dari `yAxis.max` supaya utuh.
+            position: 'top',
+            distance: 8 * s,
+            color: WARNA.teks,
             fontSize: 9.5 * s,
             fontWeight: 'bold',
             formatter: () => `Rp ${String(v).replace('.', ',')} M`,
