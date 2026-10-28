@@ -531,7 +531,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               <ArrowRight className={`w-[0.95em] h-[0.95em] transition-transform ${semuaTransaksi ? 'rotate-90' : ''}`} />
             </button>
           </div>
-          <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto' : ''}`}>
+          <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto gulir-tema pr-[0.2em]' : ''}`}>
             {(semuaTransaksi ? [...TRANSAKSI, ...TRANSAKSI_LAIN] : TRANSAKSI).map((t) => (
               <li key={t.nama} className="flex items-center gap-[0.6em]">
                 <span
@@ -634,7 +634,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           aria-label="Laporan rinci"
         >
           <div
-            className="w-full max-w-[46em] max-h-[88vh] overflow-auto rounded-[1.2em] p-[1.1em]"
+            className="w-full max-w-[46em] max-h-[88vh] overflow-auto gulir-tema rounded-[1.2em] p-[1.1em]"
             style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks }}
             onClick={(e) => e.stopPropagation()}
           >

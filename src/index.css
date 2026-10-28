@@ -384,6 +384,43 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /**
+   * Gulir bergaya tema gelap: tipis, tanpa tombol panah, track transparan,
+   * thumb abu membulat (oranye saat disorot). Dipakai daftar transaksi pada
+   * dashboard bertema gelap dan panel rincian.
+   */
+  .gulir-tema {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3d44 transparent;
+    -ms-overflow-style: auto;
+  }
+  .gulir-tema::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .gulir-tema::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .gulir-tema::-webkit-scrollbar-thumb {
+    background-color: #34373d;
+    border-radius: 999px;
+  }
+  .gulir-tema::-webkit-scrollbar-thumb:hover {
+    background-color: #ff8a1f;
+  }
+  .gulir-tema::-webkit-scrollbar-button,
+  .gulir-tema::-webkit-scrollbar-button:single-button,
+  .gulir-tema::-webkit-scrollbar-button:vertical:start:decrement,
+  .gulir-tema::-webkit-scrollbar-button:vertical:end:increment {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+  .gulir-tema::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @media print {
