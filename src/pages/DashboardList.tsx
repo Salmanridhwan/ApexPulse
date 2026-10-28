@@ -5,7 +5,6 @@ import {
   Calendar,
   Copy,
   Eye,
-  Filter,
   Layers,
   LayoutGrid,
   Plus,
@@ -46,16 +45,15 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   chatCounts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSector, setSelectedSector] = useState<string>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Filter dashboards
+  // Filter dashboards: hanya pencarian teks. Sektor tidak difilter karena daftar
+  // sudah terbatas pada instansi (tenant) yang sedang masuk.
   const filteredDashboards = dashboards.filter((d) => {
-    const matchesSearch =
+    return (
       d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (d.description && d.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesSector = selectedSector === 'all' || d.sector === selectedSector;
-    return matchesSearch && matchesSector;
+      (d.description && d.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
   });
 
   // Calculate statistics
@@ -113,25 +111,6 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-            <span className="text-xs text-ink-2 font-semibold flex items-center gap-1.5 shrink-0">
-              <Filter className="w-3.5 h-3.5 text-brand" />
-              <span>Sektor:</span>
-            </span>
-            <select
-              value={selectedSector}
-              onChange={(e) => setSelectedSector(e.target.value)}
-              className="text-xs font-bold text-ink bg-surface-2 hover:bg-surface-2/80 border border-line rounded-card px-3 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
-            >
-              <option value="all">Semua Sektor BUMD</option>
-              <option value="pdam">Air Minum (PDAM)</option>
-              <option value="bank">Bank / Keuangan Daerah</option>
-              <option value="pasar">Pasar Rakyat & Retribusi</option>
-              <option value="rsud">Kesehatan / RSUD</option>
-              <option value="transportasi">Transportasi Umum</option>
-              <option value="aneka_usaha">Aneka Usaha Daerah</option>
-            </select>
-          </div>
         </div>
 
         {/* Dashboard Grid */}
