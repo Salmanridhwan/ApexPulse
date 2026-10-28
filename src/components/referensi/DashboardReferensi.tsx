@@ -109,6 +109,13 @@ const KPI: Kpi[] = [
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const PENDAPATAN_BULANAN = [14.2, 15.6, 16.1, 17.4, 19.8, 18.6, 20.2, 21.1, 20.4, 22.3, 23.0, 23.7];
 
+/**
+ * Garis target bulanan di atas batang (gabungan batang + garis seperti
+ * referensi). Target dibuat naik bertahap sehingga titik-titiknya duduk di atas
+ * batang realisasi — selisihnya langsung terbaca sebagai capaian bulan itu.
+ */
+const TARGET_BULANAN = [15.0, 15.8, 16.6, 17.4, 18.2, 19.0, 19.8, 20.6, 21.4, 22.2, 23.0, 23.8];
+
 const RINCIAN_BEBAN = [
   { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
   { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA.teal },
@@ -163,14 +170,18 @@ const jalurSpark = (seri: number[]) => {
  * Legenda ringkas untuk tiap grafik: sederet penanda warna + label, rata kanan
  * tepat di atas bidang grafik supaya tidak menabrak judul maupun angka utama.
  */
-const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: boolean }> }> = ({ item }) => (
+const Legenda: React.FC<{ item: Array<{ warna: string; label: string; redup?: boolean; garis?: boolean }> }> = ({ item }) => (
   <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
     {item.map((x) => (
       <li key={x.label} className="inline-flex items-center gap-[0.32em] text-[0.68em]" style={{ color: WARNA.teks3 }}>
-        <span
-          className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0"
-          style={{ backgroundColor: x.warna, opacity: x.redup ? 0.45 : 1 }}
-        />
+        {x.garis ? (
+          <span className="w-[0.95em] h-[0.16em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
+        ) : (
+          <span
+            className="w-[0.55em] h-[0.55em] rounded-[0.18em] shrink-0"
+            style={{ backgroundColor: x.warna, opacity: x.redup ? 0.45 : 1 }}
+          />
+        )}
         {x.label}
       </li>
     ))}
@@ -201,10 +212,14 @@ const opsiBar = (s: number) => {
     tooltip: {
       ...dasar.tooltip,
       trigger: 'axis',
-      formatter: (p: any) => {
-        const d = p[0];
-        return `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${d.name} 2025</div><b>Rp ${String(d.value).replace('.', ',')} M</b>`;
-      },
+      formatter: (p: any[]) =>
+        `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0]?.name} 2025</div>` +
+        p
+          .map(
+            (x) =>
+              `<div>${x.marker} ${x.seriesName}: <b>Rp ${String(x.value).replace('.', ',')} M</b></div>`,
+          )
+          .join(''),
     },
     xAxis: { type: 'category', data: BULAN, ...dasar.sumbu },
     yAxis: {
@@ -225,6 +240,19 @@ const opsiBar = (s: number) => {
         // Batang dibatasi lebarnya supaya tidak melebar aneh di layar ultrawide.
         barMaxWidth: 26 * s,
         barWidth: '46%',
+        z: 2,
+      },
+      {
+        // Garis target: titik di atas tiap batang, mengikuti referensi.
+        name: 'Target',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 5 * s,
+        data: TARGET_BULANAN,
+        lineStyle: { width: 2.2 * s, color: '#38bdf8' },
+        itemStyle: { color: '#38bdf8', borderColor: WARNA.latar, borderWidth: 1.4 * s },
+        z: 3,
       },
     ],
   };
@@ -496,8 +524,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           </div>
           <Legenda
             item={[
-              { warna: WARNA.oranye, label: 'Bulan tertinggi' },
-              { warna: WARNA.oranye, label: 'Bulan lain', redup: true },
+              { warna: WARNA.oranye, label: 'Realisasi 2025' },
+              { warna: '#38bdf8', label: 'Target bulanan', garis: true },
             ]}
           />
           <div ref={barRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[10.5em]'} />
