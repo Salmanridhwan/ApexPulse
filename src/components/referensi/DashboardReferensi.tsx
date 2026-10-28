@@ -476,8 +476,18 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
   // (Konstanta di atas bersifat modul karena dipakai juga oleh pembentuk opsi
   // grafik di luar komponen; jadi nilai aktif ditulis di sini.)
   const pakaiData = !!nilai;
+  // Ikon tidak tersimpan di basis data (fungsi tidak ikut JSON), jadi nilai
+  // dokumen bisa datang tanpa `Ikon` — pakai ikon cadangan agar tidak gagal render.
+  const ikonAman = (Ikon: unknown, cadangan: React.ComponentType<{ className?: string }>) => {
+    // Setelah melewati JSON, komponen React menjadi objek kosong `{}` — bukan
+    // komponen yang bisa dirender. Hanya terima fungsi atau objek ber-$$typeof.
+    const valid =
+      typeof Ikon === 'function' ||
+      (typeof Ikon === 'object' && Ikon !== null && '$$typeof' in (Ikon as Record<string, unknown>));
+    return valid ? (Ikon as React.ComponentType<{ className?: string }>) : cadangan;
+  };
   const KPI: Kpi[] = (nilai?.kpi?.length ? nilai.kpi : KPI_CONTOH).map(
-    (k, i) => ({ ...k, Ikon: k.Ikon ?? IKON_KPI[i % IKON_KPI.length] }) as Kpi
+    (k, i) => ({ ...k, Ikon: ikonAman(k.Ikon, IKON_KPI[i % IKON_KPI.length]) }) as Kpi
   );
   const BULAN: string[] = nilai?.batang?.label?.length ? nilai.batang.label : pakaiData ? [] : BULAN_CONTOH;
   const PENDAPATAN_BULANAN: number[] = nilai?.batang?.nilai?.length
@@ -806,7 +816,11 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                   className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
                   style={{ backgroundColor: WARNA.kartu2, color: t.naik ? WARNA.hijau : WARNA.merah }}
                 >
-                  <t.Ikon className="w-[1em] h-[1em]" />
+                  {(() => {
+                    // Ikon tidak ikut tersimpan di basis data — pakai ikon cadangan.
+                    const IkonBaris = ikonAman(t.Ikon, t.naik ? Droplets : CreditCard);
+                    return <IkonBaris className="w-[1em] h-[1em]" />;
+                  })()}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.84em] font-medium truncate">{t.nama}</p>

@@ -71,6 +71,11 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
+import {
+  nilaiAnalitikDariWidgets,
+  nilaiDariWidgets,
+  nilaiTrafikDariWidgets,
+} from './src/services/templates/nilaiTemplate';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import {
   ambilPratinjau,
@@ -1510,6 +1515,17 @@ const app = express();
       // Tema template dibawa ke dashboard nyata: latar, warna kartu, dan aksen
       // harus sama dengan pratinjau yang dilihat pengguna.
       tema: template.tema,
+      // Angka dokumen dipetakan ke slot replika template: dipakai kanvas
+      // dashboard nyata supaya desainnya identik dengan pratinjau data asli.
+      replika: {
+        templateId: template.id,
+        nilai:
+          template.id === 'tpl-analitik'
+            ? nilaiAnalitikDariWidgets(widgets)
+            : template.id === 'tpl-trafik'
+              ? nilaiTrafikDariWidgets(widgets)
+              : nilaiDariWidgets(widgets),
+      },
       widgets,
       globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
       createdAt: new Date().toISOString(),

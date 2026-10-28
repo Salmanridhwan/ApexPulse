@@ -33,6 +33,9 @@ import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
+import { DashboardReferensi } from './components/referensi/DashboardReferensi';
+import { DashboardAnalitik } from './components/referensi/DashboardAnalitik';
+import { DashboardTrafik } from './components/referensi/DashboardTrafik';
 import { AKSEN_TEMA, KanvasTemaContext } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
@@ -189,6 +192,16 @@ export default function App() {
     if (!res.ok) console.error('Gagal menyimpan widget:', res.status);
   };
   const [isPresentationMode, setIsPresentationMode] = useState(false);
+  /**
+   * Dashboard hasil template tampil dengan komponen replika (sama seperti
+   * pratinjau data asli). Tombol "Ubah tata letak" membukanya sebagai kanvas
+   * widget biasa supaya tetap bisa diedit.
+   */
+  const [tampilWidget, setTampilWidget] = useState(false);
+  // Setiap dashboard dibuka, kembalikan ke tampilan template (bila ada replika).
+  useEffect(() => {
+    setTampilWidget(false);
+  }, [activeDashboard?.id]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Drawer navigasi mobile: sidebar disembunyikan di <md, dibuka sebagai overlay.
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -1212,6 +1225,24 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* Alih tampilan untuk dashboard hasil template */}
+                  {activeDashboard?.replika && !isPresentationMode && (
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-ink-3">
+                        {tampilWidget
+                          ? 'Tampilan widget: susunan bisa diedit'
+                          : 'Tampilan template: sama dengan pratinjau data asli'}
+                      </span>
+                      <button
+                        onClick={() => setTampilWidget((v) => !v)}
+                        data-testid="alih-tampilan-replika"
+                        className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                      >
+                        {tampilWidget ? 'Kembali ke tampilan template' : 'Ubah tata letak'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Filter dashboard internal (view-only, ala Tableau) */}
                   {activeDashboard && (activeDashboard.widgets?.length || 0) > 0 && (
                     <div className="mb-2.5">
@@ -1226,7 +1257,20 @@ export default function App() {
 
                   <ActiveChartFilterChip />
 
-                  {/* Dashboard Canvas Grid */}
+                  {/* Dashboard dari template: komponen replika yang sama dengan
+                      pratinjau data asli, jadi desainnya tidak berubah. */}
+                  {activeDashboard?.replika && !tampilWidget ? (
+                    <div className="pb-4">
+                      {activeDashboard.replika.templateId === 'tpl-analitik' ? (
+                        <DashboardAnalitik nilai={activeDashboard.replika.nilai as never} />
+                      ) : activeDashboard.replika.templateId === 'tpl-trafik' ? (
+                        <DashboardTrafik nilai={activeDashboard.replika.nilai as never} />
+                      ) : (
+                        <DashboardReferensi nilai={activeDashboard.replika.nilai as never} />
+                      )}
+                    </div>
+                  ) : (
+                  /* Dashboard Canvas Grid */
                   <ChartSelectionProvider>
                   <DashboardCanvas
                     widgets={widgetsTampilInternal}
@@ -1242,6 +1286,7 @@ export default function App() {
                     onOpenChat={() => setIsChatOpen(true)}
                   />
                   </ChartSelectionProvider>
+                  )}
                   </div>
                   </KanvasTemaContext.Provider>
                 </main>

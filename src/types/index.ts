@@ -383,6 +383,15 @@ export interface Dashboard {
    * "desain dan warnanya sama persis"). Kosong = ikut tema aplikasi.
    */
   tema?: string;
+  /**
+   * JEJAK TEMPLATE (opsional).
+   *
+   * Dashboard yang lahir dari template menyimpan templateId dan angka dokumen
+   * yang sudah dipetakan ke slot template. Dipakai supaya tampilan dashboard
+   * nyata bisa langsung memakai komponen replika — hasilnya sama persis dengan
+   * pratinjau data asli, bukan kanvas widget generik.
+   */
+  replika?: { templateId: string; nilai: unknown };
   widgets: WidgetSpec[];
   globalFilters: GlobalFilters;
   createdAt: string;
