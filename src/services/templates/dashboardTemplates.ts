@@ -170,45 +170,55 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
 };
 
 // ============================================================================
-// 2. KINERJA OPERASIONAL HARIAN — papan pemantauan harian (8 kartu)
+// 2. ANALITIK BISNIS HARIAN — papan analitik penjualan & kunjungan (8 kartu)
 // ============================================================================
-const TEMPLATE_KINERJA: DashboardTemplate = {
-  id: 'tpl-kinerja',
-  nama: 'Kinerja Operasional Harian',
+const TEMPLATE_ANALITIK: DashboardTemplate = {
+  id: 'tpl-analitik',
+  nama: 'Analitik Bisnis Harian',
   tujuan:
-    'Memantau kinerja harian: pendapatan, laba kotor dan bersih, jumlah transaksi, rata-rata tagihan, kehilangan air, biaya pokok, metode pembayaran, dan capaian tahun berjalan.',
+    'Memantau kinerja bisnis harian: pendapatan, jumlah pesanan, pengguna, rasio konversi, status pesanan, sumber kunjungan, pesanan terbaru, kategori teratas, jadwal, dan tugas.',
   caraPenyampaian:
-    'Gaya biru-navy dengan aksen emas: enam kartu KPI bersparkline di baris atas, lalu tren harian dua seri (minggu ini vs minggu lalu), komposisi pendapatan per segmen, kategori pendapatan teratas, enam kartu metrik biaya ringkas, peta panas pemakaian per hari × jam, metode pembayaran, dan ringkasan tahun berjalan.',
-  deskripsi: 'Papan pemantauan harian: 6 KPI, tren, segmen, kategori, biaya, peta panas, dan capaian tahun berjalan.',
-  fokus: ['Pendapatan harian', 'Margin & laba', 'Biaya pokok', 'Kehilangan air', 'Capaian tahun berjalan'],
-  aksen: '#d6a54a',
-  judulDashboard: 'Kinerja Operasional Harian (Contoh)',
+    'Gaya navy gelap dengan lima aksen (biru, teal, ungu, oranye, pink): empat kartu KPI bersparkline di baris atas, grafik area pendapatan harian, batang pesanan per status, cincin sumber kunjungan dengan legenda di samping, tabel pesanan terbaru, kategori teratas berprogres, kalender jadwal, umpan aktivitas, dan daftar tugas.',
+  deskripsi: 'Papan analitik: 4 KPI, tren pendapatan, status pesanan, sumber kunjungan, tabel, kategori, jadwal, aktivitas, tugas.',
+  fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Kategori teratas', 'Tugas tim'],
+  aksen: '#3b82f6',
+  judulDashboard: 'Analitik Bisnis Harian (Contoh)',
   deskripsiDashboard:
-    'Tampilan contoh mengikuti referensi kedua: 6 KPI bersparkline, tren harian dua seri, komposisi segmen, kategori teratas, 6 metrik biaya, peta panas pemakaian, metode pembayaran, dan ringkasan tahun berjalan. Seluruh angka ilustrasi.',
+    'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, kategori teratas, kalender jadwal, umpan aktivitas, dan tugas berprogres. Seluruh angka ilustrasi.',
   widgets: [
-    kpi('Total Pendapatan', 'Dibanding kemarin', '245,6', 'juta Rp', 12.45, 'vs kemarin', [30, 34, 32, 38, 41, 39, 45, 48, 46, 52]),
-    kpi('Laba Kotor', 'Margin 71,93%', '176,5', 'juta Rp', 9.1, 'vs kemarin', [22, 25, 24, 28, 30, 29, 33, 35, 34, 38]),
-    kpi('Laba Bersih', 'Margin 31,88%', '78,2', 'juta Rp', 6.42, 'vs kemarin', [12, 13, 12.5, 15, 16, 15.5, 18, 19, 18.5, 21]),
-    kpi('Transaksi', 'Jumlah transaksi hari ini', 356, 'transaksi', 8.21, 'vs kemarin', [40, 44, 42, 48, 51, 49, 55, 58, 56, 62]),
-    kpi('Rata-rata Tagihan', 'Per transaksi', '68.880', 'Rp', 3.91, 'vs kemarin', [18, 19, 18.6, 20, 21, 20.4, 22, 23, 22.6, 24]),
-    kpi('Kehilangan Air', 'Terhadap produksi', 28.45, '%', -1.03, 'vs kemarin', [34, 33.4, 33.8, 32, 31.5, 31.8, 30.4, 29.6, 29.2, 28.45]),
+    kpi('Pendapatan', 'vs 12 Apr – 11 Mei', '128.430', 'Rp', 12.5, 'vs 12 Apr – 11 Mei', [30, 34, 31, 38, 36, 42, 40, 47, 45, 52]),
+    kpi('Pesanan', 'vs 12 Apr – 11 Mei', '1.542', 'pesanan', 8.3, 'vs 12 Apr – 11 Mei', [20, 24, 22, 28, 26, 31, 29, 35, 33, 38]),
+    kpi('Pengguna', 'vs 12 Apr – 11 Mei', '8.458', 'pengguna', 15.7, 'vs 12 Apr – 11 Mei', [18, 22, 21, 27, 26, 32, 31, 37, 36, 43]),
+    kpi('Rasio Konversi', 'vs 12 Apr – 11 Mei', 3.27, '%', 5.4, 'vs 12 Apr – 11 Mei', [26, 24, 28, 27, 31, 29, 33, 32, 36, 34]),
 
-    grafik('line', 'Tren Pendapatan Harian', 'Minggu ini dibanding minggu lalu, juta rupiah', { w: 8, h: 4 }, ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'], [
-      { name: 'Minggu ini', data: [148, 162, 155, 178, 190, 212, 245.6] },
-      { name: 'Minggu lalu', data: [132, 141, 138, 152, 160, 174, 189], kind: 'line' },
-    ], 'Juta Rp'),
-    w('donut', 'Pendapatan per Segmen', 'Porsi tiap jenis pelanggan, persen', { w: 4, h: 4 }, {
+    grafik('line', 'Ikhtisar Pendapatan', 'Pendapatan harian, 12 Mei – 10 Jun 2024', { w: 8, h: 4 }, [
+      '12 Mei', '14 Mei', '16 Mei', '18 Mei', '20 Mei', '22 Mei', '24 Mei', '26 Mei', '28 Mei', '30 Mei', '1 Jun', '3 Jun', '5 Jun', '7 Jun', '10 Jun',
+    ], [{ name: 'Pendapatan', data: [8.2, 8.7, 10.2, 11.8, 12.4, 13.2, 14.1, 15.2, 16.4, 17.3, 18.2, 19.1, 20.4, 22.1, 25.9] }], 'Juta Rp'),
+
+    grafik('bar', 'Pesanan per Status', 'Jumlah pesanan bulan ini', { w: 4, h: 4 }, ['Selesai', 'Diproses', 'Dikirim', 'Dibatalkan', 'Dikembalikan'], [
+      { name: 'Pesanan', data: [820, 420, 160, 90, 32] },
+    ], 'pesanan'),
+
+    w('donut', 'Sumber Kunjungan', 'Porsi kunjungan bulan ini, persen', { w: 4, h: 4 }, {
       chart: {
-        xAxis: ['Rumah Tangga', 'Niaga', 'Industri', 'Instansi'],
-        series: [{ name: 'Pendapatan', data: [40.1, 22.9, 25.8, 11.2] }],
+        xAxis: ['Langsung', 'Pencarian Organik', 'Media Sosial', 'Rujukan', 'Email'],
+        series: [{ name: 'Kunjungan', data: [32.6, 28.4, 18.7, 12.3, 8.0] }],
         unit: '%',
         showLegend: true,
       },
     }),
+
+    narasi(
+      'Ringkasan',
+      'Kesimpulan cepat dari angka contoh di atas',
+      { w: 8, h: 3 },
+      'Pendapatan naik 18,2% dibanding periode lalu dan konversi membaik 5,4%. Kanal pencarian organik menyumbang 28,4% kunjungan, sementara 820 dari 1.522 pesanan sudah selesai.',
+      ['Selesaikan 90 pesanan yang dibatalkan akar penyebabnya.', 'Dorong kanal email yang baru 8% kunjungan.'],
+    ),
   ],
 };
 
-export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_KINERJA];
+export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {
