@@ -565,7 +565,6 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 nilai: `Rp ${String(TOTAL_PENDAPATAN.toFixed(1)).replace('.', ',')} M`,
               },
               { warna: WARNA.oranye, label: 'Desember (tertinggi)', nilai: 'Rp 23,7 M' },
-              { warna: '#38bdf8', label: 'Garis tren', garis: true, nilai: 'nilai = batang' },
             ]}
           />
           <div
