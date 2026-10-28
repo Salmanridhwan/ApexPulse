@@ -153,16 +153,14 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               </span>
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
-              Pratinjau dashboard siap pakai per sektor BUMD, ditampilkan seperti kanvas aslinya.
-              Pilih tab sektor di bawah, lalu tekan <strong>Pakai Template Ini</strong> — angka setiap
-              kartu akan diambil dari dokumen resmi instansi Anda.
+              Pratinjau dashboard siap pakai per sektor. Tekan <strong>Pakai Template Ini</strong>,
+              angkanya diambil dari dokumen instansi Anda.
             </p>
             <p className="text-[10.5px] text-brand-ink mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
               <span>
-                Pratinjau di bawah memakai <strong>angka contoh</strong> untuk memperlihatkan susunan
-                kartu. Setelah tombol ditekan, angka diambil dari dokumen resmi instansi; kartu yang indikatornya
-                belum ada di dokumen ditandai <strong>kosong</strong> (tanpa angka contoh).
+                Pratinjau memakai <strong>angka contoh</strong>. Setelah dipakai, indikator yang
+                tidak ada di dokumen ditandai <strong>kosong</strong>.
               </span>
             </p>
           </div>
