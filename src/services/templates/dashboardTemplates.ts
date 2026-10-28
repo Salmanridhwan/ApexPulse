@@ -169,7 +169,46 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   ],
 };
 
-export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN];
+// ============================================================================
+// 2. KINERJA OPERASIONAL HARIAN — papan pemantauan harian (8 kartu)
+// ============================================================================
+const TEMPLATE_KINERJA: DashboardTemplate = {
+  id: 'tpl-kinerja',
+  nama: 'Kinerja Operasional Harian',
+  tujuan:
+    'Memantau kinerja harian: pendapatan, laba kotor dan bersih, jumlah transaksi, rata-rata tagihan, kehilangan air, biaya pokok, metode pembayaran, dan capaian tahun berjalan.',
+  caraPenyampaian:
+    'Gaya biru-navy dengan aksen emas: enam kartu KPI bersparkline di baris atas, lalu tren harian dua seri (minggu ini vs minggu lalu), komposisi pendapatan per segmen, kategori pendapatan teratas, enam kartu metrik biaya ringkas, peta panas pemakaian per hari × jam, metode pembayaran, dan ringkasan tahun berjalan.',
+  deskripsi: 'Papan pemantauan harian: 6 KPI, tren, segmen, kategori, biaya, peta panas, dan capaian tahun berjalan.',
+  fokus: ['Pendapatan harian', 'Margin & laba', 'Biaya pokok', 'Kehilangan air', 'Capaian tahun berjalan'],
+  aksen: '#d6a54a',
+  judulDashboard: 'Kinerja Operasional Harian (Contoh)',
+  deskripsiDashboard:
+    'Tampilan contoh mengikuti referensi kedua: 6 KPI bersparkline, tren harian dua seri, komposisi segmen, kategori teratas, 6 metrik biaya, peta panas pemakaian, metode pembayaran, dan ringkasan tahun berjalan. Seluruh angka ilustrasi.',
+  widgets: [
+    kpi('Total Pendapatan', 'Dibanding kemarin', '245,6', 'juta Rp', 12.45, 'vs kemarin', [30, 34, 32, 38, 41, 39, 45, 48, 46, 52]),
+    kpi('Laba Kotor', 'Margin 71,93%', '176,5', 'juta Rp', 9.1, 'vs kemarin', [22, 25, 24, 28, 30, 29, 33, 35, 34, 38]),
+    kpi('Laba Bersih', 'Margin 31,88%', '78,2', 'juta Rp', 6.42, 'vs kemarin', [12, 13, 12.5, 15, 16, 15.5, 18, 19, 18.5, 21]),
+    kpi('Transaksi', 'Jumlah transaksi hari ini', 356, 'transaksi', 8.21, 'vs kemarin', [40, 44, 42, 48, 51, 49, 55, 58, 56, 62]),
+    kpi('Rata-rata Tagihan', 'Per transaksi', '68.880', 'Rp', 3.91, 'vs kemarin', [18, 19, 18.6, 20, 21, 20.4, 22, 23, 22.6, 24]),
+    kpi('Kehilangan Air', 'Terhadap produksi', 28.45, '%', -1.03, 'vs kemarin', [34, 33.4, 33.8, 32, 31.5, 31.8, 30.4, 29.6, 29.2, 28.45]),
+
+    grafik('line', 'Tren Pendapatan Harian', 'Minggu ini dibanding minggu lalu, juta rupiah', { w: 8, h: 4 }, ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'], [
+      { name: 'Minggu ini', data: [148, 162, 155, 178, 190, 212, 245.6] },
+      { name: 'Minggu lalu', data: [132, 141, 138, 152, 160, 174, 189], kind: 'line' },
+    ], 'Juta Rp'),
+    w('donut', 'Pendapatan per Segmen', 'Porsi tiap jenis pelanggan, persen', { w: 4, h: 4 }, {
+      chart: {
+        xAxis: ['Rumah Tangga', 'Niaga', 'Industri', 'Instansi'],
+        series: [{ name: 'Pendapatan', data: [40.1, 22.9, 25.8, 11.2] }],
+        unit: '%',
+        showLegend: true,
+      },
+    }),
+  ],
+};
+
+export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_KINERJA];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {

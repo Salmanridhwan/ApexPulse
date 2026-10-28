@@ -15,6 +15,7 @@ import {
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { DashboardReferensi } from '../components/referensi/DashboardReferensi';
+import { DashboardKinerja } from '../components/referensi/DashboardKinerja';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 
@@ -110,6 +111,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
+  /**
+   * Komponen pratinjau per template. Tiap template punya tampilan acuan sendiri,
+   * jadi galeri menampilkan komponen yang sesuai — bukan satu komponen generik.
+   */
+  const KomponenPratinjau = aktif.id === 'tpl-kinerja' ? DashboardKinerja : DashboardReferensi;
+
+  /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
+  const susunanChip =
+    aktif.id === 'tpl-kinerja'
+      ? '6 KPI · 3 grafik · 6 metrik · peta panas'
+      : '4 KPI · 3 grafik · daftar · progres';
+
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
   /**
@@ -255,7 +268,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
                   <LayoutGrid className="w-3 h-3 text-ink-3" />
-                  4 KPI · 3 grafik · daftar · progres
+                  {susunanChip}
                 </span>
                 <span className="text-line-strong text-xs">·</span>
                 <span className="text-[11px] text-ink-3">Tampilan referensi, satu halaman</span>
@@ -323,7 +336,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             strip insight. Susunannya sengaja tidak memakai DashboardCanvas agar
             bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
         <div className="tema-oranye rounded-card p-1.5 -m-1.5" data-theme="dark">
-          <DashboardReferensi />
+          <KomponenPratinjau />
         </div>
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
@@ -343,7 +356,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
-          konten={<DashboardReferensi penuh />}
+          konten={<KomponenPratinjau penuh />}
         />
       )}
     </div>
