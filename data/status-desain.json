@@ -1,0 +1,318 @@
+{
+  "defaultChart": {
+    "status": "final",
+    "catatan": "Final atas persetujuan pemilik proyek, 2026-10-29",
+    "diperbaruiPada": "2026-10-29T16:00:00.000Z"
+  },
+  "kpi-kartu/default": {
+    "chartId": "kpi-kartu",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-kartu/ringkasan": {
+    "chartId": "kpi-kartu",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-kartu/analitik": {
+    "chartId": "kpi-kartu",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-kartu/trafik": {
+    "chartId": "kpi-kartu",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-strip/ringkasan": {
+    "chartId": "kpi-strip",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-strip/analitik": {
+    "chartId": "kpi-strip",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "kpi-strip/trafik": {
+    "chartId": "kpi-strip",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "progres-target/ringkasan": {
+    "chartId": "progres-target",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "progres-target/analitik": {
+    "chartId": "progres-target",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "tabel-ringkas/default": {
+    "chartId": "tabel-ringkas",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "tabel-ringkas/ringkasan": {
+    "chartId": "tabel-ringkas",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "tabel-ringkas/analitik": {
+    "chartId": "tabel-ringkas",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "tabel-ringkas/trafik": {
+    "chartId": "tabel-ringkas",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "narasi-insight/default": {
+    "chartId": "narasi-insight",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "narasi-insight/ringkasan": {
+    "chartId": "narasi-insight",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "narasi-insight/analitik": {
+    "chartId": "narasi-insight",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "narasi-insight/trafik": {
+    "chartId": "narasi-insight",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "peringkat/trafik": {
+    "chartId": "peringkat",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak/default": {
+    "chartId": "bar-tegak",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak/ringkasan": {
+    "chartId": "bar-tegak",
+    "varian": "ringkasan",
+    "status": "draf"
+  },
+  "bar-tegak-sorot/ringkasan": {
+    "chartId": "bar-tegak-sorot",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak-sorot/analitik": {
+    "chartId": "bar-tegak-sorot",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak-sorot/trafik": {
+    "chartId": "bar-tegak-sorot",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak-target/trafik": {
+    "chartId": "bar-tegak-target",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-mendatar-peringkat/ringkasan": {
+    "chartId": "bar-mendatar-peringkat",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-mendatar-peringkat/analitik": {
+    "chartId": "bar-mendatar-peringkat",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-mendatar-peringkat/trafik": {
+    "chartId": "bar-mendatar-peringkat",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-mendatar-target/default": {
+    "chartId": "bar-mendatar-target",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-mendatar-target/ringkasan": {
+    "chartId": "bar-mendatar-target",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tumpuk/trafik": {
+    "chartId": "bar-tumpuk",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "area-gradasi/ringkasan": {
+    "chartId": "area-gradasi",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "area-gradasi/analitik": {
+    "chartId": "area-gradasi",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "area-gradasi/trafik": {
+    "chartId": "area-gradasi",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "garis-tren/default": {
+    "chartId": "garis-tren",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "garis-tren/analitik": {
+    "chartId": "garis-tren",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "garis-tren/trafik": {
+    "chartId": "garis-tren",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "combo-batang-garis/trafik": {
+    "chartId": "combo-batang-garis",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "scatter-gelembung/analitik": {
+    "chartId": "scatter-gelembung",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "titik-bersumbu/trafik": {
+    "chartId": "titik-bersumbu",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "donat-tebal/ringkasan": {
+    "chartId": "donat-tebal",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "donat-tebal/analitik": {
+    "chartId": "donat-tebal",
+    "varian": "analitik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "donat-tebal/trafik": {
+    "chartId": "donat-tebal",
+    "varian": "trafik",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "donat-tipis/default": {
+    "chartId": "donat-tipis",
+    "varian": "default",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "gauge-target/ringkasan": {
+    "chartId": "gauge-target",
+    "varian": "ringkasan",
+    "status": "draf",
+    "catatan": "",
+    "diperbaruiPada": "2026-10-29T15:08:17.652Z"
+  },
+  "bar-tegak-target/ringkasan": {
+    "chartId": "bar-tegak-target",
+    "varian": "ringkasan",
+    "status": "draf"
+  }
+}
