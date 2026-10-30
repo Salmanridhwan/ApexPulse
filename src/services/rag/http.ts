@@ -1,3 +1,4 @@
+import { kategoriWidget, unitRingkas } from '../spec/kategoriWidget';
 import { BumdSector, Citation } from '../../types';
 import { RAG_PROMPTS } from './prompts';
 import { RagClient, RagQueryOptions, RagResult } from './types';
@@ -775,7 +776,15 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
   if (bersih.length !== widgets.length) {
     console.warn(`[rag] ${widgets.length - bersih.length} grafik tidak dirender: angkanya tidak terlacak dokumen.`);
   }
-  return bersih;
+
+  // Kategori dan unit kerja dibaca dari ISI widget, bukan label tetap "Keuangan".
+  // Keduanya kolom yang dipakai filter dashboard (Periode / Unit Kerja /
+  // Kategori), jadi isinya wajib mengikuti dokumen instansi.
+  return bersih.map((w: any) => ({
+    ...w,
+    category: kategoriWidget(w.title, (w.chart?.series || []).map((sr: any) => sr?.name)),
+    unitKerja: unitRingkas(w.unitKerja),
+  }));
 }
 
 /** Angka dari potongan dokumen: "17.943", "99.7%", "1.164" → [17943, 99.7, 1164]. */
@@ -889,6 +898,47 @@ export class ConfigurableRagClient implements RagClient {
     }
     this.baseTerpakai = { dikonfigurasi, dipakai: dikonfigurasi, disesuaikan: false };
     return this.baseTerpakai;
+  }
+
+  /**
+   * Pencarian potongan mentah (POST /search).
+   *
+   * Dipakai fitur yang butuh TEKS dokumen apa adanya lalu mengurainya sendiri
+   * (mis. tabel per wilayah layanan), bukan lewat jalur ekstraksi model yang
+   * bisa mengubah angka. Kalau layanan tidak mendukung /search, hasilnya kosong.
+   */
+  async cariPotongan(
+    kbId: string,
+    kueri: string,
+    topK = 20
+  ): Promise<{ potongan: Array<{ docId: string; docName: string; halaman: number; isi: string }> }> {
+    const cfg = this.getRagConfig();
+    const kb = String(kbId || '').trim();
+    if (!kb || cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return { potongan: [] };
+    const { dipakai } = await this.resolveBase(cfg);
+    try {
+      const res = await fetch(`${dipakai}/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+        body: JSON.stringify({ knowledge_base_id: kb, query: kueri, top_k: topK }),
+        signal: AbortSignal.timeout(Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 60000)),
+      });
+      if (!res.ok) return { potongan: [] };
+      const j: any = await res.json().catch(() => null);
+      const hasil: any[] = j?.data?.results || j?.results || [];
+      return {
+        potongan: hasil
+          .filter((x) => x && x.content)
+          .map((x) => ({
+            docId: String(x.document_id || ''),
+            docName: String(x.document_name || x.doc_name || x.filename || ''),
+            halaman: Number(x.page) || 0,
+            isi: String(x.content),
+          })),
+      };
+    } catch {
+      return { potongan: [] };
+    }
   }
 
   /**

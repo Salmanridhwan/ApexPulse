@@ -8,7 +8,6 @@ import {
   Layers,
   LayoutTemplate,
   LogOut,
-  Plus,
   Shield,
   ShieldAlert,
   Boxes,
@@ -111,29 +110,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }`}
     >
       {/* 1. Header Brand (Shrink-0 / Fixed height) */}
-      <div className={`h-14 border-b border-shell-line flex items-center shrink-0 ${isCollapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
+      <div className={`h-14 border-b border-shell-line flex items-center shrink-0 ${'justify-center px-4'}`}>
         {!isCollapsed ? (
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center justify-center min-w-0">
             {/* Sidebar selalu berlatar navy, jadi dipakai lockup versi putih. */}
             <img
               src="/brand/logo-lockup-terang.png"
               alt="Aiones Boards"
               width={140}
               height={36}
-              className="h-6 w-auto shrink-0"
+              className="h-9 w-auto shrink-0"
             />
-            <div className="min-w-0">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-chip text-[9px] font-semibold bg-brand/25 text-brand-ink">Studio</span>
-            </div>
           </div>
         ) : (
           <img
             src="/brand/logo-mark-terang.png"
-            alt="Aiones Boards Studio"
+            alt="Aiones Boards"
             width={32}
             height={32}
             className="w-8 h-8"
-            title="Aiones Boards Studio"
+            title="Aiones Boards"
           />
         )}
       </div>
@@ -200,9 +196,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && (
             <div className="px-2 pb-1.5 flex items-center justify-between text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">
               <span>Workspace</span>
-              <button onClick={onCreateDashboard} className="p-0.5 text-shell-ink-2 hover:text-shell-ink hover:bg-shell-hover rounded-chip transition-colors" title="Buat Dashboard Baru">
-                <Plus className="w-3.5 h-3.5" />
-              </button>
             </div>
           )}
           <button
@@ -360,7 +353,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* GRUP 3: Tata Kelola & Sistem */}
+        {/* GRUP 3: Tata Kelola & Sistem — KHUSUS ADMIN.
+            Role pengguna tidak boleh melihat Jejak Audit, dan grup yang isinya
+            tinggal satu tombol itu tidak boleh tampil kosong. */}
+        {currentUser?.role === 'admin' && (
         <div>
           {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Sistem & Tata Kelola</div>}
           <div className="space-y-0.5">
@@ -404,6 +400,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         </div>
+        )}
       </nav>
 
       {/* 4. FOOTER: Profil (Shrink-0 / Fixed height) */}

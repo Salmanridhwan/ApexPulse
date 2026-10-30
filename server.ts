@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { daftarHalaman } from './src/services/dashboard/halaman';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
@@ -28,6 +29,7 @@ import {
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { ambilHalaman, kumpulkanPotongan } from './src/services/rag/potonganDokumen';
 import { halamanPaket, halamanSyarat } from './src/services/http/halamanPublik';
+import { uraiTabelWilayah, uraiCatatanWilayah } from './src/services/templates/wilayahLayanan';
 import {
   niatBuatDashboard,
   niatTambahWidget,
@@ -333,8 +335,51 @@ function tandaTemplate(template: any): string {
   return `${template?.id || 'tpl'}-${h.toString(36)}`;
 }
 
+/**
+ * Versi PEMETAAN widget (kategori, unit kerja, angka). Naikkan angka ini setiap
+ * kali cara mengisi widget berubah, supaya pratinjau lama tidak terus dipakai.
+ */
+const VERSI_PEMETAAN = 'filter-1';
+
+/**
+ * PILIH WIDGET HALAMAN 2 — hanya data operasional & pelayanan.
+ *
+ * Halaman 1 template Ringkasan berisi keuangan. Halaman 2 mengisi sisanya:
+ * air terjual, air terdistribusi, NRW, pengaduan, dan anggaran. Widget yang
+ * serinya tidak menyebut salah satu kata itu DIBUANG, supaya halaman 2 tidak
+ * berisi angka keuangan yang sama dengan halaman 1 atau metrik lain yang tidak
+ * berhubungan.
+ */
+const KATA_OPERASIONAL = /target|realisasi|anggaran|volume|m³|m3|nrw|kehilangan air|cakupan|kualitas/i;
+
+function pilihWidgetOperasional(calon: any[], judulDipakai: Set<string>, batas = 12): any[] {
+  const hasil: any[] = [];
+  let narasi: any | null = null;
+  for (const w of calon) {
+    const judul = String(w.title || '').trim().toLowerCase();
+    if (judul && judulDipakai.has(judul)) continue;
+
+    if (w.type === 'narasi') {
+      const teks = String(w.narasi?.text || '');
+      // Narasi ikut hanya kalau memang membahas operasional/pelayanan.
+      if (!narasi && /air|nrw|pengaduan|pelayanan|operasional/i.test(teks)) narasi = w;
+      continue;
+    }
+
+    const seri = Array.isArray(w.chart?.series) ? w.chart.series : [];
+    const cocok = seri.some((s: any) => KATA_OPERASIONAL.test(String(s?.name || '')));
+    if (!cocok) continue;
+    if (hasil.length >= batas) continue;
+
+    if (judul) judulDipakai.add(judul);
+    hasil.push(w);
+  }
+  if (narasi && hasil.length < batas) hasil.push(narasi);
+  return hasil;
+}
+
 function versiKbTenant(tenant: any, template?: any): string {
-  const dasar = String(tenant?.kbTersinkronPada || tenant?.kbDiperbaruiPada || '0');
+  const dasar = `${VERSI_PEMETAAN}:${String(tenant?.kbTersinkronPada || tenant?.kbDiperbaruiPada || '0')}`;
   return template ? `${dasar}#${tandaTemplate(template)}` : dasar;
 }
 
@@ -1382,6 +1427,69 @@ const app = express();
    *  - `belum`  → belum pernah disiapkan; permintaan ini akan memulainya
    *  - `gagal`  → penyiapan gagal (mis. layanan dokumen mati)
    */
+  /**
+   * HALAMAN 3 — KINERJA PER WILAYAH LAYANAN.
+   *
+   * Angkanya diurai LANGSUNG dari teks tabel dokumen (Tabel 3 Kinerja per
+   * wilayah layanan), bukan dari ekstraksi model bahasa. Tujuannya supaya angka
+   * yang tampil sama persis dengan dokumen dan bisa ditelusuri ke halamannya.
+   * Hasilnya disimpan 10 menit supaya pindah tab tidak memanggil RAG terus.
+   */
+  const cacheWilayah = new Map<string, { waktu: number; data: any }>();
+  app.get('/api/templates/wilayah', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    if (!kbId) {
+      return res.json({ status: 'kosong', catatan: 'Knowledge Base instansi belum diatur.' });
+    }
+    const kunci = `${tenant.id}|${kbId}`;
+    const ada = cacheWilayah.get(kunci);
+    if (ada && Date.now() - ada.waktu < 10 * 60_000) return res.json(ada.data);
+
+    const cari = await ragClient.cariPotongan(
+      kbId,
+      'kinerja per wilayah layanan pelanggan air terjual NRW pengaduan Jakarta Pusat Utara Barat Selatan Timur',
+      20
+    );
+    const kandidat = cari.potongan.filter((p) => /Kinerja per wilayah layanan/i.test(p.isi));
+    if (!kandidat.length) {
+      const kosong = {
+        status: 'kosong',
+        catatan: 'Tabel kinerja per wilayah tidak ditemukan di dokumen Knowledge Base.',
+      };
+      cacheWilayah.set(kunci, { waktu: Date.now(), data: kosong });
+      return res.json(kosong);
+    }
+
+    const p = kandidat[0];
+    const { baris, total } = uraiTabelWilayah(p.isi);
+    const catatan = uraiCatatanWilayah(p.isi);
+    const data = {
+      status: baris.length ? 'siap' : 'kosong',
+      baris,
+      total,
+      catatan,
+      satuanAir: 'm³',
+      sumber: baris.length
+        ? [
+            {
+              dokumen: p.docName || 'Laporan Kinerja Operasional dan Pelayanan PAM JAYA 2024',
+              halaman: p.halaman,
+              cuplikan: 'Tabel 3. Kinerja per wilayah layanan, 2024',
+              keyakinan: 1,
+            },
+          ]
+        : [],
+    };
+    cacheWilayah.set(kunci, { waktu: Date.now(), data });
+    return res.json(data);
+  });
+
   app.get('/api/templates/pratinjau', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1404,6 +1512,47 @@ const app = express();
     const jedaGagal = entri?.status === 'gagal' && Date.now() - (entri.selesai ?? 0) < 120_000;
     if (!siap && entri?.status !== 'proses' && !jedaGagal) {
       void siapkanTemplateTenant(tenant, template);
+    }
+
+    /**
+     * HALAMAN 2 TEMPLATE — angka dokumen yang belum dipakai template ini.
+     *
+     * Diambil dari data siap pakai template LAIN (sudah diekstrak dari dokumen
+     * instansi), dibuang bila judulnya sudah muncul di template ini. Desainnya
+     * tetap desain template yang sedang dibuka; yang berbeda hanya isinya.
+     */
+    if (String(req.query.halaman || '1') === '2') {
+      const judulDipakai = new Set(
+        template.widgets.map((w: any) => String(w.title || '').trim().toLowerCase()).filter(Boolean)
+      );
+      const calon: any[] = [];
+      for (const t of DASHBOARD_TEMPLATES) {
+        if (t.id === template.id) continue;
+        // Sisa angka hanya dipakai sebagai BAHAN halaman 2, bukan untuk tampilan
+        // template itu sendiri: cukup sudah pernah siap diekstrak dari dokumen.
+        // Pemeriksaan versi KB tidak dipakai di sini, karena versi template lain
+        // sering sudah berganti sehingga datanya dianggap basi padahal angkanya
+        // tetap berasal dari dokumen instansi ini.
+        const e = ambilPratinjau(tenant.id, t.id, kbId);
+        if (!e || e.status !== 'siap' || !Array.isArray(e.widgets)) continue;
+        calon.push(...e.widgets);
+      }
+      const seed = Date.now();
+      // Halaman 2 SEMUA template memakai penyaring yang sama: hanya widget
+      // operasional/pelayanan yang saling berhubungan, supaya desain halaman 2
+      // (volume air, NRW, indikator, anggaran) berisi angka yang nyambung.
+      const terpilih = pilihWidgetOperasional(calon, judulDipakai);
+      const dipakai = terpilih.map((w, i) => ({
+        ...w,
+        id: `tpl2-${seed}-${i + 1}`,
+        grid: { ...(w.grid || {}) },
+      }));
+      return res.json({
+        templateId: template.id,
+        halaman: 2,
+        status: dipakai.length > 0 ? 'siap' : 'kosong',
+        widgets: dipakai,
+      });
     }
 
     return res.json({
@@ -1436,6 +1585,24 @@ const app = express();
   });
 
   /** Ringkasan status semua template satu instansi (badge di galeri). */
+  /**
+   * Segarkan pratinjau template atas permintaan pengguna. Dipakai tombol
+   * "Perbarui" di halaman template: dokumen bisa sudah berubah tanpa unggahan
+   * baru, dan pengguna tidak perlu menunggu penanda versi bergeser sendiri.
+   */
+  app.post('/api/templates/segarkan', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const segar = await db.updateTenant(tenant.id, { kbTersinkronPada: new Date().toISOString() });
+    if (!segar) return res.status(500).json({ error: 'Gagal menandai pembaruan dokumen.' });
+    for (const tpl of DASHBOARD_TEMPLATES) void siapkanTemplateTenant(segar, tpl);
+    return res.json({ ok: true, template: DASHBOARD_TEMPLATES.map((t) => t.id) });
+  });
+
   app.get('/api/templates/status', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1693,6 +1860,83 @@ const app = express();
     res.json({ success: true });
   });
 
+  /**
+   * TAMBAH HALAMAN — mengisi halaman baru dengan angka dokumen yang BELUM dipakai
+   * halaman lain.
+   *
+   * Sumbernya widget yang sudah disiapkan dari dokumen untuk template lain
+   * (`ambilPratinjau`), jadi tidak ada panggilan RAG baru dan tidak ada angka
+   * contoh. Widget dibuang bila indikatornya (presetId) atau judulnya sudah
+   * dipakai halaman sebelumnya. Desain halaman baru mengikuti template dashboard
+   * ini, hanya isinya yang berbeda.
+   */
+  app.post('/api/dashboards/:id/halaman', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+
+    const dash = db.getDashboardById(req.params.id, tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan atau akses ditolak.' });
+
+    const semua = daftarHalaman(dash);
+    const presetDipakai = new Set<string>();
+    const judulDipakai = new Set<string>();
+    for (const h of semua) {
+      for (const w of h.widgets || []) {
+        if (w.presetId) presetDipakai.add(w.presetId);
+        const judul = String(w.title || '').trim().toLowerCase();
+        if (judul) judulDipakai.add(judul);
+      }
+    }
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const templateAsal = dash.replika?.templateId;
+    const calon: any[] = [];
+    for (const t of DASHBOARD_TEMPLATES) {
+      if (t.id === templateAsal) continue;
+      const entri = ambilPratinjau(tenant.id, t.id, kbId);
+      if (!entri || entri.status !== 'siap' || !Array.isArray(entri.widgets)) continue;
+      calon.push(...entri.widgets);
+    }
+
+    const seed = Date.now();
+    const dipakaiBaru = pilihWidgetOperasional(calon, judulDipakai).map((w, i) => ({
+      ...w,
+      id: `hlm-${seed}-${i + 1}`,
+      grid: { ...(w.grid || {}) },
+    }));
+
+    const acuan = semua[0];
+    const halamanBaru = {
+      id: `hlm-${seed}`,
+      judul: String(req.body?.judul || '').trim() || `Halaman ${semua.length + 1}`,
+      widgets: dipakaiBaru,
+      // Desain sama dengan halaman pertama, angka dihitung dari widget halaman ini.
+      replika: templateAsal ? { templateId: templateAsal, nilai: {} } : undefined,
+      tataLetak: acuan?.tataLetak ? { ...acuan.tataLetak } : undefined,
+      globalFilters: acuan?.globalFilters ? { ...acuan.globalFilters } : undefined,
+    };
+
+    const hasil = db.updateDashboard(
+      dash.id,
+      { halaman: [...semua, halamanBaru], halamanAktifId: halamanBaru.id },
+      tenantId
+    );
+
+    res.json({
+      dashboard: hasil,
+      halaman: halamanBaru,
+      jumlahWidget: dipakaiBaru.length,
+      peringatan:
+        dipakaiBaru.length === 0
+          ? 'Tidak ada angka dokumen lain yang belum dipakai. Halaman dibuat kosong.'
+          : undefined,
+    });
+  });
+
   app.post('/api/dashboards/:id/duplicate', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -1801,6 +2045,33 @@ const app = express();
     }
 
     res.json(pemeriksaKetersediaan.ringkas(tenant, kbId));
+  });
+
+  // Semua angka dokumen untuk katalog preset, diambil SEKALIGUS.
+  // Sumbernya catatan ketersediaan yang sudah diverifikasi saat katalog dibuka,
+  // jadi tidak ada panggilan RAG baru dan tidak ada angka contoh.
+  app.get('/api/widgets/data-katalog', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+
+    const data: Record<string, unknown> = {};
+    for (const preset of WIDGET_CATALOG) {
+      if (!preset.sektor.includes(tenant.sector) && !preset.sektor.includes('universal')) continue;
+      const daftarTipe = preset.tipeChart?.length ? preset.tipeChart : ['kpi'];
+      for (const tipe of daftarTipe) {
+        const catatan = kbId
+          ? pemeriksaKetersediaan.ambilDariCache(tenant.id, kbId, preset.id, tipe)
+          : null;
+        if (catatan?.data) data[`${preset.id}|${tipe}`] = catatan.data;
+      }
+    }
+
+    res.json({ total: Object.keys(data).length, data });
   });
 
   // ================= CHAT & SSE STREAMING ROUTE =================
@@ -4535,6 +4806,23 @@ const app = express();
         basiikanTenant(tenant.id);
         hangatkanTemplateTenant(tenant);
       }
+      // Dokumen baru berarti isi pengetahuan instansi berubah. Tanpa langkah
+      // ini, pratinjau template tetap memakai angka lama sampai admin menekan
+      // Sinkron RAG. Penanda versi digeser supaya entri pratinjau kedaluwarsa,
+      // lalu pengisian ulang dijalankan di latar belakang untuk semua template
+      // milik instansi ini. Balasan unggah tidak menunggu proses itu selesai.
+      const idTenantUnggah = tenant?.id;
+      void (async () => {
+        try {
+          if (!idTenantUnggah) return;
+          const segar = await db.updateTenant(idTenantUnggah, { kbTersinkronPada: new Date().toISOString() });
+          if (!segar) return;
+          for (const tpl of DASHBOARD_TEMPLATES) void siapkanTemplateTenant(segar, tpl);
+        } catch (err: any) {
+          console.warn('[pratinjau] gagal menyegarkan setelah unggah:', err?.message || err);
+        }
+      })();
+
       res.status(201).json({ success: true, berkas, knowledgeBase: kbTujuan || null });
     } catch (err: any) {
       balasGalatKms(res, err);
@@ -5020,7 +5308,7 @@ ${navigasi}
    * dashboard dilakukan lewat PATCH dashboard yang sudah ada, sehingga impor
    * tidak menambah jalur tulis baru.
    */
-  app.post('/api/impor/widget', (req: Request, res: Response) => {
+  app.post('/api/impor/widget', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
     const isiB64 = typeof req.body?.isi === 'string' ? req.body.isi : '';
@@ -5072,7 +5360,72 @@ ${navigasi}
         target: widget.title,
         details: `Berkas "${tabel.namaSheet}" → ${widget.type}, ${tabel.baris.length} baris.`,
       });
-      return res.json({ widget: sah.data, peringatan, baris: tabel.baris.length, namaSheet: tabel.namaSheet });
+
+      /**
+       * Berkas impor juga disimpan ke REPOSITORI DOKUMEN.
+       *
+       * Sebelumnya berkas hanya dibaca lalu dibuang, sehingga jejaknya tidak
+       * pernah muncul di menu Repositori dan tidak ikut terindeks untuk asisten.
+       * Sekarang berkas yang sama diunggah ke project KMS instansi. Kegagalan
+       * penyimpanan TIDAK membatalkan widget: widget sudah jadi dan pengguna
+       * diberi tahu lewat `peringatanBerkas`.
+       */
+      let berkasImpor: { id?: string; nama: string; ragStatus?: string } | null = null;
+      let knowledgeBase: string | null = null;
+      let peringatanBerkas: string | undefined;
+      const namaBerkas = String(req.body?.nama || tabel.namaSheet || 'Data Impor').trim();
+      try {
+        const { tenant: tenantImpor, organizationId } = await konteksBerkas(req, session);
+        if (!organizationId) {
+          peringatanBerkas =
+            'Berkas tidak tersimpan di Repositori Dokumen: instansi ini belum dipetakan ke project KMS (atur di panel admin, Instansi & KB).';
+        } else {
+          const kategoriBerkas = String(req.body?.kategoriBerkas || 'Data Impor Dashboard').trim().slice(0, 120);
+          const galatMeta = validasiMetadata({ judul: namaBerkas, kategori: kategoriBerkas, organizationId });
+          if (galatMeta) {
+            peringatanBerkas = `Berkas tidak tersimpan di Repositori Dokumen: ${galatMeta}`;
+          } else {
+            const hasil = await klienKms().unggahBerkas({
+              isi: buffer,
+              namaBerkas,
+              judul: namaBerkas,
+              kategori: kategoriBerkas,
+              organizationId,
+              tipeRepositori: 'document',
+              catatan: 'Diunggah otomatis dari Impor Data di kanvas dashboard.',
+              mimeType: req.body?.tipe ? String(req.body.tipe) : undefined,
+            });
+            berkasImpor = { id: hasil?.id, nama: namaBerkas, ragStatus: hasil?.ragStatus };
+            knowledgeBase =
+              (await daftarProjectKms().catch(() => [])).find((o) => o.id === organizationId)?.knowledgeBase ?? null;
+            if (tenantImpor?.id) {
+              // Dokumen baru masuk basis pengetahuan → pratinjau template ikut disegarkan.
+              basiikanTenant(tenantImpor.id);
+              hangatkanTemplateTenant(tenantImpor);
+            }
+            db.addAuditLog({
+              tenantId: effectiveTenantId(req, session),
+              userId: session.userId,
+              userName: session.name,
+              action: 'Impor Data → Repositori',
+              target: namaBerkas,
+              details: `Berkas impor disimpan ke project KMS ${organizationId}${knowledgeBase ? ` · KB ${knowledgeBase}` : ''}${berkasImpor.ragStatus ? ` · status RAG: ${berkasImpor.ragStatus}` : ''}`,
+            });
+          }
+        }
+      } catch (err: any) {
+        peringatanBerkas = `Widget dibuat, tetapi berkas gagal disimpan ke Repositori Dokumen: ${err?.message || 'layanan dokumen tidak merespons.'}`;
+      }
+
+      return res.json({
+        widget: sah.data,
+        peringatan,
+        baris: tabel.baris.length,
+        namaSheet: tabel.namaSheet,
+        berkas: berkasImpor,
+        knowledgeBase,
+        peringatanBerkas,
+      });
     } catch (err) {
       return res.status(400).json({ error: jelaskanError(err) });
     }
@@ -5364,6 +5717,11 @@ ${navigasi}
   app.get('/api/audit-logs', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
+    // Jejak audit memuat tindakan seluruh pengguna instansi. Menyembunyikan
+    // menunya saja tidak cukup: role pengguna juga tidak boleh membaca datanya.
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Jejak audit hanya untuk administrator.' });
+    }
     const logs = db.auditLogs.filter((l) => l.tenantId === effectiveTenantId(req, session));
 
     // Ekspor CSV untuk kebutuhan audit eksternal (dibuka di Excel).

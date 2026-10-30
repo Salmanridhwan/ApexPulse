@@ -14,6 +14,7 @@ import {
   Presentation,
   Sparkles,
   Target,
+  RefreshCw,
 } from 'lucide-react';
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
@@ -22,6 +23,16 @@ import { DashboardAnalitik } from '../components/referensi/DashboardAnalitik';
 import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
+import { HalamanTabs } from '../components/HalamanTabs';
+import { DashboardOperasional } from '../components/referensi/DashboardOperasional';
+import { DashboardWilayah } from '../components/referensi/DashboardWilayah';
+import { OperasionalTema, WilayahTema } from '../components/referensi/DashboardTemaLain';
+import {
+  CONTOH_OPERASIONAL,
+  nilaiOperasionalDariWidgets,
+  sumberPerJudul,
+} from '../services/templates/nilaiOperasional';
+import { CONTOH_WILAYAH, type NilaiWilayah } from '../services/templates/wilayahLayanan';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
 import {
   nilaiAnalitikDariWidgets,
@@ -139,6 +150,17 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     null
   );
   const [memuatAsli, setMemuatAsli] = useState(false);
+  /**
+   * HALAMAN TEMPLATE. Template pertama menampilkan dua halaman sekaligus: desain
+   * sama, isi berbeda. Halaman 2 memakai angka dokumen yang belum dipakai
+   * halaman 1 (`/api/templates/pratinjau?halaman=2`).
+   */
+  const [halamanAktif, setHalamanAktif] = useState<'1' | '2' | '3'>('1');
+  const [asli2, setAsli2] = useState<WidgetSpec[] | null>(null);
+  /** Halaman 3: kinerja per wilayah layanan (diurai server dari tabel dokumen). */
+  const [asli3, setAsli3] = useState<NilaiWilayah | null>(null);
+  const [memuat3, setMemuat3] = useState(false);
+  const [memuat2, setMemuat2] = useState(false);
   const [galatAsli, setGalatAsli] = useState<string | null>(null);
 
   /** Baca status kesiapan semua template. Gagal membaca bukan alasan menakut-nakuti
@@ -208,6 +230,38 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    */
   const nilaiAnalitikAsli = useMemo(() => nilaiAnalitikDariWidgets(asli?.widgets), [asli]);
 
+  /** Angka halaman 2 template, dipetakan ke slot yang sama dengan halaman 1. */
+  const nilai2 = useMemo(() => nilaiDariWidgets(asli2), [asli2]);
+  /** Halaman 2 template pertama: operasional & pelayanan (air terjual, NRW, pengaduan, anggaran). */
+  const nilaiOperasional2 = useMemo(() => nilaiOperasionalDariWidgets(asli2), [asli2]);
+
+  /** Sumber dokumen per judul widget untuk kartu halaman 1 (fitur kartu balik). */
+  const sumberJudul = useMemo(() => sumberPerJudul(asli?.widgets), [asli]);
+
+  /**
+   * Halaman 2 mengikuti mode yang sedang dilihat, sama seperti halaman 1:
+   * - Tampilan template (belum menekan "Pratinjau data asli") → angka CONTOH.
+   * - Pratinjau data asli → angka dokumen; slot yang dokumennya tidak memuat
+   *   angka ditutup contoh supaya desain tetap utuh.
+   */
+  /**
+   * DUA MODE BERLAKU UNTUK SEMUA HALAMAN:
+   * - Template (belum menekan "Pratinjau data asli") → semua halaman memakai
+   *   angka contoh, termasuk halaman 2.
+   * - Pratinjau data asli → halaman 2 memakai angka dokumen; slot yang dokumennya
+   *   tidak memuat angka ditutup contoh supaya desain tetap utuh.
+   */
+  const nilaiOperasionalTampil = useMemo(
+    () => (asli ? nilaiOperasional2 : CONTOH_OPERASIONAL),
+    [asli, nilaiOperasional2]
+  );
+
+  /** Halaman 3 mengikuti mode yang sama: template = contoh, pratinjau = dokumen. */
+  const nilaiWilayahTampil = useMemo<NilaiWilayah>(
+    () => (asli ? asli3 ?? { ...CONTOH_WILAYAH, contoh: false, baris: [], total: null, catatan: [], sumber: [] } : CONTOH_WILAYAH),
+    [asli, asli3]
+  );
+
   /**
    * Dashboard BAYANGAN untuk mode presentasi pratinjau.
    *
@@ -222,12 +276,14 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
       title: aktif.judulDashboard,
       description: aktif.deskripsiDashboard,
       sector: (currentTenant?.sector ?? 'aneka_usaha') as BumdSector,
-      widgets: widgetPratinjau,
+      widgets: asli?.widgets ?? widgetPratinjau,
       globalFilters: { periode: 'Contoh', unitKerja: 'Semua', kategori: 'Semua' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      // Presentasi (contoh maupun data asli) memakai tema template yang sama dengan panel pratinjau.
+      tema: aktif.tema || 'oranye',
     }),
-    [aktif, widgetPratinjau, currentTenant]
+    [aktif, widgetPratinjau, currentTenant, asli]
   );
 
   const pakai = async () => {
@@ -260,6 +316,60 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
       }
     })();
   }, [aktif.id, muatStatus]);
+
+  // Ganti template → kembali ke halaman 1 dan buang angka halaman 2 milik template lama.
+  useEffect(() => {
+    setHalamanAktif('1');
+    setAsli2(null);
+    setAsli3(null);
+  }, [aktif.id]);
+
+  /**
+   * Buka halaman 2. Angkanya diambil sekali dari server lalu disimpan; desainnya
+   * memakai komponen replika template yang sedang dibuka, jadi tidak ada tampilan
+   * kedua yang bisa melenceng.
+   */
+  const bukaHalaman2 = async () => {
+    setHalamanAktif('2');
+    if (asli2 || memuat2) return;
+    setMemuat2(true);
+    try {
+      const res = await fetch(
+        `/api/templates/pratinjau?templateId=${encodeURIComponent(aktif.id)}&halaman=2`
+      );
+      const data = (await res.json().catch(() => ({}))) as { widgets?: WidgetSpec[] | null };
+      setAsli2(Array.isArray(data.widgets) ? data.widgets : []);
+    } catch {
+      setAsli2([]);
+    } finally {
+      setMemuat2(false);
+    }
+  };
+
+  /**
+   * Buka halaman 3 (kinerja per wilayah). Angkanya diurai server langsung dari
+   * tabel dokumen, lalu disimpan supaya pindah tab tidak memanggil RAG terus.
+   */
+  const bukaHalaman3 = async () => {
+    setHalamanAktif('3');
+    if (asli3 || memuat3) return;
+    setMemuat3(true);
+    try {
+      const res = await fetch('/api/templates/wilayah');
+      const data = (await res.json().catch(() => ({}))) as Partial<NilaiWilayah> & { status?: string };
+      setAsli3({
+        baris: Array.isArray(data.baris) ? data.baris : [],
+        total: data.total ?? null,
+        catatan: Array.isArray(data.catatan) ? data.catatan : [],
+        satuanAir: data.satuanAir || 'm³',
+        sumber: Array.isArray(data.sumber) ? data.sumber : [],
+      });
+    } catch {
+      setAsli3({ baris: [], total: null, catatan: [], satuanAir: 'm³', sumber: [] });
+    } finally {
+      setMemuat3(false);
+    }
+  };
 
   const st = statusTpl[aktif.id];
 
@@ -492,6 +602,25 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 <Presentation className="w-4 h-4" />
                 <span>Mode Presentasi</span>
               </button>
+              {/* Ambil ulang angka dari dokumen tanpa perlu unggah lagi. */}
+              <button
+                onClick={async () => {
+                  setMemuatAsli(true);
+                  try {
+                    const r = await fetch('/api/templates/segarkan', { method: 'POST' });
+                    if (r.ok) window.location.reload();
+                  } finally {
+                    setMemuatAsli(false);
+                  }
+                }}
+                disabled={memuatAsli || !currentTenant}
+                data-testid="segarkan-pratinjau"
+                title="Ambil ulang angka dari dokumen untuk semua template"
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`w-4 h-4${memuatAsli ? ' animate-spin' : ''}`} />
+                <span>Perbarui</span>
+              </button>
               {/* Satu tombol dipakai bolak-balik: "Pratinjau dengan data asli" saat
                   masih menampilkan contoh, berubah jadi "Kembali ke contoh" saat
                   pratinjau data asli sedang terbuka — jadi tidak perlu tombol
@@ -562,13 +691,54 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             bisa sama persis dengan acuan; seluruh angkanya CONTOH. */}
         {/* SATU wadah untuk contoh maupun data asli. Bingkai, latar, dan
             padding-nya sama persis, jadi yang berubah hanya angka di dalamnya. */}
+        {/* Halaman template: desain sama, isi berbeda. Halaman 2 memakai angka
+            dokumen yang belum dipakai halaman 1. */}
+        <HalamanTabs
+          halaman={[
+            { id: '1', judul: 'Halaman 1', widgets: asli?.widgets ?? widgetPratinjau },
+            { id: '2', judul: 'Halaman 2', widgets: asli2 ?? [] },
+            // Halaman 3 berlaku untuk SEMUA template: satu lingkup wilayah layanan.
+            { id: '3', judul: 'Halaman 3', widgets: [] as WidgetSpec[] },
+          ]}
+          aktifId={halamanAktif}
+          onPilih={(id) => {
+            if (id === '2') void bukaHalaman2();
+            else if (id === '3') void bukaHalaman3();
+            else setHalamanAktif('1');
+          }}
+        />
+
         <div className={`tema-${aktif.tema || 'oranye'} rounded-card p-1.5 -m-1.5`} data-theme="dark">
           <KanvasTemaContext.Provider
-            value={asli ? { mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] } : null}
+            value={
+              asli || asli2 ? { mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] } : null
+            }
           >
-            {asli ? (
+            {halamanAktif === '3' ? (
+              // Halaman 3: satu lingkup wilayah, desainnya mengikuti template.
+              aktif.id === 'tpl-analitik' ? (
+                <WilayahTema tema="analitik" nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              ) : aktif.id === 'tpl-trafik' ? (
+                <WilayahTema tema="trafik" nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              ) : (
+                <DashboardWilayah nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              )
+            ) : halamanAktif === '2' ? (
+              // Halaman 2: data operasional & pelayanan, desain mengikuti template.
+              aktif.id === 'tpl-analitik' ? (
+                <OperasionalTema tema="analitik" nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              ) : aktif.id === 'tpl-trafik' ? (
+                <OperasionalTema tema="trafik" nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              ) : (
+                <DashboardOperasional nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+              )
+            ) : asli ? (
               aktif.id === 'tpl-ringkasan' ? (
-                <DashboardReferensi nilai={nilaiAsli} />
+                <DashboardReferensi
+                  nilai={nilaiAsli}
+                  sumberAktif
+                  sumberJudul={sumberJudul}
+                />
               ) : aktif.id === 'tpl-analitik' ? (
                 <DashboardAnalitik nilai={nilaiAnalitikAsli} />
               ) : aktif.id === 'tpl-trafik' ? (
@@ -609,7 +779,72 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
-          konten={<KomponenPratinjau penuh />}
+          labelPratinjau={asli ? 'Pratinjau template · data asli' : undefined}
+          halaman={[
+            {
+              id: '1',
+              judul: 'Halaman 1',
+              konten: asli ? (
+                aktif.id === 'tpl-ringkasan' ? (
+                  <DashboardReferensi
+                    penuh
+                    nilai={nilaiAsli}
+                    sumberAktif
+                    sumberJudul={sumberJudul}
+                  />
+                ) : aktif.id === 'tpl-analitik' ? (
+                  <DashboardAnalitik penuh nilai={nilaiAnalitikAsli} />
+                ) : (
+                  <DashboardTrafik penuh nilai={nilaiTrafikAsli} />
+                )
+              ) : (
+                <KomponenPratinjau penuh />
+              ),
+            },
+            {
+              id: '3',
+              judul: 'Halaman 3',
+              konten:
+                aktif.id === 'tpl-analitik' ? (
+                  <WilayahTema tema="analitik" penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ) : aktif.id === 'tpl-trafik' ? (
+                  <WilayahTema tema="trafik" penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ) : (
+                  <DashboardWilayah penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ),
+            },
+            {
+              id: '2',
+              judul: 'Halaman 2',
+              // Presentasi halaman 2: desain mengikuti template yang dibuka.
+              konten:
+                aktif.id === 'tpl-analitik' ? (
+                  <OperasionalTema tema="analitik" penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ) : aktif.id === 'tpl-trafik' ? (
+                  <OperasionalTema tema="trafik" penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ) : (
+                  <DashboardOperasional penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
+                ),
+            },
+          ]}
+          konten={
+            asli ? (
+              aktif.id === 'tpl-ringkasan' ? (
+                <DashboardReferensi
+                    penuh
+                    nilai={nilaiAsli}
+                    sumberAktif
+                    sumberJudul={sumberJudul}
+                  />
+              ) : aktif.id === 'tpl-analitik' ? (
+                <DashboardAnalitik penuh nilai={nilaiAnalitikAsli} />
+              ) : aktif.id === 'tpl-trafik' ? (
+                <DashboardTrafik penuh nilai={nilaiTrafikAsli} />
+              ) : undefined
+            ) : (
+              <KomponenPratinjau penuh />
+            )
+          }
         />
       )}
     </div>

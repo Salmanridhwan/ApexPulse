@@ -42,8 +42,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 }) => {
   const ubah = (patch: Partial<WidgetStyle>) => onChange(bersihkanGaya({ ...style, ...patch }));
 
-  const tampilGaris = mode === 'global' || (tipeWidget ? TIPE_GARIS.includes(tipeWidget) : false);
-  const tampilBatang = mode === 'global' || (tipeWidget ? TIPE_BATANG.includes(tipeWidget) : false);
 
   const jumlahSeri = namaSeri?.length ?? 0;
   const warnaSeri = Array.from({ length: Math.min(jumlahSeri, 8) }, (_, i) => style.warnaSeri?.[i] || '');
@@ -219,48 +217,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           />
         </div>
       </div>
-
-      {/* Ketebalan garis */}
-      {tampilGaris && (
-        <div>
-          <label className="label">
-            Ketebalan Garis: {style.garisTebal ?? 2} px
-          </label>
-          <input
-            type="range"
-            min={0.5}
-            max={8}
-            step={0.5}
-            value={style.garisTebal ?? 2}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              ubah({ garisTebal: v === 2 ? undefined : v });
-            }}
-            className="w-full accent-brand"
-          />
-        </div>
-      )}
-
-      {/* Sudut batang */}
-      {tampilBatang && (
-        <div>
-          <label className="label">
-            Sudut Batang: {style.batangRadius ?? 4} px
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={20}
-            step={1}
-            value={style.batangRadius ?? 4}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              ubah({ batangRadius: v === 4 ? undefined : v });
-            }}
-            className="w-full accent-brand"
-          />
-        </div>
-      )}
 
       {/* Reset */}
       <div className="pt-3 border-t border-line">

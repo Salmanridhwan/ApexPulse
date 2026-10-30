@@ -1,3 +1,4 @@
+import type { WidgetStyle } from '../../types';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowDownRight,
@@ -13,7 +14,16 @@ import {
   X,
 } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
+import { BarisGeser } from './BarisGeser';
+import { gayaReplika } from './gayaReplika';
+import { buildOpsi } from '../../services/chart/chartDefault';
+import { WidgetChart } from '../widgets/WidgetChart';
+import { labelHarian } from '../../services/chart/labelTanggal';
+import { KartuSumber, PitaSumber } from './KartuSumber';
+import type { SumberDok } from '../../services/templates/nilaiOperasional';
+import { latarGelap, temaKartu } from '../widgets/widgetCardTheme';
 import type { NilaiBeban, NilaiTemplate, NilaiTransaksi, NilaiTarget } from '../../services/templates/nilaiTemplate';
+import type { TataLetakBaris } from '../../types';
 
 /**
  * DASHBOARD REFERENSI — replika tampilan acuan pemilik produk.
@@ -172,292 +182,14 @@ const TARGET_CONTOH = [
   { nama: 'Target Laba Bersih', capai: 57, status: 'perlu perhatian', warna: WARNA.merah },
 ];
 
-/** Jalur SVG sparkline (viewBox 0..100) — area + garis, seperti referensi. */
-const jalurSpark = (seri: number[]) => {
-  const min = Math.min(...seri);
-  const max = Math.max(...seri);
-  const span = max - min || 1;
-  const titik = seri.map((v, i) => ({
-    x: (i / (seri.length - 1)) * 100,
-    y: 100 - ((v - min) / span) * 88 - 6,
-  }));
-  // Kurva halus (Catmull-Rom -> bezier) supaya sparkline tidak kaku.
-  let d = `M${titik[0].x.toFixed(1)},${titik[0].y.toFixed(1)}`;
-  for (let i = 0; i < titik.length - 1; i += 1) {
-    const p0 = titik[i - 1] ?? titik[i];
-    const p1 = titik[i];
-    const p2 = titik[i + 1];
-    const p3 = titik[i + 2] ?? p2;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  return { garis: d, area: `${d}L100,100L0,100Z` };
-};
-
-/**
- * Legenda ringkas untuk tiap grafik: sederet penanda warna + label, rata kanan
- * tepat di atas bidang grafik supaya tidak menabrak judul maupun angka utama.
- */
-const Legenda: React.FC<{
-  item: Array<{ warna: string; label: string; redup?: boolean; garis?: boolean; nilai?: string }>;
-}> = ({ item }) => (
-  <ul className="flex flex-wrap items-center justify-start gap-x-[1.15em] gap-y-[0.25em] shrink-0 mt-[0.2em] mb-[0.35em]">
-    {item.map((x) => (
-      <li key={x.label} className="inline-flex items-center gap-[0.35em] text-[0.72em] font-medium" style={{ color: WARNA.teks2 }}>
-        {x.garis ? (
-          <span className="w-[1em] h-[0.2em] rounded-full shrink-0" style={{ backgroundColor: x.warna }} />
-        ) : (
-          <span
-            className="w-[0.62em] h-[0.62em] rounded-[0.2em] shrink-0"
-            style={{ backgroundColor: x.warna, opacity: x.redup ? 0.6 : 1 }}
-          />
-        )}
-        <span>{x.label}</span>
-        {x.nilai ? (
-          <span className="tabular-nums font-semibold" style={{ color: WARNA.teks }}>
-            {x.nilai}
-          </span>
-        ) : null}
-      </li>
-    ))}
-  </ul>
-);
-
-/** Gaya dasar grafik: huruf, garis, dan padding ikut `skala` (em setara). */
-const gayaDasar = (s: number) => ({
-  tooltip: {
-    backgroundColor: 'rgba(24,26,30,0.96)',
-    borderColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    padding: [7 * s, 11 * s],
-    extraCssText: `border-radius:${8 * s}px; box-shadow:0 ${6 * s}px ${18 * s}px rgba(0,0,0,0.5); backdrop-filter:blur(6px);`,
-    textStyle: { color: WARNA.teks, fontSize: 11 * s },
-  },
-  sumbu: {
-    axisLine: { show: false },
-    axisTick: { show: false },
-    axisLabel: { color: WARNA.teks3, fontSize: 10 * s },
-  },
-});
-
-const opsiBar = (
-  s: number,
-  data?: { bulan?: string[]; pendapatan?: number[]; garis?: number[] }
-) => {
-  const bulan = data?.bulan?.length ? data.bulan : BULAN_CONTOH;
-  const pendapatan = data?.pendapatan?.length ? data.pendapatan : PENDAPATAN_CONTOH;
-  const garis = data?.garis?.length ? data.garis : pendapatan;
-  const puncak = pendapatan.indexOf(Math.max(...pendapatan));
-  const dasar = gayaDasar(s);
-  return {
-    grid: { left: 4, right: 20 * s, top: 22 * s, bottom: 2, containLabel: true },
-    tooltip: {
-      ...dasar.tooltip,
-      trigger: 'axis',
-      formatter: (p: any[]) =>
-        `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0]?.name}</div>` +
-        p
-          .map(
-            (x) =>
-              `<div>${x.marker} ${x.seriesName}: <b>Rp ${String(x.value).replace('.', ',')} M</b></div>`,
-          )
-          .join(''),
-    },
-    xAxis: { type: 'category', data: bulan, ...dasar.sumbu },
-    yAxis: {
-      type: 'value',
-      // skala mengikuti data supaya batang tidak terpotong
-      max: (() => {
-        const tertinggi = Math.max(...pendapatan, 1);
-        const langkah = Math.pow(10, Math.floor(Math.log10(tertinggi))) / 2;
-        return Math.ceil((tertinggi * 1.18) / langkah) * langkah;
-      })(),
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
-      axisLabel: {
-        color: WARNA.teks3,
-        fontSize: 10 * s,
-        formatter: (v: number) =>
-          `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(v)} M`,
-      },
-    },
-    series: [
-      {
-        type: 'bar',
-        showBackground: true,
-        backgroundStyle: { color: 'rgba(255,255,255,0.03)', borderRadius: [4 * s, 4 * s, 0, 0] },
-        data: pendapatan.map((v, i) => ({
-          value: v,
-          itemStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: i === puncak ? WARNA.oranye : 'rgba(255,138,31,0.62)' },
-                { offset: 1, color: i === puncak ? 'rgba(255,138,31,0.55)' : 'rgba(255,138,31,0.16)' },
-              ],
-            },
-            borderRadius: [4 * s, 4 * s, 0, 0],
-            shadowColor: i === puncak ? 'rgba(255,138,31,0.55)' : 'rgba(255,138,31,0.18)',
-            shadowBlur: (i === puncak ? 14 : 6) * s,
-            shadowOffsetY: 2 * s,
-          },
-          // Batang terakhir (bulan tertinggi) diberi label angkanya supaya
-          // nilainya langsung terbaca, bukan cuma warna beda.
-          // Angka tiap bulan ditulis di ATAS batangnya (bukan daftar di legenda).
-          label: {
-            show: true,
-            position: 'top',
-            distance: 8 * s,
-            color: i === puncak ? WARNA.teks : WARNA.teks2,
-            fontSize: (i === puncak ? 9.5 : 8.8) * s,
-            fontWeight: i === puncak ? 'bold' : 'normal',
-            backgroundColor: 'rgba(10,10,11,0.72)',
-            borderRadius: 3 * s,
-            padding: [1 * s, 3 * s],
-            formatter: () => String(v).replace('.', ','),
-          },
-        })),
-        // Batang dibatasi lebarnya supaya tidak melebar aneh di layar ultrawide.
-        barMaxWidth: 26 * s,
-        barWidth: '46%',
-        z: 2,
-      },
-      {
-        // Garis menelusuri puncak batang: nilai & posisi titik sama persis
-        // dengan batangnya (tanpa pergeseran), jadi tidak ada angka karangan.
-        name: 'Tren',
-        type: 'line',
-        smooth: 0.2,
-        symbol: 'circle',
-        symbolSize: 6 * s,
-        data: garis,
-        lineStyle: { width: 2.2 * s, color: '#38bdf8', shadowColor: 'rgba(56,189,248,0.6)', shadowBlur: 12 * s, shadowOffsetY: 3 * s },
-        itemStyle: { color: '#38bdf8', borderColor: '#0a0a0b', borderWidth: 1.8 * s },
-        emphasis: { scale: 1.5 },
-        // Nilainya sama dengan batang, jadi tooltip cukup sekali (dari batang).
-        tooltip: { show: false },
-        z: 3,
-      },
-    ],
-  };
-};
-
-const opsiDonat = (s: number, beban?: NilaiBeban[]) => ({
-  __beban: beban && beban.length ? beban : BEBAN_CONTOH,
-  tooltip: {
-    ...gayaDasar(s).tooltip,
-    trigger: 'item',
-    formatter: (p: any) => `${p.name}: <b>${p.value}%</b>`,
-  },
-  series: [
-    {
-      type: 'pie',
-      radius: ['68%', '97%'],
-      center: ['50%', '50%'],
-      avoidLabelOverlap: false,
-      label: { show: false },
-      labelLine: { show: false },
-      itemStyle: {
-        borderColor: WARNA.kartu,
-        borderWidth: 3 * s,
-        borderRadius: 6 * s,
-        shadowColor: 'rgba(0,0,0,0.5)',
-        shadowBlur: 8 * s,
-      },
-      emphasis: { scale: true, scaleSize: 6 * s, itemStyle: { shadowBlur: 18 * s, shadowColor: 'rgba(0,0,0,0.7)' } },
-      data: (beban && beban.length ? beban : BEBAN_CONTOH).map((r) => ({ name: r.nama, value: r.nilai, itemStyle: { color: r.warna } })),
-    },
-  ],
-});
-
-const opsiArea = (s: number, arus?: number[], label?: string[]) => {
-  const nilaiArus = arus?.length ? arus : ARUS_CONTOH;
-  const sumbu = label && label.length === nilaiArus.length ? label : nilaiArus.map((_, i) => `${i + 1}`);
-  const dasar = gayaDasar(s);
-  return {
-    grid: { left: 4, right: 26 * s, top: 14 * s, bottom: 4, containLabel: true },
-    tooltip: {
-      ...dasar.tooltip,
-      trigger: 'axis',
-      axisPointer: { type: 'line', lineStyle: { color: 'rgba(255,138,31,0.45)', type: 'dashed', width: 1 } },
-      formatter: (p: any) => `<div style="font-size:${10 * s}px;color:${WARNA.teks3}">${p[0].name}</div><b>Rp ${String(p[0].value).replace('.', ',')} M</b>`,
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: sumbu,
-      ...dasar.sumbu,
-      axisLabel: {
-        color: WARNA.teks3,
-        fontSize: 8.5 * s,
-        interval: 0,
-        rotate: 0,
-        margin: 6 * s,
-        lineHeight: 10 * s,
-      },
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)', type: 'dashed', width: 1 } },
-      axisLabel: { color: WARNA.teks3, fontSize: 9 * s, formatter: '{value} M' },
-    },
-    series: [
-      {
-        type: 'line',
-        smooth: 0.35,
-        symbol: 'circle',
-        symbolSize: 6 * s,
-        showSymbol: false,
-        data: nilaiArus,
-        lineStyle: { width: 2.6 * s, color: WARNA.oranye, shadowColor: 'rgba(255,138,31,0.55)', shadowBlur: 14 * s, shadowOffsetY: 4 * s },
-        itemStyle: { color: WARNA.oranye, borderColor: '#0a0a0b', borderWidth: 2 * s },
-        emphasis: { scale: 1.6 },
-        markPoint: {
-          symbol: 'circle',
-          symbolSize: 9 * s,
-          itemStyle: { color: '#fff', borderColor: WARNA.oranye, borderWidth: 3 * s, shadowBlur: 10 * s, shadowColor: 'rgba(255,138,31,0.9)' },
-          label: {
-            show: true,
-            // Titik tertinggi ada di ujung kanan: label ditaruh di kiri titik
-            // supaya tidak terpotong tepi kartu.
-            position: 'left',
-            distance: 8 * s,
-            color: WARNA.teks,
-            fontSize: 9 * s,
-            fontWeight: 'bold',
-            backgroundColor: 'rgba(16,16,18,0.9)',
-            borderRadius: 4 * s,
-            padding: [2 * s, 5 * s],
-            // Nilai diambil dari deret (bukan p.value) karena markPoint memakai coord.
-            formatter: () =>
-              `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(
-                Number(nilaiArus[nilaiArus.length - 1]),
-              )} M`,
-          },
-          // Titik + angka selalu di ujung KANAN garis (nilai terbaru), seperti
-          // template — bukan di titik tertinggi yang bisa jatuh di kiri.
-          data: [{ coord: [nilaiArus.length - 1, nilaiArus[nilaiArus.length - 1]] }],
-        },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(255,138,31,0.46)' },
-              { offset: 0.55, color: 'rgba(255,138,31,0.15)' },
-              { offset: 1, color: 'rgba(255,138,31,0.01)' },
-            ],
-          },
-        },
-      },
-    ],
-  };
-};
-
 interface DashboardReferensiProps {
+  /** Gaya global dashboard (panel Gaya): palet, font, ukuran, tebal garis, sudut batang. */
+  gaya?: WidgetStyle;
+  /**
+   * Warna latar kartu dari panel Gaya (draft maupun tersimpan). Kosong = warna
+   * bawaan template. Teks dan garis tetap memakai warna template agar kontras.
+   */
+  warnaKartu?: string;
   /**
    * Nilai dari dokumen instansi. Bila diisi, ANGKA pada template diganti dengan
    * angka dokumen — susunan, warna, dan bentuk kartu tetap persis seperti contoh.
@@ -469,9 +201,48 @@ interface DashboardReferensiProps {
    * dibagi dengan `flex-1` dan grafik memanjang, tidak ada ruang kosong.
    */
   penuh?: boolean;
+  /**
+   * TATA LETAK KARTU (opsional). Kunci = grupId baris (`kpi`, `grafik`, `tabel`),
+   * nilainya urutan dan lebar kartu. Kosong = susunan asli template.
+   */
+  tataLetak?: Record<string, TataLetakBaris>;
+  /** Simpan perubahan tata letak. */
+  onTataLetak?: (baru: Record<string, TataLetakBaris>) => void;
+  /** true = kartu grafik bisa diklik dan berputar menampilkan sumber dokumen. */
+  sumberAktif?: boolean;
+  /** Sumber per judul widget (huruf kecil), dari `sumberPerJudul`. */
+  sumberJudul?: Record<string, SumberDok[]>;
 }
 
-export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = false, nilai }) => {
+export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
+  penuh = false,
+  gaya,
+  warnaKartu,
+  nilai,
+  tataLetak,
+  onTataLetak,
+  sumberAktif = false,
+  sumberJudul,
+}) => {
+  /** Kartu memakai warna dari panel Gaya bila ada. */
+  const KARTU = warnaKartu || WARNA.kartu;
+  /**
+   * Isi kartu mengikuti warna kartu pilihan: kartu terang memakai teks gelap,
+   * kartu gelap memakai teks terang. Dihitung dengan kontras WCAG, bukan ditebak.
+   */
+  const TEMA_KARTU = warnaKartu ? temaKartu(warnaKartu, 'dark') : null;
+  const KARTU2 = TEMA_KARTU ? TEMA_KARTU.vars['--color-surface-2'] : WARNA.kartu2;
+  const TEKS = TEMA_KARTU ? TEMA_KARTU.vars['--color-ink'] : WARNA.teks;
+  const TEKS2 = TEMA_KARTU ? TEMA_KARTU.vars['--color-ink-2'] : WARNA.teks2;
+  const TEKS3 = TEMA_KARTU ? TEMA_KARTU.vars['--color-ink-3'] : WARNA.teks3;
+  const GARIS = TEMA_KARTU ? TEMA_KARTU.vars['--color-line'] : WARNA.garis;
+  /** Grafik ikut tema terang bila kartu terang. */
+  const kartuTerang = Boolean(warnaKartu && !latarGelap(warnaKartu));
+  /** Mode presentasi tidak boleh diubah tata letaknya. */
+  /** Hanya bisa diubah bila pemanggil menyediakan penyimpan tata letak (bukan galeri/pratinjau). */
+  const bisaUbah = !penuh && !!onTataLetak;
+  const ubahBaris = (grupId: string, baru: TataLetakBaris) =>
+    onTataLetak?.({ ...(tataLetak || {}), [grupId]: baru });
   // Terapkan nilai dokumen ke slot template SEBELUM render/opsi grafik dibuat.
   // (Konstanta di atas bersifat modul karena dipakai juga oleh pembentuk opsi
   // grafik di luar komponen; jadi nilai aktif ditulis di sini.)
@@ -534,12 +305,10 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
    * isi ikut membesar di layar besar, tanpa mengubah tata letak baris.
    */
   const [skala, setSkala] = useState(1);
+  /** Label kartu KPI yang sumbernya sedang dibuka (null = tertutup). */
+  const [kpiSumber, setKpiSumber] = useState<string | null>(null);
 
   const akarRef = useRef<HTMLDivElement | null>(null);
-  const barRef = useRef<HTMLDivElement | null>(null);
-  const donutRef = useRef<HTMLDivElement | null>(null);
-  const areaRef = useRef<HTMLDivElement | null>(null);
-  const instans = useRef<Record<string, any>>({});
 
   // Ukur wadah → tentukan skala huruf.
   useEffect(() => {
@@ -559,51 +328,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
     const ro = new ResizeObserver(hitung);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [penuh]);
-
-  // Gambar ulang grafik saat skala berubah (huruf & tebal garis ikut menyesuaikan).
-  useEffect(() => {
-    let batal = false;
-    let pengamat: ResizeObserver | null = null;
-
-    void loadEcharts().then((ec) => {
-      if (batal) return;
-
-      const ambil = (kunci: string, el: HTMLDivElement | null) => {
-        if (!el) return null;
-        const lama = instans.current[kunci];
-        if (lama && !lama.isDisposed?.()) return lama;
-        const c = ec.init(el);
-        instans.current[kunci] = c;
-        return c;
-      };
-
-      ambil('bar', barRef.current)?.setOption(opsiBar(skala, { bulan: BULAN, pendapatan: PENDAPATAN_BULANAN, garis: garis }), true);
-      ambil('donut', donutRef.current)?.setOption(opsiDonat(skala, RINCIAN_BEBAN), true);
-      ambil('area', areaRef.current)?.setOption(opsiArea(skala, ARUS_KAS, nilai?.areaLabel), true);
-
-      pengamat = new ResizeObserver(() => {
-        Object.values(instans.current).forEach((c: any) => c?.resize?.());
-      });
-      [barRef, donutRef, areaRef].forEach((r) => r.current && pengamat?.observe(r.current));
-    });
-
-    return () => {
-      batal = true;
-      pengamat?.disconnect();
-    };
-    // `nilai` WAJIB jadi dependensi: data dokumen datang belakangan (async),
-    // tanpa ini grafik tetap memakai angka contoh walau judulnya sudah berubah.
-  }, [skala, nilai]);
-
-  // Bersihkan grafik saat komponen dilepas.
-  useEffect(
-    () => () => {
-      Object.values(instans.current).forEach((c: any) => c?.dispose?.());
-      instans.current = {};
-    },
-    [],
-  );
+  }, [penuh, gaya]);
 
   // Esc menutup panel rincian.
   useEffect(() => {
@@ -631,91 +356,84 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           ? 'h-full w-full flex flex-col gap-[0.8em] p-[0.85em] overflow-hidden'
           : 'rounded-[1.4em] p-[1.2em]'
       }
-      style={{ backgroundColor: WARNA.latar, color: WARNA.teks, fontSize: `${(13 * skala).toFixed(2)}px` }}
+      style={{ backgroundColor: WARNA.latar, color: TEKS, fontSize: `${(13 * skala * ((gaya?.fontUkuran ?? 13) / 13)).toFixed(2)}px` }}
     >
       {/* ===== Baris 1: 4 kartu KPI_CONTOH ===== */}
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}>
-        {KPI.map((k) => {
-          const naik = k.delta >= 0;
-          // Delta 0% (dokumen tidak menyebut perubahan) → sparkline DATAR abu-abu:
-          // tidak ada dasar untuk menggambar tren naik/turun.
-          const datar = !k.seri || k.seri.length < 2 || k.delta === 0;
-          const jalur = datar
-            ? { garis: 'M0,62 L100,62', area: 'M0,62 L100,62 L100,100 L0,100 Z' }
-            : jalurSpark(k.seri);
-          // Aturan warna: naik = hijau, menurun = merah, tanpa data = abu.
-          const warna = datar ? '#6b7280' : naik ? WARNA.hijau : WARNA.merah;
-          const idGrad = `grad-${k.label.replace(/\s+/g, '-')}`;
-          return (
-            <div key={k.label} className={kartu('gap-[0.55em]')} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-              <div className="flex items-start justify-between gap-[0.5em]">
-                <span className="text-[0.82em] font-medium leading-tight" style={{ color: WARNA.teks3 }}>
-                  {k.label}
-                </span>
-                <span
-                  className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
-                  style={{ border: '1px solid rgba(255,138,31,0.35)', backgroundColor: 'rgba(255,138,31,0.10)', color: WARNA.oranye }}
-                >
-                  <k.Ikon className="w-[1em] h-[1em]" />
-                </span>
-              </div>
+      <BarisGeser
+        grupId="kpi"
+        kolom={4}
+        tataLetak={tataLetak?.kpi}
+        onUbah={ubahBaris}
+        bisaUbah={bisaUbah}
+        className={`grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] ${penuh ? 'baris-095' : 'mb-[0.8em]'}`}
+      >
+        {KPI.map((k) => (
+          // Bentuk kartu KPI berasal dari katalog template chart (kpi-kartu),
+          // bukan markup halaman. Halaman hanya menyiapkan datanya.
+          <WidgetChart
+            key={k.label}
+            chartId="kpi-kartu"
+            varian="ringkasan"
+            data={{
+              kategori: [k.label],
+              seri: [{ nama: k.label, data: [Number(String(k.nilai).replace(/\./g, '').replace(',', '.'))] }],
+              satuan: k.satuan,
+              delta: k.delta,
+              dariDokumen: pakaiData,
+              desimal: 0,
+            }}
+            teksAngka={k.nilai}
+            ikon={k.Ikon}
+            deltaTeks={k.deltaTeks}
+            spark={k.seri}
+            sorot={kpiSumber === k.label}
+            onKlik={sumberAktif ? () => setKpiSumber((v) => (v === k.label ? null : k.label)) : undefined}
+          />
+        ))}
+      </BarisGeser>
 
-              <div className="flex items-baseline gap-[0.35em] flex-wrap">
-                <span className="text-[1.55em] font-bold leading-none tabular-nums tracking-tight">{k.nilai}</span>
-                {k.satuan && (
-                  <span className="text-[0.72em] font-medium" style={{ color: WARNA.teks3 }}>
-                    {k.satuan}
-                  </span>
-                )}
-              </div>
-
-              <div className={`flex items-center gap-[0.4em] text-[0.76em] font-semibold ${pakaiData && k.delta === 0 ? 'hidden' : ''}`}>
-                <span className="inline-flex items-center gap-[0.15em]" style={{ color: warna }}>
-                  {datar ? (
-                    <span className="w-[0.9em] text-center leading-none">–</span>
-                  ) : naik ? (
-                    <ArrowUpRight className="w-[1em] h-[1em]" />
-                  ) : (
-                    <ArrowDownRight className="w-[1em] h-[1em]" />
-                  )}
-                  {datar ? '0' : `${naik ? '+' : ''}${String(k.delta).replace('.', ',')}`}%
-                </span>
-                <span className="font-normal" style={{ color: WARNA.teks3 }}>
-                  {k.deltaTeks}
-                </span>
-              </div>
-
-              <svg
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                className={penuh ? 'w-full flex-1 min-h-[1.6em] mt-[0.3em]' : 'w-full h-[2.6em] mt-[0.3em]'}
-                aria-hidden
-              >
-                <defs>
-                  <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={warna} stopOpacity="0.42" />
-                    <stop offset="100%" stopColor={warna} stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <path d={jalur.area} fill={`url(#${idGrad})`} />
-                <path d={jalur.garis} fill="none" stroke={warna} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          );
-        })}
-      </div>
+      {/* Pita sumber untuk kartu KPI: selebar baris, di dalam halaman. */}
+      {kpiSumber && (
+        <PitaSumber
+          judul={kpiSumber}
+          sumber={sumberJudul?.[kpiSumber.trim().toLowerCase()] ?? []}
+          onTutup={() => setKpiSumber(null)}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+          border={`1px solid ${GARIS}`}
+        />
+      )}
 
       {/* ===== Baris 2: grafik batang + cincin ===== */}
-      <div
+      <BarisGeser
+        grupId="grafik"
+        kolom={3}
+        tataLetak={tataLetak?.grafik}
+        onUbah={ubahBaris}
+        bisaUbah={bisaUbah}
         className={`grid grid-cols-1 gap-[0.8em] ${
           penuh ? 'lg:grid-cols-[1.55fr_1fr] baris-130' : 'lg:grid-cols-3 mb-[0.8em]'
         }`}
       >
-        <div className={`${penuh ? '' : 'lg:col-span-2'} ${kartu()}`} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+        <KartuSumber
+          aktif={sumberAktif}
+          judul="Ikhtisar Pendapatan"
+          sumber={sumberJudul?.['ikhtisar pendapatan'] ?? []}
+          className={`${penuh ? '' : 'lg:col-span-2'} ${kartu()}`}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+        >
           <div className="flex items-start justify-between gap-[0.7em] mb-[0.3em] shrink-0">
             <div>
               <h3 className="text-[0.98em] font-semibold">Ikhtisar Pendapatan</h3>
-              <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
+              <p className="text-[0.8em]" style={{ color: TEKS3 }}>
                 {nilai?.batangSub || 'Pendapatan usaha per bulan, 2025'}
               </p>
             </div>
@@ -726,27 +444,45 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               </div>
             </div>
           </div>
-          <Legenda
-            item={[
+          <WidgetChart
+            chartId="bar-tegak-sorot"
+            varian="ringkasan"
+            skala={skala}
+            data={{
+              kategori: BULAN,
+              seri: [{ nama: 'Pendapatan', data: PENDAPATAN_BULANAN }],
+              satuan: 'Miliar Rp',
+              desimal: 1,
+            }}
+            legendaItem={[
               {
                 warna: WARNA.oranye,
-                label: BULAN.length ? `Pendapatan ${BULAN[0]}–${BULAN[BULAN.length - 1]}` : 'Pendapatan',
+                label: BULAN.length ? `Pendapatan ${BULAN[0]}-${BULAN[BULAN.length - 1]}` : 'Pendapatan',
                 redup: true,
                 nilai: `Rp ${String(TOTAL_PENDAPATAN.toFixed(1)).replace('.', ',')} M`,
               },
               { warna: WARNA.oranye, label: PUNCAK_LABEL, nilai: `Rp ${String(PUNCAK_NILAI).replace('.', ',')} M` },
             ]}
-          />
-          <div
-            ref={barRef}
+            pembungkus={(o) => gayaReplika(o, gaya, 'bar', kartuTerang)}
             className={penuh ? 'w-full flex-1 min-h-[8.5em]' : 'w-full h-[10.5em]'}
           />
-        </div>
+        </KartuSumber>
 
-        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+        <KartuSumber
+          aktif={sumberAktif}
+          judul="Rincian Beban"
+          sumber={sumberJudul?.['rincian beban'] ?? []}
+          className={kartu()}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+        >
           <div className="shrink-0">
             <h3 className="text-[0.98em] font-semibold">{nilai?.cincinJudul || 'Rincian Beban'}</h3>
-            <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
+            <p className="text-[0.8em]" style={{ color: TEKS3 }}>
               {nilai?.cincinSub || 'Komposisi beban operasional'}
             </p>
           </div>
@@ -754,93 +490,87 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               mengikuti referensi — bukan ditumpuk di bawah. */}
           {/* Blok grafik mengisi seluruh sisa tinggi kartu supaya cincin besar dan
               tidak menyisakan ruang kosong di bawah. */}
-          <div className="relative flex-1 min-h-[7.5em] mt-[0.2em]">
-            <div className="absolute inset-0 flex items-stretch gap-[0.4em]">
-              <div className="relative grafik-140">
-                <div ref={donutRef} className="w-full h-full" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[0.95em] font-bold leading-none tabular-nums">{CINCIN_TOTAL}</span>
-                  <span className="text-[0.66em] mt-[0.1em]" style={{ color: WARNA.teks3 }}>
-                    Total
-                  </span>
-                </div>
-              </div>
-              <ul className="flex-1 min-w-0 self-center space-y-[0.55em]">
-                {RINCIAN_BEBAN.map((r) => (
-                  <li key={r.nama} className="flex items-center gap-[0.4em] text-[0.76em]">
-                    <span className="w-[0.5em] h-[0.5em] rounded-full shrink-0" style={{ backgroundColor: r.warna }} />
-                    <span className="flex-1 truncate" style={{ color: WARNA.teks2 }}>
-                      {r.nama}
-                    </span>
-                    <span className="tabular-nums font-semibold shrink-0" style={{ color: WARNA.teks }}>
-                      {String(r.nilai).replace('.', ',')}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
+          <WidgetChart
+            chartId="donat-tebal"
+            varian="ringkasan"
+            skala={skala}
+            data={{
+              kategori: RINCIAN_BEBAN.map((b) => b.nama),
+              seri: [{ nama: 'Beban', data: RINCIAN_BEBAN.map((b) => b.nilai) }],
+              satuan: '%',
+              desimal: 1,
+            }}
+            pembungkus={(o) => gayaReplika(o, gaya, 'donut', kartuTerang)}
+            className="flex-1 min-h-[7.5em] mt-[0.2em]"
+          />
+        </KartuSumber>
+      </BarisGeser>
 
       {/* ===== Baris 3: transaksi + arus kas + target ===== */}
-      <div
+      <BarisGeser
+        grupId="tabel"
+        kolom={3}
+        tataLetak={tataLetak?.tabel}
+        onUbah={ubahBaris}
+        bisaUbah={bisaUbah}
         className={`grid grid-cols-1 gap-[0.8em] ${
           penuh ? 'lg:grid-cols-[1fr_1.05fr_0.95fr] baris-105' : 'lg:grid-cols-3 mb-[0.8em]'
         }`}
       >
-        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
-          <div className="flex items-center justify-between gap-[0.25em] mb-[0.6em] shrink-0">
-            <h3 className="text-[0.98em] font-semibold truncate min-w-0">{nilai?.tabelJudul || 'Transaksi Terbaru'}</h3>
-            <button
-              type="button"
-              onClick={() => setSemuaTransaksi((v) => !v)}
-              aria-expanded={semuaTransaksi}
-              title={semuaTransaksi ? 'Ringkas daftar transaksi' : 'Tampilkan seluruh transaksi'}
-              className="shrink-0 whitespace-nowrap text-[0.74em] inline-flex items-center gap-[0.15em] rounded px-[0.1em] py-[0.1em] transition-colors hover:brightness-125 focus:outline-none focus-visible:ring-1 focus-visible:ring-current"
-              style={{ color: WARNA.oranye }}
-            >
-              {semuaTransaksi ? 'Ringkas' : 'Lihat semua'}
-              <ArrowRight className={`w-[0.95em] h-[0.95em] transition-transform ${semuaTransaksi ? 'rotate-90' : ''}`} />
-            </button>
-          </div>
-          <ul className={`space-y-[0.55em] ${penuh ? 'flex-1 min-h-0 overflow-auto gulir-tema pr-[0.2em]' : ''}`}>
-            {TRANSAKSI.length === 0 && (
-              <li className="text-[0.78em]" style={{ color: WARNA.teks3 }}>
-                Belum ada data {nilai?.tabelJudul ? 'tabel' : 'transaksi'} di dokumen instansi.
-              </li>
+        <KartuSumber
+          aktif={sumberAktif}
+          judul={nilai?.tabelJudul || 'Transaksi Terbaru'}
+          sumber={sumberJudul?.[(nilai?.tabelJudul || 'Transaksi Terbaru').trim().toLowerCase()] ?? []}
+          className={kartu()}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+        >
+          <WidgetChart
+            chartId="tabel-ringkas"
+            varian="ringkasan"
+            data={{
+              kategori: [nilai?.tabelJudul || 'Transaksi Terbaru'],
+              seri: [{ nama: 'Nilai', data: [] }],
+              satuan: 'jt',
+            }}
+            baris={(semuaTransaksi ? [...TRANSAKSI, ...(pakaiData ? [] : TRANSAKSI_LAIN_CONTOH)] : TRANSAKSI).map(
+              (t) => ({
+                // Ikon tidak ikut tersimpan di basis data, jadi ada ikon cadangan.
+                ikon: ikonAman(t.Ikon, t.naik ? Droplets : CreditCard),
+                judul: t.nama,
+                catatan: t.ket,
+                nilai: `${t.nilai} jt`,
+                arah: t.naik,
+              })
             )}
-            {(semuaTransaksi ? [...TRANSAKSI, ...(pakaiData ? [] : TRANSAKSI_LAIN_CONTOH)] : TRANSAKSI).map((t) => (
-              <li key={t.nama} className="flex items-center gap-[0.6em]">
-                <span
-                  className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
-                  style={{ backgroundColor: WARNA.kartu2, color: t.naik ? WARNA.hijau : WARNA.merah }}
-                >
-                  {(() => {
-                    // Ikon tidak ikut tersimpan di basis data — pakai ikon cadangan.
-                    const IkonBaris = ikonAman(t.Ikon, t.naik ? Droplets : CreditCard);
-                    return <IkonBaris className="w-[1em] h-[1em]" />;
-                  })()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[0.84em] font-medium truncate">{t.nama}</p>
-                  <p className="text-[0.74em] truncate" style={{ color: WARNA.teks3 }}>
-                    {t.ket}
-                  </p>
-                </div>
-                <span className="text-[0.8em] font-semibold tabular-nums shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
-                  {t.nilai} jt
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+            tautan={{
+              label: semuaTransaksi ? 'Ringkas' : 'Lihat semua',
+              onClick: () => setSemuaTransaksi((v) => !v),
+              terbuka: semuaTransaksi,
+            }}
+          />
+        </KartuSumber>
 
-        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+        <KartuSumber
+          aktif={sumberAktif}
+          judul="Arus Kas"
+          sumber={sumberJudul?.['arus kas'] ?? []}
+          className={kartu()}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+        >
           <div className="flex items-start justify-between gap-[0.5em] mb-[0.3em] shrink-0">
             <div>
               <h3 className="text-[0.98em] font-semibold">Arus Kas</h3>
-              <p className="text-[0.8em]" style={{ color: WARNA.teks3 }}>
+              <p className="text-[0.8em]" style={{ color: TEKS3 }}>
                 {nilai?.areaSub || '29 hari terakhir'}
               </p>
             </div>
@@ -848,65 +578,77 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
               {ARUS_TUMBUH >= 0 ? '+' : ''}{String(ARUS_TUMBUH).replace('.', ',')}%
             </span>
           </div>
-          <Legenda item={[{ warna: WARNA.oranye, label: 'Arus kas bersih' }]} />
-          <div ref={areaRef} className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[8em]'} />
-        </div>
+          <WidgetChart
+            chartId="area-gradasi"
+            varian="ringkasan"
+            skala={skala}
+            data={{
+              // Label tanggal dari dokumen bila panjangnya cocok. Kalau tidak,
+              // susun sendiri: deret harian berakhir hari ini, bukan nomor urut.
+              kategori:
+                nilai?.areaLabel && nilai.areaLabel.length === ARUS_KAS.length
+                  ? nilai.areaLabel
+                  : labelHarian(ARUS_KAS.length),
+              seri: [{ nama: 'Arus kas bersih', data: ARUS_KAS }],
+              satuan: 'Miliar Rp',
+              desimal: 1,
+            }}
+            pembungkus={(o) => gayaReplika(o, gaya, 'area', kartuTerang)}
+            className={penuh ? 'w-full flex-1 min-h-0' : 'w-full h-[8em]'}
+          />
+        </KartuSumber>
 
-        <div className={kartu()} style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}>
+        <KartuSumber
+          aktif={sumberAktif}
+          judul="Progres Target"
+          sumber={sumberJudul?.['progres target'] ?? []}
+          className={kartu()}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          warnaTeks={TEKS}
+          warnaTeks2={TEKS2}
+          warnaTeks3={TEKS3}
+          warnaPanel={KARTU}
+          aksen={WARNA.oranye}
+        >
           <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
-          <ul className={`space-y-[0.7em] ${penuh ? 'flex-1 min-h-0 overflow-hidden' : ''}`}>
-            {TARGET.length === 0 && (
-              <li className="text-[0.78em]" style={{ color: WARNA.teks3 }}>
-                Belum ada angka capaian target di dokumen instansi.
-              </li>
-            )}
-            {TARGET.map((t) => (
-              <li key={t.nama}>
-                <div className="flex items-center justify-between text-[0.8em] mb-[0.3em]">
-                  <span style={{ color: WARNA.teks2 }}>{t.nama}</span>
-                  <span className="font-semibold tabular-nums">{t.capai}%</span>
-                </div>
-                <div className="h-[0.42em] rounded-full overflow-hidden" style={{ backgroundColor: WARNA.kartu2 }}>
-                  <div className="h-full rounded-full" style={{ width: `${t.capai}%`, backgroundColor: t.warna }} />
-                </div>
-                <div className="flex items-center gap-[0.3em] mt-[0.25em] text-[0.72em]" style={{ color: t.warna }}>
-                  <span className="w-[0.4em] h-[0.4em] rounded-full shrink-0" style={{ backgroundColor: t.warna }} />
-                  {t.status}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+          <WidgetChart
+            chartId="progres-target"
+            varian="ringkasan"
+            data={{
+              kategori: TARGET.map((t) => t.nama),
+              seri: [{ nama: 'Capaian', data: TARGET.map((t) => t.capai) }],
+              satuan: '%',
+              desimal: 1,
+            }}
+          />
+        </KartuSumber>
+      </BarisGeser>
 
       {/* ===== Strip insight ===== */}
-      <div
+      <KartuSumber
+        aktif={sumberAktif}
+        judul="Insight Keuangan"
+        sumber={sumberJudul?.['insight keuangan'] ?? []}
         className="rounded-[1.1em] p-[0.95em] flex items-center justify-between gap-[0.7em] shrink-0"
-        style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}` }}
+        kelasIsi="flex items-center justify-between gap-[0.7em] w-full"
+        tinggiBuka="9em"
+        style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+        warnaTeks={TEKS}
+        warnaTeks2={TEKS2}
+        warnaTeks3={TEKS3}
+        warnaPanel={KARTU}
+        aksen={WARNA.oranye}
       >
-        <div className="flex-1 min-w-0 flex items-start gap-[0.6em]">
-          <span
-            className="shrink-0 inline-flex items-center justify-center w-[2.2em] h-[2.2em] rounded-[0.75em]"
-            style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffb347)`, color: '#1a1206' }}
-          >
-            <TrendingUp className="w-[1.05em] h-[1.05em]" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[0.92em] font-semibold">Insight Keuangan</p>
-            <p
-              className="text-[0.8em] leading-relaxed"
-              style={{
-                color: WARNA.teks3,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {INSIGHT || 'Belum ada insight keuangan di dokumen instansi.'}
-            </p>
-          </div>
-        </div>
+        {/* Isi strip insight juga dari katalog (narasi-insight). */}
+        <WidgetChart
+          chartId="narasi-insight"
+          varian="ringkasan"
+          judul="Insight Keuangan"
+          ikon={TrendingUp}
+          teks={INSIGHT || 'Belum ada insight keuangan di dokumen instansi.'}
+          data={{ kategori: ['Insight Keuangan'], seri: [{ nama: 'Insight', data: [1] }] }}
+          className="flex-1 min-w-0"
+        />
         <button
           type="button"
           onClick={() => setLaporanRinci(true)}
@@ -917,7 +659,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
           Lihat Laporan Rinci
           <ArrowRight className="w-[0.95em] h-[0.95em]" />
         </button>
-      </div>
+      </KartuSumber>
 
       {/* ===== Panel Laporan Rinci ===== */}
       {laporanRinci && (
@@ -931,13 +673,13 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
         >
           <div
             className="w-full max-w-[46em] max-h-[88vh] overflow-auto gulir-tema rounded-[1.2em] p-[1.1em]"
-            style={{ backgroundColor: WARNA.kartu, border: `1px solid ${WARNA.garis}`, color: WARNA.teks }}
+            style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, color: TEKS }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-[0.7em] mb-[0.8em]">
               <div>
                 <h3 className="text-[1.05em] font-bold leading-tight">Laporan Rinci Keuangan</h3>
-                <p className="text-[0.78em] mt-[0.15em]" style={{ color: WARNA.teks3 }}>
+                <p className="text-[0.78em] mt-[0.15em]" style={{ color: TEKS3 }}>
                   Periode Mei 2025 · angka contoh (bukan data dokumen)
                 </p>
               </div>
@@ -947,7 +689,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
                 title="Tutup (Esc)"
                 aria-label="Tutup laporan"
                 className="shrink-0 inline-flex items-center justify-center w-[1.9em] h-[1.9em] rounded-full transition-colors hover:brightness-125"
-                style={{ border: `1px solid ${WARNA.garis}`, color: WARNA.teks2 }}
+                style={{ border: `1px solid ${GARIS}`, color: TEKS2 }}
               >
                 <X className="w-[1em] h-[1em]" />
               </button>
@@ -955,58 +697,51 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({ penuh = 
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-[0.5em] mb-[1em]">
               {KPI.map((k) => (
-                <div key={k.label} className="rounded-[0.7em] p-[0.6em]" style={{ backgroundColor: WARNA.kartu2 }}>
-                  <p className="text-[0.72em] leading-tight" style={{ color: WARNA.teks3 }}>
-                    {k.label}
-                  </p>
-                  <p className="text-[1em] font-bold tabular-nums mt-[0.25em]">{k.nilai}</p>
-                  <p className="text-[0.7em] mt-[0.15em]" style={{ color: k.delta === 0 ? '#6b7280' : k.delta > 0 ? WARNA.hijau : WARNA.merah }}>
-                    {k.delta === 0 ? '0' : `${k.delta > 0 ? '+' : ''}${String(k.delta).replace('.', ',')}`}% {k.deltaTeks}
-                  </p>
-                </div>
+                <WidgetChart
+                  key={k.label}
+                  chartId="kpi-strip"
+                  varian="ringkasan"
+                  data={{
+                    kategori: [k.label],
+                    seri: [{ nama: k.label, data: [0] }],
+                    satuan: '',
+                  }}
+                  teksAngka={k.nilai}
+                  className="rounded-[0.7em]"
+                />
               ))}
             </div>
 
             <p className="text-[0.88em] font-semibold mb-[0.4em]">Rincian Beban Operasional</p>
-            <table className="w-full text-[0.8em] mb-[1em]">
-              <thead>
-                <tr style={{ color: WARNA.teks3 }}>
-                  <th className="text-left font-medium pb-[0.3em]">Komponen</th>
-                  <th className="text-right font-medium pb-[0.3em]">Porsi</th>
-                  <th className="text-right font-medium pb-[0.3em]">Nominal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {RINCIAN_BEBAN.map((r) => (
-                  <tr key={r.nama} style={{ borderTop: `1px solid ${WARNA.garis}` }}>
-                    <td className="py-[0.35em]">
-                      <span className="inline-flex items-center gap-[0.4em]">
-                        <span className="w-[0.5em] h-[0.5em] rounded-full" style={{ backgroundColor: r.warna }} />
-                        {r.nama}
-                      </span>
-                    </td>
-                    <td className="py-[0.35em] text-right tabular-nums">{String(r.nilai).replace('.', ',')}%</td>
-                    <td className="py-[0.35em] text-right tabular-nums font-semibold">
-                      {((12347 * r.nilai) / 100 / 1000).toFixed(2).replace('.', ',')} M
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <WidgetChart
+              chartId="tabel-ringkas"
+              varian="ringkasan"
+              data={{
+                kategori: ['Rincian Beban Operasional', ...RINCIAN_BEBAN.map((r) => r.nama)],
+                seri: [
+                  { nama: 'Porsi (%)', data: RINCIAN_BEBAN.map((r) => r.nilai) },
+                  { nama: 'Nominal (M)', data: RINCIAN_BEBAN.map((r) => (12347 * r.nilai) / 100 / 1000) },
+                ],
+                desimal: 2,
+              }}
+              className="mb-[1em]"
+            />
 
             <p className="text-[0.88em] font-semibold mb-[0.4em]">Transaksi Terbaru</p>
-            <ul className="space-y-[0.35em]">
-              {[...TRANSAKSI_CONTOH, ...TRANSAKSI_LAIN_CONTOH].map((t) => (
-                <li key={t.nama} className="flex items-center justify-between gap-[0.5em] text-[0.8em]" style={{ borderTop: `1px solid ${WARNA.garis}` }}>
-                  <span className="py-[0.35em]">
-                    {t.nama} <span style={{ color: WARNA.teks3 }}>· {t.ket}</span>
-                  </span>
-                  <span className="tabular-nums font-semibold shrink-0" style={{ color: t.naik ? WARNA.hijau : WARNA.merah }}>
-                    {t.nilai} jt
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <WidgetChart
+              chartId="tabel-ringkas"
+              varian="ringkasan"
+              data={{
+                kategori: ['Transaksi Terbaru'],
+                seri: [{ nama: 'Nilai', data: [] }],
+              }}
+              baris={[...TRANSAKSI_CONTOH, ...TRANSAKSI_LAIN_CONTOH].map((t) => ({
+                judul: t.nama,
+                catatan: t.ket,
+                nilai: `${t.nilai} jt`,
+                arah: t.naik,
+              }))}
+            />
 
             <div className="flex justify-end mt-[1em]">
               <button

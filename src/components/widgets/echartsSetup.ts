@@ -4,7 +4,13 @@
  * Kenapa: `import('echarts')` menarik SELURUH pustaka (~1.12 MB) ke satu chunk.
  * Dengan mengimpor dari `echarts/core` + register manual, bundel menyusut ke
  * komponen yang benar-benar dirender (line/bar/pie/gauge/heatmap + grid, tooltip,
- * legend, visualMap, renderer canvas).
+ * legend, visualMap, polar, renderer canvas).
+ *
+ * PolarComponent WAJIB ada: grafik radial (angleAxis/radiusAxis) di halaman 3
+ * template Analitik memakainya. Tanpa ini ECharts melempar
+ * "Component angleAxis is used but not imported" lalu
+ * "Cannot read properties of undefined (reading 'findAxisModel')" dan seluruh
+ * kanvas jadi kosong.
  *
  * Pemakaian:
  *   const { init, graphic } = await loadEcharts();
@@ -39,6 +45,7 @@ import {
   MarkAreaComponent,
   DataZoomComponent,
   TransformComponent,
+  PolarComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsOption } from 'echarts';
@@ -69,6 +76,7 @@ echarts.use([
   MarkAreaComponent,
   DataZoomComponent,
   TransformComponent,
+  PolarComponent,
   CanvasRenderer,
 ]);
 

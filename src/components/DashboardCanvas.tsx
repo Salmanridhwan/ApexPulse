@@ -13,7 +13,6 @@ interface DashboardCanvasProps {
   onReorderWidgets: (orderedIds: string[]) => void;
   onResizeWidget: (widgetId: string, w: number) => void;
   /** Opsional: di halaman tautan publik tidak ada sesi instansi, jadi tidak ditampilkan. */
-  onOpenCatalog?: () => void;
   onOpenChat?: () => void;
   /** Mode lihat-saja (mis. saat filter dashboard aktif): matikan drag & resize. */
   readOnly?: boolean;
@@ -56,7 +55,6 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onDuplicateWidget,
   onReorderWidgets,
   onResizeWidget,
-  onOpenCatalog,
   onOpenChat,
   readOnly = false,
   preview = false,
@@ -344,7 +342,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           Bangun dashboard pertama Anda
         </h3>
         <p className="text-sm text-ink-2 max-w-md mt-1 mb-6">
-          {onOpenChat || onOpenCatalog
+          {onOpenChat
             ? 'Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.'
             : 'Dashboard ini belum memiliki widget. Tambahkan widget dari workspace Aiones Boards — halaman ini hanya mengubah widget yang sudah ada.'}
         </p>
@@ -356,15 +354,6 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
             >
               <Sparkles className="w-4 h-4" />
               <span>Buat via Chat</span>
-            </button>
-          )}
-          {onOpenCatalog && (
-            <button
-              onClick={onOpenCatalog}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control shadow-xs transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Pilih dari Katalog</span>
             </button>
           )}
         </div>

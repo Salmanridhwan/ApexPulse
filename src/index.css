@@ -542,6 +542,25 @@
   }
 }
 
+/* ANIMASI KARTU SUMBER (fitur "sumber data").
+   Ditulis di kelas CSS, bukan inline, supaya bisa dikecualikan dari aturan
+   prefers-reduced-motion di bawah. Animasi ini umpan balik fungsi: tanpa gerak,
+   pengguna tidak tahu kartunya sedang membuka sumber. */
+.kartu-sumber-kotak {
+  transition:
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    min-height 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kartu-sumber-depan,
+.kartu-sumber-panel {
+  transition:
+    opacity 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Hormati preferensi pengguna: matikan animasi/transisi non-esensial. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -551,6 +570,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* PENGECUALIAN: balik kartu sumber data (umpan balik fungsi, bukan hiasan). */
+  .kartu-sumber-kotak,
+  .kartu-sumber-depan,
+  .kartu-sumber-panel {
+    transition-duration: 420ms !important;
   }
   /* PENGECUALIAN: indikator proses (spinner & denyut status) tetap bergerak.
      Tanpa gerak, pengguna tidak bisa membedakan "sedang bekerja" dari "macet" —

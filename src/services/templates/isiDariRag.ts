@@ -136,8 +136,31 @@ function kueriKamus(w: WidgetSpec, jenis: string): string | null {
   return (
     `Ambil ${jenis} untuk ${cocok.istilah} dari dokumen resmi instansi ini. ` +
     `Gunakan istilah dan angka yang benar-benar tertulis di dokumen (laporan keuangan audited bila ada). ` +
-    `Wajib menyertakan nama dokumen dan halaman.`
+    `Wajib menyertakan nama dokumen dan halaman.` +
+    mintaDeret(w)
   );
+}
+
+/**
+ * Tambahan permintaan bentuk data. Satu angka membuat garis KPI rata dan kartu
+ * progres hanya berisi satu baris, jadi untuk jenis itu deret dan seluruh baris
+ * diminta eksplisit.
+ */
+function mintaDeret(w: WidgetSpec): string {
+  if (w.type === 'kpi' || w.type === 'gauge') {
+    return (
+      ' Sertakan juga deret angka per bulan (dua belas bulan terakhir) pada field sparkline ' +
+      'berupa larik angka dari bulan terlama ke terbaru. Bila dokumen hanya memuat satu angka, ' +
+      'biarkan sparkline kosong, jangan mengarang.'
+    );
+  }
+  if (w.type === 'bullet-target' || w.type === 'table') {
+    return (
+      ' Sertakan SELURUH baris program atau indikator yang ada di dokumen, masing-masing dengan ' +
+      'nama, target, realisasi, dan capaian. Jangan hanya mengambil satu baris.'
+    );
+  }
+  return '';
 }
 
 function kueriWidget(w: WidgetSpec, gaya: 'normal' | 'longgar' | 'kamus' = 'normal'): string | null {
@@ -155,14 +178,16 @@ function kueriWidget(w: WidgetSpec, gaya: 'normal' | 'longgar' | 'kamus' = 'norm
       `Ambil ${jenis} untuk indikator "${w.title}" dari dokumen resmi instansi ini. ` +
       `Pakai angka TERDEKAT yang benar-benar ada di dokumen (misalnya pendapatan, beban, laba, ` +
       `jumlah pelanggan, volume air, atau rasio yang tersedia) dan sebutkan dasar angkanya singkat. ` +
-      `Wajib menyertakan sumber: nama dokumen dan halaman.`
+      `Wajib menyertakan sumber: nama dokumen dan halaman.` +
+      mintaDeret(w)
     );
   }
   const sub = w.subtitle ? ` (${w.subtitle})` : '';
   return (
     `Ambil ${jenis} untuk indikator "${w.title}"${sub} dari dokumen resmi instansi ini. ` +
     `Gunakan angka yang BENAR-BENAR ada di dokumen beserta sumbernya (nama dokumen & halaman). ` +
-    `Kalau indikator ini tidak ada di dokumen, katakan tidak ada — jangan mengarang.`
+    `Kalau indikator ini tidak ada di dokumen, katakan tidak ada — jangan mengarang.` +
+    mintaDeret(w)
   );
 }
 

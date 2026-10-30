@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModalKonfirmasiDashboard } from '../components/ModalKonfirmasiDashboard';
 import {
   Activity,
   Building2,
@@ -45,6 +46,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   chatCounts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [buatOpen, setBuatOpen] = useState(false);
+  const [duplicateConfirmId, setDuplicateConfirmId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Filter dashboards: hanya pencarian teks. Sektor tidak difilter karena daftar
@@ -111,6 +114,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             />
           </div>
 
+          <button
+            onClick={() => setBuatOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs shrink-0 w-full sm:w-auto"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Dashboard Baru
+          </button>
         </div>
 
         {/* Dashboard Grid */}
@@ -127,7 +137,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             </p>
             <div className="flex items-center justify-center gap-3">
               <button
-                onClick={onCreateDashboard}
+                onClick={() => setBuatOpen(true)}
                 className="px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs"
               >
                 + Dashboard Baru
@@ -251,40 +261,20 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       </button>
 
                       <button
-                        onClick={() => onDuplicateDashboard(dash)}
+                        onClick={() => setDuplicateConfirmId(dash.id)}
                         className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
                         title="Duplikat Dashboard"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
 
-                      {deleteConfirmId === dash.id ? (
-                        <div className="flex items-center gap-1 bg-neg/15 p-0.5 rounded-control border border-neg/30">
-                          <button
-                            onClick={() => {
-                              onDeleteDashboard(dash.id);
-                              setDeleteConfirmId(null);
-                            }}
-                            className="px-2 py-1 bg-neg text-on-neg rounded-chip text-[10px] font-bold hover:bg-neg"
-                          >
-                            Hapus
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="px-1.5 py-1 text-ink-2 text-[10px] hover:bg-line rounded-chip"
-                          >
-                            Batal
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirmId(dash.id)}
-                          className="p-1.5 text-ink-3 hover:text-neg hover:bg-neg/10 rounded-control transition-colors"
-                          title="Hapus Dashboard"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setDeleteConfirmId(dash.id)}
+                        className="p-1.5 text-ink-3 hover:text-neg hover:bg-neg/10 rounded-control transition-colors"
+                        title="Hapus Dashboard"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -294,6 +284,37 @@ export const DashboardList: React.FC<DashboardListProps> = ({
           </div>
         )}
       </div>
+      {buatOpen && (
+        <ModalKonfirmasiDashboard
+          aksi="buat"
+          onBatal={() => setBuatOpen(false)}
+          onKonfirmasi={() => {
+            setBuatOpen(false);
+            onCreateDashboard();
+          }}
+        />
+      )}
+      {duplicateConfirmId && dashboards.find((d) => d.id === duplicateConfirmId) && (
+        <ModalKonfirmasiDashboard
+          aksi="duplikat"
+          dashboard={dashboards.find((d) => d.id === duplicateConfirmId)!}
+          onBatal={() => setDuplicateConfirmId(null)}
+          onKonfirmasi={() => {
+            onDuplicateDashboard(dashboards.find((d) => d.id === duplicateConfirmId)!);
+            setDuplicateConfirmId(null);
+          }}
+        />
+      )}
+      {deleteConfirmId && dashboards.find((d) => d.id === deleteConfirmId) && (
+        <ModalKonfirmasiDashboard
+          dashboard={dashboards.find((d) => d.id === deleteConfirmId)!}
+          onBatal={() => setDeleteConfirmId(null)}
+          onKonfirmasi={() => {
+            onDeleteDashboard(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

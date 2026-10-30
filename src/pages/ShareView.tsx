@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Database, Lock, Pencil, Shield, ShieldCheck, X } from 'lucide-react';
 import { LogoTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { GlobalFiltersBar } from '../components/GlobalFiltersBar';
+import { GlobalFiltersBar, cocokFilter } from '../components/GlobalFiltersBar';
 import { ActiveChartFilterChip, ChartSelectionProvider } from '../components/widgets/ChartSelection';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
 import { DashboardCanvas } from '../components/DashboardCanvas';
@@ -112,16 +112,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
 
   const widgets: WidgetSpec[] = dashboard?.widgets ?? [];
 
-  const widgetsTampil = useMemo(
-    () =>
-      widgets.filter(
-        (w) =>
-          (filters.kategori === 'Semua' || w.category === filters.kategori) &&
-          (filters.unitKerja === 'Semua' || w.unitKerja === filters.unitKerja) &&
-          (filters.periode === 'Semua' || w.periode === filters.periode)
-      ),
-    [widgets, filters]
-  );
+  const widgetsTampil = useMemo(() => widgets.filter((w) => cocokFilter(w, filters)), [widgets, filters]);
 
   const adaFilter =
     new Set(widgets.map((w) => w.periode).filter(Boolean)).size > 1 ||

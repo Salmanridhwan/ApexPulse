@@ -5,6 +5,9 @@ import { useChartSelection } from './ChartSelection';
 import { RingGauge3D } from './RingGauge3D';
 import { useAksenKanvas, useThemeMode } from '../../theme';
 import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
+import { buildOpsi } from '../../services/chart/chartDefault';
+import { chartIdDariTipe } from '../../services/chart/petaTipe';
+import { GAYA } from '../../services/chart/gayaVarian';
 import { terapkanGaya } from './widgetStyle';
 import { WidgetType, type WidgetStyle } from '../../types';
 
@@ -246,7 +249,39 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       };
 
       let option: EChartsOption;
-      if (type === 'pie' || type === 'donut') {
+
+      // Dashboard biasa memakai wajah katalog bila tipenya sudah punya wajah.
+      // Warnanya mengikuti tema kanvas, bentuknya tetap milik template chart.
+      const wajah = chartIdDariTipe(type);
+      const pakaiKatalog = Boolean(wajah) && seriesView.length > 0 && (xView.length > 0 || type === 'pie' || type === 'donut');
+      const gayaKanvas = {
+        ...GAYA.ringkasan,
+        aksen: T.accent,
+        aksen2: T.accentSoft,
+        latar: T.surface,
+        kartu: T.surface,
+        kartu2: T.grid,
+        garis: T.grid,
+        teks: T.strong,
+        teks2: T.text2,
+        teks3: T.muted,
+        palet: T.series,
+      } as typeof GAYA.ringkasan;
+
+      if (pakaiKatalog && wajah) {
+        const kategori = type === 'pie' || type === 'donut' ? pieView.map((d) => d.name) : xView;
+        const seri =
+          type === 'pie' || type === 'donut'
+            ? [{ nama: seriesView[0]?.name || 'Nilai', data: pieView.map((d) => d.value) }]
+            : seriesView.map((sr) => ({ nama: sr.name, data: sr.data }));
+        option = buildOpsi(
+          wajah,
+          { kategori, seri, satuan: displayUnit, desimal: 1 },
+          'ringkasan',
+          1,
+          gayaKanvas,
+        ).opsi as EChartsOption;
+      } else if (type === 'pie' || type === 'donut') {
         option = buildChartOption(type, {
           ...chartData,
           xAxis: pieView.map((d) => d.name),

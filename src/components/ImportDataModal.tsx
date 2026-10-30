@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   CheckCircle2,
   FileSpreadsheet,
@@ -106,6 +107,10 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
   const [galat, setGalat] = useState('');
   const [peringatan, setPeringatan] = useState<string[]>([]);
   const [sukses, setSukses] = useState(false);
+  /** Tipe MIME berkas asal — dipakai server saat menyimpan ke Repositori Dokumen. */
+  const [tipeBerkas, setTipeBerkas] = useState('');
+  /** Hasil penyimpanan berkas ke repositori (null = belum/tidak tersimpan). */
+  const [repositori, setRepositori] = useState<{ nama: string; kb?: string | null; rag?: string; galat?: string } | null>(null);
   const [seretAktif, setSeretAktif] = useState(false);
 
   // Konfigurasi pemetaan.
@@ -153,6 +158,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
     }
     setMemuat(true);
     setNamaBerkas(file.name);
+    setTipeBerkas(file.type || '');
     try {
       const b64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -223,6 +229,8 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
         body: JSON.stringify({
           isi: isiBase64,
           sheet: sheetTerpilih || undefined,
+          nama: namaBerkas || undefined,
+          tipe: tipeBerkas || undefined,
           konfig: {
             tipe,
             judul,
@@ -239,9 +247,17 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
         throw new Error(data?.error || 'Gagal membangun widget dari berkas.');
       }
       setPeringatan(Array.isArray(data.peringatan) ? data.peringatan : []);
+      setRepositori(
+        data.berkas
+          ? { nama: data.berkas.nama, kb: data.knowledgeBase, rag: data.berkas.ragStatus }
+          : data.peringatanBerkas
+            ? { nama: namaBerkas, galat: String(data.peringatanBerkas) }
+            : null
+      );
       await onAddWidget(data.widget as WidgetSpec);
       setSukses(true);
-      setTimeout(() => tutup(), 900);
+      // Beri waktu membaca status penyimpanan berkas sebelum modal menutup.
+      setTimeout(() => tutup(), 2200);
     } catch (err) {
       setGalat((err as Error).message || 'Gagal menyimpan widget.');
     } finally {
@@ -320,9 +336,26 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
           )}
 
           {sukses && (
-            <div className="mb-4 flex items-center gap-2 p-3 rounded-control bg-success/10 border border-success/30 text-[12px] text-success">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Widget berhasil ditambahkan ke dashboard.</span>
+            <div className="mb-4 space-y-1.5 p-3 rounded-control bg-success/10 border border-success/30 text-[12px] text-success">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Widget berhasil ditambahkan ke dashboard.</span>
+              </div>
+              {repositori?.galat ? (
+                <div className="flex items-start gap-2 text-warn">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{repositori.galat}</span>
+                </div>
+              ) : repositori ? (
+                <div className="flex items-start gap-2 text-ink-2">
+                  <Archive className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Berkas <span className="font-semibold text-ink">{repositori.nama}</span> juga tersimpan di Repositori
+                    Dokumen{repositori.kb ? ` · basis dokumen ${repositori.kb}` : ''}
+                    {repositori.rag ? ` · status indeks: ${repositori.rag}` : ''}.
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
 

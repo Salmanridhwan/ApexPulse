@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ModalKonfirmasiDashboard } from './components/ModalKonfirmasiDashboard';
 import {
   Activity,
   AlertCircle,
@@ -18,7 +19,6 @@ import {
   Maximize2,
   Menu,
   Palette,
-  Plus,
   Presentation,
   Printer,
   Search,
@@ -29,7 +29,6 @@ import {
   Users,
 } from 'lucide-react';
 import { AlertsModal } from './components/AlertsModal';
-import { CatalogModal } from './components/CatalogModal';
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
@@ -43,7 +42,21 @@ import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
 import { MENU_KINERJA, menuTampil } from './components/menuKinerja';
-import { GlobalFiltersBar } from './components/GlobalFiltersBar';
+import {
+  nilaiDariWidgets,
+  nilaiAnalitikDariWidgets,
+  nilaiTrafikDariWidgets,
+} from './services/templates/nilaiTemplate';
+import { GlobalFiltersBar, cocokFilter } from './components/GlobalFiltersBar';
+import { HalamanTabs } from './components/HalamanTabs';
+import {
+  daftarHalaman,
+  halamanBaru as buatHalamanBaru,
+  halamanAktif as ambilHalamanAktif,
+  proyeksi,
+  tulisProyeksi,
+} from './services/dashboard/halaman';
+import type { TataLetakBaris } from './types';
 import { PresentationMode } from './components/PresentationMode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
@@ -59,6 +72,42 @@ import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 const Admin = React.lazy(() =>
   import('./pages/Admin').then((m) => ({ default: m.Admin }))
 );
+/**
+ * HALAMAN AKTIF DISIMPAN DI URL (#/v/<halaman>[/d/<id dashboard>]).
+ *
+ * Tanpa ini, menekan refresh mengembalikan pengguna ke daftar Workspace walau
+ * ia sedang membuka dashboard tertentu. Hash dipakai (bukan path) supaya server
+ * statis tidak perlu aturan tambahan, dan tautannya tetap bisa dibagikan.
+ */
+const HALAMAN_SAH = [
+  'dashboards',
+  'workspace',
+  'audit',
+  'alerts',
+  'charts',
+  'templates',
+  'pelaporan',
+  'auditTl',
+  'keuangan',
+  'risiko',
+  'aset',
+  'pk',
+  'lkjip',
+  'berkas',
+  'admin',
+] as const;
+
+type Halaman = (typeof HALAMAN_SAH)[number];
+
+const bacaHash = (): { halaman: Halaman | null; dashboard: string | null } => {
+  const m = window.location.hash.match(/^#\/v\/([A-Za-z]+)(?:\/d\/([\w-]+))?/);
+  const kandidat = m?.[1] as Halaman | undefined;
+  return {
+    halaman: kandidat && HALAMAN_SAH.includes(kandidat) ? kandidat : null,
+    dashboard: m?.[2] || null,
+  };
+};
+
 const DashboardList = React.lazy(() =>
   import('./pages/DashboardList').then((m) => ({ default: m.DashboardList }))
 );
@@ -153,7 +202,10 @@ export default function App() {
   // App Core State
   // Tampilan awal SELALU daftar Workspace ("Semua Dashboard"), bukan salah satu
   // dashboard: pengguna memilih sendiri kanvas yang mau dibuka.
-  const [viewMode, setViewMode] = useState<'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'pelaporan' | 'auditTl' | 'keuangan' | 'risiko' | 'aset' | 'pk' | 'lkjip' | 'berkas' | 'admin'>('dashboards');
+  const hashAwal = useRef(bacaHash());
+  const [viewMode, setViewMode] = useState<Halaman>(hashAwal.current.halaman ?? 'dashboards');
+  /** Dashboard yang harus dibuka lagi setelah daftar selesai dimuat (dari URL). */
+  const dashPulihkan = useRef<string | null>(hashAwal.current.dashboard);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
 
@@ -187,20 +239,39 @@ export default function App() {
     const res = await fetch(`/api/dashboards/${activeDashboard.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ widgets, tenantId: currentTenant.id }),
+      body: JSON.stringify({
+        widgets,
+        gaya: activeDashboard.gaya,
+        halaman: tulisProyeksi(activeDashboard),
+        halamanAktifId: activeDashboard.halamanAktifId || daftarHalaman(activeDashboard)[0]?.id,
+        tenantId: currentTenant.id,
+      }),
     });
     if (!res.ok) console.error('Gagal menyimpan widget:', res.status);
   };
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   /**
-   * Dashboard hasil template tampil dengan komponen replika (sama seperti
-   * pratinjau data asli). Tombol "Ubah tata letak" membukanya sebagai kanvas
-   * widget biasa supaya tetap bisa diedit.
+   * Dashboard hasil template dibuka dengan desain template (replika yang sama
+   * dengan pratinjau data asli). `tampilWidget` membukanya sebagai kanvas widget
+   * supaya tata letaknya bisa diubah — kanvas widget tidak memakai tata letak
+   * template, jadi desainnya memang berbeda saat mode ini aktif.
    */
   const [tampilWidget, setTampilWidget] = useState(false);
-  // Setiap dashboard dibuka, kembalikan ke tampilan template (bila ada replika).
+  /** Draft tata letak kartu desain template; null = belum ada perubahan. */
+  const [drafTataLetak, setDrafTataLetak] = useState<Record<string, TataLetakBaris> | null>(null);
+  /**
+   * Daftar widget SEBELUM perubahan yang belum disimpan. Selama tidak null, kanvas
+   * berisi perubahan (mis. widget baru dari katalog) yang menunggu tombol Simpan.
+   */
+  const [drafWidgetAwal, setDrafWidgetAwal] = useState<WidgetSpec[] | null>(null);
+  /** Gaya dashboard sebelum diubah dari panel Gaya; null = belum ada perubahan. */
+  const [drafGaya, setDrafGaya] = useState<{ nilai?: WidgetStyle } | null>(null);
   useEffect(() => {
     setTampilWidget(false);
+    // Draft tata letak dan draft widget tidak boleh terbawa ke dashboard lain.
+    setDrafTataLetak(null);
+    setDrafWidgetAwal(null);
+    setDrafGaya(null);
   }, [activeDashboard?.id]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Drawer navigasi mobile: sidebar disembunyikan di <md, dibuka sebagai overlay.
@@ -219,7 +290,6 @@ export default function App() {
 
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isGlobalStyleOpen, setIsGlobalStyleOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -383,6 +453,16 @@ export default function App() {
         setActiveDashboard((sebelumnya) =>
           sebelumnya ? data.find((d) => d.id === sebelumnya.id) || null : null
         );
+        // Kembali ke dashboard yang sedang dibuka sebelum halaman di-refresh.
+        const idPulih = dashPulihkan.current;
+        if (idPulih) {
+          const d = data.find((x) => x.id === idPulih);
+          if (d) {
+            dashPulihkan.current = null;
+            setActiveDashboard(d);
+            setViewMode('workspace');
+          }
+        }
       })
       .catch((err) => console.error('Fetch dashboards error:', err));
 
@@ -525,11 +605,7 @@ export default function App() {
     const updatedWidgets = activeDashboard.widgets.map((w) =>
       w.id === updatedWidget.id ? updatedWidget : w
     );
-    const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
-
-    terapkanDashboard(updatedDashboard);
-
-    await simpanWidget(updatedWidgets);
+    terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets });
   };
 
   /**
@@ -539,22 +615,51 @@ export default function App() {
    * perlu mengatur warna/font satu per satu. Disimpan sekali lewat PATCH yang
    * sama dengan penyimpanan widget biasa.
    */
-  const handleApplyStyleToAll = async (style: WidgetStyle | undefined) => {
+  /**
+   * Terapkan gaya dari panel Gaya.
+   *
+   * `target` adalah sasaran PALET WARNA: `'semua'`, id widget, atau kunci grafik
+   * template. Warna kartu, font, dan ukuran font SELALU berlaku untuk semua
+   * widget — hanya palet yang bisa dibatasi ke satu grafik.
+   */
+  const handleApplyStyleToAll = (style: WidgetStyle | undefined, target = 'semua') => {
     if (!activeDashboard || !currentTenant) return;
-    // Warna KARTU berlaku untuk semua kartu (termasuk tabel & narasi, karena
-    // warna latar dipasang di pembungkus kartunya). Field khusus CHART
-    // (palet/font/ketebalan) hanya bermakna untuk tipe yang menggambar chart —
-    // jangan disimpan di tabel/narasi supaya tidak jadi data mati.
+    // Seperti tambah widget: masuk kanvas dulu, penyimpanan lewat tombol Simpan.
+    setDrafWidgetAwal((awal) => awal ?? activeDashboard.widgets);
+    setDrafGaya((awal) => awal ?? { nilai: activeDashboard.gaya });
+
+    const dasar = activeDashboard.gaya || {};
+    const palet = style?.palette;
+    const seri = style?.warnaSeri?.length ? style.warnaSeri : undefined;
+
+    const gayaDashboard: WidgetStyle = {
+      ...dasar,
+      kartu: style?.kartu,
+      font: style?.font,
+      fontUkuran: style?.fontUkuran,
+      palette: target === 'semua' ? palet : dasar.palette,
+      warnaSeri: target === 'semua' ? seri : dasar.warnaSeri,
+      chart:
+        target === 'semua'
+          ? dasar.chart
+          : { ...(dasar.chart || {}), [target]: palet || 'default' },
+    };
+
     const updatedWidgets = activeDashboard.widgets.map((w) => {
-      if (tipePunyaGaya(w.type)) return { ...w, style };
-      // Tabel/narasi: simpan HANYA warna kartunya.
-      return { ...w, style: style?.kartu ? { kartu: style.kartu } : undefined };
+      const kenaPalet = target === 'semua' || w.id === target;
+      const gayaWidget: WidgetStyle = {
+        ...(w.style || {}),
+        kartu: gayaDashboard.kartu,
+        font: gayaDashboard.font,
+        fontUkuran: gayaDashboard.fontUkuran,
+        palette: kenaPalet ? palet : w.style?.palette,
+        warnaSeri: kenaPalet ? seri : w.style?.warnaSeri,
+      };
+      // Tabel/narasi tidak menggambar chart: simpan hanya warna kartunya.
+      return { ...w, style: tipePunyaGaya(w.type) ? gayaWidget : gayaDashboard.kartu ? { kartu: gayaDashboard.kartu } : undefined };
     });
-    const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
-    terapkanDashboard(updatedDashboard);
-
-    await simpanWidget(updatedWidgets);
+    terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets, gaya: gayaDashboard });
   };
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -609,14 +714,203 @@ export default function App() {
     await simpanWidget(updatedWidgets);
   };
 
-  const handleAddWidgetFromCatalog = async (widget: WidgetSpec) => {
+  /** Gaya kartu yang dipakai dashboard aktif (widget pertama yang punya gaya). */
+    /** Grafik yang bisa dipilih sebagai sasaran palet pada desain template. */
+  const GRAFIK_TEMPLATE: Record<string, Array<{ id: string; label: string }>> = {
+    'tpl-ringkasan': [
+      { id: 'bar', label: 'Pendapatan & Beban' },
+      { id: 'donut', label: 'Rincian Beban' },
+      { id: 'area', label: 'Arus Kas' },
+    ],
+    'tpl-analitik': [
+      { id: 'area', label: 'Grafik area' },
+      { id: 'batang', label: 'Grafik batang' },
+      { id: 'donat', label: 'Grafik donat' },
+      { id: 'kategori', label: 'Kategori' },
+      { id: 'jam', label: 'Per jam' },
+      { id: 'bayar', label: 'Metode bayar' },
+      { id: 'konversi', label: 'Konversi' },
+    ],
+    'tpl-trafik': [
+      { id: 'trafik', label: 'Sumber trafik' },
+      { id: 'relevansi', label: 'Dinamika relevansi' },
+      { id: 'usia', label: 'Usia pengunjung' },
+      { id: 'perangkat', label: 'Jenis perangkat' },
+      { id: 'perilaku', label: 'Perilaku' },
+    ],
+  };
+
+  const targetPalet = useMemo(() => {
+    if (activeDashboard?.replika) return GRAFIK_TEMPLATE[activeDashboard.replika.templateId] || [];
+    return (activeDashboard?.widgets || []).map((w) => ({ id: w.id, label: w.title }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDashboard?.replika?.templateId, activeDashboard?.widgets]);
+
+  const gayaDashboardAktif = useMemo(
+    () => activeDashboard?.gaya ?? activeDashboard?.widgets?.find((w) => w.style)?.style,
+    [activeDashboard?.gaya, activeDashboard?.widgets]
+  );
+
+  /** Font panel Gaya berlaku untuk SELURUH teks di kanvas, bukan hanya grafik. */
+  const fontKanvas = gayaDashboardAktif?.font
+    ? `'${gayaDashboardAktif.font}', 'Inter', system-ui, sans-serif`
+    : undefined;
+
+  /**
+   * HALAMAN DASHBOARD — pindah, tambah, ganti nama, hapus, geser.
+   *
+   * Isi halaman sekarang ditulis balik ke `halaman[]` sebelum berpindah, lalu
+   * halaman tujuan diproyeksikan ke field lama (`widgets`, `replika`, ...) supaya
+   * seluruh kanvas dan presentasi tetap bekerja tanpa perubahan.
+   */
+  const halamanDashboard = useMemo(() => daftarHalaman(activeDashboard), [activeDashboard]);
+  const halamanSekarang = useMemo(() => ambilHalamanAktif(activeDashboard), [activeDashboard]);
+
+  /**
+   * ISI PRESENTASI PER HALAMAN.
+   *
+   * Mode presentasi multi-halaman: satu halaman = satu slide besar. Tiap halaman
+   * dihitung angkanya sendiri dari widget-nya (desain template tetap sama), dan
+   * halaman kanvas widget memakai `widgets` halaman itu.
+   */
+  const halamanPresentasi = useMemo(() => {
+    if (!activeDashboard) return undefined;
+    const semua = halamanDashboard;
+    if (semua.length < 2) return undefined;
+    const filterDashboard = activeDashboard.globalFilters;
+    return semua.map((h) => {
+      const widgetsH = (h.widgets || []).filter((w) => cocokFilter(w, h.globalFilters ?? filterDashboard));
+      const tid = h.replika?.templateId;
+      if (!tid) return { id: h.id, judul: h.judul, widgets: h.widgets || [] };
+      const nilai =
+        tid === 'tpl-analitik'
+          ? nilaiAnalitikDariWidgets(widgetsH)
+          : tid === 'tpl-trafik'
+            ? nilaiTrafikDariWidgets(widgetsH)
+            : nilaiDariWidgets(widgetsH);
+      const tataLetakH = h.tataLetak?.[tid];
+      const props = {
+        penuh: true,
+        nilai: nilai as never,
+        warnaKartu: gayaDashboardAktif?.kartu,
+        gaya: gayaDashboardAktif,
+        tataLetak: tataLetakH,
+      };
+      const konten =
+        tid === 'tpl-analitik' ? (
+          <DashboardAnalitik {...props} />
+        ) : tid === 'tpl-trafik' ? (
+          <DashboardTrafik {...props} />
+        ) : (
+          <DashboardReferensi {...props} />
+        );
+      return { id: h.id, judul: h.judul, konten };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDashboard, halamanDashboard, gayaDashboardAktif]);
+
+
+  const pindahHalaman = (id: string) => {
+    const d = activeDashboard;
+    if (!d || id === (d.halamanAktifId || halamanSekarang?.id)) return;
+    const semua = tulisProyeksi(d);
+    const tujuan = semua.find((h) => h.id === id);
+    if (!tujuan) return;
+    // Perubahan yang belum disimpan tetap di memori (ikut tertulis di halaman),
+    // tetapi draft antar-halaman tidak boleh tercampur.
+    setDrafTataLetak(null);
+    setDrafWidgetAwal(null);
+    setDrafGaya(null);
+    terapkanDashboard({ ...d, ...proyeksi(tujuan), halaman: semua, halamanAktifId: id });
+  };
+
+  /** Simpan struktur halaman (tambah/ganti nama/hapus/geser) ke server. */
+  const simpanStrukturHalaman = (semua: ReturnType<typeof tulisProyeksi>, aktifId: string) => {
+    const d = activeDashboard;
+    if (!d) return;
+    const tujuan = semua.find((h) => h.id === aktifId) || semua[0];
+    terapkanDashboard({ ...d, ...proyeksi(tujuan), halaman: semua, halamanAktifId: tujuan.id });
+    void fetch(`/api/dashboards/${d.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ halaman: semua, halamanAktifId: tujuan.id, tenantId: currentTenant?.id }),
+    }).catch(() => undefined);
+  };
+
+  /**
+   * Tambah halaman. Dashboard hasil template diisi server dengan angka dokumen
+   * yang belum dipakai halaman lain (desain tetap sama). Bila server belum punya
+   * angka lain, halaman tetap dibuat kosong dan pengguna diberi tahu.
+   */
+  const tambahHalaman = () => {
+    const d = activeDashboard;
+    if (!d) return;
+    const semua = tulisProyeksi(d);
+    const nomor = semua.length + 1;
+
+    if (d.replika && currentTenant) {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/dashboards/${d.id}/halaman`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId: currentTenant.id, judul: `Halaman ${nomor}` }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const baru = data.halaman;
+            simpanStrukturHalaman([...semua, baru], baru.id);
+            if (data.peringatan) window.alert(data.peringatan);
+            return;
+          }
+        } catch {
+          /* jaringan gagal: buat halaman kosong di bawah */
+        }
+        const cadangan = buatHalamanBaru(nomor, halamanSekarang);
+        simpanStrukturHalaman([...semua, cadangan], cadangan.id);
+      })();
+      return;
+    }
+
+    const baru = buatHalamanBaru(nomor, halamanSekarang);
+    simpanStrukturHalaman([...semua, baru], baru.id);
+  };
+
+  const gantiNamaHalaman = (id: string, judul: string) => {
+    const d = activeDashboard;
+    if (!d) return;
+    const semua = tulisProyeksi(d).map((h) => (h.id === id ? { ...h, judul } : h));
+    simpanStrukturHalaman(semua, d.halamanAktifId || semua[0].id);
+  };
+
+  const hapusHalaman = (id: string) => {
+    const d = activeDashboard;
+    if (!d) return;
+    const semua = tulisProyeksi(d).filter((h) => h.id !== id);
+    if (semua.length === 0) return;
+    const aktifBaru = semua[0].id;
+    simpanStrukturHalaman(semua, aktifBaru);
+  };
+
+  const geserHalaman = (dari: number, ke: number) => {
+    const d = activeDashboard;
+    if (!d) return;
+    const semua = [...tulisProyeksi(d)];
+    if (ke < 0 || ke >= semua.length) return;
+    const [pindah] = semua.splice(dari, 1);
+    semua.splice(ke, 0, pindah);
+    simpanStrukturHalaman(semua, d.halamanAktifId || semua[0].id);
+  };
+
+  /**
+   * Widget baru (dari Impor Data) masuk KANVAS DAHULU, belum disimpan.
+   * Pemilik dashboard masih bisa Reset atau Simpan seperti menggeser kartu.
+   */
+  const handleAddWidgetFromCatalog = (widget: WidgetSpec) => {
     if (!activeDashboard || !currentTenant) return;
+    setDrafWidgetAwal((awal) => awal ?? activeDashboard.widgets);
     const updatedWidgets = [widget, ...activeDashboard.widgets];
-    const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
-
-    terapkanDashboard(updatedDashboard);
-
-    await simpanWidget(updatedWidgets);
+    terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets });
   };
 
   // Handler for Global Filters
@@ -665,12 +959,85 @@ export default function App() {
   const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.isRead).length : 0;
 
   // Widget yang benar-benar tampil di kanvas internal setelah filter view-only diterapkan.
-  const widgetsTampilInternal = (activeDashboard?.widgets || []).filter(
-    (w) =>
-      (viewFilters.kategori === 'Semua' || w.category === viewFilters.kategori) &&
-      (viewFilters.unitKerja === 'Semua' || w.unitKerja === viewFilters.unitKerja) &&
-      (viewFilters.periode === 'Semua' || w.periode === viewFilters.periode)
-  );
+  const widgetsTampilInternal = (activeDashboard?.widgets || []).filter((w) => cocokFilter(w, viewFilters));
+
+  // Simpan halaman aktif ke URL supaya refresh tidak melempar pengguna ke daftar.
+  useEffect(() => {
+    if (!currentUser) return;
+    const tujuan = `#/v/${viewMode}${viewMode === 'workspace' && activeDashboard ? `/d/${activeDashboard.id}` : ''}`;
+    if (window.location.hash !== tujuan) window.history.replaceState(null, '', tujuan);
+  }, [viewMode, activeDashboard?.id, currentUser]);
+  /**
+   * Angka untuk dashboard hasil template. Dihitung ULANG dari widget yang lolos
+   * filter, bukan dari nilai yang tersimpan saat dashboard dibuat — tanpa ini
+   * memilih kategori atau periode tidak mengubah apa pun di tampilan template.
+   */
+  const nilaiReplika = useMemo(() => {
+    const tid = activeDashboard?.replika?.templateId;
+    if (!tid) return null;
+    if (tid === 'tpl-analitik') return nilaiAnalitikDariWidgets(widgetsTampilInternal);
+    if (tid === 'tpl-trafik') return nilaiTrafikDariWidgets(widgetsTampilInternal);
+    return nilaiDariWidgets(widgetsTampilInternal);
+  }, [activeDashboard?.replika?.templateId, widgetsTampilInternal]);
+
+  /**
+   * TATA LETAK KARTU DESAIN TEMPLATE — DRAFT, BUKAN LANGSUNG DISIMPAN.
+   *
+   * Selama pemilik dashboard menggeser atau mengubah ukuran kartu, hasilnya hanya
+   * disimpan di `drafTataLetak`. Baru dikirim ke server saat menekan Simpan di
+   * ujung kanan baris filter, dan bisa dibatalkan dengan Reset.
+   */
+  const templateAktif = activeDashboard?.replika?.templateId;
+  const tataLetakTersimpan = templateAktif ? activeDashboard?.tataLetak?.[templateAktif] : undefined;
+  const tataLetakAktif = drafTataLetak ?? tataLetakTersimpan ?? {};
+  const tataLetakBerubah = useMemo(() => {
+    if (drafWidgetAwal || drafGaya) return true;
+    if (!drafTataLetak) return false;
+    return JSON.stringify(drafTataLetak) !== JSON.stringify(tataLetakTersimpan ?? {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drafTataLetak, drafWidgetAwal, drafGaya, activeDashboard?.tataLetak, templateAktif]);
+
+  /** Setiap gerakan kartu hanya memperbarui draft. */
+  const ubahTataLetak = (baru: Record<string, TataLetakBaris>) => setDrafTataLetak(baru);
+
+  /** Simpan draft ke server, lalu jadikan patokan baru. */
+  const simpanTataLetak = () => {
+    const d = activeDashboard;
+    if (!d) return;
+
+    // Widget baru yang masih draft ikut disimpan di sini.
+    if (drafWidgetAwal || drafGaya) {
+      void simpanWidget(d.widgets);
+      setDrafWidgetAwal(null);
+      setDrafGaya(null);
+    }
+
+    if (!templateAktif || !drafTataLetak) return;
+    const tataLetakBaru = { ...(d.tataLetak || {}), [templateAktif]: drafTataLetak };
+    setActiveDashboard({ ...d, tataLetak: tataLetakBaru });
+    setDashboards((daftar) => daftar.map((x) => (x.id === d.id ? { ...x, tataLetak: tataLetakBaru } : x)));
+    setDrafTataLetak(null);
+    void fetch(`/api/dashboards/${d.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tataLetak: tataLetakBaru }),
+    }).catch(() => undefined);
+  };
+
+  /** Buang draft, kembali ke kondisi yang tersimpan. */
+  const resetTataLetak = () => {
+    setDrafTataLetak(null);
+    if (activeDashboard && (drafWidgetAwal || drafGaya)) {
+      terapkanDashboard({
+        ...activeDashboard,
+        widgets: drafWidgetAwal ?? activeDashboard.widgets,
+        gaya: drafGaya ? drafGaya.nilai : activeDashboard.gaya,
+      });
+      setDrafWidgetAwal(null);
+      setDrafGaya(null);
+    }
+  };
+
   const filterAktif =
     viewFilters.periode !== 'Semua' ||
     viewFilters.unitKerja !== 'Semua' ||
@@ -897,18 +1264,6 @@ export default function App() {
 
               <div className="h-5 w-px bg-line shrink-0" />
 
-              {/* Tambah dashboard baru (hanya di galeri) */}
-              {viewMode === 'dashboards' && (
-                <button
-                  onClick={() => { setViewMode('workspace'); handleCreateDashboard(); }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                  title="Buat dashboard baru"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Baru</span>
-                </button>
-              )}
-
 
 
               {/* More menu (hanya di workspace) */}
@@ -956,33 +1311,13 @@ export default function App() {
 
                         {activeDashboard && (
                           <div className="mt-1 pt-1 border-t border-line">
-                            {hapusKonfirmasi ? (
-                              <div className="mx-1 my-1 p-2.5 rounded-control bg-neg/15 border border-neg/30">
-                                <p className="text-[11px] text-neg font-medium mb-2">Hapus dashboard ini?</p>
-                                <div className="flex gap-1.5">
-                                  <button
-                                    onClick={() => { setHapusKonfirmasi(false); setIsMoreMenuOpen(false); handleDeleteDashboard(activeDashboard.id); }}
-                                    className="flex-1 px-2 py-1.5 bg-neg hover:bg-neg text-on-neg rounded-control text-[11px] font-bold transition-colors"
-                                  >
-                                    Ya, Hapus
-                                  </button>
-                                  <button
-                                    onClick={() => setHapusKonfirmasi(false)}
-                                    className="flex-1 px-2 py-1.5 bg-surface text-ink-2 hover:bg-surface-2 border border-line rounded-control text-[11px] transition-colors"
-                                  >
-                                    Batal
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setHapusKonfirmasi(true)}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-neg hover:bg-neg/10 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                                <span>Hapus Dashboard</span>
-                              </button>
-                            )}
+                            <button
+                              onClick={() => { setIsMoreMenuOpen(false); setHapusKonfirmasi(true); }}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-neg hover:bg-neg/10 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Hapus Dashboard</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -998,7 +1333,9 @@ export default function App() {
       {/* ================= BODY CONTAINER (MAIN CONTENT) ================= */}
 
         {/* ================= MAIN CONTENT VIEWPORT ================= */}
-        <div className={`flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto transition-[padding] duration-200 ${isChatOpen ? 'lg:pr-[440px]' : ''}`}>
+        <div className={`flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto transition-[padding] duration-200 ${
+          isChatOpen || isGlobalStyleOpen ? 'lg:pr-[440px]' : ''
+        }`}>
           {viewMode === 'admin' && currentUser?.role === 'admin' ? (
             <React.Suspense fallback={pageFallback}>
               <Admin
@@ -1050,7 +1387,7 @@ export default function App() {
                     onBackToWorkspace={() => setViewMode('workspace')}
                   />
                 </React.Suspense>
-              ) : viewMode === 'audit' ? (
+              ) : viewMode === 'audit' && currentUser?.role === 'admin' ? (
                 <React.Suspense fallback={pageFallback}>
                   <AuditLogPage
                     tenantId={currentTenant?.id || 'tenant-pdam'}
@@ -1066,9 +1403,7 @@ export default function App() {
                 </React.Suspense>
               ) : viewMode === 'charts' ? (
                 <React.Suspense fallback={pageFallback}>
-                  <ChartGalleryPage
-                    onBukaKatalog={() => setIsCatalogOpen(true)}
-                  />
+                  <ChartGalleryPage />
                 </React.Suspense>
               ) : viewMode === 'templates' ? (
                 <React.Suspense fallback={pageFallback}>
@@ -1146,6 +1481,7 @@ export default function App() {
                   className={`flex-1 w-full ${
                     activeDashboard?.tema ? `tema-${activeDashboard.tema} bg-canvas` : ''
                   }`}
+                  style={fontKanvas ? { fontFamily: fontKanvas } : undefined}
                 >
                   {/* Tema template (bila ada) membungkus seluruh isi kanvas supaya
                       latar, kartu, dan aksen sama dengan pratinjau template. */}
@@ -1195,14 +1531,11 @@ export default function App() {
                           <span className="hidden sm:inline">Impor Data</span>
                         </button>
                         <button
-                          onClick={() => setIsCatalogOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                        >
-                          <Plus className="w-3 h-3 text-ink-3" />
-                          <span className="hidden sm:inline">Tambah Widget</span>
-                        </button>
-                        <button
-                          onClick={() => setIsGlobalStyleOpen(true)}
+                          onClick={() => {
+                            // Hanya satu panel kanan yang boleh terbuka.
+                            setIsChatOpen(false);
+                                  setIsGlobalStyleOpen(true);
+                          }}
                           disabled={!activeDashboard?.widgets?.length}
                           title={
                             activeDashboard?.widgets?.length
@@ -1225,22 +1558,17 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Alih tampilan untuk dashboard hasil template */}
-                  {activeDashboard?.replika && !isPresentationMode && (
-                    <div className="mb-2.5 flex items-center gap-2">
-                      <span className="text-[11px] font-medium text-ink-3">
-                        {tampilWidget
-                          ? 'Tampilan widget: susunan bisa diedit'
-                          : 'Tampilan template: sama dengan pratinjau data asli'}
-                      </span>
-                      <button
-                        onClick={() => setTampilWidget((v) => !v)}
-                        data-testid="alih-tampilan-replika"
-                        className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
-                      >
-                        {tampilWidget ? 'Kembali ke tampilan template' : 'Ubah tata letak'}
-                      </button>
-                    </div>
+                  {/* Strip halaman dashboard (1 halaman atau lebih) */}
+                  {activeDashboard && (
+                    <HalamanTabs
+                      halaman={halamanDashboard}
+                      aktifId={activeDashboard.halamanAktifId}
+                      onPilih={pindahHalaman}
+                      onTambah={tambahHalaman}
+                      onGantiNama={gantiNamaHalaman}
+                      onHapus={hapusHalaman}
+                      onGeser={geserHalaman}
+                    />
                   )}
 
                   {/* Filter dashboard internal (view-only, ala Tableau) */}
@@ -1251,6 +1579,9 @@ export default function App() {
                         onChange={setViewFilters}
                         widgets={activeDashboard.widgets}
                         shownCount={widgetsTampilInternal.length}
+                        tataLetakBerubah={tataLetakBerubah}
+                        onSimpanTataLetak={simpanTataLetak}
+                        onResetTataLetak={resetTataLetak}
                       />
                     </div>
                   )}
@@ -1262,11 +1593,29 @@ export default function App() {
                   {activeDashboard?.replika && !tampilWidget ? (
                     <div className="pb-4">
                       {activeDashboard.replika.templateId === 'tpl-analitik' ? (
-                        <DashboardAnalitik nilai={activeDashboard.replika.nilai as never} />
+                        <DashboardAnalitik
+                          nilai={nilaiReplika as never}
+                          warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+                          onTataLetak={ubahTataLetak}
+                        />
                       ) : activeDashboard.replika.templateId === 'tpl-trafik' ? (
-                        <DashboardTrafik nilai={activeDashboard.replika.nilai as never} />
+                        <DashboardTrafik
+                          nilai={nilaiReplika as never}
+                          warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+                          onTataLetak={ubahTataLetak}
+                        />
                       ) : (
-                        <DashboardReferensi nilai={activeDashboard.replika.nilai as never} />
+                        <DashboardReferensi
+                          nilai={nilaiReplika as never}
+                          warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+                          onTataLetak={ubahTataLetak}
+                        />
                       )}
                     </div>
                   ) : (
@@ -1282,8 +1631,10 @@ export default function App() {
                     onDuplicateWidget={handleDuplicateWidget}
                     onReorderWidgets={handleReorderWidgets}
                     onResizeWidget={handleResizeWidget}
-                    onOpenCatalog={() => setIsCatalogOpen(true)}
-                    onOpenChat={() => setIsChatOpen(true)}
+                    onOpenChat={() => {
+                      setIsGlobalStyleOpen(false);
+                      setIsChatOpen(true);
+                    }}
                   />
                   </ChartSelectionProvider>
                   )}
@@ -1324,9 +1675,39 @@ export default function App() {
       {isPresentationMode && activeDashboard && (
         <PresentationMode
           dashboard={activeDashboard}
+          halaman={halamanPresentasi}
           tenantName={currentTenant?.name}
           tenantId={currentTenant?.id}
           onExit={() => setIsPresentationMode(false)}
+          konten={
+            activeDashboard.replika && !tampilWidget ? (
+              activeDashboard.replika.templateId === 'tpl-analitik' ? (
+                <DashboardAnalitik
+                penuh
+                nilai={nilaiReplika as never}
+                warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+              />
+              ) : activeDashboard.replika.templateId === 'tpl-trafik' ? (
+                <DashboardTrafik
+                penuh
+                nilai={nilaiReplika as never}
+                warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+              />
+              ) : (
+                <DashboardReferensi
+                penuh
+                nilai={nilaiReplika as never}
+                warnaKartu={gayaDashboardAktif?.kartu}
+                          gaya={gayaDashboardAktif}
+                tataLetak={tataLetakAktif}
+              />
+              )
+            ) : undefined
+          }
           onUpdate={(d) => {
             setActiveDashboard(d);
             setDashboards((prev) => [d, ...prev.filter((x) => x.id !== d.id)]);
@@ -1339,7 +1720,7 @@ export default function App() {
       <PemberitahuanVersi />
 
       {/* Tombol buka asisten (hanya tampil saat panel chat tertutup) */}
-      {!isPresentationMode && !isChatOpen && (
+      {!isPresentationMode && !isChatOpen && !isGlobalStyleOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
           data-testid="buka-asisten"
@@ -1351,15 +1732,6 @@ export default function App() {
         </button>
       )}
 
-      {/* 2. Katalog Preset Widget (modal layar penuh) */}
-      <CatalogModal
-        isOpen={isCatalogOpen}
-        onClose={() => setIsCatalogOpen(false)}
-        sector={currentTenant?.sector || 'pdam'}
-        tenantId={currentTenant?.id}
-        onAddWidget={handleAddWidgetFromCatalog}
-      />
-
       {/* 3. Widget Editor & F-14 Manual Correction Modal */}
       <WidgetEditorModal
         isOpen={!!editingWidget}
@@ -1369,12 +1741,13 @@ export default function App() {
         initialTab={editorTab}
       />
 
-      {/* 4. Gaya Semua Widget — tombolnya ada di toolbar kanvas, sebelah "Tambah Widget" */}
+      {/* 4. Panel Gaya Widget — tombolnya ada di toolbar kanvas */}
       <GlobalStyleModal
         isOpen={isGlobalStyleOpen}
         onClose={() => setIsGlobalStyleOpen(false)}
         jumlahWidget={activeDashboard?.widgets?.length || 0}
-        styleAwal={activeDashboard?.widgets?.find((w) => w.style)?.style}
+        styleAwal={gayaDashboardAktif}
+        targetPalet={targetPalet}
         onApply={handleApplyStyleToAll}
       />
 
@@ -1396,6 +1769,14 @@ export default function App() {
         dashboard={activeDashboard}
         tenantId={currentTenant?.id}
       />
+
+      {hapusKonfirmasi && activeDashboard && (
+        <ModalKonfirmasiDashboard
+          dashboard={activeDashboard}
+          onBatal={() => setHapusKonfirmasi(false)}
+          onKonfirmasi={() => { setHapusKonfirmasi(false); handleDeleteDashboard(activeDashboard.id); }}
+        />
+      )}
 
       {/* 8. Export Printable Executive Report Modal */}
       <ExportModal

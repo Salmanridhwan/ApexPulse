@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect } from 'react';
-import { Sparkles, X } from 'lucide-react';
-import type { Dashboard } from '../types';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react';
+import type { Dashboard, WidgetSpec } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
 
@@ -17,12 +17,21 @@ interface PresentationModeProps {
    * Kartu juga tidak menampilkan menu ⋯ karena widget belum nyata.
    */
   pratinjau?: boolean;
+  /** Teks penanda pratinjau (default: angka contoh). */
+  labelPratinjau?: string;
   /**
    * Isi pengganti kanvas. Dipakai galeri template yang menampilkan TAMPILAN
    * REFERENSI (bukan widget kanvas biasa): presentasi menampilkan tampilan itu
    * apa adanya di layar penuh.
    */
   konten?: React.ReactNode;
+  /**
+   * HALAMAN DASHBOARD. Bila berisi lebih dari satu halaman, presentasi menjadi
+   * satu halaman = satu slide besar, dengan tombol panah dan tombol ← →.
+   * `konten` dipakai halaman yang memakai desain template, `widgets` untuk
+   * halaman kanvas widget biasa.
+   */
+  halaman?: Array<{ id: string; judul: string; konten?: React.ReactNode; widgets?: WidgetSpec[] }>;
 }
 
 /**
@@ -42,8 +51,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   tenantName,
   onExit,
   pratinjau = false,
+  labelPratinjau = 'Pratinjau template · angka contoh',
   konten,
+  halaman,
 }) => {
+  /** Halaman yang sedang dipresentasikan (0 = halaman pertama). */
+  const [indeks, setIndeks] = useState(0);
+  const multi = Boolean(halaman && halaman.length > 1);
+  const halamanKini = multi ? halaman?.[Math.min(indeks, (halaman?.length || 1) - 1)] : undefined;
   // Minta layar penuh sekali saat masuk (tanpa tombol; kalau browser menolak,
   // overlay tetap tampil penuh satu layar).
   useEffect(() => {
@@ -72,14 +87,21 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
     onExit();
   }, [onExit]);
 
-  // Esc keluar dari presentasi (sekaligus layar penuh).
+  // Esc keluar, panah kiri/kanan pindah halaman.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') keluar();
+      if (e.key === 'Escape') return keluar();
+      if (!multi) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        setIndeks((i) => Math.min(i + 1, (halaman?.length || 1) - 1));
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        setIndeks((i) => Math.max(i - 1, 0));
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [keluar]);
+  }, [keluar, multi, halaman?.length]);
 
   return (
     <div
@@ -98,14 +120,45 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
               {dashboard.title}
             </h1>
             {tenantName && <p className="text-[11px] text-ink-3 truncate">{tenantName}</p>}
+            {multi && halamanKini && (
+              <p className="text-[11px] text-ink-2 truncate mt-0.5">
+                <span className="font-semibold text-ink">{halamanKini.judul}</span>
+                <span className="text-ink-3"> · halaman {Math.min(indeks, (halaman?.length || 1) - 1) + 1} dari {halaman?.length}</span>
+              </p>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {multi && (
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                title="Halaman sebelumnya (←)"
+                onClick={() => setIndeks((i) => Math.max(i - 1, 0))}
+                disabled={indeks === 0}
+                className="p-2 text-ink-2 bg-surface hover:bg-surface-2 hover:text-ink border border-line rounded-control transition-colors disabled:opacity-40"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-1 text-[11px] font-semibold text-ink-2 tabular-nums">
+                {Math.min(indeks, (halaman?.length || 1) - 1) + 1}/{halaman?.length}
+              </span>
+              <button
+                type="button"
+                title="Halaman berikutnya (→)"
+                onClick={() => setIndeks((i) => Math.min(i + 1, (halaman?.length || 1) - 1))}
+                disabled={indeks >= (halaman?.length || 1) - 1}
+                className="p-2 text-ink-2 bg-surface hover:bg-surface-2 hover:text-ink border border-line rounded-control transition-colors disabled:opacity-40"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </span>
+          )}
           {pratinjau && (
             <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-chip text-[10px] font-bold text-warn bg-warn/10 border border-warn/30">
               <Sparkles className="w-3 h-3" />
-              Pratinjau template · angka contoh
+              {labelPratinjau}
             </span>
           )}
           <button
@@ -121,9 +174,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
 
       {/* ===== Seluruh dashboard dalam satu halaman ===== */}
       <main className={`flex-1 min-h-0 ${konten ? 'overflow-hidden' : 'overflow-auto gulir-tema'}`}>
-        {konten ?? (
+        {(halamanKini?.konten ?? konten) ?? (
           <DashboardCanvas
-            widgets={dashboard.widgets}
+            widgets={halamanKini?.widgets ?? dashboard.widgets}
             satuHalaman
             readOnly
             preview={pratinjau}

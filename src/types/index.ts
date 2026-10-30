@@ -213,6 +213,12 @@ export interface WidgetStyle {
    * perhitungan kontras WCAG (lihat `widgetCardTheme.ts`) supaya tetap terbaca.
    */
   kartu?: string;
+  /**
+   * Palet khusus per grafik pada desain template, mis. `{ bar: 'brand' }`.
+   * Kunci mengikuti grafik di template (bar, donut, area, trafik, ...).
+   * Kosong = seluruh grafik memakai `palette`.
+   */
+  chart?: Record<string, string>;
 }
 
 export interface WidgetSpec {
@@ -368,6 +374,23 @@ export interface GlobalFilters {
   kategori: string; // 'Semua' | 'Keuangan' | 'Operasional' | 'Pelayanan'
 }
 
+/**
+ * TATA LETAK KARTU PADA DESAIN TEMPLATE.
+ *
+ * Komponen replika (`DashboardReferensi`, `DashboardAnalitik`, `DashboardTrafik`)
+ * menyusun kartu dalam beberapa baris grid. Pemilik aplikasi ingin susunan itu
+ * bisa diubah langsung di kanvas tanpa mematikan desain template, jadi urutan
+ * dan lebar tiap kartu disimpan per baris (`grupId`).
+ */
+export interface TataLetakBaris {
+  /** Urutan id kartu. Id yang tidak tercatat ditaruh di belakang, urutan aslinya. */
+  urut?: string[];
+  /** Lebar kartu dalam satuan kolom grid (1..jumlah kolom baris). */
+  lebar?: Record<string, number>;
+  /** Tinggi kartu dalam piksel, bila pemilik dashboard menarik sisi atas/bawah. */
+  tinggi?: Record<string, number>;
+}
+
 export interface Dashboard {
   id: string;
   tenantId: string;
@@ -383,6 +406,18 @@ export interface Dashboard {
    * "desain dan warnanya sama persis"). Kosong = ikut tema aplikasi.
    */
   tema?: string;
+  /**
+   * Gaya global dashboard (panel Gaya Widget). Dipakai juga oleh desain template,
+   * yang tidak membaca `widget.style`, supaya warna kartu tetap bisa diubah.
+   */
+  gaya?: WidgetStyle;
+  /**
+   * TATA LETAK KARTU DESAIN TEMPLATE (opsional).
+   *
+   * Kunci luar = id template (`tpl-ringkasan`, `tpl-analitik`, `tpl-trafik`),
+   * nilainya peta `grupId` → urutan dan lebar kartu. Kosong = susunan asli.
+   */
+  tataLetak?: Record<string, Record<string, TataLetakBaris>>;
   /**
    * JEJAK TEMPLATE (opsional).
    *
@@ -409,6 +444,39 @@ export interface Dashboard {
     /** Kapan terakhir disusun/digenerate. */
     disusunAt?: string;
     /** Versi skema slide saat disusun (lihat VERSI_PRESENTASI). */
+    versi?: number;
+  };
+  /**
+   * HALAMAN DASHBOARD (2-10 halaman atau lebih).
+   *
+   * Sumber kebenaran isi dashboard: tiap halaman punya widget, desain template,
+   * tata letak, dan filter sendiri. Field lama di atas (widgets, replika,
+   * tataLetak, globalFilters, presentasi) hanya cermin halaman yang sedang
+   * dibuka. Dashboard lama tanpa `halaman` dianggap satu halaman.
+   */
+  halaman?: HalamanDashboard[];
+  /** Id halaman yang sedang dibuka. */
+  halamanAktifId?: string;
+}
+
+/**
+ * Satu halaman dashboard. Isinya terpisah dari halaman lain: kartu, angka,
+ * tata letak, dan filternya sendiri.
+ */
+export interface HalamanDashboard {
+  id: string;
+  judul: string;
+  widgets: WidgetSpec[];
+  /** Tata letak kartu desain template, kunci = id template. */
+  tataLetak?: Record<string, Record<string, TataLetakBaris>>;
+  /** Jejak template halaman ini: desain sama, angka berbeda. */
+  replika?: { templateId: string; nilai: unknown };
+  /** Filter khusus halaman; kosong = ikut filter dashboard. */
+  globalFilters?: GlobalFilters;
+  /** Rencana slide halaman ini. */
+  presentasi?: {
+    slides: SlidePresentasi[];
+    disusunAt?: string;
     versi?: number;
   };
 }

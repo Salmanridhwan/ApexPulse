@@ -128,7 +128,7 @@ const narasi = (
 // ============================================================================
 const TEMPLATE_RINGKASAN: DashboardTemplate = {
   id: 'tpl-ringkasan',
-  nama: 'Ringkasan Eksekutif',
+  nama: 'Pijar',
   tujuan:
     'Memberi pimpinan gambaran menyeluruh dalam satu layar: saldo kas, pendapatan, beban, laba, tren bulanan, komposisi beban, transaksi terbaru, arus kas, dan progres target — tanpa membuka laporan.',
   caraPenyampaian:
@@ -137,7 +137,7 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   fokus: ['Saldo & laba', 'Tren pendapatan', 'Komposisi beban', 'Arus kas', 'Progres target'],
   aksen: '#1fa6cc',
   tema: 'oranye',
-  judulDashboard: 'Ringkasan Eksekutif (Contoh)',
+  judulDashboard: 'Pijar (Contoh)',
   deskripsiDashboard:
     'Empat KPI berikon, grafik batang pendapatan, cincin rincian beban dengan total di tengah, daftar transaksi terbaru, area arus kas, tiga bar progres target, dan strip insight — seluruhnya dalam satu layar. Seluruh angka ilustrasi.',
   widgets: [
@@ -208,7 +208,7 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
 // ============================================================================
 const TEMPLATE_ANALITIK: DashboardTemplate = {
   id: 'tpl-analitik',
-  nama: 'Analitik Bisnis Harian',
+  nama: 'Lensa',
   tujuan:
     'Memantau kinerja bisnis harian: pendapatan, jumlah pesanan, pengguna, rasio konversi, status pesanan, sumber kunjungan, pesanan terbaru, nilai pesanan per kategori, pesanan per jam, metode pembayaran, dan tren konversi.',
   caraPenyampaian:
@@ -217,7 +217,7 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Nilai per kategori', 'Metode pembayaran'],
   aksen: '#3b82f6',
   tema: 'analitik',
-  judulDashboard: 'Analitik Bisnis Harian (Contoh)',
+  judulDashboard: 'Lensa (Contoh)',
   deskripsiDashboard:
     'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, batang nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi. Seluruh angka ilustrasi.',
   widgets: [
@@ -284,7 +284,7 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
 // ============================================================================
 const TEMPLATE_TRAFIK: DashboardTemplate = {
   id: 'tpl-trafik',
-  nama: 'Trafik Web & Perilaku',
+  nama: 'Nadi',
   tujuan:
     'Memantau trafik situs dan perilaku pengunjung: rasio pentalan, kedalaman halaman, waktu di situs, pengunjung baru, sumber trafik, dinamika relevansi, komposisi usia, halaman populer, jenis perangkat, sistem operasi, dan frasa pencarian.',
   caraPenyampaian:
@@ -293,7 +293,7 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   fokus: ['Sumber trafik', 'Perilaku pengunjung', 'Usia & perangkat', 'Halaman populer', 'Frasa pencarian'],
   aksen: '#22d3ee',
   tema: 'trafik',
-  judulDashboard: 'Trafik Web & Perilaku (Contoh)',
+  judulDashboard: 'Nadi (Contoh)',
   deskripsiDashboard:
     'Tampilan contoh mengikuti referensi ketiga: 5 KPI bersparkline, batang sumber trafik, garis relevansi, komposisi usia, halaman populer, cincin perangkat, alat ukur perilaku, sistem operasi, dan frasa pencarian. Seluruh angka ilustrasi.',
   widgets: [
