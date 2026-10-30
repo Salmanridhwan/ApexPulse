@@ -1,0 +1,3804 @@
+[
+ {
+  "id": "dash-1792064648222",
+  "judul": "Kinerja Perumda Tirta Moedal 2026",
+  "sebelum": 20,
+  "sesudah": 10,
+  "data": {
+   "id": "dash-1792064648222",
+   "title": "Kinerja Perumda Tirta Moedal 2026",
+   "sector": "pdam",
+   "widgets": [
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "%",
+      "value": "96,2"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Ketepatan Waktu Tanggap",
+     "insight": "Ketepatan waktu tanggap 96,2% menandakan layanan Perumda Air Minum Tirta Moedal Kota Semarang sudah melampaui target dan tren indikatif membaik. Pola ini kemungkinan didorong penguatan SOP penanganan gangguan, verifikasi cepat, dan pengelolaan work order terukur. Manajemen perlu menjaga konsistensi serta mewaspadai…",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perusahaan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 1 | Ketepatan waktu tanggap | ≥ 95% | 96,2% | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perusahaan",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.807Z"
+    },
+    {
+     "id": "w-kpi-2",
+     "kpi": {
+      "unit": "%",
+      "value": "93,5"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 3,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Penyelesaian Sesuai SLA",
+     "insight": "Capaian penyelesaian sesuai SLA sebesar 93,5% dengan tren indikatif positif menunjukkan keandalan proses penanganan gangguan mulai membaik. Perbaikan ini patut dijaga melalui pemantauan berita acara dan evaluasi berkala, agar peningkatan tidak berbalik menurun pada periode berikutnya.",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perusahaan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-2",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 2 | Penyelesaian dalam SLA | ≥ 92% | 93,5% | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perusahaan",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.813Z"
+    },
+    {
+     "id": "w-kpi-3",
+     "kpi": {
+      "unit": "%",
+      "value": "87,1"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 6,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Kepuasan Pengguna Penanganan",
+     "insight": "Capaian kepuasan pengguna atas penanganan gangguan sudah melampaui target dan tren indikatifnya menanjak, menandakan mutu layanan serta respons petugas semakin membaik. Agar tren ini terjaga, evaluasi berkala dan perbaikan preventif atas gangguan berulang perlu terus dijalankan.",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perusahaan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-3",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 3 | Kepuasan pengguna atas penanganan | ≥ 85 | 87,1 | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perusahaan",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.813Z"
+    },
+    {
+     "id": "w-kpi-4",
+     "kpi": {
+      "unit": "%",
+      "value": "98,7"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 9,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Ketepatan Pengisian Berita Acara",
+     "insight": "Ketepatan pengisian berita acara mencapai 98,7% terhadap target 100%, sehingga masih ada celah kecil pada kelengkapan dokumentasi penyelesaian pekerjaan meski tren indikatif membaik. Penyebab yang mungkin adalah kedisiplinan pengisian di lapangan atau validasi administrasi yang belum konsisten. Bagi pengambil…",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perusahaan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-4",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 4 | Ketepatan pengisian berita acara | 100% | 98,7% | Hampir |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perusahaan",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.813Z"
+    },
+    {
+     "id": "w-kpi-5",
+     "kpi": {
+      "unit": "%",
+      "value": "99,7"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Capaian Pelaksanaan Pekerjaan",
+     "insight": "Capaian pelaksanaan pekerjaan Perumda Air Minum Tirta Moedal Kota Semarang menunjukkan tren positif dengan capaian mendekati sempurna dan indikasi perbaikan, sejalan dengan SOP yang menetapkan target waktu tanggap serta status capaian indikator pada halaman tersebut. Perhatian utama direksi adalah konsistensi…",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perusahaan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-5",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| JUMLAH | 14.400 | 14.354 | 99.7% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perusahaan",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.813Z"
+    },
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "%",
+      "value": "99,7"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 4,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Realisasi pendapatan usaha dibandingkan…",
+     "insight": "Realisasi pendapatan usaha sepanjang 2026 hanya sedikit di bawah target, dengan fluktuasi bulanan yang masih terkendali. Tren indikatif positif ini menunjukkan kinerja komersial relatif stabil, namun capaian yang belum sepenuhnya sesuai target menuntut perhatian pada bulan-bulan lemah dan penguatan strategi pendapatan.",
+     "periode": "2026",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 1,
+       "docName": "PRJ-TIRTAMOEDAL_rkap_Rencana_Kerja_dan_Anggaran_Perusahaan_RKAP_2026.pdf",
+       "chunkSnippet": "| JUMLAH | 18.000 | 17.943 | 99.7% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:36.368Z"
+    },
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "Rp juta",
+      "value": "1.201.293.410"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 8,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Laba bersih sebelum pajak triwulan ini…",
+     "insight": "Angka ini berasal dari total rincian anggaran per komponen pekerjaan RKAP 2026, bukan laba bersih sebelum pajak, sehingga tren 6,4% tidak dapat dimaknai sebagai kinerja profitabilitas. Perlu verifikasi ulang label widget dan sumber data laba sebelum dijadikan dasar keputusan.",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perumda Air Minum Tirta Moedal…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_rkap_Rencana_Kerja_dan_Anggaran_Perusahaan_RKAP_2026.pdf",
+       "chunkSnippet": "| | TOTAL | | | | 1.201.293.410 |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perumda Air Minum Tirta Moedal Kota…",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:35.746Z"
+    },
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "unit",
+      "value": "1201293410"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 6
+     },
+     "type": "kpi",
+     "title": "Deviden disetor ke kas daerah (setara…",
+     "insight": "Setoran deviden ke kas daerah menunjukkan tren indikatif naik, menandakan kinerja keuangan Perumda Air Minum Tirta Moedal membaik dan kontribusinya terhadap pendapatan daerah menguat. Namun angka ini berasal dari rincian anggaran RKAP yang bersifat ilustratif, sehingga pengambil keputusan perlu memverifikasi…",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Perumda Air Minum Tirta Moedal…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_rkap_Rencana_Kerja_dan_Anggaran_Perusahaan_RKAP_2026.pdf",
+       "chunkSnippet": "| | TOTAL | | | | 1.201.293.410 |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perumda Air Minum Tirta Moedal Kota…",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:44.626Z"
+    },
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "%",
+      "value": "87,1"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 6,
+      "y": 6
+     },
+     "type": "kpi",
+     "title": "Kepuasan pengguna atas penanganan…",
+     "insight": "Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai.",
+     "periode": "2026",
+     "category": "Keuangan",
+     "subtitle": "Unit Pengendali Mutu",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 3 | Kepuasan pengguna atas penanganan | ≥ 85 | 87,1 | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Unit Pengendali Mutu",
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:58.930Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 9
+     },
+     "type": "line",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "Jan",
+       "Feb",
+       "Mar",
+       "Apr",
+       "Mei",
+       "Jun",
+       "Jul",
+       "Agu",
+       "Sep",
+       "Okt",
+       "Nov",
+       "Des"
+      ],
+      "series": [
+       {
+        "data": [
+         97.5,
+         98.8,
+         100,
+         101.2,
+         102.5,
+         97.5,
+         98.8,
+         100,
+         101.2,
+         102.5,
+         97.5,
+         98.8
+        ],
+        "name": "Capaian",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Tren Capaian Pekerjaan Bulanan 2026",
+     "insight": "Capaian pekerjaan bulanan 2026 berfluktuasi antara 97,5% dan 102,5%, dengan puncak pada April–Mei dan Oktober, serta titik terendah pada Januari, Juni, dan November. Pola ini mengindikasikan kapasitas pelaksanaan belum sepenuhnya stabil antar bulan, sehingga pengambil keputusan perlu mewaspadai bulan-bulan rawan dan…",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| Januari | 1.164 | 1.135 | 97.5% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.813Z"
+    },
+    {
+     "id": "w-grafik-2",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 13
+     },
+     "type": "combo",
+     "chart": {
+      "unit": "unit",
+      "xAxis": [
+       "Jan",
+       "Feb",
+       "Mar",
+       "Apr",
+       "Mei",
+       "Jun",
+       "Jul",
+       "Agu",
+       "Sep",
+       "Okt",
+       "Nov",
+       "Des"
+      ],
+      "series": [
+       {
+        "data": [
+         1164,
+         1200,
+         1236,
+         1164,
+         1200,
+         1236,
+         1164,
+         1200,
+         1236,
+         1164,
+         1200,
+         1236
+        ],
+        "name": "Target",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         1135,
+         1185,
+         1236,
+         1179,
+         1230,
+         1205,
+         1149,
+         1200,
+         1251,
+         1193,
+         1170,
+         1221
+        ],
+        "name": "Realisasi",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Jan s.d. Des Target dan Realisasi",
+     "insight": "Secara umum realisasi berkisar mendekati target dengan capaian tahunan 99,7%, namun pola naik-turun menunjukkan bulan tertentu berpotensi kurang optimal. Selisih tipis ini menuntut perhatian pada konsistensi jadwal dan kesiapan sumber daya agar capaian tidak berfluktuasi.",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "unit",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-2",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| Januari | 1.164 | 1.135 | 97.5% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.816Z"
+    },
+    {
+     "id": "w-grafik-3",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 17
+     },
+     "type": "hbar",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "Unit 15",
+       "Unit 13",
+       "Unit 11",
+       "Unit 9",
+       "Unit 7",
+       "Unit 5",
+       "Unit 3",
+       "Unit 1"
+      ],
+      "series": [
+       {
+        "data": [
+         90,
+         91,
+         92,
+         93,
+         94,
+         95,
+         96,
+         96.9
+        ],
+        "name": "Capaian",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Capaian Kinerja per Unit Pelaksana",
+     "insight": "Terdapat kesenjangan kinerja antar unit pelaksana: unit bernomor besar (11-15) konsisten di bawah 93%, sedangkan unit kecil (1-7) mendekati atau di atas 95%. Pola ini mengindikasikan beban kerja atau kapasitas unit besar perlu ditinjau ulang, sehingga perbaikan dan pemerataan target menjadi perhatian manajemen.",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-3",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 15 | Unit kerja 15 | 95 | 3055 | 2749 | 90.0% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.816Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 21
+     },
+     "type": "line",
+     "chart": {
+      "unit": "pekerjaan",
+      "xAxis": [
+       "Jan",
+       "Feb",
+       "Mar",
+       "Apr",
+       "Mei",
+       "Jun"
+      ],
+      "series": [
+       {
+        "data": [
+         1164,
+         1200,
+         1236,
+         1164,
+         1200,
+         1236
+        ],
+        "name": "Target",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         1135,
+         1185,
+         1236,
+         1179,
+         1230,
+         1205
+        ],
+        "name": "Realisasi",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Jumlah Pekerjaan Gangguan Suplai & Kebocoran per Bulan…",
+     "insight": "Pada semester pertama 2026, realisasi penanganan gangguan suplai dan kebocoran umumnya masih di bawah target, sehingga capaian belum sepenuhnya sesuai rencana. Pola ini dapat mengindikasikan beban kerja lapangan atau kendala operasional yang perlu ditelusuri, sehingga manajemen disarankan memperkuat pemantauan SLA…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "pekerjaan",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "Jadwal Pelaksanaan Bulanan Target dan realisasi pelaksanaan pekerjaan per bulan: | Bulan | Target (pekerjaan) | Realisasi (pekerjaan) | % Capaian | | Januari | 1.164 | 1.135 | 97.5% | | Februari | 1.200 | 1.185 | 98.8% | | Maret | 1.236 | 1.236 | 100.0% | | April | 1.164 | 1.179 | 101.2% | | Mei | 1.200 | 1.230 | 102.5% | | Juni | 1.236 | 1.205 | 97.5% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:36.227Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 25
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "pekerjaan",
+      "xAxis": [
+       "Januari",
+       "Februari",
+       "Maret",
+       "April",
+       "Mei",
+       "Juni"
+      ],
+      "series": [
+       {
+        "data": [
+         1164,
+         1200,
+         1236,
+         1164,
+         1200,
+         1236
+        ],
+        "name": "Target",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         1135,
+         1185,
+         1236,
+         1179,
+         1230,
+         1205
+        ],
+        "name": "Realisasi",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Capaian Pekerjaan Bulanan Operasional 2026",
+     "insight": "Capaian semester I 2026 umumnya di bawah target, dengan Maret satu-satunya bulan yang tepat sasaran. Pola ini menandakan konsistensi pelaksanaan pekerjaan belum stabil, khususnya pada awal dan pertengahan triwulan, sehingga perlu penguatan perencanaan kapasitas dan pemantauan progres bulanan agar target berikutnya…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "pekerjaan",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "jadwal pelaksanaan bulanan target dan realisasi pelaksanaan pekerjaan per bulan januari 1.164 1.135 97.5 februari 1.200 1.185 98.8 maret 1.236 1.236 100.0 april 1.164 1.179 101.2 mei 1.200 1.230 102.5 juni 1.236 1.205 97.5",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:44.708Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 29
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "Rp",
+      "xAxis": [
+       "Perencanaan",
+       "Pelaksanaan",
+       "Pengendalian",
+       "Evaluasi"
+      ],
+      "series": [
+       {
+        "data": [
+         1,
+         1,
+         1,
+         1
+        ],
+        "name": "Anggaran",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         1,
+         1,
+         1,
+         1
+        ],
+        "name": "Capaian",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Perencanaan s.d. Evaluasi Anggaran dan Capaian",
+     "insight": "Data anggaran dan capaian pada tahap perencanaan hingga evaluasi tampil seragam Rp1 sehingga belum cukup untuk menilai arah atau kesenjangan kinerja. Angka ini diduga placeholder atau satuan yang belum terkonversi, bukan realisasi riil. Pengambil keputusan perlu memverifikasi sumber dan skala nilai sebelum memakai…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Rp",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 5,
+       "docName": "PRJ-TIRTAMOEDAL_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+       "chunkSnippet": "aspek perencanaan dilaksanakan mengacu pada ketentuan internal perusahaan, standar teknis yang berlaku, serta peraturan perundang-undangan. Tahapannya mencakup penetapan sasaran, penyusunan rencana kerja, alokasi sumber daya, pelaksanaan di lapangan, pengukuran capaian, dan penyusunan laporan.",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:59.548Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 33
+     },
+     "type": "donut",
+     "chart": {
+      "unit": "Rp",
+      "xAxis": [
+       "Beban Pegawai",
+       "Beban Operasional",
+       "Beban Administrasi"
+      ],
+      "series": [
+       {
+        "data": [
+         1102,
+         1324,
+         1354
+        ],
+        "name": "Anggaran RKAP 2026",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "RKAP 2026: Beban Pegawai, Operasional, Administrasi",
+     "insight": "Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Rp",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "Kinerja per Unit Pelaksana Rekapitulasi capaian unit kerja terkait pelaksanaan SOP: | No | Unit kerja | Pegawai | Target | Realisasi | Capaian | | 1 | Unit kerja 1 | 25 | 1137 | 1102 | 96.9% | | 2 | Unit kerja 2 | 30 | 1274 | 1324 | 103.9% | | 3 | Unit kerja 3 | 35 | 1411 | 1354 | 96.0% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:51.546Z"
+    },
+    {
+     "id": "w-tabel-1",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 33
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "Ketepatan waktu tanggap",
+        "k1": "≥ 95%",
+        "k2": "96,2%",
+        "k3": "Tercapai"
+       },
+       {
+        "k0": "Penyelesaian dalam SLA",
+        "k1": "≥ 92%",
+        "k2": "93,5%",
+        "k3": "Tercapai"
+       },
+       {
+        "k0": "Kepuasan pengguna",
+        "k1": "≥ 85",
+        "k2": "87,1",
+        "k3": "Tercapai"
+       },
+       {
+        "k0": "Ketepatan berita acara",
+        "k1": "100%",
+        "k2": "98,7%",
+        "k3": "Hampir"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "Indikator"
+       },
+       {
+        "key": "k1",
+        "label": "Target"
+       },
+       {
+        "key": "k2",
+        "label": "Realisasi"
+       },
+       {
+        "key": "k3",
+        "label": "Status"
+       }
+      ]
+     },
+     "title": "Realisasi Indikator Kinerja SOP 2026",
+     "insight": "Secara umum indikator kinerja SOP 2026 sudah tercapai, menandakan layanan berjalan sesuai standar, namun status 'Hampir' pada ketepatan pengisian berita acara patut dicermati karena berdampak pada jejak audit. Perlu penekanan disiplin administrasi, bukan sekadar kecepatan teknis lapangan.",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "PRJ-TIRTAMOEDAL_sop_Standar_Ope…",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 1 | Ketepatan waktu tanggap | ≥ 95% | 96,2% | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.816Z"
+    },
+    {
+     "id": "w-tabel-1",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 37
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "1",
+        "k1": "Ketepatan waktu tanggap",
+        "k2": "≥ 95%",
+        "k3": "96,2%"
+       },
+       {
+        "k0": "2",
+        "k1": "Penyelesaian dalam SLA",
+        "k2": "≥ 92%",
+        "k3": "93,5%"
+       },
+       {
+        "k0": "3",
+        "k1": "Kepuasan pengguna atas…",
+        "k2": "≥ 85",
+        "k3": "87,1"
+       },
+       {
+        "k0": "4",
+        "k1": "Ketepatan pengisian berita…",
+        "k2": "100%",
+        "k3": "98,7%"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "No"
+       },
+       {
+        "key": "k1",
+        "label": "Indikator Kinerja"
+       },
+       {
+        "key": "k2",
+        "label": "Target"
+       },
+       {
+        "key": "k3",
+        "label": "Realisasi"
+       }
+      ]
+     },
+     "title": "Indikator Kinerja Penanganan Gangguan Suplai dan…",
+     "insight": "Tiga dari empat indikator penanganan gangguan suplai dan kebocoran sudah melampaui target, menandakan layanan responsif dan mutu penanganan terjaga. Namun, ketepatan pengisian berita acara belum mencapai target penuh, sehingga jejak audit dan akuntabilitas administrasi berisiko lemah. Prioritas perbaikan sebaiknya…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "PRJ-TIRTAMOEDAL_sop_Standar_Ope…",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "Indikator Kinerja | No | Indikator kinerja | Target | Realisasi | Status | 1 | Ketepatan waktu tanggap | ≥ 95% | 96,2% | Tercapai | 2 | Penyelesaian dalam SLA | ≥ 92% | 93,5% | Tercapai | 3 | Kepuasan pengguna atas penanganan | ≥ 85 | 87,1 | Tercapai | 4 | Ketepatan pengisian berita acara | 100% | 98,7% | Hampir |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:44:08.192Z"
+    },
+    {
+     "id": "w-narasi-1",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 37
+     },
+     "type": "narasi",
+     "title": "Ringkasan Kinerja 2026",
+     "narasi": {
+      "text": "Perumda Air Minum Tirta Moedal Kota Semarang tahun 2026 mencatat ketepatan waktu tanggap 96,2%, penyelesaian sesuai SLA 93,5%, dan kepuasan pengguna 87,1. Capaian pelaksanaan pekerjaan 99,7% dengan realisasi 14.354 dari target 14.400 pekerjaan."
+     },
+     "insight": "Secara umum kinerja pelayanan Perumda Air Minum Tirta Moedal Kota Semarang tahun 2026 menunjukkan arah positif: seluruh indikator utama telah memenuhi target, dengan pelaksanaan pekerjaan hampir menyentuh sasaran tahunan. Namun status \"hampir tercapai\" pada ketepatan pengisian berita acara menandakan disiplin…",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "PRJ-TIRTAMOEDAL_sop_Standar_Ope…",
+     "citations": [
+      {
+       "id": "cit-extract-narasi-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-TIRTAMOEDAL_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| 1 | Ketepatan waktu tanggap | ≥ 95% | 96,2% | Tercapai |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:43:26.818Z"
+    },
+    {
+     "id": "w-narasi-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 41
+     },
+     "type": "narasi",
+     "title": "Ringkasan Eksekutif Capaian Kunci dan Kendala…",
+     "narasi": {
+      "text": "Dokumen tidak memuat data capaian kunci maupun kendala operasional periode ini. Profil dan Laporan Kinerja serta RKAP 2026 hanya memuat narasi generik pengelolaan usaha tanpa angka capaian, target, atau indikator kinerja yang dapat dipakai."
+     },
+     "insight": "Dokumen profil dan RKAP 2026 menampilkan narasi pengelolaan usaha yang generik dan berulang, sehingga capaian kunci serta kendala operasional periode ini tidak dapat disimpulkan dari sumber yang tersedia. Bagi pengambil keputusan, kondisi ini menandakan perlunya verifikasi data indikator kinerja dari sistem internal…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "PRJ-TIRTAMOEDAL_profil_Profil_d…",
+     "citations": [
+      {
+       "id": "cit-extract-narasi-1",
+       "date": "",
+       "page": 10,
+       "docName": "PRJ-TIRTAMOEDAL_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+       "chunkSnippet": "Catatan: sebagian data pada dokumen ini belum dapat diverifikasi dari sumber publik resmi (ditandai 'Data belum tersedia pada sumber publik').",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "rag",
+     "lastUpdated": "2026-10-15T11:44:00.147Z"
+    }
+   ],
+   "tenantId": "tenant-1791429954407",
+   "createdAt": "2026-10-15T11:44:08.222Z",
+   "updatedAt": "2026-10-21T04:58:40.487Z",
+   "presentasi": {
+    "slides": [
+     {
+      "id": "slide-1",
+      "judul": "Ringkasan Kinerja Utama (1/2)",
+      "narasi": "Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai. Capaian penyelesaian sesuai SLA sebesar 93,5% dengan tren indikatif positif menunjukkan keandalan proses penanganan gangguan mulai membaik. Perbaikan ini patut dijaga melalui pemantauan berita acara dan evaluasi berkala, agar peningkatan tidak berbalik menurun pada periode berikutnya. Capaian kepuasan pengguna atas penanganan gangguan sudah melampaui target dan tren indikatifnya menanjak, menandakan mutu layanan serta respons petugas semakin membaik. Agar tren ini terjaga, evaluasi berkala dan perbaikan preventif atas gangguan berulang perlu terus dijalankan. Ketepatan pengisian berita acara mencapai 98,7% terhadap target 100%, sehingga masih ada celah kecil pada kelengkapan dokumentasi penyelesaian pekerjaan meski tren indikatif membaik. Penyebab yang mungkin adalah kedisiplinan pengisian di lapangan atau validasi administrasi yang belum konsisten. Bagi pengambil… Capaian pelaksanaan pekerjaan Perumda Air Minum Tirta Moedal Kota Semarang menunjukkan tren positif dengan capaian mendekati sempurna dan indikasi perbaikan, sejalan dengan SOP yang menetapkan target waktu tanggap serta status capaian indikator pada halaman tersebut. Perhatian utama direksi adalah konsistensi… Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai.",
+      "widgetIds": [
+       "w-kpi-1",
+       "w-kpi-2",
+       "w-kpi-3",
+       "w-kpi-4",
+       "w-kpi-5",
+       "w-kpi-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-2",
+      "judul": "Ringkasan Kinerja Utama (2/2)",
+      "narasi": "Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai. Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai. Capaian kepuasan pengguna 87,1% yang melampaui target menandakan mutu penanganan gangguan dan kebocoran jaringan dinilai baik, dengan tren indikatif membaik. Ini mengimplikasikan standar layanan perlu dijaga konsisten, terutama ketepatan pengisian berita acara yang masih hampir tercapai.",
+      "widgetIds": [
+       "w-kpi-1",
+       "w-kpi-1",
+       "w-kpi-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-3",
+      "judul": "Tren & Perkembangan",
+      "narasi": "Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi… Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi…",
+      "widgetIds": [
+       "w-grafik-1",
+       "w-grafik-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-4",
+      "judul": "Perbandingan Kinerja",
+      "narasi": "Secara umum realisasi berkisar mendekati target dengan capaian tahunan 99,7%, namun pola naik-turun menunjukkan bulan tertentu berpotensi kurang optimal. Selisih tipis ini menuntut perhatian pada konsistensi jadwal dan kesiapan sumber daya agar capaian tidak berfluktuasi. Terdapat kesenjangan kinerja antar unit pelaksana: unit bernomor besar (11-15) konsisten di bawah 93%, sedangkan unit kecil (1-7) mendekati atau di atas 95%. Pola ini mengindikasikan beban kerja atau kapasitas unit besar perlu ditinjau ulang, sehingga perbaikan dan pemerataan target menjadi perhatian manajemen. Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi… Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi…",
+      "widgetIds": [
+       "w-grafik-2",
+       "w-grafik-3",
+       "w-grafik-1",
+       "w-grafik-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-5",
+      "judul": "Komposisi & Kontribusi",
+      "narasi": "Alokasi anggaran 2026 menempatkan beban administrasi sebagai komponen terbesar, disusul operasional, sementara beban pegawai paling kecil; pola ini mengindikasikan penekanan pada fungsi pendukung dan layanan ketimbang belanja SDM. Karena angka ini berasal dari dokumen SOP pelayanan, kewajarannya perlu diverifikasi…",
+      "widgetIds": [
+       "w-grafik-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-6",
+      "judul": "Rincian Angka",
+      "narasi": "Tiga dari empat indikator penanganan gangguan suplai dan kebocoran sudah melampaui target, menandakan layanan responsif dan mutu penanganan terjaga. Namun, ketepatan pengisian berita acara belum mencapai target penuh, sehingga jejak audit dan akuntabilitas administrasi berisiko lemah. Prioritas perbaikan sebaiknya… Tiga dari empat indikator penanganan gangguan suplai dan kebocoran sudah melampaui target, menandakan layanan responsif dan mutu penanganan terjaga. Namun, ketepatan pengisian berita acara belum mencapai target penuh, sehingga jejak audit dan akuntabilitas administrasi berisiko lemah. Prioritas perbaikan sebaiknya…",
+      "widgetIds": [
+       "w-tabel-1",
+       "w-tabel-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-7",
+      "judul": "Kesimpulan & Catatan",
+      "narasi": "Dokumen profil dan RKAP 2026 menampilkan narasi pengelolaan usaha yang generik dan berulang, sehingga capaian kunci serta kendala operasional periode ini tidak dapat disimpulkan dari sumber yang tersedia. Bagi pengambil keputusan, kondisi ini menandakan perlunya verifikasi data indikator kinerja dari sistem internal… Dokumen profil dan RKAP 2026 menampilkan narasi pengelolaan usaha yang generik dan berulang, sehingga capaian kunci serta kendala operasional periode ini tidak dapat disimpulkan dari sumber yang tersedia. Bagi pengambil keputusan, kondisi ini menandakan perlunya verifikasi data indikator kinerja dari sistem internal…",
+      "widgetIds": [
+       "w-narasi-1",
+       "w-narasi-1"
+      ],
+      "narasiAsal": "rag"
+     }
+    ],
+    "disusunAt": "2026-10-15T12:28:30.971Z"
+   },
+   "description": "Ringkasan indikator kinerja pelayanan dan operasional Perumda Air Minum Tirta Moedal Kota Semarang tahun 2026.",
+   "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+   }
+  }
+ },
+ {
+  "id": "dash-1792118713086",
+  "judul": "Kinerja bank bjb Tahun 2025",
+  "sebelum": 14,
+  "sesudah": 10,
+  "data": {
+   "id": "dash-1792118713086",
+   "title": "Kinerja bank bjb Tahun 2025",
+   "sector": "bank",
+   "widgets": [
+    {
+     "id": "w-rag-1792132256823",
+     "kpi": {
+      "unit": "%",
+      "value": "1,16"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "NPL gross",
+     "periode": "2022",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 32,
+       "docName": "laporan-tahunan-Bank-Bjb 2022.pdf",
+       "chunkSnippet": "| NPL Gross | 1.16 | 1.24 | 1.40 | 1.58 | 1.65 | NPL Gross |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-16T06:30:56.823Z"
+    },
+    {
+     "id": "w-kpi-1",
+     "kpi": {
+      "unit": "Rp miliar",
+      "value": "2.223,64"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 9,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Laba bersih 2022 (pre-tax tidak tersedia)",
+     "insight": "Nilai saat ini 2.223,64 Rp miliar, naik 6.4% Dividen 49,47% / Saldo Laba 50,53%.",
+     "periode": "Tahun Buku…",
+     "category": "Keuangan",
+     "subtitle": "PT Bank Pembangunan Daerah…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 639,
+       "docName": "laporan-tahunan-Bank-Bjb 2023.pdf",
+       "chunkSnippet": "Menetapkan penggunaan laba bersih Perseroan tahun buku 2022 sebesar Rp2.223.637.871.682,- ... 1. 49,47% dari Laba Bersih Tahun Buku 2022 atau setelah pembulatan sebesar Rp1.100.016.937.371,- atau sebesar Rp104,55 per lembar saham ditetapkan sebagai Dividen Tunai ... 2. 50,53% dari Laba Bersih Tahun Buku 2022 ... sebesar Rp1.123.620.934.311,- ditetapkan sebagai Saldo Laba.",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PT Bank Pembangunan Daerah Jawa Barat…",
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:45:13.080Z"
+    },
+    {
+     "id": "w-kpi-2",
+     "kpi": {
+      "unit": "Rp triliun",
+      "value": "17,06"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 3,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Pendapatan Bunga Syariah",
+     "insight": "Nilai saat ini 17,06 Rp triliun, naik 7.8% +7,82% vs 2024.",
+     "periode": "2025",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-2",
+       "date": "",
+       "page": 26,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "Pendapatan Bunga dan Syariah | 17,055,730 | 15,818,754 | 14,203,734",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.148Z"
+    },
+    {
+     "id": "w-kpi-3",
+     "kpi": {
+      "unit": "Rp triliun",
+      "value": "1,58"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 6,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Laba Tahun Berjalan",
+     "insight": "Nilai saat ini 1,58 Rp triliun, naik 8.2% +8,84% vs 2024.",
+     "periode": "2025",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-3",
+       "date": "",
+       "page": 27,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "LABA TAHUN BERJALAN | 1,584,126 | 1,455,449 | 1,681,177",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.150Z"
+    },
+    {
+     "id": "w-kpi-4",
+     "kpi": {
+      "unit": "Rp triliun",
+      "value": "111,94"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 9,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Total Kredit",
+     "insight": "Nilai saat ini 111,94 Rp triliun, turun 6.3% -6,32% vs 2024.",
+     "periode": "2025",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-4",
+       "date": "",
+       "page": 31,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "TOTAL | 111,943,038 | 119,483,882 | 116,142,388",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.150Z"
+    },
+    {
+     "id": "w-kpi-5",
+     "kpi": {
+      "unit": "Rp triliun",
+      "value": "122,09"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Dana Pihak Ketiga",
+     "insight": "Nilai saat ini 122,09 Rp triliun, turun 2.9% -2,89% vs 2024.",
+     "periode": "2025",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-5",
+       "date": "",
+       "page": 31,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "TOTAL | 122,088,401 | 125,726,425 | 126,419,817",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.150Z"
+    },
+    {
+     "id": "w-kpi-6",
+     "kpi": {
+      "unit": "%",
+      "value": "2,91"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 3,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "NPL Gross",
+     "insight": "Nilai saat ini 2,91 %, naik 31.1% +0,69 poin vs 2024.",
+     "periode": "2025",
+     "category": "Keuangan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-6",
+       "date": "",
+       "page": 30,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "NPL Gross | 2.91 | 2.22 | 1.21 | 1.16 | 1.24",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.150Z"
+    },
+    {
+     "id": "w-kpi-1-1",
+     "kpi": {
+      "unit": "Rp miliar",
+      "value": "2.223,64"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 9,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Laba bersih 2022 (pre-tax tidak tersedia)",
+     "insight": "Nilai saat ini 2.223,64 Rp miliar, naik 6.4% Dividen 49,47% / Saldo Laba 50,53%.",
+     "periode": "Tahun Buku…",
+     "category": "Keuangan",
+     "subtitle": "PT Bank Pembangunan Daerah…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 639,
+       "docName": "laporan-tahunan-Bank-Bjb 2023.pdf",
+       "chunkSnippet": "Menetapkan penggunaan laba bersih Perseroan tahun buku 2022 sebesar Rp2.223.637.871.682,- ... 1. 49,47% dari Laba Bersih Tahun Buku 2022 atau setelah pembulatan sebesar Rp1.100.016.937.371,- atau sebesar Rp104,55 per lembar saham ditetapkan sebagai Dividen Tunai ... 2. 50,53% dari Laba Bersih Tahun Buku 2022 ... sebesar Rp1.123.620.934.311,- ditetapkan sebagai Saldo Laba.",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PT Bank Pembangunan Daerah Jawa Barat…",
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:45:13.080Z"
+    },
+    {
+     "id": "w-grafik-2",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 10
+     },
+     "type": "hbar",
+     "chart": {
+      "unit": "Rp triliun",
+      "xAxis": [
+       "Kredit Konsumer & Ritel",
+       "Kredit Korporasi &…",
+       "Kredit KPR & KKB",
+       "Kredit UMKM",
+       "Kredit Term Loan"
+      ],
+      "series": [
+       {
+        "data": [
+         74.68,
+         20.4,
+         10.57,
+         3.79,
+         2.5
+        ],
+        "name": "2025",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Komposisi Kredit Menurut Produk 2025",
+     "insight": "Tertinggi di Kredit Konsumer & Ritel (74.68 Rp triliun), terendah di Kredit Term Loan (2.5 Rp triliun).",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp triliun",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-2",
+       "date": "",
+       "page": 31,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "Kredit Konsumer & Ritel | 74,677,933 ... Kredit UMKM | 3,794,542 ... Kredit Term Loan | 2,500,000",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.153Z"
+    },
+    {
+     "id": "w-grafik-4",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 14
+     },
+     "type": "line",
+     "chart": {
+      "unit": "Rp triliun",
+      "xAxis": [
+       "2021",
+       "2022",
+       "2023",
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "data": [
+         2.02,
+         2.25,
+         1.68,
+         1.46,
+         1.58
+        ],
+        "name": "Laba Tahun Berjalan",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Laba Tahun Berjalan 2021-2025",
+     "insight": "Tertinggi di 2022 (2.25 Rp triliun), terendah di 2024 (1.46 Rp triliun).",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp triliun",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-4",
+       "date": "",
+       "page": 27,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "LABA TAHUN BERJALAN | 1,584,126 | 1,455,449 | 1,681,177 | 2,245,282 | 2,018,654",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Semua Unit",
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:55:52.607Z"
+    },
+    {
+     "id": "w-grafik-5",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 18
+     },
+     "type": "combo",
+     "chart": {
+      "unit": "Rp trillions;%",
+      "xAxis": [
+       "2021",
+       "2022",
+       "2023",
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "data": [
+         113.5,
+         121.75,
+         126.42,
+         125.73,
+         122.09
+        ],
+        "name": "Dana Pihak Ketiga (Rp…",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         81.68,
+         85.03,
+         87.54,
+         89.49,
+         88.13
+        ],
+        "name": "LDR (%)",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Dana Pihak Ketiga (Rp… dan LDR (%) (2021–2025)",
+     "insight": "Tertinggi di 2023 (126.42 Rp trillions;%), terendah di 2021 (113.5 Rp trillions;%).",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp trillions;%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-5",
+       "date": "",
+       "page": 30,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "Loan to Deposit Ratio (LDR) | 88.13 | 89.49 | 87.54 | 85.03 | 81.68",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.154Z"
+    },
+    {
+     "id": "w-grafik-3",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 26
+     },
+     "type": "donut",
+     "chart": {
+      "unit": "Rp triliun",
+      "xAxis": [
+       "Deposito",
+       "Giro",
+       "Tabungan"
+      ],
+      "series": [
+       {
+        "data": [
+         70.71,
+         34.25,
+         17.13
+        ],
+        "name": "2025",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Komposisi Dana Pihak Ketiga 2025",
+     "insight": "Tertinggi di Deposito (70.71 Rp triliun), terendah di Tabungan (17.13 Rp triliun).",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp triliun",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-3",
+       "date": "",
+       "page": 31,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "Tabungan | 17,130,629 | Giro | 34,250,746 | Deposito | 70,707,026",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.153Z"
+    },
+    {
+     "id": "w-tabel-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 6,
+      "y": 26
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "BOPO",
+        "k1": "92,18",
+        "k2": "90,20"
+       },
+       {
+        "k0": "Cost to Income Ratio",
+        "k1": "70,89",
+        "k2": "71,47"
+       },
+       {
+        "k0": "NPL Nett",
+        "k1": "1,29",
+        "k2": "1,00"
+       },
+       {
+        "k0": "LDR",
+        "k1": "88,13",
+        "k2": "89,49"
+       },
+       {
+        "k0": "NIM",
+        "k1": "3,84",
+        "k2": "3,83"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "Indikator"
+       },
+       {
+        "key": "k1",
+        "label": "2025"
+       },
+       {
+        "key": "k2",
+        "label": "2024"
+       }
+      ]
+     },
+     "title": "Rasio Utama bank bjb 2025",
+     "insight": "Rincian 5 baris data pendukung.",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "laporan-tahunan-Bank-Bjb…",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 30,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "Biaya Operasional terhadap Pendapatan Operasional (BOPO) | 92.18 | 90.20 ... NPL Nett | 1.29 | 1.00 ... Net Interest Margin (NIM) | 3.84 | 3.83",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.154Z"
+    },
+    {
+     "id": "w-narasi-1",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 30
+     },
+     "type": "narasi",
+     "title": "Ringkasan Kinerja 2025",
+     "narasi": {
+      "text": "bank bjb menutup2025 dengan total aset Rp221,35 triliun, naik tipis dari Rp219,99 triliun. Pendapatan bunga dan syariah tumbuh, laba tahun berjalan naik ke Rp1,58 triliun. Kredit dan dana pihak ketiga menyempit, NPL gross meningkat ke 2,91%."
+     },
+     "insight": "bank bjb menutup2025 dengan total aset Rp221,35 triliun, naik tipis dari Rp219,99 triliun. Pendapatan bunga dan syariah tumbuh, laba tahun berjalan naik ke Rp1,58 triliun. Kredit dan dana pihak ketiga menyempit, NPL gross meningkat ke 2,91%.",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "laporan-tahunan-Bank-Bjb…",
+     "citations": [
+      {
+       "id": "cit-extract-narasi-1",
+       "date": "",
+       "page": 26,
+       "docName": "laporan-tahunan-Bank-Bjb 2025.pdf",
+       "chunkSnippet": "TOTAL LIABILITAS, DANA SYIRKAH TEMPORER DAN EKUITAS KONSOLIDASIAN | 221,347,288 | 219,990,827",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "insightAsal": "otomatis",
+     "lastUpdated": "2026-10-16T02:43:45.160Z"
+    }
+   ],
+   "tenantId": "tenant-1792118282289",
+   "createdAt": "2026-10-16T02:45:13.087Z",
+   "updatedAt": "2026-10-22T03:50:04.513Z",
+   "presentasi": {
+    "versi": 2,
+    "slides": [
+     {
+      "id": "slide-1",
+      "judul": "Ringkasan Kinerja Utama (1/2)",
+      "widgetIds": [
+       "w-kpi-1",
+       "w-kpi-2",
+       "w-kpi-3",
+       "w-kpi-4",
+       "w-kpi-5",
+       "w-kpi-6"
+      ]
+     },
+     {
+      "id": "slide-2",
+      "judul": "Ringkasan Kinerja Utama (2/2)",
+      "narasi": "Nilai saat ini 2.223,64 Rp miliar, naik 6.4% Dividen 49,47% / Saldo Laba 50,53%. Nilai saat ini 2.223,64 Rp miliar, naik 6.4% Dividen 49,47% / Saldo Laba 50,53%.",
+      "widgetIds": [
+       "w-kpi-1",
+       "w-kpi-1"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-3",
+      "judul": "Perbandingan Kinerja",
+      "narasi": "Tertinggi di Kredit Konsumer & Ritel (74.68 Rp triliun), terendah di Kredit Term Loan (2.5 Rp triliun). Tertinggi di 2022 (2.25 Rp triliun), terendah di 2024 (1.46 Rp triliun).",
+      "widgetIds": [
+       "w-grafik-2",
+       "w-grafik-4",
+       "w-grafik-5"
+      ],
+      "narasiAsal": "rag"
+     },
+     {
+      "id": "slide-4",
+      "judul": "Komposisi & Kontribusi",
+      "widgetIds": [
+       "w-grafik-3"
+      ]
+     },
+     {
+      "id": "slide-5",
+      "judul": "Rincian Angka",
+      "widgetIds": [
+       "w-tabel-1"
+      ]
+     },
+     {
+      "id": "slide-6",
+      "judul": "Kesimpulan & Catatan",
+      "widgetIds": [
+       "w-narasi-1"
+      ]
+     }
+    ],
+    "disusunAt": "2026-10-16T04:33:45.023Z"
+   },
+   "description": "Ringkasan kinerja bank bjb atas aset, kredit, dana pihak ketiga, laba, dan rasio prudensial tahun 2025.",
+   "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+   }
+  }
+ },
+ {
+  "id": "dash-1793022079639",
+  "judul": "Kinerja Utama PAM JAYA 2024",
+  "sebelum": 16,
+  "sesudah": 10,
+  "data": {
+   "id": "dash-1793022079639",
+   "title": "Kinerja Utama PAM JAYA 2024",
+   "sector": "pdam",
+   "widgets": [
+    {
+     "id": "sw-kpi-1",
+     "kpi": {
+      "unit": "sambungan",
+      "delta": 2,
+      "value": "951.640",
+      "deltaLabel": "vs periode sebelumnya"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Jumlah Pelanggan",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "PAM JAYA",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Jumlah pelanggan 923.756 932.892 951.640 sambungan",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PAM JAYA",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.834Z"
+    },
+    {
+     "id": "sw-kpi-2",
+     "kpi": {
+      "unit": "%",
+      "delta": -3.9,
+      "value": "43,85",
+      "deltaLabel": "turun 1,77 poin dari 2023"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 3,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Tingkat Kehilangan Air (NRW)",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "PAM JAYA",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-2",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "NRW 45,74 45,62 43,85 %",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PAM JAYA",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "sw-kpi-3",
+     "kpi": {
+      "unit": "%",
+      "delta": 2.2,
+      "value": "69,12",
+      "deltaLabel": "naik dari 67,65% pada 2023"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 6,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Cakupan Layanan",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "PAM JAYA",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-3",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Cakupan layanan 66,26 67,65 69,12 %",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PAM JAYA",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "sw-kpi-4",
+     "kpi": {
+      "unit": "m³",
+      "delta": 5.6,
+      "value": "376.887.150",
+      "deltaLabel": "naik 5,58% dari 2023"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 9,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Air Terjual",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "PAM JAYA",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-4",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Air terjual 345.015.675 356.962.228 376.887.150 m³",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PAM JAYA",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "sw-kpi-5",
+     "kpi": {
+      "unit": "Rp miliar",
+      "delta": 8.2,
+      "value": "3.184,72",
+      "deltaLabel": "tumbuh 8,21% dari 2023"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 0,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Pendapatan Usaha",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "PAM JAYA",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-5",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Pendapatan usaha 2.761,84 2.943,02 3.184,72 miliar Rp",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "PAM JAYA",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "sw-bulanan-1",
+     "kpi": {
+      "unit": "m³",
+      "value": "671.250.480"
+     },
+     "grid": {
+      "h": 3,
+      "w": 2,
+      "x": 6,
+      "y": 3
+     },
+     "type": "kpi",
+     "title": "Air terdistribusi 2024",
+     "periode": "Januari–Des…",
+     "category": "Keuangan",
+     "subtitle": "Operasional",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Total air terdistribusi sepanjang 2024 tercatat 671.250.480 m³",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Operasional",
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "w-grafik-1",
+     "grid": {
+      "h": 4,
+      "w": 4,
+      "x": 0,
+      "y": 6
+     },
+     "type": "line",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "2022",
+       "2023",
+       "2024"
+      ],
+      "series": [
+       {
+        "data": [
+         45.74,
+         45.62,
+         43.85
+        ],
+        "name": "NRW",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Tren NRW 2022–2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 6,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "| NRW | 45,74 | 45,62 | 43,85 | % |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.844Z"
+    },
+    {
+     "id": "w-saran-1793022992184",
+     "grid": {
+      "h": 4,
+      "w": 8,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "Pertumbuhan pendapatan…",
+       "Penyelesaian keluhan",
+       "Efisiensi biaya…",
+       "Realisasi program…"
+      ],
+      "series": [
+       {
+        "data": [
+         7,
+         95,
+         3,
+         90
+        ],
+        "name": "Target",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         7.3,
+         94.1,
+         3.8,
+         88.5
+        ],
+        "name": "Realisasi",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Pertumbuhan pendapatan… s.d. Realisasi program… Target…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 1,
+       "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+       "chunkSnippet": "Indikator Kinerja Utama ... | 1 | Tingkat pertumbuhan pendapatan usaha | ≥ 7,0% | 7,3% | Tercapai | ... | 4 | Tingkat penyelesaian keluhan | ≥ 95% | 94,1% | Hampir | 5 | Efisiensi biaya operasional | ≥ 3% | 3,8% | Tercapai | 6 | Realisasi program investasi | ≥ 90% | 88,5% | Hampir |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:56:32.184Z"
+    },
+    {
+     "id": "w-grafik-2",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 10
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "Rp miliar",
+      "xAxis": [
+       "2022",
+       "2023",
+       "2024"
+      ],
+      "series": [
+       {
+        "data": [
+         2761.84,
+         2943.02,
+         3184.72
+        ],
+        "name": "Pendapatan usaha",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Pendapatan Usaha 2022–2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp miliar",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-2",
+       "date": "",
+       "page": 4,
+       "docName": "Rekap-Kinerja-Bulanan-PAM-JAYA-2024.xlsx",
+       "chunkSnippet": "baris 15: A=Pendapatan usaha | B=miliar Rp | C=2761.84 | D=2943.02 | E=3184.72",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.846Z"
+    },
+    {
+     "id": "w-grafik-3",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 14
+     },
+     "type": "combo",
+     "chart": {
+      "unit": "sambungan dan%",
+      "xAxis": [
+       "2022",
+       "2023",
+       "2024"
+      ],
+      "series": [
+       {
+        "data": [
+         923756,
+         932892,
+         951640
+        ],
+        "name": "Jumlah pelanggan (sambungan)",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         66.26,
+         67.65,
+         69.12
+        ],
+        "name": "Cakupan layanan (%)",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Pelanggan dan Cakupan Layanan 2022–2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "sambungan dan%",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-3",
+       "date": "",
+       "page": 6,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Jumlah pelanggan 923.756 932.892 951.640 sambungan | Cakupan layanan 66,26 67,65 69,12 %",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.846Z"
+    },
+    {
+     "id": "w-grafik-5",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 18
+     },
+     "type": "hbar",
+     "chart": {
+      "unit": "kejadian",
+      "xAxis": [
+       "Kebocoran pipa…",
+       "Gangguan pompa dan…",
+       "Air keruh setelah…",
+       "Gangguan listrik…",
+       "Kebocoran pipa induk",
+       "Gangguan instalasi…"
+      ],
+      "series": [
+       {
+        "data": [
+         1884,
+         742,
+         684,
+         512,
+         268,
+         196
+        ],
+        "name": "Kejadian",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Gangguan Pasokan per Jenis 2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "kejadian",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-5",
+       "date": "",
+       "page": 5,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Kebocoran pipa distribusi 1.884 6,4 | Kebocoran pipa induk | 268 | 14,2 | Gangguan pompa dan booster 742 5,8 | Gangguan instalasi pengolahan | 196 | 9,6 | Air keruh setelah perbaikan 684 3,2 | Gangguan listrik pada instalasi | 512 | 4,4",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.846Z"
+    },
+    {
+     "id": "sw-bulanan-6",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 22
+     },
+     "type": "line",
+     "chart": {
+      "unit": "m³",
+      "xAxis": [
+       "Januari",
+       "Februari",
+       "Maret",
+       "April",
+       "Mei",
+       "Juni",
+       "Juli",
+       "Agustus",
+       "September",
+       "Oktober",
+       "November",
+       "Desember"
+      ],
+      "series": [
+       {
+        "data": [
+         54841164,
+         52626038,
+         56183665,
+         55378165,
+         56049415,
+         55176789,
+         56720666,
+         56452165,
+         55915165,
+         56317915,
+         56787791,
+         58801542
+        ],
+        "name": "Air terdistribusi",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         30458929,
+         29265480,
+         31294452,
+         30917778,
+         31371007,
+         30943291,
+         31871494,
+         31788365,
+         31553077,
+         31847931,
+         32181793,
+         33393553
+        ],
+        "name": "Air terjual",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Air terdistribusi dan air terjual per bulan 2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "m³",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 1. Kinerja operasional dan pelayanan per bulan, 2024: Januari 54.841.164 30.458.929; ... Desember 58.801.542 33.393.553",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.848Z"
+    },
+    {
+     "id": "w-grafik-4",
+     "grid": {
+      "h": 5,
+      "w": 6,
+      "x": 0,
+      "y": 26
+     },
+     "type": "donut",
+     "chart": {
+      "unit": "Rp miliar",
+      "xAxis": [
+       "Kapasitas IPA dan intake",
+       "Penggantian pipa induk",
+       "Perluasan jaringan",
+       "Sambungan rumah baru",
+       "Digitalisasi meter dan…",
+       "Laboratorium kualitas…",
+       "Lain-lain"
+      ],
+      "series": [
+       {
+        "data": [
+         398.2,
+         271.8,
+         232.1,
+         188.4,
+         138.6,
+         79.4,
+         39.4
+        ],
+        "name": "Realisasi",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Realisasi Investasi per Program 2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Rp miliar",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-4",
+       "date": "",
+       "page": 11,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Peningkatan kapasitas IPA dan intake 412,60 398,20 | Penggantian pipa induk | 286,40 | 271,80 | Perluasan jaringan timur dan utara 248,30 232,10 | Sambungan rumah baru 196,70 188,40 | Digitalisasi meter dan CRM 142,80 138,60 | Laboratorium dan kualitas air 84,20 79,40 | Lain-lain dan pendukung 97,90 39,40",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.846Z"
+    },
+    {
+     "id": "w-saran-1793022893196",
+     "grid": {
+      "h": 4,
+      "w": 12,
+      "x": 0,
+      "y": 0
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "Air baku",
+        "k1": "m³",
+        "k2": "700612480",
+        "k3": "712884310",
+        "k4": "726905640"
+       },
+       {
+        "k0": "Air terproduksi",
+        "k1": "m³",
+        "k2": "542774618",
+        "k3": "559099147",
+        "k4": "571402880"
+       },
+       {
+        "k0": "Air terdistribusi",
+        "k1": "m³",
+        "k2": "635819589",
+        "k3": "656400453",
+        "k4": "671250480"
+       },
+       {
+        "k0": "Air terjual",
+        "k1": "m³",
+        "k2": "345015675",
+        "k3": "356962228",
+        "k4": "376887150"
+       },
+       {
+        "k0": "NRW",
+        "k1": "%",
+        "k2": "45,74",
+        "k3": "45,62",
+        "k4": "43,85"
+       },
+       {
+        "k0": "Jumlah pelanggan",
+        "k1": "sambungan",
+        "k2": "923756",
+        "k3": "932892",
+        "k4": "951640"
+       },
+       {
+        "k0": "Sambungan baru",
+        "k1": "sambungan",
+        "k2": "24180",
+        "k3": "22640",
+        "k4": "26480"
+       },
+       {
+        "k0": "Cakupan layanan",
+        "k1": "%",
+        "k2": "66.26000000000001",
+        "k3": "67.65000000000001",
+        "k4": "69,12"
+       },
+       {
+        "k0": "Indeks Kepuasan Pelanggan",
+        "k1": "indeks",
+        "k2": "80,34",
+        "k3": "81,27",
+        "k4": "82.65000000000001"
+       },
+       {
+        "k0": "Pengaduan masuk",
+        "k1": "kasus",
+        "k2": "118940",
+        "k3": "121360",
+        "k4": "128460"
+       },
+       {
+        "k0": "Pendapatan usaha",
+        "k1": "miliar Rp",
+        "k2": "2761,84",
+        "k3": "2943,02",
+        "k4": "3184,72"
+       },
+       {
+        "k0": "Laba usaha",
+        "k1": "miliar Rp",
+        "k2": "-1.08",
+        "k3": "279,67",
+        "k4": "310,63"
+       },
+       {
+        "k0": "Laba bersih",
+        "k1": "miliar Rp",
+        "k2": "335,45",
+        "k3": "1247,36",
+        "k4": "1300,31"
+       },
+       {
+        "k0": "Jumlah aset",
+        "k1": "miliar Rp",
+        "k2": "3308,5",
+        "k3": "4824,46",
+        "k4": "5386,24"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "Indikator"
+       },
+       {
+        "key": "k1",
+        "label": "Satuan"
+       },
+       {
+        "key": "k2",
+        "label": "2022"
+       },
+       {
+        "key": "k3",
+        "label": "2023"
+       },
+       {
+        "key": "k4",
+        "label": "2024"
+       }
+      ]
+     },
+     "title": "Indikator Utama Instansi — dasar: Indikator Tahunan…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Rekap-Kinerja-Bulanan-PAM-JAYA…",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 1,
+       "docName": "Rekap-Kinerja-Bulanan-PAM-JAYA-2024.xlsx",
+       "chunkSnippet": "Lembar: Indikator 2022-2024 baris 1: A=INDIKATOR TAHUNAN 2022–2024 baris 3: A=Indikator | B=Satuan | C=2022 | D=2023 | E=2024 baris 4: A=Air baku | B=m³ | C=700612480 | D=712884310 | E=726905640 baris 5: A=Air terproduksi | B=m³ | C=542774618 | D=559099147 | E=571402880 baris 6: A=Air terdistribusi | B=m³ | C=635819589 | D=656400453 | E=671250480 baris 7: A=Air terjual | B=m³ | C=345015675 | D=356962228 | E=376887150 baris 8: A=NRW | B=% | C=45.74 | D=45.62 | E=43.85 baris 9: A=Jumlah pelanggan | B=sambungan | C=923756 | D=932892 | E=951640 baris 10: A=Sambungan baru | B=sambungan | C=24180…",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:54:53.196Z"
+    },
+    {
+     "id": "w-tabel-1",
+     "grid": {
+      "h": 5,
+      "w": 12,
+      "x": 6,
+      "y": 26
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "Pendapatan usaha",
+        "k1": "2.943,02",
+        "k2": "3.184,72",
+        "k3": "8,21"
+       },
+       {
+        "k0": "Beban usaha",
+        "k1": "1.762,37",
+        "k2": "1.905,64",
+        "k3": "8,13"
+       },
+       {
+        "k0": "Laba kotor",
+        "k1": "1.180,64",
+        "k2": "1.279,08",
+        "k3": "8,34"
+       },
+       {
+        "k0": "Beban umum dan administrasi",
+        "k1": "900,97",
+        "k2": "968,45",
+        "k3": "7,49"
+       },
+       {
+        "k0": "Laba usaha",
+        "k1": "279,67",
+        "k2": "310,63",
+        "k3": "11,07"
+       },
+       {
+        "k0": "Pendapatan non usaha",
+        "k1": "1.982,29",
+        "k2": "2.104,88",
+        "k3": "6,18"
+       },
+       {
+        "k0": "Laba sebelum pajak",
+        "k1": "1.596,69",
+        "k2": "1.673,20",
+        "k3": "4,79"
+       },
+       {
+        "k0": "Beban pajak",
+        "k1": "349,33",
+        "k2": "372,89",
+        "k3": "6,74"
+       },
+       {
+        "k0": "Laba bersih tahun berjalan",
+        "k1": "1.247,36",
+        "k2": "1.300,31",
+        "k3": "4,24"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "Uraian"
+       },
+       {
+        "key": "k1",
+        "label": "2023"
+       },
+       {
+        "key": "k2",
+        "label": "2024"
+       },
+       {
+        "key": "k3",
+        "label": "Perubahan (%)"
+       }
+      ]
+     },
+     "title": "Ringkasan Laba Rugi 2023–2024",
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Laporan-Tahunan-PAM-JAYA-2024.p…",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 8,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 5. Ringkasan laba rugi 2023–2024 (miliar Rupiah) | Uraian | 2023 | 2024 | Perubahan (%) | Pendapatan usaha 2.943,02 3.184,72 8,21 | Beban usaha | 1.762,37 | 1.905,64 | 8,13 | Laba kotor 1.180,64 1.279,08 8,34 | Beban umum dan administrasi | 900,97 | 968,45 | 7,49 | Laba usaha 279,67 310,63 11,07 | Pendapatan non usaha | 1.982,29 | 2.104,88 | 6,18 | Laba sebelum pajak 1.596,69 1.673,20 4,79 | Beban pajak | 349,33 | 372,89 | 6,74 | Laba bersih tahun berjalan 1.247,36 1.300,31 4,24",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.846Z"
+    },
+    {
+     "id": "w-narasi-1",
+     "grid": {
+      "h": 3,
+      "w": 12,
+      "x": 0,
+      "y": 31
+     },
+     "type": "narasi",
+     "title": "Ringkasan Kinerja 2024",
+     "narasi": {
+      "text": "Pendapatan usaha 2024 naik 8,21 persen menjadi Rp 3.184,72 miliar dengan laba bersih Rp 1.300,31 miliar. NRW turun 1,77 poin persentase ke 43,85 persen, sementara pelanggan bertambah 18.748 menjadi 951.640 sambungan."
+     },
+     "periode": "2026-Q1",
+     "category": "Keuangan",
+     "subtitle": "Laporan-Tahunan-PAM-JAYA-2024.p…",
+     "citations": [
+      {
+       "id": "cit-extract-narasi-1",
+       "date": "",
+       "page": 8,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Pendapatan usaha 2024 tercatat Rp 3.184,72 miliar, tumbuh 8,21 persen dari Rp 2.943,02 miliar pada 2023. ... laba bersih tahun berjalan Rp 1.300,31 miliar",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "lastUpdated": "2026-10-26T13:50:06.847Z"
+    }
+   ],
+   "tenantId": "tenant-1791501310547",
+   "createdAt": "2026-10-26T13:41:19.639Z",
+   "updatedAt": "2026-10-26T13:57:13.050Z",
+   "description": "Ringkasan kinerja keuangan, operasional, dan pelayanan Perumda Air Minum Jaya tahun 2024.",
+   "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+   }
+  }
+ },
+ {
+  "id": "dash-1793023099874",
+  "judul": "Dashboard Kinerja PDAM",
+  "sebelum": 18,
+  "sesudah": 10,
+  "data": {
+   "id": "dash-1793023099874",
+   "title": "Dashboard Kinerja PDAM",
+   "sector": "pdam",
+   "widgets": [
+    {
+     "id": "tpl-pdam-1793023064858-1",
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Realisasi Pendapatan Air",
+     "category": "Operasional",
+     "subtitle": "Capaian vs RKAP periode berjalan",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-2",
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Tingkat Kehilangan Air (NRW)",
+     "category": "Operasional",
+     "subtitle": "Semakin rendah semakin baik",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-3",
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Efisiensi Penagihan",
+     "category": "Operasional",
+     "subtitle": "Collection efficiency rekening air",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-4",
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Sambungan Langganan Aktif",
+     "category": "Operasional",
+     "subtitle": "Total pelanggan terlayani",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-5",
+     "grid": {
+      "h": 4,
+      "w": 8,
+      "x": 0,
+      "y": 0
+     },
+     "type": "line",
+     "title": "Tren Pendapatan Air Bulanan",
+     "category": "Operasional",
+     "subtitle": "Realisasi vs target sepanjang tahun",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-6",
+     "grid": {
+      "h": 4,
+      "w": 4,
+      "x": 0,
+      "y": 0
+     },
+     "type": "gauge",
+     "title": "Capaian Target Pendapatan",
+     "category": "Operasional",
+     "subtitle": "Realisasi terhadap target RKAP",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-7",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "donut",
+     "title": "Komposisi Pelanggan per Golongan Tarif",
+     "category": "Operasional",
+     "subtitle": "Porsi SL menurut golongan",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-8",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "title": "Tingkat NRW per Zona Distribusi",
+     "category": "Operasional",
+     "subtitle": "Perbandingan kehilangan air antar zona",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-9",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "combo",
+     "title": "Produksi vs Air Tertagih",
+     "category": "Operasional",
+     "subtitle": "Volume produksi dan air terjual",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-10",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "area",
+     "title": "Tren Volume Air Terdistribusi",
+     "category": "Operasional",
+     "subtitle": "Volume distribusi bulanan",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-11",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "heatmap",
+     "title": "NRW per Zona per Triwulan",
+     "category": "Operasional",
+     "subtitle": "Pola kehilangan air per zona",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-12",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "pie",
+     "title": "Komposisi Biaya Operasional",
+     "category": "Operasional",
+     "subtitle": "Struktur beban usaha",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-13",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "hbar",
+     "title": "Jumlah Gangguan per Kategori",
+     "category": "Operasional",
+     "subtitle": "Frekuensi gangguan layanan",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-14",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "waterfall",
+     "title": "Perubahan Pelanggan Aktif",
+     "category": "Operasional",
+     "subtitle": "Dekomposisi penambahan & pengurangan SL",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-15",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "radar",
+     "title": "Profil Kinerja Layanan",
+     "category": "Operasional",
+     "subtitle": "Skor indikator layanan vs standar",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-16",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "scatter",
+     "title": "Sebaran Konsumsi per Golongan",
+     "category": "Operasional",
+     "subtitle": "Konsumsi rata-rata vs jumlah SL",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-17",
+     "grid": {
+      "h": 3,
+      "w": 12,
+      "x": 0,
+      "y": 0
+     },
+     "type": "table",
+     "title": "Rekap Kinerja Operasional",
+     "category": "Operasional",
+     "subtitle": "Indikator teknis utama",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    },
+    {
+     "id": "tpl-pdam-1793023064858-18",
+     "grid": {
+      "h": 3,
+      "w": 12,
+      "x": 0,
+      "y": 0
+     },
+     "type": "narasi",
+     "title": "Ringkasan Eksekutif",
+     "category": "Operasional",
+     "subtitle": "Catatan singkat kondisi periode berjalan",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T13:52:09.336Z"
+    }
+   ],
+   "tenantId": "tenant-1791501310547",
+   "createdAt": "2026-10-26T13:58:19.874Z",
+   "updatedAt": "2026-10-26T13:58:19.874Z",
+   "description": "Template sektor air minum lengkap (18 widget, 12 grafik): pendapatan, NRW, produksi, distribusi, dan pelayanan. Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.",
+   "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+   }
+  }
+ },
+ {
+  "id": "dash-1793027960327",
+  "judul": "Dashboard Kinerja PDAM (terisi dari dokumen)",
+  "sebelum": 18,
+  "sesudah": 10,
+  "data": {
+   "id": "dash-1793027960327",
+   "title": "Dashboard Kinerja PDAM (terisi dari dokumen)",
+   "sector": "pdam",
+   "widgets": [
+    {
+     "id": "tpl-pdam-1793027540050-1",
+     "kpi": {
+      "unit": "Rp miliar",
+      "value": "3.184,72",
+      "deltaLabel": "Capaian 101,1%"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Realisasi Pendapatan Air",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "Perumda Air Minum Jaya (PAM…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 7,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Pendapatan usaha | miliar Rp | 3.150,00 | 3.184,72 | 101,1 | Melampaui target",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:12:51.841Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-2",
+     "kpi": {
+      "unit": "%",
+      "delta": -3.9,
+      "value": "43,85",
+      "deltaLabel": "Turun 1,77 poin persentase"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Tingkat Kehilangan Air (NRW)",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "Perumda Air Minum Jaya (PAM…",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 6,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "tingkat kehilangan air atau NRW dihitung sebesar 43,85 persen, turun 1,77 poin persentase dibandingkan 2023 yang sebesar 45,62 persen.",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:12:42.940Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-3",
+     "kpi": {
+      "unit": "%",
+      "value": "101,1"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Efisiensi Penagihan",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "Collection efficiency rekening air",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 7,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 6. Target dan realisasi indikator operasional serta pelayanan 2024 ... | Pendapatan usaha | miliar Rp | 3.150,00 | 3.184,72 | 101,1 | Melampaui target |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:13:07.203Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-4",
+     "kpi": {
+      "unit": "unit",
+      "delta": 2,
+      "value": "951640",
+      "deltaLabel": "vs periode sebelumnya"
+     },
+     "grid": {
+      "h": 3,
+      "w": 3,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Sambungan Langganan Aktif (Jumlah pelanggan)",
+     "periode": "2024",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Sambungan Langganan Aktif",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 14,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "7 Jumlah pelanggan sambungan 923.756 932.892 951.640",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:13:07.201Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-5",
+     "grid": {
+      "h": 4,
+      "w": 8,
+      "x": 0,
+      "y": 0
+     },
+     "type": "line",
+     "chart": {
+      "unit": "Rp miliar",
+      "xAxis": [
+       "Pendapatan usaha",
+       "Beban usaha",
+       "Laba kotor",
+       "Laba usaha",
+       "Laba bersih tahun…",
+       "Belanja modal"
+      ],
+      "series": [
+       {
+        "data": [
+         3184.72,
+         1905.64,
+         1279.08,
+         310.63,
+         1300.31,
+         1348.9
+        ],
+        "name": "Realisasi 2024",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         3412.6,
+         2020.4,
+         1392.2,
+         352.8,
+         1180,
+         1850
+        ],
+        "name": "Anggaran 2025",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Pendapatan usaha s.d. Belanja modal Realisasi 2024 dan…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Tren Pendapatan Air Bulanan",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "RKAP-PAM-JAYA-2025.pdf",
+       "chunkSnippet": "Tabel 3. Anggaran laba rugi dan posisi keuangan 2025 (miliar Rupiah) | Uraian | Realisasi 2024 | Anggaran 2025 | Perubahan (%) | Pendapatan usaha 3.184,72 3.412,60 7,16 | Beban usaha 1.905,64 2.020,40 6,02 | Laba kotor 1.279,08 1.392,20 8,84 | Laba usaha 310,63 352,80 13,58 | Laba bersih tahun berjalan 1.300,31 1.180,00 -9,25 | Belanja modal 1.348,90 1.850,00 37,15",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:02.297Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-6",
+     "kpi": {
+      "unit": "Rp miliar",
+      "delta": 7.2,
+      "value": "3.412,60",
+      "deltaLabel": "vs periode sebelumnya"
+     },
+     "grid": {
+      "h": 4,
+      "w": 4,
+      "x": 0,
+      "y": 0
+     },
+     "type": "kpi",
+     "title": "Pendapatan usaha (target RKAP 2025)",
+     "periode": "2025",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Capaian Target Pendapatan",
+     "citations": [
+      {
+       "id": "cit-extract-kpi-1",
+       "date": "",
+       "page": 4,
+       "docName": "RKAP-PAM-JAYA-2025.pdf",
+       "chunkSnippet": "Pendapatan usaha 3.184,72 3.412,60 7,16",
+       "confidenceScore": 0.95
+      }
+     ],
+     "unitKerja": "Perumda Air Minum Jaya (PAM JAYA)",
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:14:37.546Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-7",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "donut",
+     "chart": {
+      "unit": "sambungan",
+      "xAxis": [
+       "2022",
+       "2023",
+       "2024"
+      ],
+      "series": [
+       {
+        "data": [
+         923756,
+         932892,
+         951640
+        ],
+        "name": "Jumlah pelanggan (sambungan)",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Jumlah Pelanggan 2022–2024, Pengganti Komposisi Tarif",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Komposisi Pelanggan per Golongan Tarif",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 14,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "| 7 Jumlah pelanggan sambungan 923.756 932.892 951.640 | 8 | Sambungan baru | sambungan | 24.180 | 22.640 | 26.480 |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:01.448Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-8",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "Jakarta Pusat",
+       "Jakarta Utara",
+       "Jakarta Barat",
+       "Jakarta Selatan",
+       "Jakarta Timur"
+      ],
+      "series": [
+       {
+        "data": [
+         41.2,
+         46.8,
+         45.1,
+         42.6,
+         43.6
+        ],
+        "name": "NRW 2024 (%)",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Tingkat NRW per Wilayah Layanan 2024 (dasar: NRW per…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Tingkat NRW per Zona Distribusi",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 4,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 3. Kinerja per wilayah layanan, 2024 | Wilayah | Pelanggan | Air terjual (m³) | NRW (%) | Pengaduan | Pengaduan per 1.000 pelanggan | Jakarta Pusat 186.420 74.318.640 41,20 24.180 129,7 | Jakarta Utara 172.880 68.402.910 46,80 27.640 159,9 | Jakarta Barat 208.360 82.146.280 45,10 29.320 140,7 | Jakarta Selatan 196.240 77.905.420 42,60 25.410 129,5 | Jakarta Timur 187.740 74.113.900 43,60 21.910 116,7 | Jumlah 951.640 376.887.150 43,85 128.460 —",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:18.289Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-9",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "m³",
+      "xAxis": [
+       "Air terproduksi 2024",
+       "Air terjual 2024",
+       "Air terproduksi 2025",
+       "Air terjual 2025"
+      ],
+      "series": [
+       {
+        "data": [
+         571402880,
+         376887150,
+         585640000,
+         398240000
+        ],
+        "name": "Volume air",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "Air terproduksi 2024 s.d. Air terjual 2025 Volume air",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Produksi vs Air Tertagih",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 2,
+       "docName": "RKAP-PAM-JAYA-2025.pdf",
+       "chunkSnippet": "| Air terproduksi | m³ | 571.402.880 | 585.640.000 | 2,49% | ... | Air terjual | m³ | 376.887.150 | 398.240.000 | 5,67% |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:31.499Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-10",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "area",
+     "chart": {
+      "unit": "m³",
+      "xAxis": [
+       "Januari",
+       "Februari",
+       "Maret",
+       "April",
+       "Mei",
+       "Juni"
+      ],
+      "series": [
+       {
+        "data": [
+         54841164,
+         52626038,
+         56183665,
+         55378165,
+         56049415,
+         55176789
+        ],
+        "name": "Air terdistribusi",
+        "color": "#38c6e2"
+       }
+      ],
+      "stacked": true,
+      "showLegend": false
+     },
+     "title": "Tren Volume Air Terdistribusi",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "m³",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 2,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 1. Kinerja operasional dan pelayanan per bulan, 2024 | Bulan | Air terdistribusi (m³) ... Januari 54.841.164 | Februari 52.626.038 | Maret 56.183.665 | April 55.378.165 | Mei 56.049.415 | Juni 55.176.789",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:39.842Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-11",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "Triwulan I",
+       "Triwulan II",
+       "Triwulan III",
+       "Triwulan IV"
+      ],
+      "series": [
+       {
+        "data": [
+         44.38,
+         44.04,
+         43.69,
+         43.33
+        ],
+        "name": "NRW (%)",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": false
+     },
+     "title": "NRW per Triwulan 2024 (dasar: NRW triwulanan total)",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: NRW per Zona per Triwulan",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 3,
+       "docName": "Laporan-Kinerja-Operasional-dan-Pelayanan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 2. Rekapitulasi triwulanan 2024 | Periode | Air terdistribusi (m³) | Air terjual (m³) | NRW (%) | Pengaduan masuk | Pengaduan selesai | Triwulan I 163.650.867 91.018.861 44,38 31.260 30.855 | Triwulan II | 166.604.369 | 93.232.076 | 44,04 | 31.530 | 31.119 | Triwulan III 169.087.996 95.212.936 43,69 32.040 31.623 | Triwulan IV | 171.907.248 | 97.423.277 | 43,33 | 33.630 | 33.193 |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:15:45.681Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-12",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "pie",
+     "chart": {
+      "unit": "Rupiah",
+      "xAxis": [
+       "Beban usaha",
+       "Beban umum dan…",
+       "Beban non usaha",
+       "Beban pajak penghasilan"
+      ],
+      "series": [
+       {
+        "data": [
+         1905640000000,
+         968450000000,
+         742310000000,
+         372890000000
+        ],
+        "name": "Beban 2024 (Rp)",
+        "color": "#38c6e2"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Komposisi Beban Laporan Keuangan Audited 2024",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Komposisi Biaya Operasional",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 4,
+       "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 3. Laporan laba rugi dan penghasilan komprehensif lain | Uraian | 2024 | 2023 | Pendapatan usaha 3.184.720.000.000 2.943.020.000.000 | Beban usaha | (1.905.640.000.000) | (1.762.370.000.000) | Laba kotor 1.279.080.000.000 1.180.640.000.000 | Beban umum dan administrasi | (968.450.000.000) | (900.970.000.000) | Laba usaha 310.630.000.000 279.670.000.000 | Pendapatan non usaha | 2.104.880.000.000 | 1.982.290.000.000 | Beban non usaha (742.310.000.000) (665.270.000.000) | Laba sebelum pajak | 1.673.200.000.000 | 1.596.690.000.000 | Beban pajak penghasilan (372.890.000.000) (349.330.000.000)",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:19:20.326Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-13",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "hbar",
+     "chart": {
+      "unit": "menit; jam",
+      "xAxis": [
+       "Gangguan ringan/adminis…",
+       "Gangguan sedang",
+       "Gangguan berat/menyelur…"
+      ],
+      "series": [
+       {
+        "data": [
+         30,
+         60,
+         60
+        ],
+        "name": "Waktu tanggap (menit)",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         6,
+         12,
+         24
+        ],
+        "name": "Waktu penyelesaian (jam)",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "SLA Waktu Tanggap dan Penyelesaian per Kategori Gangguan",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Jumlah Gangguan per Kategori",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 2,
+       "docName": "PRJ-PAMJAYA_sop_Standar_Operasional_Prosedur_Pelayanan.pdf",
+       "chunkSnippet": "| Jenis pekerjaan | Waktu tanggap | Waktu penyelesaian | | Gangguan ringan/administratif | ≤ 30 menit | ≤ 6 jam | | Gangguan sedang | ≤ 1 jam | ≤ 12 jam | | Gangguan berat/menyeluruh | ≤ 1 jam | ≤ 24 jam | | Permintaan informasi | ≤ 15 menit | ≤ 1 hari kerja |",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:17:25.405Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-14",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "bar",
+     "chart": {
+      "unit": "sambungan",
+      "xAxis": [
+       "2022",
+       "2023",
+       "2024"
+      ],
+      "series": [
+       {
+        "data": [
+         923756,
+         932892,
+         951640
+        ],
+        "name": "Jumlah pelanggan sambungan",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         24180,
+         22640,
+         26480
+        ],
+        "name": "Sambungan baru",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "Data Terdekat Perubahan Pelanggan Aktif",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Perubahan Pelanggan Aktif",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 14,
+       "docName": "Laporan-Tahunan-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "7 Jumlah pelanggan sambungan 923.756 932.892 951.640 | 8 | Sambungan baru | sambungan | 24.180 | 22.640 | 26.480",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:16:49.474Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-15",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "radar",
+     "chart": {
+      "unit": "%",
+      "xAxis": [
+       "NRW",
+       "Cakupan layanan",
+       "Kualitas air memenuhi…"
+      ],
+      "series": [
+       {
+        "data": [
+         43.85,
+         69.12,
+         99.51
+        ],
+        "name": "Realisasi 2024",
+        "color": "#38c6e2"
+       },
+       {
+        "data": [
+         41.5,
+         71.5,
+         99.6
+        ],
+        "name": "Target 2025",
+        "color": "#2bb8a8"
+       }
+      ],
+      "showLegend": true
+     },
+     "title": "NRW s.d. Kualitas air memenuhi… Realisasi 2024 dan…",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Profil Kinerja Layanan",
+     "citations": [
+      {
+       "id": "cit-extract-grafik-1",
+       "date": "",
+       "page": 1,
+       "docName": "RKAP-PAM-JAYA-2025.pdf",
+       "chunkSnippet": "| NRW | % | 43,85 | 41,50 | −2,35 poin | Jumlah pelanggan sambungan 951.640 985.300 3,54% | Sambungan baru | sambungan | 26.480 | 33.660 | 27,11% | Cakupan layanan % 69,12 71,50 +2,38 poin | Tekanan air rata-rata | bar | 1,02 | 1,05 | 2,94% | Kualitas air memenuhi baku mutu % 99,51 99,60 +0,09 poin",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:17:13.885Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-16",
+     "grid": {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0
+     },
+     "type": "scatter",
+     "title": "Sebaran Konsumsi per Golongan",
+     "category": "Operasional",
+     "subtitle": "Konsumsi rata-rata vs jumlah SL",
+     "citations": [],
+     "confidence": "inferensi AI",
+     "dataKosong": true,
+     "catatanData": "Indikator ini tidak ditemukan di dokumen instansi.",
+     "lastUpdated": "2026-10-26T15:11:58.245Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-17",
+     "grid": {
+      "h": 3,
+      "w": 12,
+      "x": 0,
+      "y": 0
+     },
+     "type": "table",
+     "table": {
+      "rows": [
+       {
+        "k0": "Marjin laba usaha (%)",
+        "k1": "9,75",
+        "k2": "9,50",
+        "k3": "Laba usaha dibagi pendapatan…"
+       },
+       {
+        "k0": "Marjin laba bersih (%)",
+        "k1": "40,83",
+        "k2": "42,38",
+        "k3": "Laba bersih dibagi…"
+       },
+       {
+        "k0": "Rasio ekuitas terhadap aset…",
+        "k1": "68,75",
+        "k2": "68,58",
+        "k3": "Struktur modal"
+       },
+       {
+        "k0": "Rasio liabilitas terhadap…",
+        "k1": "45,46",
+        "k2": "45,82",
+        "k3": "Tingkat leverage"
+       },
+       {
+        "k0": "Perputaran piutang (kali)",
+        "k1": "1,11",
+        "k2": "1,09",
+        "k3": "Pendapatan dibagi rata-rata…"
+       },
+       {
+        "k0": "Pendapatan per m³ (Rp)",
+        "k1": "8.450",
+        "k2": "8.245",
+        "k3": "Pendapatan usaha dibagi air…"
+       },
+       {
+        "k0": "Biaya per m³ terjual (Rp)",
+        "k1": "5.056",
+        "k2": "4.937",
+        "k3": "Beban usaha dibagi air terjual"
+       }
+      ],
+      "columns": [
+       {
+        "key": "k0",
+        "label": "Rasio"
+       },
+       {
+        "key": "k1",
+        "label": "2024"
+       },
+       {
+        "key": "k2",
+        "label": "2023"
+       },
+       {
+        "key": "k3",
+        "label": "Penjelasan"
+       }
+      ]
+     },
+     "title": "Rekap Kinerja Operasional: Rasio Keuangan Utama",
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "Dari template: Rekap Kinerja Operasional",
+     "citations": [
+      {
+       "id": "cit-extract-tabel-1",
+       "date": "",
+       "page": 6,
+       "docName": "Laporan-Keuangan-Audited-PAM-JAYA-2024.pdf",
+       "chunkSnippet": "Tabel 7. Rasio keuangan utama | Rasio | 2024 | 2023 | Penjelasan | Marjin laba usaha (%) 9,75 9,50 Laba usaha dibagi pendapatan usaha | Marjin laba bersih (%) 40,83 42,38 Laba bersih dibagi pendapatan usaha | Rasio ekuitas terhadap aset (%) 68,75 68,58 Struktur modal | Rasio liabilitas terhadap ekuitas (%) 45,46 45,82 Tingkat leverage | Perputaran piutang (kali) 1,11 1,09 Pendapatan dibagi rata-rata piutang | Pendapatan per m³ (Rp) 8.450 8.245 Pendapatan usaha dibagi air terjual | Biaya per m³ terjual (Rp) 5.056 4.937 Beban usaha dibagi air terjual",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:17:56.024Z"
+    },
+    {
+     "id": "tpl-pdam-1793027540050-18",
+     "grid": {
+      "h": 3,
+      "w": 12,
+      "x": 0,
+      "y": 0
+     },
+     "type": "narasi",
+     "title": "Ringkasan Eksekutif",
+     "narasi": {
+      "text": "Tidak ditemukan bagian \"Ringkasan Eksekutif\" maupun narasi kondisi periode berjalan pada dokumen yang tersedia. Konteks hanya memuat uraian berulang aspek tata kelola (transparansi, akuntabilitas, perencanaan, dan seterusnya) tanpa angka kondisi periode berjalan, sehingga tidak ada ringkasan yang dapat diambil."
+     },
+     "periode": "",
+     "category": "Keuangan",
+     "subtitle": "PRJ-PAMJAYA_profil_Profil_dan_L…",
+     "citations": [
+      {
+       "id": "cit-extract-narasi-1",
+       "date": "",
+       "page": 10,
+       "docName": "PRJ-PAMJAYA_profil_Profil_dan_Laporan_Kinerja_Perusahaan.pdf",
+       "chunkSnippet": "Sumber Data • https://pamjaya.co.id/ • https://id.wikipedia.org/wiki/PAM_JAYA Catatan: sebagian data pada dokumen ini belum dapat diverifikasi dari sumber publik resmi (ditandai 'Data belum tersedia pada sumber publik').",
+       "confidenceScore": 0.95
+      }
+     ],
+     "confidence": "sumber",
+     "dataKosong": false,
+     "lastUpdated": "2026-10-26T15:17:58.355Z"
+    }
+   ],
+   "tenantId": "tenant-1791501310547",
+   "createdAt": "2026-10-26T15:19:20.327Z",
+   "updatedAt": "2026-10-27T15:07:06.920Z",
+   "description": "Template sektor air minum lengkap (18 widget, 12 grafik): pendapatan, NRW, produksi, distribusi, dan pelayanan. Angka diambil dari dokumen resmi instansi; kartu yang indikatornya belum ada di dokumen ditandai kosong.",
+   "globalFilters": {
+    "periode": "2026-Q1",
+    "kategori": "Semua",
+    "unitKerja": "Semua"
+   }
+  }
+ }
+]
