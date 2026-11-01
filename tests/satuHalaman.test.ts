@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hitungBarisKanvas, lebarKolom, tinggiBaris, KOLOM_KANVAS } from '../src/services/tataLetak/satuHalaman';
+import { hitungBarisKanvas, lebarKolom, tataTinggiKanvas, tinggiBaris, KOLOM_KANVAS, TINGGI_KPI_MAKS } from '../src/services/tataLetak/satuHalaman';
 
 /**
  * Dashboard harus tampil penuh dalam SATU layar tanpa scroll. Yang mudah salah:
@@ -91,4 +91,15 @@ test('kalau baris minimum tidak cukup, grid diperkecil agar tetap satu layar', (
 test('ruang kosong / tanpa baris tidak menghasilkan skala aneh', () => {
   assert.deepEqual(tinggiBaris(0, 5, 10, 84), { tinggi: 0, skala: 1 });
   assert.deepEqual(tinggiBaris(800, 0, 10, 84), { tinggi: 0, skala: 1 });
+});
+
+test('baris KPI dibatasi tingginya; sisa layar untuk grafik', () => {
+  const hanyaKpi = tataTinggiKanvas(700, true, 0, 10, 84);
+  assert.equal(hanyaKpi.kpi, TINGGI_KPI_MAKS);
+  const campur = tataTinggiKanvas(700, true, 1, 10, 84);
+  assert.equal(campur.kpi, TINGGI_KPI_MAKS);
+  assert.equal(campur.baris, 700 - TINGGI_KPI_MAKS - 10);
+  // Layar pendek: KPI dan grafik dibagi rata seperti biasa.
+  const pendek = tataTinggiKanvas(300, true, 2, 10, 84);
+  assert.equal(pendek.kpi, pendek.baris);
 });

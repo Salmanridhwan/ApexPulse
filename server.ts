@@ -3084,6 +3084,8 @@ const app = express();
         instansi: tenantAktif?.name,
         desain: desainDiminta,
         idAwal: `ast-${Date.now()}`,
+        halamanDiminta: genResult.halamanDiminta,
+        halamanWidget: genResult.halamanWidget,
       });
       const isiBaru = {
         title: susun.title,
@@ -3141,6 +3143,18 @@ const app = express();
       }, terbagi dalam **${daftarHalaman.length} halaman**:
 ${isiHalaman}
 \n`;
+
+      if (genResult.halamanBawaan && susun.halaman.length > 0) {
+        replyText += `Halaman disusun per segmen (satu topik per halaman). Untuk susunan sendiri, tulis daftarnya, mis. "1. Halaman Keuangan – pendapatan, laba, arus kas".
+
+`;
+      }
+
+      if (susun.halamanKosong.length) {
+        replyText += `Halaman **${susun.halamanKosong.join('**, **')}** tidak dibuat karena dokumen instansi tidak memuat datanya.
+
+`;
+      }
 
       if (narasiWidget?.narasi?.text) {
         replyText += `📋 **Ringkasan temuan:**

@@ -81,3 +81,32 @@ export function tinggiBaris(
   const tinggiGrid = baris * barisMin + jarak * (baris - 1);
   return { tinggi: barisMin, skala: Math.min(1, tinggiIsi / tinggiGrid) };
 }
+
+/**
+ * Batas tinggi baris KPI. Kartu KPI hanya berisi angka + selisih, jadi tidak
+ * perlu ikut membesar: tanpa batas ini halaman yang isinya hanya KPI membuat
+ * tiga kartu setinggi layar dengan ruang kosong di tengahnya.
+ */
+export const TINGGI_KPI_MAKS = 190;
+
+/**
+ * Tinggi baris KPI dan baris kartu lain untuk mode satu halaman. Baris KPI
+ * dibatasi `TINGGI_KPI_MAKS`; sisa tinggi diberikan ke grafik/tabel.
+ */
+export function tataTinggiKanvas(
+  tinggiIsi: number,
+  adaKpi: boolean,
+  barisLain: number,
+  jarak: number,
+  barisMin: number
+): { kpi: number; baris: number; skala: number } {
+  if (!adaKpi) {
+    const t = tinggiBaris(tinggiIsi, barisLain, jarak, barisMin);
+    return { kpi: 0, baris: t.tinggi, skala: t.skala };
+  }
+  if (barisLain === 0) return { kpi: Math.min(TINGGI_KPI_MAKS, Math.max(0, tinggiIsi)), baris: 0, skala: 1 };
+  const rata = tinggiBaris(tinggiIsi, barisLain + 1, jarak, barisMin);
+  if (rata.tinggi <= TINGGI_KPI_MAKS) return { kpi: rata.tinggi, baris: rata.tinggi, skala: rata.skala };
+  const sisa = tinggiBaris(tinggiIsi - TINGGI_KPI_MAKS - jarak, barisLain, jarak, barisMin);
+  return { kpi: TINGGI_KPI_MAKS, baris: sisa.tinggi, skala: sisa.skala };
+}

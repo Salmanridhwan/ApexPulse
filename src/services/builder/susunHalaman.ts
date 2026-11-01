@@ -11,12 +11,14 @@
  *   antar halaman).
  * - Setiap halaman muat satu layar: maksimal 4 KPI dan 4 kartu lain.
  * - Judul dashboard dan judul halaman mengikuti isi yang benar-benar tampil.
+ * - Bila pengguna menulis susunan halamannya sendiri, susunan itu yang dipakai.
  */
 
 import type { HalamanDashboard, WidgetSpec, WidgetType } from '../../types';
 import type { ChartId } from '../chart/chartDefault';
 import type { Varian } from '../chart/gayaVarian';
 import { kategoriWidget, type KategoriDashboard } from '../spec/kategoriWidget';
+import { halamanUntukWidget, type HalamanDiminta } from './halamanDiminta';
 
 /** Batas isi satu halaman supaya muat satu layar tanpa digulir. */
 export const MAKS_KPI_PER_HALAMAN = 4;
@@ -228,6 +230,48 @@ export function bagiHalaman(widgets: WidgetSpec[]): Array<{ judul: string; widge
   return halaman.map((h) => ({ judul: h.judul, widgets: tataHalaman([...h.kpi, ...h.lain]) }));
 }
 
+/** Batas isi halaman yang diminta pengguna: satu baris KPI penuh + tiga baris kartu. */
+const MAKS_KPI_DIMINTA = 6;
+const MAKS_KARTU_DIMINTA = 6;
+
+/**
+ * Bagi widget ke halaman yang DITULIS pengguna. Widget yang diambil khusus
+ * untuk satu halaman (`petaWidget`) masuk ke halaman itu; widget lain ke
+ * halaman yang butirnya paling cocok. Widget yang tidak cocok dengan halaman
+ * mana pun tidak dipaksakan masuk (pengguna meminta satu topik per halaman),
+ * kecuali KPI yang boleh masuk halaman pertama bila halaman itu ringkasan.
+ * Halaman tanpa isi tidak dibuat.
+ */
+export function bagiHalamanDiminta(
+  widgets: WidgetSpec[],
+  diminta: HalamanDiminta[],
+  petaWidget: Record<string, number> = {}
+): { halaman: Array<{ judul: string; widgets: WidgetSpec[] }>; kosong: string[]; dilewati: WidgetSpec[] } {
+  const isi = diminta.map(() => ({ kpi: [] as WidgetSpec[], lain: [] as WidgetSpec[] }));
+  const dilewati: WidgetSpec[] = [];
+  const pertamaRingkasan = /ringkas|umum|ikhtisar|overview|utama/i.test(diminta[0]?.judul ?? '');
+  for (const w of widgets) {
+    let i = petaWidget[w.id] ?? halamanUntukWidget(w, diminta);
+    const kpi = TIPE_KPI.includes(w.type);
+    if (i < 0 && kpi && pertamaRingkasan) i = 0;
+    const wadah = i >= 0 ? isi[i] : undefined;
+    const daftar = wadah ? (kpi ? wadah.kpi : wadah.lain) : undefined;
+    if (!daftar || daftar.length >= (kpi ? MAKS_KPI_DIMINTA : MAKS_KARTU_DIMINTA)) {
+      dilewati.push(w);
+      continue;
+    }
+    daftar.push(w);
+  }
+  const halaman: Array<{ judul: string; widgets: WidgetSpec[] }> = [];
+  const kosong: string[] = [];
+  diminta.forEach((h, i) => {
+    const { kpi, lain } = isi[i];
+    if (kpi.length + lain.length === 0) kosong.push(h.judul);
+    else halaman.push({ judul: h.judul, widgets: tataHalaman([...kpi, ...lain]) });
+  });
+  return { halaman, kosong, dilewati };
+}
+
 const NAMA_GAYA: Record<string, Varian> = { pijar: 'ringkasan', lensa: 'analitik', nadi: 'trafik', kaca: 'kaca', glassy: 'kaca', glass: 'kaca', bening: 'kaca', tirta: 'tirta', samudra: 'tirta', aurora: 'aurora', neon: 'neon', blok: 'blok', brutal: 'blok', neubrutalism: 'blok', bento: 'bento', pastel: 'bento', koran: 'koran', editorial: 'koran', default: 'default', netral: 'default' };
 
 /** Gaya yang diminta di kalimat pengguna ("pakai gaya lensa"), bila ada. */
@@ -254,6 +298,8 @@ export function judulDariIsi(halaman: Array<{ judul: string }>, instansi?: strin
 export interface HasilSusun {
   title: string;
   halaman: HalamanDashboard[];
+  /** Halaman yang diminta pengguna tetapi tidak ada datanya di dokumen. */
+  halamanKosong: string[];
 }
 
 /**
@@ -261,7 +307,15 @@ export interface HasilSusun {
  */
 export function susunDashboardBerhalaman(
   widgets: WidgetSpec[],
-  opsi: { instansi?: string; desain?: Varian; idAwal?: string } = {}
+  opsi: {
+    instansi?: string;
+    desain?: Varian;
+    idAwal?: string;
+    /** Susunan halaman dari kalimat pengguna; kosong = dibagi otomatis per topik. */
+    halamanDiminta?: HalamanDiminta[];
+    /** Widget yang diambil khusus untuk satu halaman: id -> indeks halaman. */
+    halamanWidget?: Record<string, number>;
+  } = {}
 ): HasilSusun {
   const dasar = opsi.idAwal ?? `w${Date.now()}`;
   const terpilih = buangKembar(widgets).map((w, i) => {
@@ -275,7 +329,15 @@ export function susunDashboardBerhalaman(
     } as WidgetSpec;
   });
 
-  const bagian = bagiHalaman(terpilih);
+  const diminta = opsi.halamanDiminta ?? [];
+  const sesuaiPermintaan = diminta.length > 0 ? bagiHalamanDiminta(terpilih, diminta, opsi.halamanWidget) : null;
+  // Tidak satu pun halaman yang diminta terisi: kembali ke pembagian otomatis.
+  const pakaiPermintaan = sesuaiPermintaan && sesuaiPermintaan.halaman.length > 0;
+  const bagian = pakaiPermintaan ? sesuaiPermintaan.halaman : bagiHalaman(terpilih);
   const halaman: HalamanDashboard[] = bagian.map((h, i) => ({ id: `hlm-${i + 1}`, judul: h.judul, widgets: h.widgets }));
-  return { title: judulDariIsi(bagian, opsi.instansi), halaman };
+  return {
+    title: judulDariIsi(bagian, opsi.instansi),
+    halaman,
+    halamanKosong: pakaiPermintaan ? sesuaiPermintaan.kosong : diminta.map((h) => h.judul),
+  };
 }

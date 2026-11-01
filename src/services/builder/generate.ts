@@ -5,6 +5,7 @@ import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { rapikanTataLetak } from './tataLetak';
+import { butirTerwakili, halamanUntukPermintaan, tipeButir, type HalamanDiminta } from './halamanDiminta';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
@@ -68,6 +69,12 @@ export interface GenerateResult {
    * cukup indikator). Pemanggil wajib menyampaikan ini apa adanya ke pengguna.
    */
   jumlahKurang: boolean;
+  /** Susunan halaman yang ditulis pengguna di kalimatnya (kosong = dibagi otomatis). */
+  halamanDiminta: HalamanDiminta[];
+  /** true = pengguna tidak menulis daftar halaman; dipakai segmentasi bawaan sektor. */
+  halamanBawaan: boolean;
+  /** Widget yang diambil khusus untuk satu halaman yang diminta: id widget -> indeks halaman. */
+  halamanWidget: Record<string, number>;
 }
 
 export async function generateDashboard(options: GenerateOptions): Promise<GenerateResult> {
@@ -80,6 +87,10 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   // pernah melebihi widget yang benar-benar dibuat.
   const permintaanJumlahDibaca = parsePermintaanJumlahWidget(userPrompt);
   const permintaanJumlah: PermintaanJumlahWidget | undefined = permintaanJumlahDibaca ?? undefined;
+  // Susunan halaman yang ditulis pengguna ("1. Halaman Ringkasan – ... 2. Halaman Keuangan – ...").
+  // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
+  const { halaman: halamanDiminta, bawaan: halamanBawaan } = halamanUntukPermintaan(userPrompt, sector);
+  const halamanWidget: Record<string, number> = {};
   if (permintaanJumlah) {
     logSummary.push(
       `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`
@@ -172,6 +183,9 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       permintaanJumlah,
       jumlahWidget: 0,
       jumlahKurang: !!permintaanJumlah,
+      halamanDiminta,
+      halamanBawaan,
+      halamanWidget: {},
     };
   }
 
@@ -207,6 +221,62 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     } else {
       logSummary.push(`[Jalur A Gagal] Ditolak: ${jsonRes.errors?.join('; ')}.`);
     }
+  }
+
+  // Step 3a: HALAMAN YANG DIMINTA PENGGUNA.
+  // Ekstraksi umum di atas hanya memberi beberapa widget (sering KPI saja), jadi
+  // halaman yang disebut pengguna kosong dan isinya jatuh ke "Ringkasan". Setiap
+  // butir yang belum terwakili diambil sendiri dari dokumen dengan bentuk chart
+  // yang sesuai kalimatnya (tren -> garis, komposisi -> donat, per wilayah ->
+  // batang). Angkanya tetap dari RAG; butir yang tidak ada di dokumen dilewati.
+  if (halamanDiminta.length > 0 && typeof options.ragClient?.ambilDataWidget === 'function') {
+    const ragClient = options.ragClient;
+    const tugas: Array<{ halaman: number; butir: string }> = [];
+    halamanDiminta.forEach((h, i) => {
+      for (const b of h.butir) if (!butirTerwakili(b, synthesizedWidgets)) tugas.push({ halaman: i, butir: b });
+    });
+    onProgress?.({
+      id: 'step-3a',
+      title: `Mengisi ${halamanDiminta.length} halaman yang diminta (${tugas.length} indikator)...`,
+      status: 'in_progress',
+    });
+    const hasil: Array<WidgetSpec | null> = new Array(tugas.length).fill(null);
+    let berikut = 0;
+    // Empat sekaligus: lebih banyak membuat layanan RAG membalas 429.
+    const pekerja = Array.from({ length: Math.min(4, tugas.length) }, async () => {
+      while (berikut < tugas.length) {
+        const k = berikut++;
+        const t = tugas[k];
+        try {
+          const r = await ragClient.ambilDataWidget!(
+            `${t.butir} (${halamanDiminta[t.halaman].judul})`,
+            sector,
+            tipeButir(t.butir),
+            instansi,
+            kbId,
+            { batasMs: 120_000, turunkanTipe: true }
+          );
+          if (r?.data) hasil[k] = r.data as WidgetSpec;
+        } catch {
+          // Satu butir gagal tidak boleh menggagalkan halaman lain.
+        }
+      }
+    });
+    await Promise.all(pekerja);
+    let didapat = 0;
+    hasil.forEach((w, k) => {
+      if (!w) return;
+      const id = `hd-${tugas[k].halaman + 1}-${k + 1}`;
+      halamanWidget[id] = tugas[k].halaman;
+      synthesizedWidgets.push({ ...w, id });
+      didapat++;
+    });
+    logSummary.push(`[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan di dokumen.`);
+    onProgress?.({
+      id: 'step-3a',
+      title: `${didapat} dari ${tugas.length} indikator halaman ditemukan di dokumen`,
+      status: 'completed',
+    });
   }
 
   // JALUR B DIHAPUS (permintaan user 2026-10-15): aplikasi TIDAK menyusun dashboard
@@ -430,5 +500,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     permintaanJumlah,
     jumlahWidget: synthesizedWidgets.length,
     jumlahKurang: !!permintaanJumlah && synthesizedWidgets.length < permintaanJumlah.max,
+    halamanDiminta,
+    halamanBawaan,
+    halamanWidget,
   };
 }

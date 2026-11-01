@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
-import { hitungBarisGrid, hitungBarisKanvas, tinggiBaris } from '../services/tataLetak/satuHalaman';
+import { hitungBarisGrid, hitungBarisKanvas, tataTinggiKanvas } from '../services/tataLetak/satuHalaman';
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -193,8 +193,12 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    * baris minimum pun tidak cukup, seluruh grid diperkecil dengan `scale`
    * supaya TETAP muat satu layar tanpa scroll.
    */
-  const tata = pasSatuHalaman ? tinggiBaris(tinggiIsi, barisKanvas, JARAK, BARIS_MIN) : { tinggi: 0, skala: 1 };
-  const tinggiBarisFinal = tata.tinggi;
+  const tata = pasSatuHalaman
+    ? tataTinggiKanvas(tinggiIsi, widgetsKpi.length > 0, barisLain, JARAK, BARIS_MIN)
+    : { kpi: 0, baris: 0, skala: 1 };
+  const tinggiBarisFinal = tata.baris;
+  /** Baris KPI dibatasi tingginya supaya kartu angka tidak melar setinggi layar. */
+  const tinggiKpi = tata.kpi;
   const skala = tata.skala;
   /** Tinggi total kartu non-KPI (dipakai sebagai tinggi grid utamanya). */
   const tinggiGridLain = barisLain * tinggiBarisFinal + JARAK * Math.max(0, barisLain - 1);
@@ -382,7 +386,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
             style={{
               gridTemplateColumns: `repeat(${kolomKpi}, minmax(0, 1fr))`,
               gap: JARAK,
-              height: pasSatuHalaman ? tinggiBarisFinal : undefined,
+              height: pasSatuHalaman ? tinggiKpi : undefined,
               marginBottom: JARAK,
             }}
           >
