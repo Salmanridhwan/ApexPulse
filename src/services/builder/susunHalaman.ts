@@ -18,7 +18,7 @@ import type { HalamanDashboard, WidgetSpec, WidgetType } from '../../types';
 import type { ChartId } from '../chart/chartDefault';
 import type { Varian } from '../chart/gayaVarian';
 import { kategoriWidget, type KategoriDashboard } from '../spec/kategoriWidget';
-import { halamanUntukWidget, type HalamanDiminta } from './halamanDiminta';
+import { halamanUntukWidget, widgetKembar, type HalamanDiminta } from './halamanDiminta';
 
 /** Batas isi satu halaman supaya muat satu layar tanpa digulir. */
 export const MAKS_KPI_PER_HALAMAN = 4;
@@ -250,7 +250,13 @@ export function bagiHalamanDiminta(
   const isi = diminta.map(() => ({ kpi: [] as WidgetSpec[], lain: [] as WidgetSpec[] }));
   const dilewati: WidgetSpec[] = [];
   const pertamaRingkasan = /ringkas|umum|ikhtisar|overview|utama/i.test(diminta[0]?.judul ?? '');
+  const terpasang: WidgetSpec[] = [];
   for (const w of widgets) {
+    // Metrik sama dengan nama lain ("NRW" vs "Tingkat Kehilangan Air") cukup sekali.
+    if (widgetKembar(w, terpasang)) {
+      dilewati.push(w);
+      continue;
+    }
     let i = petaWidget[w.id] ?? halamanUntukWidget(w, diminta);
     const kpi = TIPE_KPI.includes(w.type);
     if (i < 0 && kpi && pertamaRingkasan) i = 0;
@@ -261,6 +267,7 @@ export function bagiHalamanDiminta(
       continue;
     }
     daftar.push(w);
+    terpasang.push(w);
   }
   const halaman: Array<{ judul: string; widgets: WidgetSpec[] }> = [];
   const kosong: string[] = [];

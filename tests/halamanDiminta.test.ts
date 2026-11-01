@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bacaHalamanDiminta, butirTerwakili, halamanUntukPermintaan, halamanUntukWidget, mintaBanyakHalaman, tipeButir } from '../src/services/builder/halamanDiminta';
+import {
+  bacaHalamanDiminta,
+  bersihkanJudulRag,
+  butirTerwakili,
+  halamanUntukPermintaan,
+  halamanUntukWidget,
+  judulUntukButir,
+  mintaBanyakHalaman,
+  tipeButir,
+  widgetKembar,
+} from '../src/services/builder/halamanDiminta';
 import { susunDashboardBerhalaman } from '../src/services/builder/susunHalaman';
 import type { WidgetSpec } from '../src/types';
 
@@ -131,4 +141,33 @@ test('segmentasi bawaan: KPI hasil ekstraksi masuk halaman topiknya, tidak campu
     'Operasional & Produksi': ['NRW (Non Revenue Water)'],
   });
   assert.deepEqual(hasil.halamanKosong, ['Pelayanan Pelanggan', 'Wilayah']);
+});
+
+test('bug: NRW dengan nama lain dikenali sebagai kartu yang sama', () => {
+  const ada = [kpi('a', 'Tingkat Kehilangan Air (NRW)', 43.85)];
+  assert.ok(butirTerwakili('NRW (kehilangan air)', ada));
+  assert.ok(butirTerwakili('NRW (kehilangan air)', [kpi('b', 'NRW (Non Revenue Water)', 41.2)]));
+});
+
+test('bug: sinonim pelanggan dikenali (warga terlayani = jumlah pelanggan)', () => {
+  assert.ok(butirTerwakili('warga terlayani', [kpi('a', 'Jumlah Pelanggan', 951640)]));
+  assert.ok(widgetKembar(kpi('x', 'Warga terlayani', 936480), [kpi('a', 'Jumlah Pelanggan', 951640)]));
+  assert.ok(widgetKembar(kpi('x', 'Keluhan pelanggan', 120), [kpi('a', 'Jumlah pengaduan pelanggan', 118)]));
+  assert.ok(!widgetKembar(kpi('x', 'Pendapatan usaha', 1), [kpi('a', 'Laba bersih', 2)]));
+});
+
+test('bug: judul balikan RAG dibersihkan dari "— dasar: …" dan kurung terpotong', () => {
+  assert.equal(bersihkanJudulRag('Warga terlayani (Ringkasan) — dasar: laporan tahunan 2024', 'Ringkasan'), 'Warga terlayani');
+  assert.equal(bersihkanJudulRag('Keluhan (jumlah pengaduan, dasar: status pengaduan'), 'Keluhan');
+  assert.equal(bersihkanJudulRag('Status Pengaduan Oktober — dasar: tabel status pengaduan'), 'Status Pengaduan Oktober');
+  assert.equal(bersihkanJudulRag('Tingkat Kehilangan Air (NRW)'), 'Tingkat Kehilangan Air (NRW)');
+});
+
+test('bug: judul kartu dari butir; data tetangga dibuang', () => {
+  const kartu = (title: string, type = 'kpi') => (type === 'kpi' ? kpi('r', title, 1) : grafik('r', title, type));
+  assert.equal(judulUntukButir('arus kas', kartu('Arus kas operasi — dasar: laporan arus kas')), 'Arus kas');
+  // Diminta tren kualitas layanan, RAG memberi air terjual bulanan: dibuang.
+  assert.equal(judulUntukButir('tren kualitas layanan', kartu('Air terjual bulanan — dasar: laporan produksi', 'line')), null);
+  // Diminta tren, RAG hanya punya satu angka: judul mengikuti isi, bukan "Tren …".
+  assert.equal(judulUntukButir('tren pengaduan per kategori', kartu('Jumlah pengaduan 2024 — dasar: tabel')), 'Jumlah pengaduan 2024');
 });

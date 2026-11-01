@@ -30,16 +30,44 @@ export const MAKS_BUTIR = 7;
 const KATA_UMUM = new Set([
   'dan', 'per', 'di', 'ke', 'dari', 'yang', 'tiap', 'setiap', 'terhadap', 'untuk', 'dengan', 'atau', 'lalu', 'serta',
   'angka', 'kpi', 'tren', 'bulanan', 'bulan', 'tahunan', 'tahun', 'utama', 'total', 'nilai', 'data', 'grafik', 'chart',
+  'jumlah', 'tingkat', 'rasio', 'persentase',
 ]);
 
-/** Token bermakna: huruf kecil, isi kurung dibuang, kata umum dibuang. */
+/**
+ * Sinonim metrik BUMD disatukan ke satu kata supaya "Tingkat Kehilangan Air"
+ * dan "NRW", atau "Warga terlayani" dan "Jumlah Pelanggan", dikenali sebagai
+ * metrik yang sama.
+ */
+const FRASA_SAMA: Array<[RegExp, string]> = [
+  [/non[\s-]*revenue[\s-]*water|kehilangan air|air (?:yang )?hilang|air t(?:ak|idak) berekening/g, ' nrw '],
+  [/(?:warga|penduduk|jiwa) terlayani|sambungan (?:rumah|langganan)/g, ' pelanggan '],
+];
+const KATA_SAMA: Record<string, string> = {
+  sambungan: 'pelanggan',
+  keluhan: 'pengaduan',
+  aduan: 'pengaduan',
+  komplain: 'pengaduan',
+  biaya: 'beban',
+  keuntungan: 'laba',
+  penerimaan: 'pendapatan',
+  omzet: 'pendapatan',
+  revenue: 'pendapatan',
+};
+
+/**
+ * Token bermakna: huruf kecil, sinonim disatukan, kata umum dibuang. Isi kurung
+ * TIDAK dibuang: "Tingkat Kehilangan Air (NRW)" justru menyebut metriknya di
+ * dalam kurung.
+ */
 export function tokenBermakna(teks: string): string[] {
-  return String(teks ?? '')
-    .toLowerCase()
-    .replace(/\(.*?\)/g, ' ')
+  let t = String(teks ?? '').toLowerCase();
+  for (const [pola, ganti] of FRASA_SAMA) t = t.replace(pola, ganti);
+  const token = t
     .replace(/[^a-z0-9]+/g, ' ')
     .split(' ')
-    .filter((t) => t.length >= 3 && !KATA_UMUM.has(t));
+    .map((k) => KATA_SAMA[k] ?? k)
+    .filter((k) => k.length >= 3 && !KATA_UMUM.has(k));
+  return [...new Set(token)];
 }
 
 /** Dua kata dianggap sama bila salah satu awalan yang lain ("pelanggan" ~ "pelanggannya"). */
@@ -47,10 +75,13 @@ const kataSama = (a: string, b: string) => a === b || (Math.min(a.length, b.leng
 
 /** Porsi token `butir` yang muncul di `teks` (0..1). */
 export function skorCocok(butir: string, teks: string): number {
-  const tb = tokenBermakna(butir);
-  if (tb.length === 0) return 0;
   const tt = tokenBermakna(teks);
-  return tb.filter((b) => tt.some((t) => kataSama(b, t))).length / tb.length;
+  const skor = (b: string) => {
+    const tb = tokenBermakna(b);
+    return tb.length === 0 ? 0 : tb.filter((x) => tt.some((t) => kataSama(x, t))).length / tb.length;
+  };
+  // Keterangan dalam kurung di butir ("laba (rugi) bersih") boleh diabaikan.
+  return Math.max(skor(butir), skor(butir.replace(/\(.*?\)/g, ' ')));
 }
 
 /** Pecah uraian satu halaman menjadi butir indikator. */
@@ -197,4 +228,53 @@ export function halamanUntukPermintaan(prompt: string, sector: string): { halama
   if (!minta) return { halaman: [], bawaan: false };
   const segmen = segmenBawaan(sector);
   return { halaman: typeof minta === 'number' ? segmen.slice(0, minta) : segmen, bawaan: true };
+}
+
+/** Kelompok bentuk: angka tunggal vs grafik/tabel. Kartu kembar hanya dalam kelompok yang sama. */
+const angkaTunggal = (tipe: string) => ['kpi', 'bullet-target', 'gauge'].includes(tipe);
+
+const kapital = (t: string) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+
+/**
+ * Bersihkan judul balikan RAG: buang keterangan "— dasar: …", nama halaman
+ * dalam kurung yang ikut terbawa dari pertanyaan, dan kurung yang terpotong.
+ */
+export function bersihkanJudulRag(judul: string, judulHalaman = ''): string {
+  let t = String(judul ?? '').replace(/\s+/g, ' ');
+  t = t.replace(/\s*[—–-]+\s*(?:dasar|sumber|berdasarkan)\b.*$/i, '');
+  t = t.replace(/\s*[,;(]\s*(?:dasar|sumber|berdasarkan)\b.*$/i, '');
+  if (judulHalaman) t = t.split(`(${judulHalaman})`).join(' ');
+  // Kurung yang dibuka tapi tidak ditutup (judul terpotong): buang dari kurung itu.
+  while ((t.match(/\(/g)?.length ?? 0) > (t.match(/\)/g)?.length ?? 0)) t = t.slice(0, t.lastIndexOf('('));
+  t = t.replace(/\s{2,}/g, ' ').replace(/[\s,;:—–-]+$/, '').trim();
+  if (t.length > 60) t = t.slice(0, 60).replace(/\s+\S*$/, '');
+  return kapital(t);
+}
+
+/**
+ * Judul kartu untuk widget yang diambil demi satu butir. Mengembalikan `null`
+ * bila datanya bukan tentang butir itu: RAG kadang memberi data tetangga
+ * (diminta "tren kualitas layanan", dibalas air terjual bulanan), dan kartu
+ * seperti itu menyesatkan bila diberi judul butir.
+ *
+ * - Cocok kuat dan bentuknya sesuai (tren -> grafik, angka -> KPI): judul butir.
+ * - Cocok sebagian, atau bentuknya diturunkan: judul RAG yang sudah dibersihkan,
+ *   karena judul itu yang menggambarkan isi kartunya.
+ */
+export function judulUntukButir(butir: string, w: WidgetSpec, judulHalaman = ''): string | null {
+  const bersih = bersihkanJudulRag(w.title, judulHalaman);
+  const skor = skorCocok(butir, [bersih, ...(w.chart?.series ?? []).map((s) => s.name)].join(' '));
+  if (skor < AMBANG) return null;
+  const bentukSesuai = angkaTunggal(tipeButir(butir)) === angkaTunggal(w.type);
+  if (skor >= 0.75 && bentukSesuai) return kapital(butir);
+  return bersih || null;
+}
+
+/** Widget ini metrik yang sama dengan salah satu kartu di `daftar` (sinonim ikut dikenali)? */
+export function widgetKembar(w: WidgetSpec, daftar: WidgetSpec[]): boolean {
+  return daftar.some(
+    (x) =>
+      angkaTunggal(x.type) === angkaTunggal(w.type) &&
+      (skorCocok(w.title, teksWidget(x)) >= 0.75 || skorCocok(x.title, teksWidget(w)) >= 0.75)
+  );
 }

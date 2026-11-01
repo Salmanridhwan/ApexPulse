@@ -5,7 +5,14 @@ import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { rapikanTataLetak } from './tataLetak';
-import { butirTerwakili, halamanUntukPermintaan, tipeButir, type HalamanDiminta } from './halamanDiminta';
+import {
+  butirTerwakili,
+  halamanUntukPermintaan,
+  judulUntukButir,
+  tipeButir,
+  widgetKembar,
+  type HalamanDiminta,
+} from './halamanDiminta';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
@@ -249,7 +256,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
         const t = tugas[k];
         try {
           const r = await ragClient.ambilDataWidget!(
-            `${t.butir} (${halamanDiminta[t.halaman].judul})`,
+            // Butir saja: nama halaman di pertanyaan ikut terbawa ke judul balikan RAG.
+            t.butir,
             sector,
             tipeButir(t.butir),
             instansi,
@@ -264,13 +272,24 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     });
     await Promise.all(pekerja);
     let didapat = 0;
+    let dilewati = 0;
     hasil.forEach((w, k) => {
       if (!w) return;
-      const id = `hd-${tugas[k].halaman + 1}-${k + 1}`;
-      halamanWidget[id] = tugas[k].halaman;
-      synthesizedWidgets.push({ ...w, id });
+      const t = tugas[k];
+      // Judul dari butir (atau judul RAG yang dibersihkan); null = RAG memberi data
+      // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
+      const judul = judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul);
+      const kartu: WidgetSpec = { ...w, title: judul ?? w.title, id: `hd-${t.halaman + 1}-${k + 1}` };
+      // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
+      if (!judul || widgetKembar(kartu, synthesizedWidgets)) {
+        dilewati++;
+        return;
+      }
+      halamanWidget[kartu.id] = t.halaman;
+      synthesizedWidgets.push(kartu);
       didapat++;
     });
+    if (dilewati) logSummary.push(`[Halaman Diminta] ${dilewati} kartu dibuang: datanya bukan tentang butirnya atau kembar dengan kartu lain.`);
     logSummary.push(`[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan di dokumen.`);
     onProgress?.({
       id: 'step-3a',
