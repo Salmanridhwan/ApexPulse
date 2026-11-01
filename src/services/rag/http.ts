@@ -1203,8 +1203,12 @@ export class ConfigurableRagClient implements RagClient {
     sector: BumdSector,
     instansi?: string,
     kbId?: string,
-    /** 'umum' = pertanyaan sudah dibersihkan dari jargon internal (percobaan kedua katalog). */
-    gaya: 'normal' | 'umum' = 'normal'
+    /**
+     * 'umum' = pertanyaan sudah dibersihkan dari jargon internal (percobaan kedua katalog).
+     * 'ketat' = hanya angka indikator itu persis; tidak boleh angka terdekat
+     * (dipakai halaman yang diminta pengguna, di mana judul kartu = indikatornya).
+     */
+    gaya: 'normal' | 'umum' | 'ketat' = 'normal'
   ): string {
     const aturanFokus =
       fokus === 'kpi'
@@ -1229,6 +1233,20 @@ export class ConfigurableRagClient implements RagClient {
         `atau rasio yang tersedia) dan sebutkan dasar angkanya secara singkat pada label atau judul (maksimal 8 kata). ` +
         aturanFokus +
         `Semua angka wajib dari dokumen, tidak boleh dikarang. Wajib mengisi docName, page, dan chunkSnippet asli.`
+      );
+    }
+    if (gaya === 'ketat') {
+      return (
+        `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
+        sebutanInstansi +
+        `Indikator yang diminta: "${query}". ` +
+        `Ambil HANYA angka untuk indikator itu persis. Kalau dokumen tidak memuat indikator ini, ` +
+        `kosongkan semua isian; JANGAN memakai angka indikator lain (misalnya beban pegawai untuk jumlah pegawai, ` +
+        `atau air terjual untuk kualitas layanan). Tulis label dengan nama indikator di dokumen dan periodenya ` +
+        `(mis. "Pendapatan usaha Okt 2026"). ` +
+        aturanFokus +
+        `Semua angka wajib dari dokumen. Wajib mengisi docName, page, dan chunkSnippet dengan isi dokumen aslinya ` +
+        `yang memuat nama indikator dan angkanya.`
       );
     }
     return (
@@ -1524,13 +1542,39 @@ export class ConfigurableRagClient implements RagClient {
    * Tidak ada angka contoh: kalau dokumen tidak memuat indikator itu, hasilnya null
    * dan pemanggil harus menampilkan pesan gagal, bukan angka karangan.
    */
+  /**
+   * Cache hasil mode ketat per indikator (kb + sektor + tipe + pertanyaan).
+   * Pertanyaan yang sama dulu bisa dijawab angka berbeda tiap kali dashboard
+   * dibuat ulang (arus kas 24,8 lalu 7,5); hasil yang sudah ada dipakai lagi
+   * selama 6 jam, sama seperti cache sapuan. Galat layanan tidak disimpan.
+   */
+  private cacheIndikator = new Map<string, { waktu: number; hasil: Awaited<ReturnType<ConfigurableRagClient['ambilDataWidgetMentah']>> }>();
+
   async ambilDataWidget(
     query: string,
     sector: BumdSector,
     tipeTarget: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean }
+  ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
+    if (!opsi?.ketat) return this.ambilDataWidgetMentah(query, sector, tipeTarget, instansi, kbId, opsi);
+    const cfg = this.getRagConfig();
+    const kunci = `${kbId || cfg.kbId || '-'}|${sector}|${tipeTarget}|${query.trim().toLowerCase()}`;
+    const tersimpan = this.cacheIndikator.get(kunci);
+    if (tersimpan && Date.now() - tersimpan.waktu < this.statisCacheSapuan) return tersimpan.hasil;
+    const hasil = await this.ambilDataWidgetMentah(query, sector, tipeTarget, instansi, kbId, opsi);
+    this.cacheIndikator.set(kunci, { waktu: Date.now(), hasil });
+    return hasil;
+  }
+
+  private async ambilDataWidgetMentah(
+    query: string,
+    sector: BumdSector,
+    tipeTarget: string,
+    instansi?: string,
+    kbId?: string,
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
     const cfg = this.getRagConfig();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
@@ -1545,7 +1589,7 @@ export class ConfigurableRagClient implements RagClient {
           : tipeTarget === 'table'
             ? 'tabel'
             : 'narasi';
-    const instruksi = this.instruksiFokus(fokus, query, sector, instansi, kbId);
+    const instruksi = this.instruksiFokus(fokus, query, sector, instansi, kbId, opsi?.ketat ? 'ketat' : 'normal');
     // Bungkus hasil fokus ke bentuk payload dashboard supaya pemetaan & pembersih
     // (potong teks, angka gaya Indonesia, satuan seragam) dipakai ulang apa adanya.
     const bungkus = (hasil: any) => payloadKeWidgetSpec(this.bungkusFokus(fokus, hasil), sector);
@@ -1590,7 +1634,7 @@ export class ConfigurableRagClient implements RagClient {
     // Percobaan kedua: istilah internal BUMD (RKAP, LRA, per unit kerja, bulanan)
     // sering tidak ada di dokumen yang tersedia. Ulangi dengan pertanyaan bersih
     // supaya yang diambil adalah angka terdekat yang benar-benar ada.
-    if (widgets.length === 0) {
+    if (widgets.length === 0 && !opsi?.ketat) {
       const polos = String(query)
         .replace(/\b(vs\.?|dibandingkan|dibanding)\s+target[^?.!,]*/gi, '')
         .replace(/\b(RKAP|LRA|RBA|opex|Opex|OPEX)\b/g, '')

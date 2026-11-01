@@ -52,6 +52,11 @@ const KATA_SAMA: Record<string, string> = {
   penerimaan: 'pendapatan',
   omzet: 'pendapatan',
   revenue: 'pendapatan',
+  rkap: 'target',
+  rencana: 'target',
+  realisasi: 'progres',
+  capaian: 'progres',
+  karyawan: 'pegawai',
 };
 
 /**
@@ -266,7 +271,7 @@ export function judulUntukButir(butir: string, w: WidgetSpec, judulHalaman = '')
   const skor = skorCocok(butir, [bersih, ...(w.chart?.series ?? []).map((s) => s.name)].join(' '));
   if (skor < AMBANG) return null;
   const bentukSesuai = angkaTunggal(tipeButir(butir)) === angkaTunggal(w.type);
-  if (skor >= 0.75 && bentukSesuai) return kapital(butir);
+  if (skor >= 0.75 && bentukSesuai) return rapikanJudulButir(butir);
   return bersih || null;
 }
 
@@ -277,4 +282,86 @@ export function widgetKembar(w: WidgetSpec, daftar: WidgetSpec[]): boolean {
       angkaTunggal(x.type) === angkaTunggal(w.type) &&
       (skorCocok(w.title, teksWidget(x)) >= 0.75 || skorCocok(x.title, teksWidget(w)) >= 0.75)
   );
+}
+
+type KelasSatuan = 'uang' | 'persen' | 'orang' | 'volume' | 'waktu' | 'jumlah';
+
+/** Kelas satuan dari teks satuan kartu ("Rp miliar", "%", "juta m³", "sambungan"). */
+export function kelasSatuan(unit: string | undefined): KelasSatuan | null {
+  const u = String(unit ?? '').toLowerCase();
+  if (!u.trim()) return null;
+  if (/m3|m³|meter kubik|liter|l\/d|lps/.test(u)) return 'volume';
+  if (/\brp\b|rupiah|miliar|juta|triliun|ribu/.test(u)) return 'uang';
+  if (/%|persen/.test(u)) return 'persen';
+  if (/orang|pegawai|karyawan|jiwa/.test(u)) return 'orang';
+  if (/\b(?:jam|hari|menit)\b/.test(u)) return 'waktu';
+  if (/unit|sambungan|\bsr\b|tiket|kasus|pelanggan|kali|buah|program|kegiatan/.test(u)) return 'jumlah';
+  return null;
+}
+
+/**
+ * Satuan yang masuk akal untuk satu butir. `null` = tidak bisa ditebak (semua boleh).
+ * Contoh: "jumlah pegawai" harus orang, bukan Rp (beban pegawai); "cakupan
+ * pelayanan" harus persen, bukan jumlah sambungan.
+ */
+export function satuanUntukButir(butir: string): KelasSatuan[] | null {
+  const b = butir.toLowerCase();
+  const uang = /pendapatan|penerimaan|beban|biaya|laba|rugi|arus kas|\bkas\b|aset|modal|utang|ekuitas|belanja|dividen|investasi|gaji/.test(b);
+  if (/komposisi|porsi|proporsi|struktur|bauran|status|daftar|rincian/.test(b)) return null;
+  if (/waktu|durasi|lama|jam operasi/.test(b)) return ['waktu', 'persen'];
+  if (/progres|capaian|realisasi|terhadap target/.test(b)) return uang ? ['persen', 'uang'] : ['persen', 'jumlah'];
+  if (/nrw|kehilangan air|cakupan|kepatuhan|rasio|persentase|tingkat|margin/.test(b)) return ['persen'];
+  if (uang) return ['uang'];
+  if (/pegawai|karyawan|sdm|pekerja|pelatihan/.test(b)) return ['orang', 'jumlah', 'waktu'];
+  if (/\bair\b|produksi|kapasitas|volume/.test(b)) return ['volume'];
+  if (/pelanggan|sambungan|pengaduan|keluhan|tiket/.test(b)) return ['jumlah', 'orang'];
+  return null;
+}
+
+/**
+ * Apakah data balikan RAG benar-benar tentang butir ini? Ekstraksi kadang
+ * memilih angka terdekat: "Jumlah pegawai" diisi beban pegawai Rp386,2 M,
+ * "Program CSR" diisi beban lain-lain. Dua penjaga:
+ * 1. Satuan kartu harus sesuai jenis butirnya.
+ * 2. Potongan dokumen (sitasi) harus menyebut sebagian besar kata kunci butir.
+ * Lebih baik kartu kosong daripada angka indikator lain berjudul butir.
+ */
+export function validasiDataButir(butir: string, w: WidgetSpec): { ok: boolean; alasan?: string } {
+  const unit = w.kpi?.unit ?? w.chart?.unit ?? w.chart?.series?.[0]?.unit;
+  const kelas = kelasSatuan(unit);
+  const boleh = satuanUntukButir(butir);
+  if (kelas && boleh && !boleh.includes(kelas)) return { ok: false, alasan: `satuan "${unit}" bukan satuan ${butir}` };
+  const potongan = (w.citations ?? []).map((c) => c?.chunkSnippet ?? '').join(' ');
+  if (potongan.trim().length >= 15) {
+    const kunci = tokenBermakna(butir.replace(/\(.*?\)/g, ' ')).filter((t) => t !== 'progres');
+    const ada = tokenBermakna(potongan);
+    const kena = kunci.filter((k) => ada.some((t) => kataSama(k, t))).length;
+    if (kunci.length > 0 && kena / kunci.length < 0.6) return { ok: false, alasan: `sumber tidak menyebut ${butir}` };
+  }
+  return { ok: true };
+}
+
+/** Rapikan judul dari butir: "tren produksi bulanan per bulan" -> "Tren produksi bulanan". */
+export function rapikanJudulButir(butir: string): string {
+  const t = butir
+    .replace(/bulanan\s+per\s+bulan\b|per\s+bulan\s+bulanan/i, 'bulanan')
+    .replace(/tahunan\s+per\s+tahun\b|per\s+tahun\s+tahunan/i, 'tahunan')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return kapital(t);
+}
+
+/**
+ * Label periode + sumber untuk kartu ("Okt 2026 · keuangan-kpi-bulanan-okt-2026.md").
+ * Judul kartu memakai kata butir sehingga periode di judul RAG hilang; tanpa
+ * label ini angka 2026 dan 2024 tampak setara.
+ */
+export function labelPeriodeSumber(w: WidgetSpec): string | undefined {
+  const bulan = '(?:jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*';
+  const pola = new RegExp(`(?:${bulan}\\s+)?20\\d\\d`, 'i');
+  const sumber = w.citations?.[0]?.docName;
+  const teks = [w.title, w.citations?.[0]?.chunkSnippet ?? ''].join(' ');
+  const periode = teks.match(pola)?.[0];
+  const bagian = [periode ? kapital(periode.replace(/\s+/g, ' ')) : '', sumber ?? ''].filter(Boolean);
+  return bagian.length ? bagian.join(' · ') : undefined;
 }

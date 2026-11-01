@@ -176,7 +176,8 @@ export interface RagClient {
     tipe: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean }
+    /** ketat: hanya angka indikator itu persis (tanpa angka terdekat), hasilnya di-cache. */
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null>;
 
   /**

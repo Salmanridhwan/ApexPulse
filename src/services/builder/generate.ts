@@ -9,6 +9,8 @@ import {
   butirTerwakili,
   halamanUntukPermintaan,
   judulUntukButir,
+  labelPeriodeSumber,
+  validasiDataButir,
   tipeButir,
   widgetKembar,
   type HalamanDiminta,
@@ -53,6 +55,12 @@ export type GenerateMode =
   | 'Gagal (Layanan RAG)'
   | 'Gagal (Dokumen Tidak Memadai)';
 
+/** Butir yang tidak ada di dokumen (atau datanya bukan tentang butir itu) dan yang gagal karena layanan sibuk. */
+export interface LaporanButir {
+  tidakAda: string[];
+  gagalLayanan: string[];
+}
+
 export interface GenerateResult {
   dashboard: Dashboard;
   modeUsed: GenerateMode;
@@ -82,6 +90,8 @@ export interface GenerateResult {
   halamanBawaan: boolean;
   /** Widget yang diambil khusus untuk satu halaman yang diminta: id widget -> indeks halaman. */
   halamanWidget: Record<string, number>;
+  /** Butir halaman yang tidak terisi, untuk disampaikan apa adanya ke pengguna. */
+  laporanButir: LaporanButir;
 }
 
 export async function generateDashboard(options: GenerateOptions): Promise<GenerateResult> {
@@ -98,6 +108,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
   const { halaman: halamanDiminta, bawaan: halamanBawaan } = halamanUntukPermintaan(userPrompt, sector);
   const halamanWidget: Record<string, number> = {};
+  const laporanButir: LaporanButir = { tidakAda: [], gagalLayanan: [] };
   if (permintaanJumlah) {
     logSummary.push(
       `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`
@@ -193,6 +204,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       halamanDiminta,
       halamanBawaan,
       halamanWidget: {},
+      laporanButir,
     };
   }
 
@@ -248,49 +260,77 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       status: 'in_progress',
     });
     const hasil: Array<WidgetSpec | null> = new Array(tugas.length).fill(null);
-    let berikut = 0;
-    // Empat sekaligus: lebih banyak membuat layanan RAG membalas 429.
-    const pekerja = Array.from({ length: Math.min(4, tugas.length) }, async () => {
-      while (berikut < tugas.length) {
-        const k = berikut++;
-        const t = tugas[k];
-        try {
-          const r = await ragClient.ambilDataWidget!(
-            // Butir saja: nama halaman di pertanyaan ikut terbawa ke judul balikan RAG.
-            t.butir,
-            sector,
-            tipeButir(t.butir),
-            instansi,
-            kbId,
-            { batasMs: 120_000, turunkanTipe: true }
-          );
-          if (r?.data) hasil[k] = r.data as WidgetSpec;
-        } catch {
-          // Satu butir gagal tidak boleh menggagalkan halaman lain.
-        }
+    /** Butir yang gagal karena layanan (429/timeout), bukan karena dokumen kosong. */
+    const sibuk = new Set<number>();
+    const ambil = async (k: number) => {
+      const t = tugas[k];
+      try {
+        const r = await ragClient.ambilDataWidget!(
+          // Butir saja: nama halaman di pertanyaan ikut terbawa ke judul balikan RAG.
+          t.butir,
+          sector,
+          tipeButir(t.butir),
+          instansi,
+          kbId,
+          // Ketat: tanpa "angka terdekat"; hasilnya di-cache supaya angka sama tiap dibuat ulang.
+          { batasMs: 120_000, turunkanTipe: true, ketat: true, lemparSaatGagal: true }
+        );
+        sibuk.delete(k);
+        if (r?.data) hasil[k] = r.data as WidgetSpec;
+      } catch {
+        // Satu butir gagal tidak boleh menggagalkan halaman lain; dicoba ulang di bawah.
+        sibuk.add(k);
       }
+    };
+    let berikut = 0;
+    // Dua sekaligus: layanan RAG membalas 429 saat 3-4 permintaan berjalan bersamaan.
+    const pekerja = Array.from({ length: Math.min(2, tugas.length) }, async () => {
+      while (berikut < tugas.length) await ambil(berikut++);
     });
     await Promise.all(pekerja);
+    // Putaran kedua untuk butir yang kena layanan sibuk: satu per satu setelah jeda.
+    if (sibuk.size > 0) {
+      await new Promise((r) => setTimeout(r, 5000));
+      for (const k of [...sibuk]) await ambil(k);
+    }
+
     let didapat = 0;
-    let dilewati = 0;
     hasil.forEach((w, k) => {
-      if (!w) return;
       const t = tugas[k];
-      // Judul dari butir (atau judul RAG yang dibersihkan); null = RAG memberi data
-      // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
-      const judul = judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul);
-      const kartu: WidgetSpec = { ...w, title: judul ?? w.title, id: `hd-${t.halaman + 1}-${k + 1}` };
-      // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
-      if (!judul || widgetKembar(kartu, synthesizedWidgets)) {
-        dilewati++;
+      if (sibuk.has(k)) {
+        laporanButir.gagalLayanan.push(t.butir);
         return;
       }
+      if (!w) {
+        laporanButir.tidakAda.push(t.butir);
+        return;
+      }
+      // Satuan dan sumber harus tentang butir ini (bukan beban pegawai untuk "jumlah pegawai").
+      const valid = validasiDataButir(t.butir, w);
+      // Judul dari butir (atau judul RAG yang dibersihkan); null = RAG memberi data
+      // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
+      const judul = valid.ok ? judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul) : null;
+      if (!judul) {
+        laporanButir.tidakAda.push(t.butir);
+        logSummary.push(`[Halaman Diminta] "${t.butir}" ditolak: ${valid.alasan ?? 'data bukan tentang butir ini'}.`);
+        return;
+      }
+      const kartu: WidgetSpec = {
+        ...w,
+        title: judul,
+        subtitle: w.subtitle || labelPeriodeSumber(w),
+        id: `hd-${t.halaman + 1}-${k + 1}`,
+      };
+      // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
+      if (widgetKembar(kartu, synthesizedWidgets)) return;
       halamanWidget[kartu.id] = t.halaman;
       synthesizedWidgets.push(kartu);
       didapat++;
     });
-    if (dilewati) logSummary.push(`[Halaman Diminta] ${dilewati} kartu dibuang: datanya bukan tentang butirnya atau kembar dengan kartu lain.`);
-    logSummary.push(`[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan di dokumen.`);
+    logSummary.push(
+      `[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan; ` +
+        `${laporanButir.tidakAda.length} tidak ada di dokumen, ${laporanButir.gagalLayanan.length} gagal karena layanan sibuk.`
+    );
     onProgress?.({
       id: 'step-3a',
       title: `${didapat} dari ${tugas.length} indikator halaman ditemukan di dokumen`,
@@ -522,5 +562,6 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     halamanDiminta,
     halamanBawaan,
     halamanWidget,
+    laporanButir,
   };
 }

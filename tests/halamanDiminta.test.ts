@@ -8,11 +8,14 @@ import {
   halamanUntukPermintaan,
   halamanUntukWidget,
   judulUntukButir,
+  labelPeriodeSumber,
   mintaBanyakHalaman,
+  rapikanJudulButir,
   tipeButir,
+  validasiDataButir,
   widgetKembar,
 } from '../src/services/builder/halamanDiminta';
-import { susunDashboardBerhalaman } from '../src/services/builder/susunHalaman';
+import { judulDariIsi, susunDashboardBerhalaman } from '../src/services/builder/susunHalaman';
 import type { WidgetSpec } from '../src/types';
 
 const PROMPT =
@@ -170,4 +173,67 @@ test('bug: judul kartu dari butir; data tetangga dibuang', () => {
   assert.equal(judulUntukButir('tren kualitas layanan', kartu('Air terjual bulanan — dasar: laporan produksi', 'line')), null);
   // Diminta tren, RAG hanya punya satu angka: judul mengikuti isi, bukan "Tren …".
   assert.equal(judulUntukButir('tren pengaduan per kategori', kartu('Jumlah pengaduan 2024 — dasar: tabel')), 'Jumlah pengaduan 2024');
+});
+
+// ===== Laporan uji 5 skenario: angka tetangga, judul, KPI nyasar =====
+
+const kpiSumber = (title: string, value: number, unit: string, snippet: string): WidgetSpec =>
+  ({ ...kpi('s', title, value), kpi: { value, unit }, citations: [{ id: 'c', docName: 'd.md', page: 1, chunkSnippet: snippet, confidenceScore: 1, date: '' }] }) as any;
+
+test('P0-1: angka tetangga ditolak lewat satuan dan sumber', () => {
+  // Beban pegawai (Rp) bukan jumlah pegawai.
+  assert.equal(validasiDataButir('jumlah pegawai', kpiSumber('Jumlah pegawai', 386.2, 'Rp miliar', 'Rincian beban: Pegawai | 386,2')).ok, false);
+  // Beban lain-lain bukan program CSR.
+  assert.equal(validasiDataButir('program CSR', kpiSumber('Program CSR', 52.4, 'Rp miliar', 'Rincian Beban usaha Lain-lain 52,4')).ok, false);
+  // Jumlah sambungan bukan cakupan pelayanan (%).
+  assert.equal(validasiDataButir('cakupan pelayanan', kpiSumber('Cakupan pelayanan', 936480, 'unit', 'Pelanggan aktif 936.480 sambungan')).ok, false);
+  // Penerimaan bulanan bukan progres target.
+  assert.equal(validasiDataButir('progres target pendapatan', kpiSumber('Progres', 162.9, 'Rp miliar', 'Penerimaan Oktober Rp 162,9 miliar')).ok, false);
+  // Grafik air terjual (juta m³) bukan pelatihan pegawai.
+  const air = { ...grafik('g', 'Tren pelatihan pegawai', 'line'), chart: { xAxis: ['Jan', 'Feb', 'Mar'], unit: 'juta m³', series: [{ name: 'Air terjual', data: [1, 2, 3] }] } } as any;
+  assert.equal(validasiDataButir('tren pelatihan pegawai', air).ok, false);
+  // Data yang benar tetap lolos.
+  assert.equal(validasiDataButir('jumlah pegawai', kpiSumber('Jumlah pegawai', 1820, 'orang', 'Jumlah pegawai tetap per Oktober 2026: 1.820 orang')).ok, true);
+  assert.equal(validasiDataButir('NRW (kehilangan air)', kpiSumber('NRW', 43.85, '%', 'Tingkat kehilangan air (NRW) 43,85%')).ok, true);
+  assert.equal(
+    validasiDataButir('progres target pendapatan', kpiSumber('Progres', 85, '%', 'Realisasi pendapatan Rp1.244,7 M atau 85% dari RKAP')).ok,
+    true
+  );
+});
+
+test('P2-7: judul butir dirapikan', () => {
+  assert.equal(rapikanJudulButir('tren produksi bulanan per bulan'), 'Tren produksi bulanan');
+  assert.equal(rapikanJudulButir('arus kas'), 'Arus kas');
+});
+
+test('P2-6: judul dashboard tanpa "& Lainnya"', () => {
+  assert.equal(judulDariIsi([{ judul: 'Kepegawaian' }, { judul: 'Keuangan' }, { judul: 'CSR' }]), 'Kinerja Kepegawaian, Keuangan & CSR');
+  assert.equal(judulDariIsi([{ judul: 'Keuangan' }]), 'Kinerja Keuangan');
+  assert.ok(!/Lainnya/.test(judulDariIsi([{ judul: 'A' }, { judul: 'B' }, { judul: 'C' }, { judul: 'D' }])));
+});
+
+test('P2-9: KPI tanpa halaman cocok tidak dibuang ke Ringkasan', () => {
+  const diminta = bacaHalamanDiminta(PROMPT);
+  const hasil = susunDashboardBerhalaman([kpi('k', 'Target Kegiatan Setahun 2026', 40), kpi('p', 'Pendapatan usaha', 3184)], {
+    halamanDiminta: diminta,
+  });
+  const semua = hasil.halaman.flatMap((h) => h.widgets.map((w) => w.title));
+  assert.deepEqual(semua, ['Pendapatan usaha']);
+});
+
+test('P2-8: kartu bertopik halaman lain dipindah ke halaman itu', () => {
+  const diminta = [
+    { judul: 'Ringkasan', butir: ['status sistem utama', 'jumlah pelanggan'] },
+    { judul: 'Kualitas dan Keluhan', butir: ['jumlah pengaduan', 'tren pengaduan per kategori'] },
+  ];
+  const tabel = { ...grafik('t', 'Status Pengaduan Oktober 2026', 'table'), type: 'table' } as any;
+  const hasil = susunDashboardBerhalaman([kpi('p', 'Jumlah pelanggan', 1), tabel], { halamanDiminta: diminta, halamanWidget: { t: 0 } });
+  const peta = Object.fromEntries(hasil.halaman.map((h) => [h.judul, h.widgets.map((w) => w.title)]));
+  assert.deepEqual(peta['Ringkasan'], ['Jumlah pelanggan']);
+  assert.ok(peta['Kualitas dan Keluhan'].includes('Status Pengaduan Oktober 2026'));
+});
+
+test('P1-5: kartu diberi label periode + sumber', () => {
+  const w = kpiSumber('Pendapatan usaha Okt 2026', 1244.7, 'Rp miliar', 'Pendapatan usaha s.d. Oktober 2026');
+  assert.equal(labelPeriodeSumber({ ...w, citations: [{ ...w.citations[0], docName: 'kpi-okt-2026.md' }] } as any), 'Okt 2026 · kpi-okt-2026.md');
 });

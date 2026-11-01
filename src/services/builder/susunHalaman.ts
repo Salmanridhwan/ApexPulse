@@ -18,7 +18,7 @@ import type { HalamanDashboard, WidgetSpec, WidgetType } from '../../types';
 import type { ChartId } from '../chart/chartDefault';
 import type { Varian } from '../chart/gayaVarian';
 import { kategoriWidget, type KategoriDashboard } from '../spec/kategoriWidget';
-import { halamanUntukWidget, widgetKembar, type HalamanDiminta } from './halamanDiminta';
+import { halamanUntukWidget, skorCocok, widgetKembar, type HalamanDiminta } from './halamanDiminta';
 
 /** Batas isi satu halaman supaya muat satu layar tanpa digulir. */
 export const MAKS_KPI_PER_HALAMAN = 4;
@@ -239,8 +239,10 @@ const MAKS_KARTU_DIMINTA = 6;
  * untuk satu halaman (`petaWidget`) masuk ke halaman itu; widget lain ke
  * halaman yang butirnya paling cocok. Widget yang tidak cocok dengan halaman
  * mana pun tidak dipaksakan masuk (pengguna meminta satu topik per halaman),
- * kecuali KPI yang boleh masuk halaman pertama bila halaman itu ringkasan.
- * Halaman tanpa isi tidak dibuat.
+ * termasuk KPI: dulu KPI tanpa pasangan dibuang ke halaman Ringkasan sehingga
+ * "Target Kegiatan Setahun" ikut tampil di sana. Widget yang topiknya adalah
+ * judul halaman lain (tabel pengaduan di Ringkasan, padahal ada halaman
+ * "Kualitas dan Keluhan") dipindah ke halaman itu. Halaman tanpa isi tidak dibuat.
  */
 export function bagiHalamanDiminta(
   widgets: WidgetSpec[],
@@ -249,7 +251,6 @@ export function bagiHalamanDiminta(
 ): { halaman: Array<{ judul: string; widgets: WidgetSpec[] }>; kosong: string[]; dilewati: WidgetSpec[] } {
   const isi = diminta.map(() => ({ kpi: [] as WidgetSpec[], lain: [] as WidgetSpec[] }));
   const dilewati: WidgetSpec[] = [];
-  const pertamaRingkasan = /ringkas|umum|ikhtisar|overview|utama/i.test(diminta[0]?.judul ?? '');
   const terpasang: WidgetSpec[] = [];
   for (const w of widgets) {
     // Metrik sama dengan nama lain ("NRW" vs "Tingkat Kehilangan Air") cukup sekali.
@@ -259,7 +260,16 @@ export function bagiHalamanDiminta(
     }
     let i = petaWidget[w.id] ?? halamanUntukWidget(w, diminta);
     const kpi = TIPE_KPI.includes(w.type);
-    if (i < 0 && kpi && pertamaRingkasan) i = 0;
+    if (i >= 0) {
+      const teks = [w.title, ...(w.chart?.series ?? []).map((s) => s.name)].join(' ');
+      const skorButir = (h: HalamanDiminta) => Math.max(0, ...h.butir.map((b) => skorCocok(b, teks)));
+      const sendiri = Math.max(skorButir(diminta[i]), skorCocok(diminta[i].judul, teks));
+      // Pindah hanya bila cocoknya di halaman sendiri lemah dan halaman lain lebih cocok.
+      const pemilik = diminta.findIndex(
+        (h, j) => j !== i && skorCocok(h.judul, teks) >= 0.5 && skorButir(h) > sendiri
+      );
+      if (pemilik >= 0 && sendiri < 0.75) i = pemilik;
+    }
     const wadah = i >= 0 ? isi[i] : undefined;
     const daftar = wadah ? (kpi ? wadah.kpi : wadah.lain) : undefined;
     if (!daftar || daftar.length >= (kpi ? MAKS_KPI_DIMINTA : MAKS_KARTU_DIMINTA)) {
@@ -296,9 +306,10 @@ export function judulDariIsi(halaman: Array<{ judul: string }>, instansi?: strin
   const inti =
     topikAda.length === 0
       ? 'Ringkasan Kinerja'
-      : topikAda.length <= 2
-        ? `Kinerja ${topikAda.join(' & ')}`
-        : `Kinerja ${topikAda.slice(0, 2).join(', ')} & Lainnya`;
+      : topikAda.length <= 3
+        ? `Kinerja ${topikAda.slice(0, -1).join(', ')}${topikAda.length > 1 ? ' & ' : ''}${topikAda[topikAda.length - 1]}`
+        : // Banyak topik: "& Lainnya" terbaca seperti judul yang terpotong.
+          'Kinerja Terpadu';
   return instansi ? `${inti} — ${instansi}` : inti;
 }
 

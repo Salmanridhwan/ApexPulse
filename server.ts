@@ -3150,6 +3150,16 @@ ${isiHalaman}
 `;
       }
 
+      // Butir yang tidak terisi disebut apa adanya: kartunya tidak dibuat,
+      // BUKAN diisi angka indikator lain.
+      const { tidakAda, gagalLayanan } = genResult.laporanButir;
+      if (tidakAda.length) {
+        replyText += `Tidak ditemukan di dokumen (kartunya tidak dibuat): ${tidakAda.join(', ')}.\n\n`;
+      }
+      if (gagalLayanan.length) {
+        replyText += `⚠️ ${gagalLayanan.length} indikator gagal diambil karena layanan dokumen sedang sibuk: ${gagalLayanan.join(', ')}. Minta ulang beberapa saat lagi untuk melengkapinya.\n\n`;
+      }
+
       if (susun.halamanKosong.length) {
         replyText += `Halaman **${susun.halamanKosong.join('**, **')}** tidak dibuat karena dokumen instansi tidak memuat datanya.
 
@@ -3173,7 +3183,7 @@ ${kpiItems}
 
       replyText +=
         genResult.modeUsed === 'Jalur A (LLM JSON)'
-          ? `Seluruh angka diambil dari dokumen resmi instansi ini.\n`
+          ? `Angka diambil dari dokumen instansi ini; sumber tiap kartu bisa dilihat di kartunya.\n`
           : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
 
       // JUJUR soal jumlah widget: kalau pengguna meminta jumlah tertentu
