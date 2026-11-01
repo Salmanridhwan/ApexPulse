@@ -55,9 +55,23 @@ export function niatBuatDashboard(prompt: unknown): boolean {
   // Konfirmasi singkat diperiksa lebih dulu: kalimatnya tidak menyebut objek
   // ("dashboard") karena objeknya ada di pesan asisten sebelumnya.
   if (KONFIRMASI_BUAT.test(teks) || HANYA_PERINTAH.test(teks)) return true;
-  if (TANYA.test(teks)) return false;
+  // Pertanyaan tentang CARA atau ARTI selalu dijawab, bukan dieksekusi.
+  if (TANYA_CARA.test(teks)) return false;
+  // Kata tanya lain tidak membatalkan perintah yang tegas: "bisakah kamu
+  // buatkan dashboard dari data apa saja yang ada" jelas meminta dashboard.
+  if (TANYA.test(teks)) return BUAT_TEGAS.test(teks) && DASHBOARD.test(teks);
   return PERINTAH.test(teks) && OBJEK.test(teks);
 }
+
+/** Pertanyaan cara/arti: "bagaimana cara buat dashboard?", "apa itu dashboard?". */
+const TANYA_CARA =
+  /(?:^|[^a-z])(?:bagaimana|gimana|cara(?:nya)?|kenapa|mengapa|apa\s+itu|apa\s+bedanya)(?:[^a-z]|$)/i;
+
+/** Kata kerja membuat yang tegas (tanpa "tampilkan"/"isi" yang juga dipakai bertanya). */
+const BUAT_TEGAS =
+  /(?:^|[^a-z])(?:mem(?:buat|bikin|susun|rancang)|buat|bikin|susun|rancang|generate|hasilkan)(?:kan|in|lah)?(?:[^a-z]|$)/i;
+
+const DASHBOARD = /(?:^|[^a-z])(?:dashboard|dasbor)(?:nya|ku|mu)?(?:[^a-z]|$)/i;
 
 /**
  * Kata perintah MENAMBAH widget, termasuk bentuk berimbuhan.

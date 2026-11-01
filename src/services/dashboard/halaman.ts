@@ -25,13 +25,17 @@ const FIELD_HALAMAN = [
   'presentasi',
 ] as const;
 
-/** Ambil isi halaman sebagai potongan field dashboard. */
-export function proyeksi(h: HalamanDashboard): Partial<Dashboard> {
+/**
+ * Ambil isi halaman sebagai potongan field dashboard.
+ * Halaman tanpa filter sendiri memakai filter dashboard (`dasar`): filter
+ * kosong membuat kanvas gagal membaca periode.
+ */
+export function proyeksi(h: HalamanDashboard, dasar?: Partial<Dashboard>): Partial<Dashboard> {
   return {
     widgets: h.widgets || [],
     replika: h.replika,
     tataLetak: h.tataLetak,
-    globalFilters: h.globalFilters,
+    globalFilters: h.globalFilters ?? dasar?.globalFilters ?? { periode: 'Semua', unitKerja: 'Semua', kategori: 'Semua' },
     presentasi: h.presentasi,
   };
 }

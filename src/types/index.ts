@@ -194,6 +194,12 @@ export interface WidgetGrid {
  * lama (yang belum punya `style`) tampil persis seperti sebelumnya.
  */
 export interface WidgetStyle {
+  /**
+   * Desain chart dari katalog Template Chart: `default`, `ringkasan` (Pijar),
+   * `analitik` (Lensa), atau `trafik` (Nadi). Mengatur bentuk, warna kartu,
+   * gradasi, dan label sekaligus. Kosong = ikut tema aplikasi.
+   */
+  desain?: 'default' | 'ringkasan' | 'analitik' | 'trafik' | 'kaca' | 'tirta' | 'aurora' | 'neon' | 'blok' | 'bento' | 'koran';
   /** Palet siap pakai. Menimpa warna seri bawaan tema. */
   palette?: 'default' | 'brand' | 'hijau' | 'ungu' | 'oranye' | 'monokrom' | 'hangat' | 'sejuk';
   /** Warna kustom per-seri (menimpa palet). Indeks 0 = seri pertama. */
@@ -225,6 +231,11 @@ export interface WidgetSpec {
   id: string;
   presetId?: string;
   type: WidgetType;
+  /**
+   * Chart katalog Template Chart yang dipakai widget ini (mis. `bar-tegak-sorot`).
+   * Kosong = dipilih otomatis dari `type`. Semua dashboard baru mengisinya.
+   */
+  chartId?: string;
   title: string;
   subtitle?: string;
   category?: string;

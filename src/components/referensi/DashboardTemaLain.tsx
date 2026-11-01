@@ -237,7 +237,7 @@ export const OperasionalTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiO
                 {volume?.label || 'Rantai volume air'}
               </p>
               <WidgetChart
-                chartId={'garis-tren'}
+                chartId={'bar-tegak-sorot'}
                 varian={'analitik'}
                 skala={skala}
                 data={{    kategori: volume?.kategori ?? [],
@@ -335,7 +335,7 @@ export const OperasionalTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiO
               </span>
             </div>
             <WidgetChart
-              chartId={'bar-tumpuk'}
+              chartId={'bar-mendatar-peringkat'}
               varian={'trafik'}
               skala={skala}
               data={{    kategori: volume?.kategori ?? [],
@@ -360,7 +360,7 @@ export const OperasionalTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiO
                 Realisasi indikator
               </p>
               <WidgetChart
-                chartId={'bar-tegak'}
+                chartId={'bar-mendatar-peringkat'}
                 varian={'trafik'}
                 skala={skala}
                 data={{    kategori: indikator.slice(0, 6).map((i) => i.nama),
@@ -505,7 +505,7 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
 
   // Varian katalog mengikuti tema kartu: Lensa = analitik, Nadi = trafik.
   const varianKartu = tema === 'analitik' ? 'analitik' : 'trafik';
-  const idUtama = varianKartu === 'analitik' ? 'scatter-gelembung' : 'bar-tumpuk';
+  const idUtama = varianKartu === 'analitik' ? 'scatter-gelembung' : 'combo-batang-garis';
   const kartuKelas = `${d.radius} border overflow-hidden p-[0.95em]`;
   const judulKelas = 'text-[0.7em] font-bold uppercase tracking-[0.12em]';
   const bingkai = { backgroundColor: KARTU, borderColor: d.garis };
@@ -601,17 +601,24 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
                   Pelanggan vs air terjual
                 </p>
                 <span className="text-[0.62em]" style={{ color: d.teks3 }}>
-                  besar gelembung = pengaduan
+                  {tema === 'analitik' ? 'besar gelembung = pengaduan' : 'batang = pelanggan · garis = air terjual'}
                 </span>
               </div>
             <WidgetChart
               chartId={idUtama}
               varian={varianKartu}
               skala={skala}
-              data={{    kategori: baris.map((b) => b.wilayah.replace('Jakarta ', '')),
-    seri: [{ nama: 'Air terjual', data: baris.map((b) => Number((b.airTerjual / 1_000_000).toFixed(2))) }],
-    satuan: 'jt m³',
-    desimal: 1,}}
+              data={{
+                kategori: baris.map((b) => b.wilayah.replace('Jakarta ', '')),
+                // Gelembung: X = pelanggan, Y = air terjual, besar = pengaduan.
+                // Nadi: batang = pelanggan, garis = air terjual (dua sumbu).
+                seri: [
+                  { nama: 'Pelanggan', data: baris.map((b) => b.pelanggan) },
+                  { nama: 'Air terjual (jt m³)', data: baris.map((b) => Number((b.airTerjual / 1_000_000).toFixed(2))) },
+                  { nama: 'Pengaduan', data: baris.map((b) => b.pengaduan) },
+                ],
+                desimal: 1,
+              }}
               className={penuh ? 'w-full flex-1 min-h-0' : 'w-full'}
               tinggi={penuh ? '100%' : '14em'}
             />

@@ -265,6 +265,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
       >
         {kpi.map((k) => (
           <WidgetChart
+            khas
             key={k.label}
             chartId="kpi-kartu"
             varian="trafik"
@@ -337,6 +338,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
           />
           <div className="flex-1 min-h-0 flex gap-[0.5em]">
             <WidgetChart
+              khas
               chartId="garis-tren"
               varian="trafik"
               skala={skala}
@@ -374,6 +376,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
             warna={WARNA.cyan}
           />
           <WidgetChart
+            khas
             chartId="combo-batang-garis"
             varian="trafik"
             skala={skala}
@@ -425,6 +428,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
             ))}
           </div>
           <WidgetChart
+            khas
             chartId="bar-tumpuk"
             varian="trafik"
             skala={skala}
@@ -515,6 +519,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
             </span>
           </div>
           <WidgetChart
+            khas
             chartId="donat-tebal"
             varian="trafik"
             skala={skala}
@@ -551,6 +556,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
               <WidgetChart
+                khas
                 chartId="bar-mendatar-peringkat"
                 varian="trafik"
                 skala={skala}
@@ -597,6 +603,7 @@ export const DashboardTrafik: React.FC<DashboardTrafikProps> = ({
             <Kosong teks="Belum ada angka sistem operasi." />
           ) : (
             <WidgetChart
+              khas
               chartId="strip-os"
               varian="trafik"
               skala={skala}

@@ -15,7 +15,7 @@
 
 import type { WidgetType } from '../../types';
 import type { DataChart, Pembangun, SpesifikasiHtml } from './pembangunOpsi';
-import { MATRIKS } from './chartTemplate';
+import { MATRIKS, MATRIKS_KHAS } from './chartTemplate';
 import { GAYA, VARIAN, type GayaVarian, type Varian } from './gayaVarian';
 
 export type ChartId =
@@ -39,7 +39,16 @@ export type ChartId =
   | 'donat-tebal'
   | 'donat-tipis'
   | 'gauge-target'
-  | 'strip-os';
+  | 'strip-os'
+  | 'bar-kapsul'
+  | 'area-banding'
+  | 'cincin-progres'
+  | 'air-terjun'
+  | 'sankey-alur'
+  | 'radar-aspek'
+  | 'gauge-kesehatan'
+  | 'peta-panas'
+  | 'treemap-porsi';
 
 export interface EntriChart {
   id: ChartId;
@@ -51,30 +60,54 @@ export interface EntriChart {
   mesin: 'echarts' | 'html';
   /** Bentuk data yang wajib tersedia supaya chart ini bisa digambar. */
   butuh: string;
+  /** Kegunaan dalam bahasa awam, ditampilkan di katalog. */
+  guna: string;
+  /** Kelompok tampilan katalog. */
+  kelompok: KelompokChart;
 }
 
+export type KelompokChart = 'ringkas' | 'banding' | 'tren' | 'komposisi' | 'sebaran';
+
+export const LABEL_KELOMPOK: Record<KelompokChart, string> = {
+  ringkas: 'Angka ringkas, tabel, dan teks',
+  banding: 'Perbandingan',
+  tren: 'Perkembangan dari waktu ke waktu',
+  komposisi: 'Porsi dan capaian',
+  sebaran: 'Sebaran dan hubungan',
+};
+
 export const CHART_DEFAULT: Record<ChartId, EntriChart> = {
-  'kpi-kartu': { id: 'kpi-kartu', nama: 'Kartu KPI berikon', tipe: 'kpi', mesin: 'html', butuh: 'satu angka, delta, satuan' },
-  'kpi-strip': { id: 'kpi-strip', nama: 'Strip KPI ringkas', tipe: 'kpi', mesin: 'html', butuh: 'satu angka dan satuan' },
-  'progres-target': { id: 'progres-target', nama: 'Progres target', tipe: 'bullet-target', mesin: 'html', butuh: 'label, capaian, target' },
-  'tabel-ringkas': { id: 'tabel-ringkas', nama: 'Tabel ringkas', tipe: 'table', mesin: 'html', butuh: 'kolom dan baris angka' },
-  'narasi-insight': { id: 'narasi-insight', nama: 'Strip narasi', tipe: 'narasi', mesin: 'html', butuh: 'satu paragraf' },
-  peringkat: { id: 'peringkat', nama: 'Daftar peringkat', tipe: 'hbar', mesin: 'html', butuh: 'label dan nilai' },
-  'bar-tegak': { id: 'bar-tegak', nama: 'Batang tegak polos', tipe: 'bar', mesin: 'echarts', butuh: 'kategori dan satu seri' },
-  'bar-tegak-sorot': { id: 'bar-tegak-sorot', nama: 'Batang tegak bersorot', tipe: 'bar', mesin: 'echarts', butuh: 'kategori dan satu seri' },
-  'bar-tegak-target': { id: 'bar-tegak-target', nama: 'Batang tegak dengan target', tipe: 'bar', mesin: 'echarts', butuh: 'kategori, satu seri, target' },
-  'bar-mendatar-peringkat': { id: 'bar-mendatar-peringkat', nama: 'Batang mendatar peringkat', tipe: 'hbar', mesin: 'echarts', butuh: 'label dan nilai' },
-  'bar-mendatar-target': { id: 'bar-mendatar-target', nama: 'Batang mendatar target', tipe: 'hbar', mesin: 'echarts', butuh: 'label, capaian, target' },
-  'bar-tumpuk': { id: 'bar-tumpuk', nama: 'Batang bertumpuk', tipe: 'combo', mesin: 'echarts', butuh: 'kategori dan dua seri' },
-  'area-gradasi': { id: 'area-gradasi', nama: 'Area bergradasi', tipe: 'area', mesin: 'echarts', butuh: 'kategori dan satu seri' },
-  'garis-tren': { id: 'garis-tren', nama: 'Garis tren', tipe: 'line', mesin: 'echarts', butuh: 'kategori dan satu seri' },
-  'combo-batang-garis': { id: 'combo-batang-garis', nama: 'Batang dan garis dua sumbu', tipe: 'combo', mesin: 'echarts', butuh: 'kategori, seri batang, seri garis' },
-  'scatter-gelembung': { id: 'scatter-gelembung', nama: 'Gelembung sebaran', tipe: 'bubble', mesin: 'echarts', butuh: 'label, dua angka, ukuran' },
-  'titik-bersumbu': { id: 'titik-bersumbu', nama: 'Titik bersumbu', tipe: 'scatter', mesin: 'echarts', butuh: 'label dan nilai' },
-  'donat-tebal': { id: 'donat-tebal', nama: 'Cincin tebal', tipe: 'donut', mesin: 'echarts', butuh: 'kategori dan nilai' },
-  'donat-tipis': { id: 'donat-tipis', nama: 'Cincin tipis', tipe: 'donut', mesin: 'echarts', butuh: 'kategori dan nilai' },
-  'gauge-target': { id: 'gauge-target', nama: 'Gauge target', tipe: 'gauge', mesin: 'echarts', butuh: 'satu angka, target, batas' },
-  'strip-os': { id: 'strip-os', nama: 'Strip sistem operasi', tipe: 'kpi', mesin: 'html', butuh: 'label, persen, delta, deret kecil' },
+  'kpi-kartu': { id: 'kpi-kartu', nama: 'Kartu KPI berikon', tipe: 'kpi', mesin: 'html', butuh: 'satu angka, delta, satuan', guna: 'Satu angka penting beserta naik-turunnya', kelompok: 'ringkas' },
+  'kpi-strip': { id: 'kpi-strip', nama: 'Strip KPI ringkas', tipe: 'kpi', mesin: 'html', butuh: 'satu angka dan satuan', guna: 'Beberapa angka penting berjajar dalam satu baris', kelompok: 'ringkas' },
+  'progres-target': { id: 'progres-target', nama: 'Progres target', tipe: 'bullet-target', mesin: 'html', butuh: 'label, capaian, target', guna: 'Seberapa dekat capaian dengan target', kelompok: 'ringkas' },
+  'tabel-ringkas': { id: 'tabel-ringkas', nama: 'Tabel ringkas', tipe: 'table', mesin: 'html', butuh: 'kolom dan baris angka', guna: 'Angka lengkap per baris untuk dibaca teliti', kelompok: 'ringkas' },
+  'narasi-insight': { id: 'narasi-insight', nama: 'Strip narasi', tipe: 'narasi', mesin: 'html', butuh: 'satu paragraf', guna: 'Kesimpulan singkat dalam kalimat', kelompok: 'ringkas' },
+  peringkat: { id: 'peringkat', nama: 'Daftar peringkat', tipe: 'hbar', mesin: 'html', butuh: 'label dan nilai', guna: 'Urutan teratas tanpa grafik', kelompok: 'ringkas' },
+  'bar-tegak': { id: 'bar-tegak', nama: 'Batang tegak polos', tipe: 'bar', mesin: 'echarts', butuh: 'kategori dan satu seri', guna: 'Membandingkan nilai antar periode atau kategori', kelompok: 'banding' },
+  'bar-tegak-sorot': { id: 'bar-tegak-sorot', nama: 'Batang tegak bersorot', tipe: 'bar', mesin: 'echarts', butuh: 'kategori dan satu seri', guna: 'Membandingkan nilai dan menyorot yang tertinggi', kelompok: 'banding' },
+  'bar-tegak-target': { id: 'bar-tegak-target', nama: 'Batang tegak dengan target', tipe: 'bar', mesin: 'echarts', butuh: 'kategori, satu seri, target', guna: 'Membandingkan nilai dengan garis target', kelompok: 'banding' },
+  'bar-mendatar-peringkat': { id: 'bar-mendatar-peringkat', nama: 'Batang mendatar peringkat', tipe: 'hbar', mesin: 'echarts', butuh: 'label dan nilai', guna: 'Peringkat kategori dengan nama panjang', kelompok: 'banding' },
+  'bar-mendatar-target': { id: 'bar-mendatar-target', nama: 'Batang mendatar target', tipe: 'hbar', mesin: 'echarts', butuh: 'label, capaian, target', guna: 'Capaian tiap indikator terhadap targetnya', kelompok: 'banding' },
+  'bar-tumpuk': { id: 'bar-tumpuk', nama: 'Batang bertumpuk', tipe: 'combo', mesin: 'echarts', butuh: 'kategori dan dua seri', guna: 'Dua ukuran dalam satu batang per kategori', kelompok: 'banding' },
+  'area-gradasi': { id: 'area-gradasi', nama: 'Area bergradasi', tipe: 'area', mesin: 'echarts', butuh: 'kategori dan satu seri', guna: 'Perkembangan dari waktu ke waktu beserta volumenya', kelompok: 'tren' },
+  'garis-tren': { id: 'garis-tren', nama: 'Garis tren', tipe: 'line', mesin: 'echarts', butuh: 'kategori dan satu seri', guna: 'Arah naik-turun dari waktu ke waktu', kelompok: 'tren' },
+  'combo-batang-garis': { id: 'combo-batang-garis', nama: 'Batang dan garis dua sumbu', tipe: 'combo', mesin: 'echarts', butuh: 'kategori, seri batang, seri garis', guna: 'Dua ukuran berbeda satuan dalam satu grafik', kelompok: 'tren' },
+  'scatter-gelembung': { id: 'scatter-gelembung', nama: 'Gelembung sebaran', tipe: 'bubble', mesin: 'echarts', butuh: 'label, dua angka, ukuran', guna: 'Hubungan dua ukuran, besar gelembung = ukuran ketiga', kelompok: 'sebaran' },
+  'titik-bersumbu': { id: 'titik-bersumbu', nama: 'Titik bersumbu', tipe: 'scatter', mesin: 'echarts', butuh: 'label dan nilai', guna: 'Sebaran nilai per kategori', kelompok: 'sebaran' },
+  'donat-tebal': { id: 'donat-tebal', nama: 'Cincin tebal', tipe: 'donut', mesin: 'echarts', butuh: 'kategori dan nilai', guna: 'Porsi tiap bagian dari keseluruhan', kelompok: 'komposisi' },
+  'donat-tipis': { id: 'donat-tipis', nama: 'Cincin tipis', tipe: 'donut', mesin: 'echarts', butuh: 'kategori dan nilai', guna: 'Porsi tiap bagian, tampilan ringan', kelompok: 'komposisi' },
+  'gauge-target': { id: 'gauge-target', nama: 'Gauge target', tipe: 'gauge', mesin: 'echarts', butuh: 'satu angka, target, batas', guna: 'Persentase capaian pada satu skala', kelompok: 'komposisi' },
+  'strip-os': { id: 'strip-os', nama: 'Daftar persen bertren', tipe: 'kpi', mesin: 'html', butuh: 'label, persen, delta, deret kecil', guna: 'Porsi tiap kelompok beserta trennya', kelompok: 'ringkas' },
+  'bar-kapsul': { id: 'bar-kapsul', nama: 'Batang kapsul', tipe: 'bar', mesin: 'echarts', butuh: 'kategori dan satu atau dua seri', guna: 'Membandingkan nilai per periode, puncaknya disorot', kelompok: 'banding' },
+  'area-banding': { id: 'area-banding', nama: 'Dua garis dibandingkan', tipe: 'line', mesin: 'echarts', butuh: 'kategori dan dua seri', guna: 'Membandingkan dua ukuran dari waktu ke waktu, mis. pendapatan vs beban', kelompok: 'tren' },
+  'cincin-progres': { id: 'cincin-progres', nama: 'Cincin capaian', tipe: 'gauge', mesin: 'echarts', butuh: 'satu persen capaian', guna: 'Persen capaian satu target dalam cincin penuh', kelompok: 'komposisi' },
+  // Khas BUMD: neraca air (IWA) dan penilaian kinerja (aspek keuangan, pelayanan, operasional, SDM).
+  'air-terjun': { id: 'air-terjun', nama: 'Air terjun neraca', tipe: 'waterfall', mesin: 'echarts', butuh: 'total awal, pengurang/penambah, total akhir', guna: 'Dari air diproduksi sampai air terjual: ke mana selisihnya hilang', kelompok: 'banding' },
+  'sankey-alur': { id: 'sankey-alur', nama: 'Alur sankey', tipe: 'sankey', mesin: 'echarts', butuh: 'pasangan asal>tujuan dan nilai', guna: 'Aliran dari sumber ke pemakaian, mis. air produksi ke tiap golongan', kelompok: 'komposisi' },
+  'radar-aspek': { id: 'radar-aspek', nama: 'Radar aspek kinerja', tipe: 'radar', mesin: 'echarts', butuh: 'aspek dan skor, boleh dua tahun', guna: 'Skor tiap aspek penilaian kinerja dibanding tahun lalu', kelompok: 'sebaran' },
+  'gauge-kesehatan': { id: 'gauge-kesehatan', nama: 'Gauge kesehatan BUMD', tipe: 'gauge', mesin: 'echarts', butuh: 'satu skor 0-5', guna: 'Skor kinerja dengan pita Sakit, Kurang Sehat, Sehat', kelompok: 'komposisi' },
+  'peta-panas': { id: 'peta-panas', nama: 'Peta panas', tipe: 'heatmap', mesin: 'echarts', butuh: 'baris (mis. wilayah), kolom (mis. bulan), nilai', guna: 'Di mana dan kapan angka menumpuk, mis. pengaduan per wilayah', kelompok: 'sebaran' },
+  'treemap-porsi': { id: 'treemap-porsi', nama: 'Petak porsi (treemap)', tipe: 'treemap', mesin: 'echarts', butuh: 'kategori dan nilai', guna: 'Porsi banyak kategori sekaligus, mis. pendapatan per golongan', kelompok: 'komposisi' },
 };
 
 export const DAFTAR_CHART: ChartId[] = Object.keys(CHART_DEFAULT) as ChartId[];
@@ -103,6 +136,7 @@ export interface HasilOpsi {
  * @param data    data dengan bentuk yang sama untuk semua varian
  * @param varian  wajah yang diminta
  * @param skala   skala huruf (1 = ukuran dasar)
+ * @param khas    true = pakai wajah khas replika halaman 1 Lensa/Nadi bila ada
  * @param gantiGaya gaya pengganti (mis. tema terang kanvas dashboard). Bila
  *                  kosong, dipakai gaya bawaan varian. Bentuk grafiknya tetap
  *                  milik wajah katalog; hanya warnanya yang mengikuti tema.
@@ -113,8 +147,11 @@ export function buildOpsi(
   varian: Varian,
   skala = 1,
   gantiGaya?: typeof GAYA[Varian],
+  khas = false,
 ): HasilOpsi {
-  const sel = MATRIKS[id];
+  const sel: Partial<Record<Varian, Pembangun>> | undefined = khas
+    ? { ...MATRIKS[id], ...MATRIKS_KHAS[id] }
+    : MATRIKS[id];
   if (!sel) {
     return { opsi: null, varian, cadangan: true, gaya: GAYA[varian] ?? GAYA.default };
   }

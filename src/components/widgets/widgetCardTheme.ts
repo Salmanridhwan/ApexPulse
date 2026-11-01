@@ -109,6 +109,9 @@ export interface KartuVars {
   '--chart-ink': string;
   '--chart-muted': string;
   '--chart-grid': string;
+  /** Latar & garis kartu tema "Bersih & Tegas" (`card-tegas` membaca ini, bukan --color-surface). */
+  '--tegas-card': string;
+  '--tegas-line': string;
 }
 
 export interface KartuTema {
@@ -172,6 +175,8 @@ export function temaKartu(warna?: string, mode: 'light' | 'dark' = 'light'): Kar
     '--chart-ink': tinta.warna,
     '--chart-muted': tinta2,
     '--chart-grid': campur(latar, ujung, gelap ? 0.16 : 0.1),
+    '--tegas-card': latar,
+    '--tegas-line': campur(latar, ujung, gelap ? 0.18 : 0.14),
   };
 
   return {
@@ -179,7 +184,7 @@ export function temaKartu(warna?: string, mode: 'light' | 'dark' = 'light'): Kar
     vars,
     gelap,
     peringatanKontras: tinta.peringatan
-      ? `Kontras teks hanya ${tinta.rasio.toFixed(1)}:1 — pilih warna latar yang lebih terang atau lebih gelap.`
+      ? `Teks di kartu ini sulit dibaca — pilih warna latar yang lebih terang atau lebih gelap.`
       : undefined,
   };
 }

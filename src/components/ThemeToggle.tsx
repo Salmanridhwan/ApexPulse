@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
-import { applyTheme, getInitialTheme, ThemeMode } from '../theme';
+import { applyTheme, EVENT_TEMA, getInitialTheme, ThemeMode } from '../theme';
 
 /** Tombol saklar terang/gelap berbentuk pil dengan knob timbul. */
 export const ThemeToggle: React.FC = () => {
   const [mode, setMode] = useState<ThemeMode>(getInitialTheme);
 
   useEffect(() => {
-    applyTheme(mode);
+    if (document.documentElement.getAttribute('data-theme') !== mode) applyTheme(mode);
   }, [mode]);
+
+  // Tema bisa diganti dari tempat lain (menu akun); saklar ini ikut menyesuaikan.
+  useEffect(() => {
+    const ikut = (e: Event) => setMode((e as CustomEvent<ThemeMode>).detail);
+    window.addEventListener(EVENT_TEMA, ikut);
+    return () => window.removeEventListener(EVENT_TEMA, ikut);
+  }, []);
 
   const gelap = mode === 'dark';
 

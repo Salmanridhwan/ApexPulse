@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Gauge } from 'lucide-react';
 import { loadEcharts } from './echartsSetup';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
 import { contohKartu } from '../../services/chart/contohData';
 import { ringkasWilayah } from '../../services/templates/wilayahLayanan';
 import type { DataChart, SpesifikasiHtml } from '../../services/chart/pembangunOpsi';
-import type { Varian } from '../../services/chart/gayaVarian';
+import type { GayaVarian, Varian } from '../../services/chart/gayaVarian';
 
 /**
  * RENDERER TUNGGAL WIDGET.
@@ -72,6 +72,10 @@ export interface WidgetChartProps {
   /** Warna sorotan, mengikuti aksen varian bila kosong. */
   warnaSorot?: string;
   className?: string;
+  /** Pakai wajah khas replika halaman 1 Lensa/Nadi (hanya komponen replika). */
+  khas?: boolean;
+  /** Ganti nilai gaya varian, mis. Default versi gelap di katalog. */
+  gaya?: GayaVarian;
 }
 
 /**
@@ -105,15 +109,17 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   legenda,
   legendaItem,
   className,
+  khas = false,
+  gaya,
 }) => {
   const wadah = useRef<HTMLDivElement | null>(null);
   const hasil = useMemo(() => {
-    const keluaran = buildOpsi(chartId, data, varian, skala);
+    const keluaran = buildOpsi(chartId, data, varian, skala, gaya, khas);
     const mentah: any = keluaran.opsi;
     // Bentuk HTML tidak pernah disentuh panel Gaya; hanya kanvas.
     if (pembungkus && mentah?.mesin !== 'html') return { ...keluaran, opsi: pembungkus(mentah) };
     return keluaran;
-  }, [chartId, data, varian, skala, pembungkus]);
+  }, [chartId, data, varian, skala, pembungkus, khas, gaya]);
   const html = (hasil.opsi as SpesifikasiHtml | null)?.mesin === 'html' ? (hasil.opsi as SpesifikasiHtml) : null;
 
   useEffect(() => {
@@ -158,9 +164,10 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
 
   const gayaTinggi = tinggi === undefined ? undefined : typeof tinggi === 'number' ? `${tinggi}px` : tinggi;
   const letakLegenda = legenda ?? letakLegendaBawaan(chartId, data);
-  const palet = (hasil.opsi as any)?.gaya?.palet ?? ['#ff8a1f'];
+  const palet = (hasil.opsi as any)?.gaya?.palet ?? hasil.gaya?.palet ?? ['#ff8a1f'];
   const warna = (hasil.opsi as any)?.gaya?.aksen ?? palet[0];
-  const aksenTeks = (hasil.opsi as any)?.gaya?.teks2 ?? '#b7bdc6';
+  // Teks legenda ikut gaya varian (kartu terang = teks gelap), bukan abu-abu tetap.
+  const aksenTeks = (hasil.opsi as any)?.gaya?.teks2 ?? hasil.gaya?.teks2 ?? '#b7bdc6';
   const kanvas = (
     <div className={letakLegenda === 'tidak' ? (className ?? 'w-full h-full') : 'w-full flex-1 min-h-0'} style={letakLegenda === 'tidak' ? { height: gayaTinggi } : undefined}>
       <div ref={wadah} className="w-full h-full" />
@@ -376,10 +383,12 @@ const BentukHtml: React.FC<BentukProps> = ({
   warnaSorot,
 }) => {
   const g = spesifikasi.gaya;
+  // Gaya bertepi tegas (Blok, Koran) membawa tebal, warna, dan bayangan tepinya sendiri.
   const kotak: React.CSSProperties = {
     backgroundColor: g.kartu,
-    border: `1px solid ${sorot ? warnaSorot ?? g.aksen : g.garis}`,
-    borderRadius: '0.9em',
+    border: `${g.tepi?.tebal ?? 1}px solid ${sorot ? warnaSorot ?? g.aksen : g.tepi?.warna ?? g.garis}`,
+    boxShadow: g.tepi && g.tepi.bayangan !== 'none' ? g.tepi.bayangan : undefined,
+    borderRadius: g.sudutKartu !== undefined ? `${Math.min(g.sudutKartu, 16) / 16}em` : '0.9em',
     color: g.teks,
     cursor: onKlik ? 'pointer' : undefined,
   };
@@ -395,7 +404,9 @@ const BentukHtml: React.FC<BentukProps> = ({
       const nilaiPetak = data.seri?.[0]?.data ?? [];
       const satuanPetak = data.catatan ?? [];
       return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] h-full" style={{ color: g.teks }}>
+        // Tanpa h-full: di halaman layar penuh (flex kolom) strip ini harus
+        // setinggi isinya, bukan setinggi induk, supaya grafik tetap kebagian ruang.
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] shrink-0" style={{ color: g.teks }}>
           {data.kategori.map((label, i) => (
             <div
               key={label}
@@ -641,6 +652,330 @@ const BentukHtml: React.FC<BentukProps> = ({
             </>
           )}
         </svg>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'kpi-tirta') {
+    // Tirta: angka besar di atas "permukaan air". Tinggi air = capaian terhadap
+    // `maks` bila dokumen menyebutnya; tanpa batas, air setengah kartu sebagai hiasan.
+    const IkonKpi = Ikon ?? Gauge;
+    const label = judul || data.kategori?.[0] || data.seri?.[0]?.nama || contohKartu.judul;
+    const kosong = data.kosong === true;
+    const delta = data.delta;
+    const adaDelta = delta !== undefined && !(data.dariDokumen && delta === 0);
+    const naik = (delta ?? 0) > 0;
+    const datar = !delta;
+    const warnaDelta = datar ? g.teks3 : naik ? g.hijau : g.merah;
+    const PanahDelta = datar ? ArrowRight : naik ? ArrowUpRight : ArrowDownRight;
+    const maks = typeof data.maks === 'number' && data.maks > 0 ? data.maks : null;
+    const capai = maks && angka !== null && !kosong ? Math.max(0, Math.min(100, (angka / maks) * 100)) : null;
+    // Permukaan air: capaian 100% = air setinggi 62% kartu, supaya label dan angka tetap terbaca.
+    const muka = 100 - (12 + ((capai ?? 50) / 100) * 50);
+    const idAir = `tirta-${String(label).replace(/\s+/g, '-')}`;
+    const ombak = (y: number, a: number) =>
+      `M0,${y} C12,${y - a} 25,${y - a} 37,${y} S62,${y + a} 75,${y} S100,${y - a} 100,${y} L100,100 L0,100 Z`;
+
+    return (
+      <div
+        className="h-full relative overflow-hidden flex flex-col gap-[0.45em] p-[0.9em] min-w-0"
+        style={{
+          ...kotak,
+          borderRadius: '1.1em',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+        }}
+        onClick={onKlik}
+      >
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden>
+          <defs>
+            <linearGradient id={idAir} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={g.aksen} stopOpacity="0.42" />
+              <stop offset="100%" stopColor={g.palet[1] ?? g.aksen2} stopOpacity="0.12" />
+            </linearGradient>
+          </defs>
+          <path d={ombak(muka + 4, 5)} fill={g.aksen} fillOpacity="0.12" />
+          <path d={ombak(muka, 4)} fill={`url(#${idAir})`} />
+        </svg>
+
+        <div className="relative flex items-center justify-between gap-[0.5em]">
+          <span className="inline-flex items-center gap-[0.45em] min-w-0">
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-[1.8em] h-[1.8em] rounded-full"
+              style={{ backgroundColor: `${g.aksen}26`, color: g.aksen, boxShadow: `0 0 0.9em ${g.aksen}40` }}
+            >
+              <IkonKpi className="w-[0.95em] h-[0.95em]" />
+            </span>
+            <span className="text-[0.76em] font-semibold truncate" style={{ color: g.teks2 }}>
+              {label}
+            </span>
+          </span>
+          {adaDelta && (
+            <span
+              className="inline-flex items-center gap-[0.1em] text-[0.66em] font-bold rounded-full px-[0.5em] py-[0.15em] shrink-0 border"
+              style={{ color: warnaDelta, borderColor: `${warnaDelta}55`, backgroundColor: `${warnaDelta}14` }}
+            >
+              <PanahDelta className="w-[1em] h-[1em]" />
+              {datar ? '0%' : `${naik ? '+' : ''}${String(delta).replace('.', ',')}%`}
+            </span>
+          )}
+        </div>
+
+        <div className="relative flex items-baseline gap-[0.3em] min-w-0">
+          <span
+            className="text-[1.85em] font-extrabold leading-none tabular-nums tracking-tight truncate"
+            style={{ color: kosong ? g.teks3 : g.teks }}
+          >
+            {kosong ? '—' : teksAngka ?? format(angka, desimal)}
+          </span>
+          {satuan && !kosong && (
+            <span className="text-[0.7em] font-semibold shrink-0" style={{ color: g.teks3 }}>
+              {satuan}
+            </span>
+          )}
+        </div>
+
+        <div className="relative mt-auto flex items-end justify-between gap-[0.5em] text-[0.64em]">
+          <span className="truncate" style={{ color: g.teks2 }}>
+            {kosong ? 'belum ada di dokumen' : deltaTeks || ''}
+          </span>
+          {capai !== null && (
+            <span className="font-bold tabular-nums shrink-0" style={{ color: g.teks }}>
+              {capai.toLocaleString('id-ID', { maximumFractionDigits: 0 })}% capaian
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'kpi-netral' || spesifikasi.jenis === 'kpi-pijar' || spesifikasi.jenis === 'kpi-kaca') {
+    // Tiga wajah kartu KPI dengan data yang sama:
+    // - netral (Default): garis aksen di atas, ikon berpetak, batang mini.
+    // - pijar: kartu gelap berpendar oranye, ikon bergradasi, garis tren bercahaya.
+    // - kaca: kartu bening buram, pil delta gelap, kapsul capaian terhadap maks.
+    const wajah = spesifikasi.jenis;
+    const IkonKpi = Ikon ?? Gauge;
+    const label = judul || data.kategori?.[0] || data.seri?.[0]?.nama || contohKartu.judul;
+    const kosong = data.kosong === true;
+    const delta = data.delta;
+    const adaDelta = delta !== undefined && !(data.dariDokumen && delta === 0);
+    const naik = (delta ?? 0) > 0;
+    const datar = !delta;
+    const warnaDelta = datar ? g.teks3 : naik ? g.hijau : g.merah;
+    const teksDelta = datar ? '0%' : `${naik ? '+' : ''}${String(delta).replace('.', ',')}%`;
+    const deret = deretSpark(spark, data);
+    const idGrad = `${wajah}-${String(label).replace(/\s+/g, '-')}`;
+    const nilaiTampil = kosong ? '—' : teksAngka ?? format(angka, desimal);
+    const PanahDelta = datar ? ArrowRight : naik ? ArrowUpRight : ArrowDownRight;
+
+    const angkaUtama = (ukuran: string) => (
+      <div className="flex items-baseline gap-[0.3em] min-w-0">
+        <span
+          className={`${ukuran} font-extrabold leading-none tabular-nums tracking-tight truncate`}
+          style={kosong ? { color: g.teks3 } : undefined}
+        >
+          {nilaiTampil}
+        </span>
+        {satuan && !kosong && (
+          <span className="text-[0.7em] font-semibold shrink-0" style={{ color: g.teks3 }}>
+            {satuan}
+          </span>
+        )}
+      </div>
+    );
+
+    if (wajah === 'kpi-netral') {
+      // Batang mini: delapan titik terakhir, batang terakhir paling pekat.
+      const batang = deret.slice(-8);
+      const maksBatang = Math.max(...batang);
+      const minBatang = Math.min(...batang);
+      return (
+        <div
+          className="h-full relative overflow-hidden flex flex-col gap-[0.5em] p-[0.85em] pt-[1em] min-w-0"
+          style={kotak}
+          onClick={onKlik}
+        >
+          <span
+            className="absolute inset-x-0 top-0 h-[0.22em]"
+            style={{ background: `linear-gradient(90deg, ${g.aksen}, ${g.palet[1] ?? g.aksen2})` }}
+          />
+          <div className="flex items-center gap-[0.55em] min-w-0">
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-[1.9em] h-[1.9em] rounded-[0.55em]"
+              style={{ backgroundColor: `${g.aksen}1f`, color: g.aksen }}
+            >
+              <IkonKpi className="w-[1em] h-[1em]" />
+            </span>
+            <span className="text-[0.78em] font-semibold leading-tight truncate" style={{ color: g.teks2 }}>
+              {label}
+            </span>
+          </div>
+          {angkaUtama('text-[1.6em]')}
+          <div className="flex items-end justify-between gap-[0.6em] mt-auto">
+            {adaDelta ? (
+              <span
+                className="inline-flex items-center gap-[0.15em] text-[0.7em] font-bold rounded-full px-[0.55em] py-[0.15em] shrink-0"
+                style={{ color: warnaDelta, backgroundColor: `${warnaDelta}1f` }}
+              >
+                <PanahDelta className="w-[1em] h-[1em]" />
+                {teksDelta}
+              </span>
+            ) : (
+              <span className="text-[0.68em]" style={{ color: g.teks3 }}>
+                {kosong ? 'belum ada di dokumen' : 'tanpa pembanding'}
+              </span>
+            )}
+            {batang.length >= 2 && (
+              <div className="flex items-end gap-[0.18em] h-[1.9em]" aria-hidden>
+                {batang.map((v, i) => (
+                  <span
+                    key={i}
+                    className="w-[0.36em] rounded-full"
+                    style={{
+                      height: `${28 + ((v - minBatang) / (maksBatang - minBatang || 1)) * 72}%`,
+                      backgroundColor: g.aksen,
+                      opacity: i === batang.length - 1 ? 1 : 0.28 + (i / batang.length) * 0.4,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {deltaTeks && (
+            <span className="text-[0.66em] truncate -mt-[0.2em]" style={{ color: g.teks3 }}>
+              {deltaTeks}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (wajah === 'kpi-pijar') {
+      const jalur = jalurSpark(deret);
+      return (
+        <div
+          className="h-full relative overflow-hidden flex flex-col gap-[0.45em] p-[0.85em] min-w-0"
+          style={{
+            ...kotak,
+            background: `radial-gradient(circle at 100% 0%, ${g.aksen}38 0%, transparent 55%), ${g.kartu}`,
+          }}
+          onClick={onKlik}
+        >
+          <div className="flex items-start justify-between gap-[0.5em]">
+            <div className="min-w-0">
+              <p className="text-[0.62em] font-bold uppercase tracking-[0.12em] truncate" style={{ color: g.aksen2 }}>
+                {label}
+              </p>
+              {deltaTeks && (
+                <p className="text-[0.62em] truncate mt-[0.15em]" style={{ color: g.teks3 }}>
+                  {deltaTeks}
+                </p>
+              )}
+            </div>
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-[2.1em] h-[2.1em] rounded-[0.7em] text-white"
+              style={{ background: `linear-gradient(135deg, ${g.aksen2}, ${g.aksen})`, boxShadow: `0 0.4em 1.2em ${g.aksen}55` }}
+            >
+              <IkonKpi className="w-[1.05em] h-[1.05em]" />
+            </span>
+          </div>
+          <div className="flex items-end justify-between gap-[0.5em]">
+            {angkaUtama('text-[1.7em]')}
+            {adaDelta && (
+              <span className="inline-flex items-center text-[0.72em] font-bold shrink-0" style={{ color: warnaDelta }}>
+                <PanahDelta className="w-[1.05em] h-[1.05em]" />
+                {teksDelta}
+              </span>
+            )}
+          </div>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full flex-1 min-h-[1.4em] max-h-[2.2em]" aria-hidden>
+            <defs>
+              <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={g.aksen} stopOpacity="0.45" />
+                <stop offset="100%" stopColor={g.aksen} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={jalur.area} fill={`url(#${idGrad})`} />
+            <path
+              d={jalur.garis}
+              fill="none"
+              stroke={g.aksen}
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              style={{ filter: `drop-shadow(0 0 4px ${g.aksen})` }}
+            />
+          </svg>
+        </div>
+      );
+    }
+
+    // kpi-kaca: capaian dihitung terhadap `maks` bila dokumen menyebutnya.
+    const maks = typeof data.maks === 'number' && data.maks > 0 ? data.maks : null;
+    const capai = maks && angka !== null ? Math.max(0, Math.min(100, (angka / maks) * 100)) : null;
+    return (
+      <div
+        className="h-full flex flex-col gap-[0.55em] p-[0.95em] min-w-0"
+        style={{
+          ...kotak,
+          backgroundColor: 'rgba(255,255,255,0.42)',
+          border: `1px solid ${sorot ? warnaSorot ?? g.aksen : 'rgba(255,255,255,0.65)'}`,
+          borderRadius: '1.15em',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 0.6em 1.6em rgba(60,40,20,0.12), inset 0 1px 0 rgba(255,255,255,0.7)',
+        }}
+        onClick={onKlik}
+      >
+        <div className="flex items-center justify-between gap-[0.5em]">
+          <span className="inline-flex items-center gap-[0.45em] min-w-0">
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-[1.8em] h-[1.8em] rounded-full"
+              style={{ backgroundColor: 'rgba(255,255,255,0.7)', color: g.teks }}
+            >
+              <IkonKpi className="w-[0.95em] h-[0.95em]" />
+            </span>
+            <span className="text-[0.76em] font-semibold truncate" style={{ color: g.teks2 }}>
+              {label}
+            </span>
+          </span>
+          {adaDelta && (
+            <span
+              className="inline-flex items-center gap-[0.1em] text-[0.66em] font-bold rounded-full px-[0.55em] py-[0.2em] shrink-0"
+              style={{ backgroundColor: g.teks, color: datar ? '#ffffff' : naik ? '#7ee2b8' : '#ffb4a2' }}
+            >
+              <PanahDelta className="w-[1em] h-[1em]" />
+              {teksDelta}
+            </span>
+          )}
+        </div>
+        {angkaUtama('text-[1.8em]')}
+        <div className="mt-auto">
+          {capai !== null ? (
+            <>
+              <div className="flex justify-between text-[0.62em] font-semibold mb-[0.3em]" style={{ color: g.teks3 }}>
+                <span className="truncate">{deltaTeks || 'Capaian'}</span>
+                <span className="tabular-nums" style={{ color: g.teks }}>
+                  {capai.toLocaleString('id-ID', { maximumFractionDigits: 0 })}%
+                </span>
+              </div>
+              <div className="h-[0.6em] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${capai}%`, background: `linear-gradient(90deg, ${g.aksen}, ${g.aksen2})` }}
+                />
+              </div>
+            </>
+          ) : (
+            deltaTeks && (
+              <span className="text-[0.66em]" style={{ color: g.teks3 }}>
+                {deltaTeks}
+              </span>
+            )
+          )}
+        </div>
       </div>
     );
   }

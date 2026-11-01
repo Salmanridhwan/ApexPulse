@@ -21,8 +21,12 @@ export function getInitialTheme(): ThemeMode {
   return 'dark';
 }
 
+/** Nama event saat tema global berganti, supaya semua saklar tema ikut berubah. */
+export const EVENT_TEMA = 'aiones:tema';
+
 export function applyTheme(mode: ThemeMode): void {
   document.documentElement.setAttribute('data-theme', mode);
+  window.dispatchEvent(new CustomEvent<ThemeMode>(EVENT_TEMA, { detail: mode }));
   try {
     localStorage.setItem(KEY, mode);
   } catch {
@@ -76,4 +80,10 @@ export const AKSEN_TEMA: Record<string, string> = {
   oranye: '#ff8a1f',
   analitik: '#3b82f6',
   trafik: '#22d3ee',
+  kaca: '#2f8f7d',
+};
+
+/** Mode terang/gelap kanvas per tema dashboard. Tema yang tidak disebut = gelap. */
+export const MODE_TEMA: Record<string, 'light' | 'dark'> = {
+  kaca: 'light',
 };

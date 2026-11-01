@@ -3,6 +3,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import type { WidgetStyle, WidgetType } from '../types';
 import { PALET, URUTAN_PALET, FONT_TERSEDIA, adaGaya, bersihkanGaya } from './widgets/widgetStyle';
 import { KARTU_PRESET, URUTAN_KARTU, temaKartu } from './widgets/widgetCardTheme';
+import { GAYA, VARIAN, type Varian } from '../services/chart/gayaVarian';
 
 /** Tipe yang memakai ketebalan garis / radius batang. */
 const TIPE_GARIS: WidgetType[] = ['line', 'area', 'scatter', 'bubble'];
@@ -54,6 +55,44 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Desain dari Template Chart: satu klik mengganti bentuk, warna kartu,
+          gradasi, dan label sekaligus. Paling atas karena paling berdampak. */}
+      <div>
+        <label className="block text-ink-2 font-medium mb-2">Desain Chart</label>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {([undefined, ...VARIAN] as Array<Varian | undefined>).map((v) => {
+            const aktif = (style.desain || undefined) === v;
+            const g = v ? GAYA[v] : null;
+            return (
+              <button
+                key={v ?? 'ikut'}
+                type="button"
+                data-testid={`desain-${v ?? 'ikut'}`}
+                onClick={() => ubah({ desain: v })}
+                className={`p-2 rounded-card border text-left transition-all ${aktif ? 'border-brand ring-1 ring-brand' : 'border-line hover:bg-surface-2'}`}
+              >
+                <span className="block text-[10px] font-semibold text-ink mb-1.5">{g ? g.nama : 'Ikut tema'}</span>
+                <span
+                  className="flex items-end gap-0.5 h-5 rounded-xs px-1 py-0.5 border border-line"
+                  style={{ background: g ? g.kartu : 'var(--color-surface)' }}
+                >
+                  {[0.45, 0.8, 0.6, 1].map((t, i) => (
+                    <span
+                      key={i}
+                      className="flex-1 rounded-[2px]"
+                      style={{ height: `${t * 100}%`, background: g ? g.palet[i % g.palet.length] : 'var(--color-brand)' }}
+                    />
+                  ))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-ink-3 mt-1.5">
+          Sama dengan pilihan gaya di menu Template Chart. Warna kartu dan palet di bawah tetap bisa diubah setelahnya.
+        </p>
+      </div>
+
       {/* Warna latar KARTU — ditaruh paling atas karena efeknya paling terlihat:
           seluruh kartu berubah warna, bukan hanya seri chartnya. */}
       <div>
@@ -122,7 +161,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
       {/* Palet warna seri chart */}
       <div>
-        <label className="block text-ink-2 font-medium mb-2">Palet Warna Chart</label>
+        <label className="block text-ink-2 font-medium mb-2">Warna Grafik</label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {URUTAN_PALET.map((id) => {
             const p = PALET[id];
@@ -146,7 +185,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           })}
         </div>
         <p className="text-[10px] text-ink-3 mt-1.5">
-          Palet menimpa warna seluruh seri. "Bawaan" = warna tema aplikasi.
+          Mengganti warna semua batang, garis, dan potongan grafik. "Bawaan" = warna dari desain.
         </p>
       </div>
 
@@ -154,11 +193,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       {jumlahSeri > 1 && (
         <div>
           <label className="block text-ink-2 font-medium mb-2">
-            Warna Khusus per-Seri (menimpa palet)
+            Warna per Data (lebih kuat dari Warna Grafik)
           </label>
           <div className="space-y-2">
             {warnaSeri.map((w, i) => {
-              const nama = namaSeri?.[i] || `Seri ${i + 1}`;
+              const nama = namaSeri?.[i] || `Data ${i + 1}`;
               return (
                 <div key={i} className="flex items-center gap-2">
                   <input
@@ -187,21 +226,21 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       {/* Font & ukuran */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Jenis Font</label>
+          <label className="label">Jenis Huruf</label>
           <select
             value={style.font || ''}
             onChange={(e) => ubah({ font: (e.target.value || undefined) as WidgetStyle['font'] })}
             className="field-lg"
           >
-            <option value="">Bawaan (Inter)</option>
+            <option value="">Bawaan</option>
             {FONT_TERSEDIA.map((f) => (
-              <option key={f} value={f}>{f}</option>
+              <option key={f} value={f}>{f === 'JetBrains Mono' ? 'Angka rata (mudah dibandingkan)' : f}</option>
             ))}
           </select>
         </div>
         <div>
           <label className="label">
-            Ukuran Font Label: {style.fontUkuran ?? 10} px
+            Ukuran Huruf: {style.fontUkuran ?? 10}
           </label>
           <input
             type="range"

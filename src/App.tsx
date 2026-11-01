@@ -32,10 +32,7 @@ import { AlertsModal } from './components/AlertsModal';
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
-import { DashboardReferensi } from './components/referensi/DashboardReferensi';
-import { DashboardAnalitik } from './components/referensi/DashboardAnalitik';
-import { DashboardTrafik } from './components/referensi/DashboardTrafik';
-import { AKSEN_TEMA, KanvasTemaContext } from './theme';
+import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
@@ -65,6 +62,7 @@ import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { GlobalStyleModal } from './components/GlobalStyleModal';
 import { tipePunyaGaya } from './components/widgets/widgetStyle';
 import { ThemeToggle } from './components/ThemeToggle';
+import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman';
 import { Login } from './pages/Login';
 import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 
@@ -634,6 +632,7 @@ export default function App() {
 
     const gayaDashboard: WidgetStyle = {
       ...dasar,
+      desain: target === 'semua' ? style?.desain : dasar.desain,
       kartu: style?.kartu,
       font: style?.font,
       fontUkuran: style?.fontUkuran,
@@ -649,6 +648,7 @@ export default function App() {
       const kenaPalet = target === 'semua' || w.id === target;
       const gayaWidget: WidgetStyle = {
         ...(w.style || {}),
+        desain: kenaPalet ? style?.desain : w.style?.desain,
         kartu: gayaDashboard.kartu,
         font: gayaDashboard.font,
         fontUkuran: gayaDashboard.fontUkuran,
@@ -656,7 +656,10 @@ export default function App() {
         warnaSeri: kenaPalet ? seri : w.style?.warnaSeri,
       };
       // Tabel/narasi tidak menggambar chart: simpan hanya warna kartunya.
-      return { ...w, style: tipePunyaGaya(w.type) ? gayaWidget : gayaDashboard.kartu ? { kartu: gayaDashboard.kartu } : undefined };
+      // Tabel/narasi tetap menerima desain dan warna kartu: keduanya ikut desain katalog.
+      const gayaRingan: WidgetStyle | undefined =
+        gayaWidget.desain || gayaDashboard.kartu ? { desain: gayaWidget.desain, kartu: gayaDashboard.kartu } : undefined;
+      return { ...w, style: tipePunyaGaya(w.type) ? gayaWidget : gayaRingan };
     });
 
     terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets, gaya: gayaDashboard });
@@ -782,28 +785,22 @@ export default function App() {
       const widgetsH = (h.widgets || []).filter((w) => cocokFilter(w, h.globalFilters ?? filterDashboard));
       const tid = h.replika?.templateId;
       if (!tid) return { id: h.id, judul: h.judul, widgets: h.widgets || [] };
-      const nilai =
-        tid === 'tpl-analitik'
+      // Halaman 2 dan 3 menyimpan angkanya sendiri; halaman 1 dihitung dari widget.
+      const nilai = tid.includes('#')
+        ? h.replika?.nilai
+        : tid === 'tpl-analitik'
           ? nilaiAnalitikDariWidgets(widgetsH)
           : tid === 'tpl-trafik'
             ? nilaiTrafikDariWidgets(widgetsH)
             : nilaiDariWidgets(widgetsH);
-      const tataLetakH = h.tataLetak?.[tid];
-      const props = {
-        penuh: true,
-        nilai: nilai as never,
-        warnaKartu: gayaDashboardAktif?.kartu,
-        gaya: gayaDashboardAktif,
-        tataLetak: tataLetakH,
-      };
-      const konten =
-        tid === 'tpl-analitik' ? (
-          <DashboardAnalitik {...props} />
-        ) : tid === 'tpl-trafik' ? (
-          <DashboardTrafik {...props} />
-        ) : (
-          <DashboardReferensi {...props} />
-        );
+      const konten = (
+        <ReplikaHalaman
+          penuh
+          replika={{ templateId: tid, nilai }}
+          gaya={gayaDashboardAktif}
+          tataLetak={h.tataLetak?.[tid]}
+        />
+      );
       return { id: h.id, judul: h.judul, konten };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -821,7 +818,7 @@ export default function App() {
     setDrafTataLetak(null);
     setDrafWidgetAwal(null);
     setDrafGaya(null);
-    terapkanDashboard({ ...d, ...proyeksi(tujuan), halaman: semua, halamanAktifId: id });
+    terapkanDashboard({ ...d, ...proyeksi(tujuan, d), halaman: semua, halamanAktifId: id });
   };
 
   /** Simpan struktur halaman (tambah/ganti nama/hapus/geser) ke server. */
@@ -829,7 +826,7 @@ export default function App() {
     const d = activeDashboard;
     if (!d) return;
     const tujuan = semua.find((h) => h.id === aktifId) || semua[0];
-    terapkanDashboard({ ...d, ...proyeksi(tujuan), halaman: semua, halamanAktifId: tujuan.id });
+    terapkanDashboard({ ...d, ...proyeksi(tujuan, d), halaman: semua, halamanAktifId: tujuan.id });
     void fetch(`/api/dashboards/${d.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -975,6 +972,8 @@ export default function App() {
   const nilaiReplika = useMemo(() => {
     const tid = activeDashboard?.replika?.templateId;
     if (!tid) return null;
+    // Halaman 2 dan 3 template menyimpan angkanya sendiri (bukan turunan widget).
+    if (tid.includes('#')) return activeDashboard?.replika?.nilai ?? null;
     if (tid === 'tpl-analitik') return nilaiAnalitikDariWidgets(widgetsTampilInternal);
     if (tid === 'tpl-trafik') return nilaiTrafikDariWidgets(widgetsTampilInternal);
     return nilaiDariWidgets(widgetsTampilInternal);
@@ -1488,7 +1487,7 @@ export default function App() {
                   <KanvasTemaContext.Provider
                     value={
                       activeDashboard?.tema
-                        ? { mode: 'dark', aksen: AKSEN_TEMA[activeDashboard.tema] }
+                        ? { mode: MODE_TEMA[activeDashboard.tema] ?? 'dark', aksen: AKSEN_TEMA[activeDashboard.tema] }
                         : null
                     }
                   >
@@ -1591,33 +1590,17 @@ export default function App() {
                   {/* Dashboard dari template: komponen replika yang sama dengan
                       pratinjau data asli, jadi desainnya tidak berubah. */}
                   {activeDashboard?.replika && !tampilWidget ? (
-                    <div className="pb-4">
-                      {activeDashboard.replika.templateId === 'tpl-analitik' ? (
-                        <DashboardAnalitik
-                          nilai={nilaiReplika as never}
-                          warnaKartu={gayaDashboardAktif?.kartu}
+                    <PasLayar>
+                      {(penuh) => (
+                        <ReplikaHalaman
+                          penuh={penuh}
+                          replika={{ templateId: activeDashboard.replika!.templateId, nilai: nilaiReplika }}
                           gaya={gayaDashboardAktif}
-                tataLetak={tataLetakAktif}
-                          onTataLetak={ubahTataLetak}
-                        />
-                      ) : activeDashboard.replika.templateId === 'tpl-trafik' ? (
-                        <DashboardTrafik
-                          nilai={nilaiReplika as never}
-                          warnaKartu={gayaDashboardAktif?.kartu}
-                          gaya={gayaDashboardAktif}
-                tataLetak={tataLetakAktif}
-                          onTataLetak={ubahTataLetak}
-                        />
-                      ) : (
-                        <DashboardReferensi
-                          nilai={nilaiReplika as never}
-                          warnaKartu={gayaDashboardAktif?.kartu}
-                          gaya={gayaDashboardAktif}
-                tataLetak={tataLetakAktif}
+                          tataLetak={tataLetakAktif}
                           onTataLetak={ubahTataLetak}
                         />
                       )}
-                    </div>
+                    </PasLayar>
                   ) : (
                   /* Dashboard Canvas Grid */
                   <ChartSelectionProvider>
@@ -1664,6 +1647,8 @@ export default function App() {
         dashboardId={activeDashboard?.id}
         onDashboardUpdated={(newDash) => {
           setActiveDashboard(newDash);
+          // Dashboard dari asisten langsung dibuka di kanvas, dari menu mana pun.
+          setViewMode('workspace');
           setDashboards((prev) => [
             newDash,
             ...prev.filter((d) => d.id !== newDash.id),
@@ -1681,31 +1666,12 @@ export default function App() {
           onExit={() => setIsPresentationMode(false)}
           konten={
             activeDashboard.replika && !tampilWidget ? (
-              activeDashboard.replika.templateId === 'tpl-analitik' ? (
-                <DashboardAnalitik
+              <ReplikaHalaman
                 penuh
-                nilai={nilaiReplika as never}
-                warnaKartu={gayaDashboardAktif?.kartu}
-                          gaya={gayaDashboardAktif}
+                replika={{ templateId: activeDashboard.replika.templateId, nilai: nilaiReplika }}
+                gaya={gayaDashboardAktif}
                 tataLetak={tataLetakAktif}
               />
-              ) : activeDashboard.replika.templateId === 'tpl-trafik' ? (
-                <DashboardTrafik
-                penuh
-                nilai={nilaiReplika as never}
-                warnaKartu={gayaDashboardAktif?.kartu}
-                          gaya={gayaDashboardAktif}
-                tataLetak={tataLetakAktif}
-              />
-              ) : (
-                <DashboardReferensi
-                penuh
-                nilai={nilaiReplika as never}
-                warnaKartu={gayaDashboardAktif?.kartu}
-                          gaya={gayaDashboardAktif}
-                tataLetak={tataLetakAktif}
-              />
-              )
             ) : undefined
           }
           onUpdate={(d) => {

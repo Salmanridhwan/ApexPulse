@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { GayaVarian } from './gayaVarian';
+import { cukupTerang, type GayaVarian } from './gayaVarian';
 
 /**
  * BENTUK DATA TUNGGAL UNTUK SEMUA CHART.
@@ -72,6 +72,24 @@ export const format = (v: number, d: DataChart): string => {
   return v.toLocaleString('id-ID', { maximumFractionDigits: desimal });
 };
 
+/**
+ * Label sumbu ringkas gaya Indonesia: 612.400.000 -> "612,4 jt". Sumbu tidak
+ * punya ruang untuk angka penuh; angka lengkap tetap tampil di tooltip.
+ */
+export const ringkasSumbu = (v: number): string => {
+  const mutlak = Math.abs(v);
+  const tingkat: Array<[number, string]> = [
+    [1e12, ' T'],
+    [1e9, ' M'],
+    [1e6, ' jt'],
+    [1e3, ' rb'],
+  ];
+  for (const [batas, akhiran] of tingkat) {
+    if (mutlak >= batas) return `${(v / batas).toLocaleString('id-ID', { maximumFractionDigits: 1 })}${akhiran}`;
+  }
+  return v.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+};
+
 export const labelNilai = (v: number, d: DataChart): string =>
   d.satuan ? `${format(v, d)} ${d.satuan}` : format(v, d);
 
@@ -83,6 +101,9 @@ const gradien = (g: GayaVarian, warna: string, tebal = 1) => {
     : warna;
   return { type: 'linear', ...arah, colorStops: [{ offset: 0, color: warna }, { offset: 1, color: ujung }] };
 };
+
+/** Latar label pil: pil hitam di gaya gelap, kartu lembut di gaya terang. */
+const latarPil = (g: GayaVarian) => (cukupTerang(g.latar) ? g.kartu2 : 'rgba(10,10,11,0.72)');
 
 const tooltip = (g: GayaVarian, s: number) => ({
   backgroundColor: g.kartu2,
@@ -121,25 +142,47 @@ const sumbuNilai = (g: GayaVarian, s: number, opsi: { maks?: number; satuanSumbu
   },
 });
 
+/** Legenda kecil di atas grafik, untuk grafik dengan lebih dari satu seri. */
+const legendaAtas = (g: GayaVarian, s: number) => ({
+  top: 0,
+  right: 0,
+  itemWidth: 10 * s,
+  itemHeight: 6 * s,
+  icon: 'roundRect',
+  textStyle: { color: g.teks3, fontSize: 9.5 * s },
+});
+
 /* ------------------------------ BENTUK ECHARTS ------------------------------ */
 
 /** Batang polos: gaya netral tanpa sorotan dan tanpa garis tren. */
 export const barTegak: Pembangun = (d, g, s) => ({
-  grid: { left: 6 * s, right: 12 * s, top: 14 * s, bottom: 4, containLabel: true },
+  grid: { left: 6 * s, right: 12 * s, top: (d.seri.length > 1 ? 26 : 14) * s, bottom: 4, containLabel: true },
   tooltip: { ...tooltip(g, s), trigger: 'axis' },
   xAxis: sumbuKategori(g, s, d.kategori),
-  yAxis: sumbuNilai(g, s, { satuanSumbu: d.satuan ? ` ${d.satuan}` : undefined }),
-  series: [
-    {
-      type: 'bar',
-      name: d.seri[0]?.nama ?? 'Nilai',
-      barMaxWidth: 26 * s,
-      data: deret(d).map((v, i) => ({
-        value: typeof v === 'number' ? v : null,
-        itemStyle: { color: warnaKategori(g, i), borderRadius: [g.sudut * s, g.sudut * s, 0, 0] },
-      })),
-    },
-  ],
+  yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
+  // Banyak seri (mis. Pendapatan vs Beban): batang berdampingan, satu warna per
+  // seri, dengan legenda. Satu seri: satu warna per kategori.
+  ...(d.seri.length > 1 ? { legend: legendaAtas(g, s) } : {}),
+  series:
+    d.seri.length > 1
+      ? d.seri.map((sr, k) => ({
+          type: 'bar',
+          name: sr.nama,
+          barMaxWidth: 18 * s,
+          data: sr.data,
+          itemStyle: { color: g.palet[k % g.palet.length], borderRadius: [g.sudut * s, g.sudut * s, 0, 0] },
+        }))
+      : [
+          {
+            type: 'bar',
+            name: d.seri[0]?.nama ?? 'Nilai',
+            barMaxWidth: 26 * s,
+            data: deret(d).map((v, i) => ({
+              value: typeof v === 'number' ? v : null,
+              itemStyle: { color: warnaKategori(g, i), borderRadius: [g.sudut * s, g.sudut * s, 0, 0] },
+            })),
+          },
+        ],
 });
 
 /** Batang bergradasi dengan sorotan puncak, label pil, dan garis tren. */
@@ -159,7 +202,7 @@ export const barSorot: Pembangun = (d, g, s) => {
       },
     },
     xAxis: sumbuKategori(g, s, d.kategori),
-    yAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+    yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     series: [
       {
         type: 'bar',
@@ -183,7 +226,7 @@ export const barSorot: Pembangun = (d, g, s) => {
             color: g.labelPil ? (i === puncak ? g.teks : g.teks2) : g.teks3,
             fontSize: 8.8 * s,
             fontWeight: i === puncak ? 'bold' : 'normal',
-            backgroundColor: g.labelPil ? 'rgba(10,10,11,0.72)' : 'transparent',
+            backgroundColor: g.labelPil ? latarPil(g) : 'transparent',
             borderRadius: g.labelPil ? 3 * s : 0,
             padding: g.labelPil ? [1 * s, 3 * s] : 0,
             formatter: () => (typeof v === 'number' ? format(v, d) : ''),
@@ -245,7 +288,7 @@ export const barPeringkat: Pembangun = (d, g, s) => {
       axisPointer: { type: 'shadow' },
       formatter: (p: any[]) => `<div>${d.kategori[p[0]?.dataIndex ?? 0] ?? ''}: <b>${labelNilai(Number(p[0]?.value ?? 0), d)}</b></div>`,
     },
-    xAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+    xAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     yAxis: { ...sumbuKategori(g, s, d.kategori), splitLine: { show: false } },
     series: [
       {
@@ -283,7 +326,7 @@ export const barTargetMendatar: Pembangun = (d, g, s) => {
     grid: { left: 6 * s, right: 24 * s, top: 8 * s, bottom: 4, containLabel: true },
     tooltip: { ...tooltip(g, s), trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { show: false },
-    xAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+    xAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     yAxis: { ...sumbuKategori(g, s, d.kategori), inverse: true, splitLine: { show: false } },
     series: [
       {
@@ -310,7 +353,7 @@ export const barTargetMendatar: Pembangun = (d, g, s) => {
           position: 'right',
           color: g.teks2,
           fontSize: 9 * s,
-          backgroundColor: g.labelPil ? 'rgba(10,10,11,0.72)' : 'transparent',
+          backgroundColor: g.labelPil ? latarPil(g) : 'transparent',
           borderRadius: g.labelPil ? 3 * s : 0,
           padding: g.labelPil ? [1 * s, 3 * s] : 0,
           formatter: (p: any) => `${format(Number(p.value ?? 0), d)}${d.satuan ?? ''}`,
@@ -328,7 +371,7 @@ export const barTumpuk: Pembangun = (d, g, s) => {
     tooltip: { ...tooltip(g, s), trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { show: false },
     xAxis: sumbuKategori(g, s, d.kategori),
-    yAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+    yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     series: seri.map((x, i) => ({
       type: 'bar',
       name: x.nama,
@@ -353,7 +396,7 @@ export const areaGradasi: Pembangun = (d, g, s) => {
       formatter: (p: any[]) => `<div style="font-size:${10 * s}px;color:${g.teks3}">${p[0]?.name ?? ''}</div><b>${labelNilai(Number(p[0]?.value ?? 0), d)}</b>`,
     },
     xAxis: { ...sumbuKategori(g, s, d.kategori, false, 'auto'), boundaryGap: false },
-    yAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+    yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     series: [
       {
         type: 'line',
@@ -407,22 +450,25 @@ export const areaGradasi: Pembangun = (d, g, s) => {
 
 /** Garis tunggal tanpa area. */
 export const garisTren: Pembangun = (d, g, s) => ({
-  grid: { left: 6 * s, right: 16 * s, top: 16 * s, bottom: 4, containLabel: true },
+  grid: { left: 6 * s, right: 16 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
   tooltip: { ...tooltip(g, s), trigger: 'axis' },
   xAxis: { ...sumbuKategori(g, s, d.kategori), boundaryGap: false },
-  yAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
-  series: [
-    {
+  yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
+  ...(d.seri.length > 1 ? { legend: legendaAtas(g, s) } : {}),
+  // Semua seri digambar; seri pertama memakai warna aksen gaya.
+  series: (d.seri.length ? d.seri : [{ nama: 'Nilai', data: [] }]).map((sr, k) => {
+    const warna = k === 0 ? g.aksen : g.palet[k % g.palet.length];
+    return {
       type: 'line',
-      name: d.seri[0]?.nama ?? 'Nilai',
+      name: sr.nama,
       smooth: 0.3,
       symbol: 'circle',
       symbolSize: 6 * s,
-      data: deret(d),
-      lineStyle: { width: g.tebalGaris * s, color: g.aksen },
-      itemStyle: { color: g.aksen, borderColor: g.latar, borderWidth: 1.5 * s },
-    },
-  ],
+      data: sr.data,
+      lineStyle: { width: g.tebalGaris * s, color: warna },
+      itemStyle: { color: warna, borderColor: g.latar, borderWidth: 1.5 * s },
+    };
+  }),
 });
 
 /** Batang pada sumbu kiri, garis pada sumbu kanan. */
@@ -435,8 +481,8 @@ export const comboBatangGaris: Pembangun = (d, g, s) => {
     legend: { show: false },
     xAxis: sumbuKategori(g, s, d.kategori),
     yAxis: [
-      sumbuNilai(g, s, { format: (v) => format(v, d) }),
-      sumbuNilai(g, s, { satuanSumbu: '%' }),
+      sumbuNilai(g, s, { format: ringkasSumbu }),
+      sumbuNilai(g, s, { format: ringkasSumbu }),
     ],
     series: [
       {
@@ -463,16 +509,32 @@ export const comboBatangGaris: Pembangun = (d, g, s) => {
 
 /** Gelembung: kategori + dua angka, ukuran dari seri kedua. */
 export const scatterGelembung: Pembangun = (d, g, s) => ({
-  grid: { left: 8 * s, right: 16 * s, top: 16 * s, bottom: 4, containLabel: true },
-  tooltip: { ...tooltip(g, s), trigger: 'item' },
-  xAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
-  yAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+  grid: { left: 8 * s, right: 24 * s, top: 22 * s, bottom: 18 * s, containLabel: true },
+  tooltip: {
+    ...tooltip(g, s),
+    trigger: 'item',
+    formatter: (p: any) =>
+      `${d.kategori[p.dataIndex] ?? ''}<br/>${d.seri[0]?.nama ?? 'X'}: <b>${format(p.value[0], d)}</b><br/>${d.seri[1]?.nama ?? 'Y'}: <b>${format(p.value[1], d)}</b>${d.seri[2] ? `<br/>${d.seri[2].nama}: <b>${format(p.value[2], d)}</b>` : ''}`,
+  },
+  // Sebaran: sumbu mengikuti rentang data (bukan dari nol) supaya titik tidak menumpuk.
+  xAxis: { ...sumbuNilai(g, s, { format: ringkasSumbu }), scale: true, name: d.seri[0]?.nama, nameLocation: 'middle', nameGap: 22 * s, nameTextStyle: { color: g.teks3, fontSize: 9 * s } },
+  yAxis: { ...sumbuNilai(g, s, { format: ringkasSumbu }), scale: true },
   series: [
     {
       type: 'scatter',
-      symbolSize: (v: any) => Math.max(14, Math.sqrt(Math.abs(Number(v?.[2] ?? 100))) * 2.4),
+      // Besar gelembung = seri ke-3 bila ada (mis. pengaduan), diskalakan 14-46 px
+      // terhadap nilai terbesar supaya angka jutaan tidak membuat gelembung raksasa.
+      symbolSize: (v: any) => {
+        const ukuran = (d.seri[2]?.data ?? d.seri[0]?.data ?? []).map((x) => Math.abs(Number(x ?? 0)));
+        const puncak = Math.max(...ukuran, 1);
+        return (14 + (Math.abs(Number(v?.[2] ?? 0)) / puncak) * 32) * s;
+      },
       data: (d.kategori ?? []).map((_, i) => ({
-        value: [deret(d)[i] ?? 0, d.seri[1]?.data?.[i] ?? 0, Math.abs(Number(deret(d)[i] ?? 0))],
+        value: [
+          deret(d)[i] ?? 0,
+          d.seri[1]?.data?.[i] ?? 0,
+          Math.abs(Number((d.seri[2] ?? d.seri[0])?.data?.[i] ?? 0)),
+        ],
         itemStyle: { color: `${g.palet[i % g.palet.length]}cc`, borderColor: g.palet[i % g.palet.length] },
       })),
       label: {
@@ -490,7 +552,7 @@ export const scatterGelembung: Pembangun = (d, g, s) => ({
 export const titikBersumbu: Pembangun = (d, g, s) => ({
   grid: { left: 6 * s, right: 20 * s, top: 10 * s, bottom: 4, containLabel: true },
   tooltip: { ...tooltip(g, s), trigger: 'item' },
-  xAxis: sumbuNilai(g, s, { format: (v) => format(v, d) }),
+  xAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
   yAxis: { ...sumbuKategori(g, s, d.kategori), splitLine: { show: false } },
   series: [
     {
@@ -589,6 +651,435 @@ export const gaugeTarget: Pembangun = (d, g, s) => {
   };
 };
 
+/**
+ * Batang kapsul: ujung membulat penuh di atas lintasan tipis. Satu seri =
+ * puncak disorot aksen, sisanya aksen redup. Dua seri atau lebih = kapsul
+ * berpasangan per kategori (mis. pendapatan vs beban).
+ */
+export const barKapsul: Pembangun = (d, g, s) => {
+  const nilai = deret(d);
+  const angka = angkaSah(d);
+  const puncak = angka.length ? nilai.indexOf(Math.max(...angka)) : -1;
+  const banyak = d.seri.length > 1;
+  const redup = g.aksen.startsWith('#') ? `${g.aksen}59` : g.kartu2;
+  return {
+    grid: { left: 6 * s, right: 10 * s, top: (banyak ? 26 : 14) * s, bottom: 4, containLabel: true },
+    tooltip: { ...tooltip(g, s), trigger: 'axis', axisPointer: { type: 'none' } },
+    xAxis: sumbuKategori(g, s, d.kategori),
+    yAxis: { ...sumbuNilai(g, s, { format: ringkasSumbu }), splitLine: { show: false } },
+    ...(banyak ? { legend: legendaAtas(g, s) } : {}),
+    series: banyak
+      ? d.seri.map((sr, k) => ({
+          type: 'bar',
+          name: sr.nama,
+          barMaxWidth: 14 * s,
+          barGap: '30%',
+          data: sr.data,
+          showBackground: k === 0,
+          backgroundStyle: { color: g.kartu2, borderRadius: 999 },
+          itemStyle: { color: k === 0 ? g.aksen : k === 1 ? g.teks : g.palet[k % g.palet.length], borderRadius: 999 },
+        }))
+      : [
+          {
+            type: 'bar',
+            name: d.seri[0]?.nama ?? 'Nilai',
+            barMaxWidth: 30 * s,
+            showBackground: true,
+            backgroundStyle: { color: g.kartu2, borderRadius: 999 },
+            data: nilai.map((v, i) => ({
+              value: typeof v === 'number' ? v : null,
+              itemStyle: { color: i === puncak ? g.aksen : redup, borderRadius: 999 },
+            })),
+          },
+        ],
+  };
+};
+
+/**
+ * Dua garis halus dibandingkan: seri pertama berarsir lembut, seri kedua
+ * garis tegas tanpa arsir (mis. pendapatan vs beban per bulan).
+ */
+export const areaBanding: Pembangun = (d, g, s) => {
+  const warna = (k: number) => (k === 0 ? g.aksen2 : k === 1 ? g.teks : g.palet[k % g.palet.length]);
+  return {
+    grid: { left: 6 * s, right: 14 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
+    tooltip: { ...tooltip(g, s), trigger: 'axis' },
+    xAxis: { ...sumbuKategori(g, s, d.kategori, false, 'auto'), boundaryGap: false },
+    yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
+    ...(d.seri.length > 1 ? { legend: legendaAtas(g, s) } : {}),
+    series: (d.seri.length ? d.seri : [{ nama: 'Nilai', data: [] }]).map((sr, k) => ({
+      type: 'line',
+      name: sr.nama,
+      smooth: 0.45,
+      showSymbol: false,
+      symbol: 'circle',
+      symbolSize: 6 * s,
+      data: sr.data,
+      lineStyle: { width: g.tebalGaris * s, color: warna(k) },
+      itemStyle: { color: warna(k) },
+      ...(k === 0 && warna(0).startsWith('#')
+        ? {
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: `${warna(0)}55` },
+                  { offset: 1, color: `${warna(0)}00` },
+                ],
+              },
+            },
+          }
+        : {}),
+    })),
+  };
+};
+
+/** Cincin capaian penuh: satu persen di tengah, busur berujung bulat. */
+export const cincinProgres: Pembangun = (d, g, s) => {
+  const nilai = Number(deret(d)[0] ?? 0);
+  const maks = typeof d.maks === 'number' ? d.maks : 100;
+  const warna = nilai / maks >= 0.9 ? g.hijau : g.aksen2;
+  return {
+    tooltip: { show: false },
+    series: [
+      {
+        type: 'gauge',
+        startAngle: 90,
+        endAngle: -270,
+        min: 0,
+        max: maks,
+        radius: '88%',
+        progress: { show: true, roundCap: true, width: 9 * s, itemStyle: { color: warna } },
+        axisLine: { lineStyle: { width: 9 * s, color: [[1, g.kartu2]] } },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: { show: false },
+        pointer: { show: false },
+        anchor: { show: false },
+        title: { show: false },
+        detail: {
+          offsetCenter: [0, 0],
+          fontSize: 17 * s,
+          fontWeight: 800,
+          color: g.teks,
+          formatter: (v: number) => `${format(v, d)}${d.satuan ?? '%'}`,
+        },
+        data: [{ value: nilai, name: d.seri[0]?.nama ?? d.kategori[0] ?? 'Nilai' }],
+      },
+    ],
+  };
+};
+
+/* ------------------------- BENTUK KHAS BUMD (NERACA & KINERJA) ------------------------- */
+
+/**
+ * Air terjun (waterfall). Pola neraca air IWA: batang pertama dan terakhir
+ * adalah total (mis. air diproduksi dan air terjual), batang di tengah adalah
+ * pengurang atau penambah (kebocoran, meter tak akurat, pemakaian tak resmi).
+ * Juga cocok untuk jembatan laba: pendapatan, dikurangi beban, sama dengan laba.
+ */
+export const airTerjun: Pembangun = (d, g, s) => {
+  const nilai = deret(d).map((v) => Number(v ?? 0));
+  const akhir = nilai.length - 1;
+  const dasar: number[] = [];
+  const tinggi: number[] = [];
+  let berjalan = 0;
+  nilai.forEach((v, i) => {
+    if (i === 0 || i === akhir) {
+      dasar.push(0);
+      tinggi.push(v);
+      berjalan = v;
+      return;
+    }
+    const baru = berjalan + v;
+    dasar.push(Math.min(berjalan, baru));
+    tinggi.push(Math.abs(v));
+    berjalan = baru;
+  });
+  const warnaBatang = (i: number) =>
+    i === 0 || i === akhir ? g.aksen : nilai[i] < 0 ? g.merah : g.hijau;
+  return {
+    grid: { left: 6 * s, right: 10 * s, top: 18 * s, bottom: 4, containLabel: true },
+    tooltip: {
+      ...tooltip(g, s),
+      trigger: 'axis',
+      axisPointer: { type: 'shadow', shadowStyle: { color: `${g.aksen}14` } },
+      formatter: (p: any[]) => {
+        const i = p[0]?.dataIndex ?? 0;
+        const v = nilai[i];
+        const tanda = i === 0 || i === akhir ? '' : v < 0 ? '−' : '+';
+        return `${d.kategori[i]}<br/><b>${tanda}${labelNilai(Math.abs(v), d)}</b>`;
+      },
+    },
+    // Nama tahap neraca panjang: dipecah dua baris supaya tidak bertumpuk.
+    xAxis: {
+      ...sumbuKategori(g, s, d.kategori, true, 0),
+      axisLabel: {
+        color: g.teks3,
+        fontSize: 9 * s,
+        interval: 0,
+        lineHeight: 11 * s,
+        formatter: (v: string) => v.replace(' ', '\n'),
+      },
+    },
+    yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
+    series: [
+      { type: 'bar', stack: 'air', silent: true, itemStyle: { color: 'transparent' }, data: dasar },
+      {
+        type: 'bar',
+        stack: 'air',
+        barWidth: '52%',
+        data: tinggi.map((v, i) => ({
+          value: v,
+          itemStyle: { color: gradien(g, warnaBatang(i), 2.4), borderRadius: g.sudut * s },
+        })),
+        label: {
+          show: true,
+          position: 'top',
+          color: g.teks2,
+          fontSize: 9 * s,
+          fontWeight: 600,
+          formatter: (p: any) => {
+            const v = nilai[p.dataIndex];
+            const tanda = p.dataIndex === 0 || p.dataIndex === akhir ? '' : v < 0 ? '−' : '+';
+            return `${tanda}${format(Math.abs(v), d)}`;
+          },
+        },
+      },
+    ],
+  };
+};
+
+/**
+ * Alur sankey. Tiap kategori ditulis `Asal>Tujuan` dan nilainya di seri ke-0,
+ * mis. `Produksi>Terjual` = 377. Simpul yang namanya memuat "hilang", "bocor",
+ * atau "rugi" diwarnai merah supaya kehilangan langsung terlihat.
+ */
+export const sankeyAlur: Pembangun = (d, g, s) => {
+  const tautan = d.kategori
+    .map((k, i) => {
+      const [source, target] = k.split('>').map((x) => x.trim());
+      return { source, target, value: Number(deret(d)[i] ?? 0) };
+    })
+    .filter((t) => t.source && t.target && t.value > 0);
+  const nama = Array.from(new Set(tautan.flatMap((t) => [t.source, t.target])));
+  const rugi = /hilang|bocor|rugi|tak resmi|ilegal/i;
+  return {
+    tooltip: {
+      ...tooltip(g, s),
+      trigger: 'item',
+      formatter: (p: any) =>
+        p.dataType === 'edge'
+          ? `${p.data.source} → ${p.data.target}<br/><b>${labelNilai(p.data.value, d)}</b>`
+          : `${p.name}<br/><b>${labelNilai(p.value, d)}</b>`,
+    },
+    series: [
+      {
+        type: 'sankey',
+        left: 4 * s,
+        right: 92 * s,
+        top: 6 * s,
+        bottom: 6 * s,
+        nodeWidth: 10 * s,
+        nodeGap: 9 * s,
+        draggable: false,
+        emphasis: { focus: 'adjacency' },
+        data: nama.map((n, i) => ({
+          name: n,
+          itemStyle: { color: rugi.test(n) ? g.merah : warnaKategori(g, i), borderWidth: 0, borderRadius: 3 * s },
+        })),
+        links: tautan,
+        lineStyle: { color: 'gradient', opacity: 0.32, curveness: 0.5 },
+        label: { color: g.teks2, fontSize: 9.5 * s, fontWeight: 600 },
+      },
+    ],
+  };
+};
+
+/**
+ * Radar aspek kinerja. Pola penilaian kinerja BUMD air minum (BPPSPAM): empat
+ * aspek (keuangan, pelayanan, operasional, SDM) dengan skor 1 sampai 5. Seri
+ * pertama adalah tahun berjalan dan diisi; seri lain (mis. tahun lalu) hanya garis.
+ */
+export const radarAspek: Pembangun = (d, g, s) => {
+  const maks = typeof d.maks === 'number' ? d.maks : 5;
+  return {
+    tooltip: { ...tooltip(g, s), trigger: 'item' },
+    legend: d.seri.length > 1 ? { ...legendaAtas(g, s), left: 0, right: 'auto' } : undefined,
+    radar: {
+      center: ['50%', '55%'],
+      radius: '62%',
+      splitNumber: 4,
+      indicator: d.kategori.map((k) => ({ name: k, max: maks })),
+      axisName: { color: g.teks2, fontSize: 9.5 * s, fontWeight: 600 },
+      splitLine: { lineStyle: { color: g.garis } },
+      splitArea: { areaStyle: { color: [`${g.aksen}08`, 'transparent'] } },
+      axisLine: { lineStyle: { color: g.garis } },
+    },
+    series: [
+      {
+        type: 'radar',
+        symbolSize: 5 * s,
+        data: d.seri.map((sr, i) => ({
+          name: sr.nama,
+          value: sr.data.map((v) => Number(v ?? 0)),
+          lineStyle: { color: i === 0 ? g.aksen : g.teks3, width: (i === 0 ? 2.2 : 1.4) * s, type: i === 0 ? 'solid' : 'dashed' },
+          itemStyle: { color: i === 0 ? g.aksen : g.teks3 },
+          areaStyle: i === 0 ? { color: `${g.aksen}33` } : undefined,
+        })),
+      },
+    ],
+  };
+};
+
+/**
+ * Gauge kesehatan. Skor 0 sampai `maks` (bawaan 5) dengan tiga pita kategori
+ * penilaian BUMD air minum: Sakit (< 2,2), Kurang Sehat (2,2 sampai 2,8), Sehat (> 2,8).
+ * Untuk skala lain, ambangnya ikut proporsi yang sama.
+ */
+export const gaugeKesehatan: Pembangun = (d, g, s) => {
+  const nilai = Number(deret(d)[0] ?? 0);
+  const maks = typeof d.maks === 'number' ? d.maks : 5;
+  const sakit = maks * (2.2 / 5);
+  const kurang = maks * (2.8 / 5);
+  const kuning = '#e0a63a';
+  const kategori = nilai > kurang ? 'Sehat' : nilai >= sakit ? 'Kurang Sehat' : 'Sakit';
+  const warna = nilai > kurang ? g.hijau : nilai >= sakit ? kuning : g.merah;
+  return {
+    tooltip: { show: false },
+    series: [
+      {
+        type: 'gauge',
+        startAngle: 200,
+        endAngle: -20,
+        min: 0,
+        max: maks,
+        radius: '98%',
+        center: ['50%', '60%'],
+        splitNumber: 5,
+        axisLine: {
+          lineStyle: {
+            width: 11 * s,
+            color: [
+              [sakit / maks, g.merah],
+              [kurang / maks, kuning],
+              [1, g.hijau],
+            ],
+          },
+        },
+        pointer: { length: '58%', width: 5 * s, itemStyle: { color: g.teks } },
+        anchor: { show: true, size: 10 * s, itemStyle: { color: g.teks, borderColor: g.kartu, borderWidth: 2 * s } },
+        axisTick: { distance: -11 * s, length: 4 * s, lineStyle: { color: g.kartu, width: 1 } },
+        splitLine: { distance: -11 * s, length: 11 * s, lineStyle: { color: g.kartu, width: 2 * s } },
+        axisLabel: { distance: 15 * s, color: g.teks3, fontSize: 8.5 * s },
+        title: { offsetCenter: [0, '34%'], color: warna, fontSize: 10.5 * s, fontWeight: 800 },
+        detail: {
+          offsetCenter: [0, '62%'],
+          fontSize: 18 * s,
+          fontWeight: 800,
+          color: g.teks,
+          formatter: (v: number) => format(v, { ...d, desimal: d.desimal ?? 2 }),
+        },
+        data: [{ value: nilai, name: kategori }],
+      },
+    ],
+  };
+};
+
+/**
+ * Peta panas. Kolom = `kategori` (mis. bulan), baris = tiap seri (mis. wilayah).
+ * Sel makin pekat makin besar nilainya; cocok untuk pengaduan atau gangguan.
+ */
+export const petaPanas: Pembangun = (d, g, s) => {
+  const baris = d.seri.map((sr) => sr.nama);
+  const sel = d.seri.flatMap((sr, y) => sr.data.map((v, x) => [x, y, typeof v === 'number' ? v : '-']));
+  const angka = sel.map((c) => c[2]).filter((v): v is number => typeof v === 'number');
+  return {
+    grid: { left: 6 * s, right: 8 * s, top: 6 * s, bottom: 26 * s, containLabel: true },
+    tooltip: {
+      ...tooltip(g, s),
+      trigger: 'item',
+      formatter: (p: any) => `${baris[p.value[1]]} · ${d.kategori[p.value[0]]}<br/><b>${labelNilai(Number(p.value[2]), d)}</b>`,
+    },
+    xAxis: { ...sumbuKategori(g, s, d.kategori), splitArea: { show: false } },
+    yAxis: {
+      type: 'category',
+      data: baris,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: g.teks2, fontSize: 9.5 * s },
+    },
+    visualMap: {
+      min: Math.min(...angka, 0),
+      max: Math.max(...angka, 1),
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      itemWidth: 9 * s,
+      itemHeight: 90 * s,
+      calculable: false,
+      textStyle: { color: g.teks3, fontSize: 8.5 * s },
+      // Rendah = senada kartu, tinggi = merah: titik panas langsung terlihat.
+      inRange: { color: [`${g.aksen}2e`, g.aksen, g.merah] },
+    },
+    series: [
+      {
+        type: 'heatmap',
+        data: sel,
+        itemStyle: { borderColor: g.kartu, borderWidth: 3 * s, borderRadius: 4 * s },
+        label: { show: true, color: g.teks, fontSize: 8.5 * s, formatter: (p: any) => format(Number(p.value[2]), d) },
+        emphasis: { itemStyle: { borderColor: g.teks, borderWidth: 1.5 * s } },
+      },
+    ],
+  };
+};
+
+/**
+ * Treemap porsi. Luas petak = besar nilai; label memuat nilai dan persennya.
+ * Lebih hemat tempat daripada cincin bila kategorinya banyak.
+ */
+export const treemapPorsi: Pembangun = (d, g, s) => {
+  const total = angkaSah(d).reduce((a, b) => a + b, 0) || 1;
+  return {
+    tooltip: {
+      ...tooltip(g, s),
+      trigger: 'item',
+      formatter: (p: any) => `${p.name}<br/><b>${labelNilai(p.value, d)}</b> · ${format((p.value / total) * 100, { ...d, desimal: 1 })}%`,
+    },
+    series: [
+      {
+        type: 'treemap',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        roam: false,
+        nodeClick: false,
+        breadcrumb: { show: false },
+        itemStyle: { borderColor: g.kartu, borderWidth: 3 * s, gapWidth: 3 * s, borderRadius: g.sudut * 1.5 * s },
+        label: {
+          show: true,
+          color: '#ffffff',
+          fontSize: 10 * s,
+          fontWeight: 700,
+          lineHeight: 14 * s,
+          formatter: (p: any) => `${p.name}\n{n|${format(p.value, d)} · ${format((p.value / total) * 100, { ...d, desimal: 0 })}%}`,
+          rich: { n: { fontSize: 9 * s, fontWeight: 500, color: 'rgba(255,255,255,0.85)' } },
+        },
+        data: d.kategori.map((k, i) => ({
+          name: k,
+          value: Number(deret(d)[i] ?? 0),
+          itemStyle: { color: gradien({ ...g, gradasi: 'y' }, warnaKategori(g, i), 3.2) },
+        })),
+      },
+    ],
+  };
+};
+
 /* -------------------------------- BENTUK HTML -------------------------------- */
 
 /**
@@ -597,10 +1088,10 @@ export const gaugeTarget: Pembangun = (d, g, s) => {
  */
 export interface SpesifikasiHtml {
   mesin: 'html';
-  jenis: 'kpi-kartu' | 'kpi-strip' | 'kpi-lensa' | 'kpi-nadi' | 'progres-target' | 'tabel-ringkas' | 'narasi-insight' | 'peringkat' | 'strip-os';
+  jenis: 'kpi-kartu' | 'kpi-netral' | 'kpi-pijar' | 'kpi-kaca' | 'kpi-tirta' | 'kpi-strip' | 'kpi-lensa' | 'kpi-nadi' | 'progres-target' | 'tabel-ringkas' | 'narasi-insight' | 'peringkat' | 'strip-os';
   gaya: Pick<
     GayaVarian,
-    'aksen' | 'aksen2' | 'kartu' | 'kartu2' | 'garis' | 'teks' | 'teks2' | 'teks3' | 'palet' | 'sudut' | 'hijau' | 'merah'
+    'aksen' | 'aksen2' | 'kartu' | 'kartu2' | 'garis' | 'teks' | 'teks2' | 'teks3' | 'palet' | 'sudut' | 'hijau' | 'merah' | 'tepi' | 'sudutKartu'
   >;
   jumlah?: number;
 }
@@ -621,12 +1112,26 @@ export const htmlBentuk = (jenis: SpesifikasiHtml['jenis']): Pembangun => (_d, g
     sudut: g.sudut,
     hijau: g.hijau,
     merah: g.merah,
+    tepi: g.tepi,
+    sudutKartu: g.sudutKartu,
   },
 });
 
 export const kpiKartu = htmlBentuk('kpi-kartu');
 export const kpiStrip = htmlBentuk('kpi-strip');
+/** Kartu KPI per gaya: Default (netral), Pijar (pendar oranye), Kaca (bening). */
+export const kpiNetral = htmlBentuk('kpi-netral');
+export const kpiPijar = htmlBentuk('kpi-pijar');
+export const kpiKaca = htmlBentuk('kpi-kaca');
+/** Kartu KPI Tirta: permukaan air bergelombang setinggi capaian. */
+export const kpiTirta = htmlBentuk('kpi-tirta');
 export const progresTarget = htmlBentuk('progres-target');
 export const tabelRingkas = htmlBentuk('tabel-ringkas');
 export const narasiInsight = htmlBentuk('narasi-insight');
 export const peringkat = htmlBentuk('peringkat');
+
+/** Cincin tebal di semua gaya: sudut membulat dan bayangan. */
+export const donatTebal: Pembangun = (d, g, s) => donat(d, { ...g, donatTebal: true }, s);
+
+/** Cincin tipis di semua gaya: garis tipis tanpa bayangan. */
+export const donatTipis: Pembangun = (d, g, s) => donat(d, { ...g, donatTebal: false }, s);

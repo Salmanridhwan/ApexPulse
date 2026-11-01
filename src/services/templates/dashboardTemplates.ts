@@ -135,9 +135,9 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
     'Satu halaman gelap dengan satu aksen oranye: 4 kartu KPI berikon + sparkline, grafik batang pendapatan, cincin rincian beban dengan total di tengah, daftar transaksi, area arus kas, batang progres target, lalu strip insight. Selesai dibaca di bawah dua menit.',
   deskripsi: 'Satu layar untuk pimpinan: KPI, tren, komposisi, transaksi, arus kas, dan progres target.',
   fokus: ['Saldo & laba', 'Tren pendapatan', 'Komposisi beban', 'Arus kas', 'Progres target'],
-  aksen: '#1fa6cc',
+  aksen: '#ff8a1f',
   tema: 'oranye',
-  judulDashboard: 'Pijar (Contoh)',
+  judulDashboard: 'Pijar',
   deskripsiDashboard:
     'Empat KPI berikon, grafik batang pendapatan, cincin rincian beban dengan total di tengah, daftar transaksi terbaru, area arus kas, tiga bar progres target, dan strip insight — seluruhnya dalam satu layar. Seluruh angka ilustrasi.',
   widgets: [
@@ -210,16 +210,16 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   id: 'tpl-analitik',
   nama: 'Lensa',
   tujuan:
-    'Memantau kinerja bisnis harian: pendapatan, jumlah pesanan, pengguna, rasio konversi, status pesanan, sumber kunjungan, pesanan terbaru, nilai pesanan per kategori, pesanan per jam, metode pembayaran, dan tren konversi.',
+    'Menelusuri kinerja usaha secara rinci: pendapatan, volume transaksi, jumlah pelanggan, rasio capaian, status layanan, sumber pendapatan, transaksi terbaru, nilai per kategori, sebaran per waktu, cara pembayaran, dan tren capaian.',
   caraPenyampaian:
-    'Gaya navy gelap dengan lima aksen (biru, teal, ungu, oranye, pink): empat kartu KPI bersparkline di baris atas, grafik area pendapatan harian, batang pesanan per status, cincin sumber kunjungan dengan legenda di samping, tabel pesanan terbaru, batang mendatar nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi dengan garis rata-rata.',
-  deskripsi: 'Papan analitik: 4 KPI, tren pendapatan, status pesanan, sumber kunjungan, tabel, kategori, per jam, pembayaran, konversi.',
-  fokus: ['Pendapatan harian', 'Pesanan & status', 'Sumber kunjungan', 'Nilai per kategori', 'Metode pembayaran'],
+    'Tampilan gelap beraksen biru: empat kartu angka utama dengan garis tren kecil, grafik area perkembangan, batang per status, cincin komposisi dengan keterangan di samping, tabel transaksi terbaru, batang per kategori, sebaran per waktu, dan garis tren capaian.',
+  deskripsi: 'Papan analitik: 4 angka utama, tren, status, komposisi, tabel, kategori, sebaran waktu, dan tren capaian.',
+  fokus: ['Tren pendapatan', 'Status layanan', 'Komposisi sumber', 'Nilai per kategori', 'Tren capaian'],
   aksen: '#3b82f6',
   tema: 'analitik',
-  judulDashboard: 'Lensa (Contoh)',
+  judulDashboard: 'Lensa',
   deskripsiDashboard:
-    'Tampilan contoh mengikuti referensi kedua: 4 KPI bersparkline, area pendapatan harian, batang pesanan per status, cincin sumber kunjungan, tabel pesanan terbaru, batang nilai pesanan per kategori, batang pesanan per jam, cincin metode pembayaran, dan garis tren konversi. Seluruh angka ilustrasi.',
+    'Tampilan analitik rinci: 4 angka utama bergaris tren, area perkembangan, batang per status, cincin komposisi, tabel transaksi terbaru, batang per kategori, sebaran per waktu, dan garis tren capaian. Seluruh angka ilustrasi.',
   widgets: [
     kpi('Pendapatan', 'vs 12 Apr – 11 Mei', '128.430', 'Rp', 12.5, 'vs 12 Apr – 11 Mei', [30, 34, 31, 38, 36, 42, 40, 47, 45, 52]),
     kpi('Pesanan', 'vs 12 Apr – 11 Mei', '1.542', 'pesanan', 8.3, 'vs 12 Apr – 11 Mei', [20, 24, 22, 28, 26, 31, 29, 35, 33, 38]),
@@ -286,16 +286,16 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   id: 'tpl-trafik',
   nama: 'Nadi',
   tujuan:
-    'Memantau trafik situs dan perilaku pengunjung: rasio pentalan, kedalaman halaman, waktu di situs, pengunjung baru, sumber trafik, dinamika relevansi, komposisi usia, halaman populer, jenis perangkat, sistem operasi, dan frasa pencarian.',
+    'Memantau denyut layanan dari hari ke hari: angka harian utama, sumber permintaan, perkembangan capaian, komposisi pelanggan, unit dengan beban terbesar, jenis layanan, faktor penilaian, dan porsi tiap kelompok beserta trennya.',
   caraPenyampaian:
-    'Gaya gelap-netral dengan lima warna kategori: lima kartu KPI bersparkline, grafik batang bertumpuk sumber trafik 31 hari dengan legenda di samping, garis dinamika relevansi, komposisi usia, daftar halaman populer, batang jenis perangkat, cincin faktor perilaku, area sistem operasi bertanda tren, dan daftar frasa pencarian.',
-  deskripsi: 'Papan trafik: 5 KPI, sumber trafik, relevansi, usia, halaman, perangkat, perilaku, OS, frasa pencarian.',
-  fokus: ['Sumber trafik', 'Perilaku pengunjung', 'Usia & perangkat', 'Halaman populer', 'Frasa pencarian'],
+    'Tampilan gelap beraksen biru muda: lima kartu angka utama dengan garis tren kecil, batang bertumpuk harian, garis perkembangan, komposisi, daftar peringkat, cincin jenis layanan, dan daftar porsi bertren.',
+  deskripsi: 'Papan pemantauan harian: 5 angka utama, batang harian, garis perkembangan, komposisi, peringkat, dan porsi bertren.',
+  fokus: ['Angka harian', 'Sumber permintaan', 'Komposisi pelanggan', 'Unit teratas', 'Porsi bertren'],
   aksen: '#22d3ee',
   tema: 'trafik',
-  judulDashboard: 'Nadi (Contoh)',
+  judulDashboard: 'Nadi',
   deskripsiDashboard:
-    'Tampilan contoh mengikuti referensi ketiga: 5 KPI bersparkline, batang sumber trafik, garis relevansi, komposisi usia, halaman populer, cincin perangkat, alat ukur perilaku, sistem operasi, dan frasa pencarian. Seluruh angka ilustrasi.',
+    'Tampilan pemantauan harian: 5 angka utama bergaris tren, batang harian bertumpuk, garis perkembangan, komposisi, peringkat, cincin jenis layanan, dan porsi bertren. Seluruh angka ilustrasi.',
   widgets: [
     kpi('Rasio Pentalan', 'Persen kunjungan sekali lihat', 57, '%', 1, 'vs periode lalu', [52, 54, 53, 56, 55, 58, 57, 59, 56, 57]),
     kpi('Kedalaman Halaman', 'Halaman per kunjungan', 1.45, 'halaman', 0.05, 'vs periode lalu', [1.2, 1.25, 1.3, 1.28, 1.35, 1.4, 1.38, 1.42, 1.44, 1.45]),
@@ -335,7 +335,34 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   ],
 };
 
-export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK, TEMPLATE_TRAFIK];
+// ============================================================================
+// 4. KACA — kartu bening di atas latar hangat (glassmorphism)
+// ============================================================================
+/**
+ * Isi datanya sama dengan Pijar (saldo, pendapatan, beban, laba, transaksi,
+ * arus kas, target), jadi pengisian dari dokumen memakai slot yang sama.
+ * Yang berbeda adalah desain dan susunannya: kartu kaca, batang kapsul,
+ * cincin capaian, dan tabel laporan.
+ */
+const TEMPLATE_KACA: DashboardTemplate = {
+  ...TEMPLATE_RINGKASAN,
+  id: 'tpl-kaca',
+  nama: 'Kaca',
+  tujuan:
+    'Menyajikan ringkasan keuangan, operasional, dan kinerja wilayah dengan tampilan lembut dan bersih, cocok untuk layar rapat dan presentasi pimpinan.',
+  caraPenyampaian:
+    'Kartu bening di atas latar hangat: angka utama besar dengan arus kas, empat petak angka, batang kapsul pendapatan, cincin rincian beban, daftar aktivitas kas, cincin capaian tiap indikator layanan, dan tabel laporan per wilayah.',
+  deskripsi: 'Tampilan bening untuk presentasi: angka utama, batang kapsul, cincin capaian, dan tabel laporan.',
+  fokus: ['Saldo & laba', 'Pendapatan bulanan', 'Capaian indikator', 'Kinerja wilayah'],
+  aksen: '#2f8f7d',
+  tema: 'kaca',
+  judulDashboard: 'Kaca',
+  deskripsiDashboard:
+    'Tampilan kartu bening tiga halaman: ringkasan keuangan, operasional & pelayanan dengan cincin capaian, serta kinerja per wilayah dengan tabel laporan. Seluruh angka ilustrasi.',
+  widgets: TEMPLATE_RINGKASAN.widgets.map((w) => ({ ...w, id: w.id.replace(/^tpl-/, 'tpl-kaca-') })),
+};
+
+export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK, TEMPLATE_TRAFIK, TEMPLATE_KACA];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {

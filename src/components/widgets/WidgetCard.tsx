@@ -1,3 +1,4 @@
+import { cukupTerang, GAYA } from '../../services/chart/gayaVarian';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -143,17 +144,55 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
    * token tema seperti biasa (tidak ada perubahan perilaku).
    */
   const mode = useThemeMode();
-  const tema = temaKartu(widget.style?.kartu, mode);
-  const pakaiWarnaKartu = warnaKartuValid(widget.style?.kartu);
+  // Desain katalog membawa warna kartunya sendiri bila pengguna belum memilih warna.
+  // Desain bening (Kaca): warna kartunya rgba, jadi tinta dihitung dari warna
+  // padanan yang terang, lalu latarnya diganti kaca buram.
+  const gayaDesain = widget.style?.desain ? GAYA[widget.style.desain] : undefined;
+  const kacaAktif = !widget.style?.kartu && Boolean(gayaDesain?.kaca);
+  const kartuEfektif = widget.style?.kartu ?? (kacaAktif ? gayaDesain?.padanan ?? '#efe6dc' : gayaDesain?.kartu);
+  const garisBening = kacaAktif && gayaDesain && !cukupTerang(gayaDesain.padanan ?? '#efe6dc') ? gayaDesain.garis : 'rgba(255,255,255,0.5)';
+  const tema = temaKartu(kartuEfektif, mode);
+  const pakaiWarnaKartu = warnaKartuValid(kartuEfektif);
   // Tema "Bersih & Tegas": satu aksen untuk semua kartu, warna lain hanya
   // untuk status data. Aksen tidak lagi bergantung pada jenis widget.
-  const gayaKartu: React.CSSProperties = pakaiWarnaKartu ? (tema.vars as React.CSSProperties) : {};
+  const gayaKartu: React.CSSProperties = pakaiWarnaKartu
+    ? ({
+        ...tema.vars,
+        ...(kacaAktif && gayaDesain
+          ? {
+              '--color-surface': gayaDesain.kartu,
+              '--tegas-card': gayaDesain.kartu,
+              '--color-line': garisBening,
+              '--tegas-line': garisBening,
+              backdropFilter: 'blur(18px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+              borderRadius: 20,
+            }
+          : {}),
+        // Gaya bertepi tegas, bersudut khusus, atau berhuruf khusus (Blok, Bento, Koran, Neon).
+        ...(gayaDesain && !widget.style?.kartu
+          ? {
+              ...(gayaDesain.tepi
+                ? {
+                    '--color-line': gayaDesain.tepi.warna,
+                    '--tegas-line': gayaDesain.tepi.warna,
+                    borderWidth: gayaDesain.tepi.tebal,
+                    borderColor: gayaDesain.tepi.warna,
+                    boxShadow: gayaDesain.tepi.bayangan !== 'none' ? gayaDesain.tepi.bayangan : undefined,
+                  }
+                : {}),
+              ...(gayaDesain.sudutKartu !== undefined ? { borderRadius: gayaDesain.sudutKartu } : {}),
+              ...(gayaDesain.huruf ? { fontFamily: gayaDesain.huruf } : {}),
+            }
+          : {}),
+      } as React.CSSProperties)
+    : {};
 
   return (
     <div
       className="relative card-tegas flex flex-col h-full overflow-hidden group"
       style={gayaKartu}
-      data-kartu-warna={pakaiWarnaKartu ? widget.style?.kartu : undefined}
+      data-kartu-warna={pakaiWarnaKartu ? kartuEfektif : undefined}
     >
       {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
       <span aria-hidden="true" className="accent-bar" />

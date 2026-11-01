@@ -5,7 +5,7 @@ import { useChartSelection } from './ChartSelection';
 import { RingGauge3D } from './RingGauge3D';
 import { useAksenKanvas, useThemeMode } from '../../theme';
 import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
-import { buildOpsi } from '../../services/chart/chartDefault';
+import { buildOpsi, DAFTAR_CHART, type ChartId } from '../../services/chart/chartDefault';
 import { chartIdDariTipe } from '../../services/chart/petaTipe';
 import { GAYA } from '../../services/chart/gayaVarian';
 import { terapkanGaya } from './widgetStyle';
@@ -123,6 +123,8 @@ export interface ChartEchartsProps {
   /** Mode padat (dashboard satu halaman): lepas tinggi minimum supaya grafik
    *  tetap tampil utuh di kartu pendek. */
   padat?: boolean;
+  /** Chart katalog yang dipilih widget. Kosong = dipilih otomatis dari `type`. */
+  chartId?: string;
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -148,6 +150,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   style,
   warnaSeed = 0,
   padat = false,
+  chartId,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -223,7 +226,10 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         chartInstanceRef.current = echarts.init(chartRef.current);
       }
       const chart = chartInstanceRef.current;
-      const T = chartTheme(themeMode, style?.kartu, aksenKanvas);
+      // Desain katalog (Pijar/Lensa/Nadi/Default) membawa warna kartunya sendiri;
+      // warna teks & sumbu diturunkan dari situ supaya tetap kontras.
+      const desain = style?.desain;
+      const T = chartTheme(themeMode, style?.kartu ?? (desain ? GAYA[desain].kartu : undefined), aksenKanvas);
       const { xView, seriesView, heatCols, heatRows, heatMatriks, treemapView, radarView, funnelView, pieView } = view;
 
       const chartData: ChartData = {
@@ -252,10 +258,12 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 
       // Dashboard biasa memakai wajah katalog bila tipenya sudah punya wajah.
       // Warnanya mengikuti tema kanvas, bentuknya tetap milik template chart.
-      const wajah = chartIdDariTipe(type);
+      const wajah = (chartId && DAFTAR_CHART.includes(chartId as ChartId) ? (chartId as ChartId) : null) ?? chartIdDariTipe(type);
       const pakaiKatalog = Boolean(wajah) && seriesView.length > 0 && (xView.length > 0 || type === 'pie' || type === 'donut');
-      const gayaKanvas = {
-        ...GAYA.ringkasan,
+      const gayaKanvas = desain && !style?.kartu
+        ? GAYA[desain]
+        : ({
+        ...(desain ? GAYA[desain] : GAYA.ringkasan),
         aksen: T.accent,
         aksen2: T.accentSoft,
         latar: T.surface,
@@ -266,7 +274,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         teks2: T.text2,
         teks3: T.muted,
         palet: T.series,
-      } as typeof GAYA.ringkasan;
+      } as typeof GAYA.ringkasan);
 
       if (pakaiKatalog && wajah) {
         const kategori = type === 'pie' || type === 'donut' ? pieView.map((d) => d.name) : xView;
@@ -277,7 +285,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
         option = buildOpsi(
           wajah,
           { kategori, seri, satuan: displayUnit, desimal: 1 },
-          'ringkasan',
+          desain ?? 'ringkasan',
           1,
           gayaKanvas,
         ).opsi as EChartsOption;
@@ -347,7 +355,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style, chartId]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {

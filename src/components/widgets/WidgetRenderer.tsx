@@ -138,6 +138,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
         style={widget.style}
         warnaSeed={seed}
         padat={padat}
+        chartId={widget.chartId}
       />
     );
   }

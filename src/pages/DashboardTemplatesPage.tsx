@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -18,15 +18,10 @@ import {
 } from 'lucide-react';
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
-import { DashboardReferensi } from '../components/referensi/DashboardReferensi';
-import { DashboardAnalitik } from '../components/referensi/DashboardAnalitik';
-import { DashboardTrafik } from '../components/referensi/DashboardTrafik';
+import { ReplikaHalaman } from '../components/referensi/ReplikaHalaman';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 import { HalamanTabs } from '../components/HalamanTabs';
-import { DashboardOperasional } from '../components/referensi/DashboardOperasional';
-import { DashboardWilayah } from '../components/referensi/DashboardWilayah';
-import { OperasionalTema, WilayahTema } from '../components/referensi/DashboardTemaLain';
 import {
   CONTOH_OPERASIONAL,
   nilaiOperasionalDariWidgets,
@@ -34,12 +29,15 @@ import {
 } from '../services/templates/nilaiOperasional';
 import { CONTOH_WILAYAH, type NilaiWilayah } from '../services/templates/wilayahLayanan';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
+import { GAYA, cukupTerang, type Varian } from '../services/chart/gayaVarian';
+
+/** Tema template ke gaya chart katalog (untuk contoh warna di tab). */
+const VARIAN_TEMA: Record<string, Varian> = { oranye: 'ringkasan', analitik: 'analitik', trafik: 'trafik', kaca: 'kaca' };
 import {
   nilaiAnalitikDariWidgets,
   nilaiDariWidgets,
   nilaiTrafikDariWidgets,
 } from '../services/templates/nilaiTemplate';
-import { DashboardCanvas } from '../components/DashboardCanvas';
 
 interface DashboardTemplatesPageProps {
   currentTenant: Tenant | null;
@@ -193,20 +191,16 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
-  /**
-   * Komponen pratinjau per template. Tiap template punya tampilan acuan sendiri,
-   * jadi galeri menampilkan komponen yang sesuai — bukan satu komponen generik.
-   */
-  const KomponenPratinjau =
-    aktif.id === 'tpl-analitik' ? DashboardAnalitik : aktif.id === 'tpl-trafik' ? DashboardTrafik : DashboardReferensi;
 
   /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
   const susunanChip =
     aktif.id === 'tpl-analitik'
-      ? '4 KPI · 7 grafik · tabel pesanan'
+      ? '4 angka utama · 7 grafik · 1 tabel · 3 halaman'
       : aktif.id === 'tpl-trafik'
-        ? '5 KPI · 4 grafik · 3 daftar · alat ukur'
-        : '4 KPI · 3 grafik · daftar · progres';
+        ? '5 angka utama · 4 grafik · 3 daftar · 3 halaman'
+        : aktif.id === 'tpl-kaca'
+          ? '5 angka utama · 3 grafik · cincin capaian · tabel · 3 halaman'
+          : '4 angka utama · 3 grafik · daftar · progres · 3 halaman';
 
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
@@ -237,6 +231,33 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
 
   /** Sumber dokumen per judul widget untuk kartu halaman 1 (fitur kartu balik). */
   const sumberJudul = useMemo(() => sumberPerJudul(asli?.widgets), [asli]);
+
+  /**
+   * Satu halaman template (1, 2, atau 3) dengan angka yang sedang tampil.
+   * Galeri, presentasi, dan dashboard tersimpan memakai `ReplikaHalaman` yang
+   * sama, jadi tampilannya tidak mungkin berbeda.
+   */
+  const replikaTampil = (nomor: 1 | 2 | 3, penuh: boolean) => {
+    const nilaiHal1 = !asli
+      ? undefined
+      : aktif.id === 'tpl-analitik'
+        ? nilaiAnalitikAsli
+        : aktif.id === 'tpl-trafik'
+          ? nilaiTrafikAsli
+          : nilaiAsli;
+    return (
+      <ReplikaHalaman
+        penuh={penuh}
+        replika={{
+          templateId: nomor === 1 ? aktif.id : `${aktif.id}#${nomor}`,
+          nilai: nomor === 2 ? nilaiOperasionalTampil : nomor === 3 ? nilaiWilayahTampil : nilaiHal1,
+        }}
+        contoh={!asli}
+        sumberAktif={Boolean(asli)}
+        sumberJudul={sumberJudul}
+      />
+    );
+  };
 
   /**
    * Halaman 2 mengikuti mode yang sedang dilihat, sama seperti halaman 1:
@@ -329,9 +350,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * memakai komponen replika template yang sedang dibuka, jadi tidak ada tampilan
    * kedua yang bisa melenceng.
    */
-  const bukaHalaman2 = async () => {
+  const bukaHalaman2 = async (paksa = false) => {
     setHalamanAktif('2');
-    if (asli2 || memuat2) return;
+    if (!paksa && (asli2 || memuat2)) return;
     setMemuat2(true);
     try {
       const res = await fetch(
@@ -350,9 +371,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * Buka halaman 3 (kinerja per wilayah). Angkanya diurai server langsung dari
    * tabel dokumen, lalu disimpan supaya pindah tab tidak memanggil RAG terus.
    */
-  const bukaHalaman3 = async () => {
+  const bukaHalaman3 = async (paksa = false) => {
     setHalamanAktif('3');
-    if (asli3 || memuat3) return;
+    if (!paksa && (asli3 || memuat3)) return;
     setMemuat3(true);
     try {
       const res = await fetch('/api/templates/wilayah');
@@ -372,6 +393,47 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   };
 
   const st = statusTpl[aktif.id];
+
+  /**
+   * IKUT DOKUMEN TERBARU.
+   *
+   * Server menyiapkan ulang angka template setiap kali dokumen instansi
+   * berubah (unggah, hapus, sinkron). Begitu status menyatakan siap dengan waktu
+   * selesai yang lebih baru dari pratinjau yang sedang tampil, ambil ulang
+   * semua halaman tanpa perlu menekan tombol atau memuat ulang halaman.
+   */
+  const versiTampil = useRef<number | null>(null);
+  useEffect(() => {
+    if (!asli || st?.status !== 'siap' || !st.selesaiPada) return;
+    if (versiTampil.current === null) {
+      versiTampil.current = st.selesaiPada;
+      return;
+    }
+    if (st.selesaiPada <= versiTampil.current) return;
+    versiTampil.current = st.selesaiPada;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/templates/pratinjau?templateId=${encodeURIComponent(aktif.id)}`);
+        const data = (await res.json().catch(() => ({}))) as { status?: string; widgets?: WidgetSpec[]; terisi?: number; kosong?: number };
+        if (data.status === 'siap' && Array.isArray(data.widgets)) {
+          setAsli({ widgets: data.widgets, terisi: data.terisi ?? 0, kosong: data.kosong ?? 0 });
+        }
+      } catch {
+        /* biarkan pratinjau lama; percobaan berikutnya ikut status berikutnya */
+      }
+      // Halaman 2 dan 3 diambil ulang saat dibuka berikutnya.
+      setAsli2(null);
+      setAsli3(null);
+      if (halamanAktif === '2') void bukaHalaman2(true);
+      if (halamanAktif === '3') void bukaHalaman3(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.status, st?.selesaiPada, asli, aktif.id]);
+
+  // Ganti template = mulai lagi dari versi yang tampil.
+  useEffect(() => {
+    versiTampil.current = null;
+  }, [aktif.id]);
 
   /**
    * Buka pratinjau dengan DATA ASLI.
@@ -476,6 +538,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         >
           {DASHBOARD_TEMPLATES.map((t) => {
             const terpilih = t.id === aktif.id;
+            // Tiap tab memakai warna template-nya sendiri; campuran dengan token
+            // tema (ink/surface) membuat teks & latar tetap terbaca di gelap maupun terang.
+            const palet = GAYA[VARIAN_TEMA[t.tema] ?? 'ringkasan'].palet.filter(cukupTerang).slice(0, 3);
             return (
               <button
                 key={t.id}
@@ -484,18 +549,28 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 data-testid={`tab-template-${t.id}`}
                 onClick={() => setAktifId(t.id)}
                 className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-t-control text-xs font-semibold border-b-2 transition-colors ${
-                  terpilih
-                    ? 'border-brand text-brand-ink bg-brand/10'
-                    : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
+                  terpilih ? '' : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
                 }`}
-                style={terpilih ? { borderBottomColor: t.aksen } : undefined}
+                style={
+                  terpilih
+                    ? {
+                        borderBottomColor: t.aksen,
+                        background: `color-mix(in srgb, ${t.aksen} 14%, transparent)`,
+                        color: `color-mix(in srgb, ${t.aksen} 45%, var(--color-ink))`,
+                      }
+                    : undefined
+                }
                 title={`${t.nama} — ${t.tujuan}`}
               >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: t.aksen }}
-                  aria-hidden="true"
-                />
+                <span className="flex -space-x-1 shrink-0" aria-hidden="true">
+                  {palet.map((w, i) => (
+                    <span
+                      key={i}
+                      className="w-2.5 h-2.5 rounded-full ring-2 ring-surface"
+                      style={{ background: w, opacity: terpilih || i === 0 ? 1 : 0.55 }}
+                    />
+                  ))}
+                </span>
                 <span className="whitespace-nowrap">{t.nama}</span>
                 <span className="text-[9.5px] font-medium text-ink-3">{t.widgets.length}</span>
               </button>
@@ -714,137 +789,34 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               asli || asli2 ? { mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] } : null
             }
           >
-            {halamanAktif === '3' ? (
-              // Halaman 3: satu lingkup wilayah, desainnya mengikuti template.
-              aktif.id === 'tpl-analitik' ? (
-                <WilayahTema tema="analitik" nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              ) : aktif.id === 'tpl-trafik' ? (
-                <WilayahTema tema="trafik" nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              ) : (
-                <DashboardWilayah nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              )
-            ) : halamanAktif === '2' ? (
-              // Halaman 2: data operasional & pelayanan, desain mengikuti template.
-              aktif.id === 'tpl-analitik' ? (
-                <OperasionalTema tema="analitik" nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              ) : aktif.id === 'tpl-trafik' ? (
-                <OperasionalTema tema="trafik" nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              ) : (
-                <DashboardOperasional nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-              )
-            ) : asli ? (
-              aktif.id === 'tpl-ringkasan' ? (
-                <DashboardReferensi
-                  nilai={nilaiAsli}
-                  sumberAktif
-                  sumberJudul={sumberJudul}
-                />
-              ) : aktif.id === 'tpl-analitik' ? (
-                <DashboardAnalitik nilai={nilaiAnalitikAsli} />
-              ) : aktif.id === 'tpl-trafik' ? (
-                <DashboardTrafik nilai={nilaiTrafikAsli} />
-              ) : (
-                <DashboardCanvas
-                  widgets={asli.widgets}
-                  onEditWidget={() => {}}
-                  onManualCorrection={() => {}}
-                  onDeleteWidget={() => {}}
-                  onDuplicateWidget={() => {}}
-                  onReorderWidgets={() => {}}
-                  onResizeWidget={() => {}}
-                  preview
-                  readOnly
-                />
-              )
-            ) : (
-              <KomponenPratinjau />
-            )}
+            {/* Satu komponen untuk ketiga halaman semua template, sama dengan dashboard tersimpan. */}
+            {replikaTampil(Number(halamanAktif) as 1 | 2 | 3, false)}
           </KanvasTemaContext.Provider>
         </div>
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
           <BarChart3 className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
-            Template hanya menyusun kerangka dashboard. Setelah dipakai, setiap widget dapat diubah tipenya,
-            diganti angkanya lewat koreksi manual, atau dihapus — persis seperti dashboard biasa.
+            <strong>Simpan sebagai dashboard</strong> menyimpan ketiga halaman sekaligus, persis seperti pratinjau ini.
+            Angkanya ikut diperbarui setiap kali dokumen instansi bertambah atau berubah.
           </span>
         </p>
       </div>
 
       {/* Mode presentasi pratinjau — layar penuh, seluruh dashboard dalam satu
-          halaman (tanpa slide). `pratinjau` menandai angkanya angka contoh. */}
+          halaman (tanpa slide). `pratinjau` menyembunyikan menu kartu. */}
       {presentasi && (
         <PresentationMode
           dashboard={dashPratinjau}
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
-          labelPratinjau={asli ? 'Pratinjau template · data asli' : undefined}
-          halaman={[
-            {
-              id: '1',
-              judul: 'Halaman 1',
-              konten: asli ? (
-                aktif.id === 'tpl-ringkasan' ? (
-                  <DashboardReferensi
-                    penuh
-                    nilai={nilaiAsli}
-                    sumberAktif
-                    sumberJudul={sumberJudul}
-                  />
-                ) : aktif.id === 'tpl-analitik' ? (
-                  <DashboardAnalitik penuh nilai={nilaiAnalitikAsli} />
-                ) : (
-                  <DashboardTrafik penuh nilai={nilaiTrafikAsli} />
-                )
-              ) : (
-                <KomponenPratinjau penuh />
-              ),
-            },
-            {
-              id: '3',
-              judul: 'Halaman 3',
-              konten:
-                aktif.id === 'tpl-analitik' ? (
-                  <WilayahTema tema="analitik" penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ) : aktif.id === 'tpl-trafik' ? (
-                  <WilayahTema tema="trafik" penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ) : (
-                  <DashboardWilayah penuh nilai={nilaiWilayahTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ),
-            },
-            {
-              id: '2',
-              judul: 'Halaman 2',
-              // Presentasi halaman 2: desain mengikuti template yang dibuka.
-              konten:
-                aktif.id === 'tpl-analitik' ? (
-                  <OperasionalTema tema="analitik" penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ) : aktif.id === 'tpl-trafik' ? (
-                  <OperasionalTema tema="trafik" penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ) : (
-                  <DashboardOperasional penuh nilai={nilaiOperasionalTampil} contoh={!asli} sumberAktif={Boolean(asli)} />
-                ),
-            },
-          ]}
-          konten={
-            asli ? (
-              aktif.id === 'tpl-ringkasan' ? (
-                <DashboardReferensi
-                    penuh
-                    nilai={nilaiAsli}
-                    sumberAktif
-                    sumberJudul={sumberJudul}
-                  />
-              ) : aktif.id === 'tpl-analitik' ? (
-                <DashboardAnalitik penuh nilai={nilaiAnalitikAsli} />
-              ) : aktif.id === 'tpl-trafik' ? (
-                <DashboardTrafik penuh nilai={nilaiTrafikAsli} />
-              ) : undefined
-            ) : (
-              <KomponenPratinjau penuh />
-            )
-          }
+          halaman={([1, 2, 3] as const).map((nomor) => ({
+            id: String(nomor),
+            judul: `Halaman ${nomor}`,
+            konten: replikaTampil(nomor, true),
+          }))}
+          konten={replikaTampil(1, true)}
         />
       )}
     </div>

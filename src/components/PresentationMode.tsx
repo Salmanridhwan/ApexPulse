@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { Dashboard, WidgetSpec } from '../types';
 import { DashboardCanvas } from './DashboardCanvas';
-import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
+import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from '../theme';
 
 interface PresentationModeProps {
   dashboard: Dashboard;
@@ -13,12 +13,10 @@ interface PresentationModeProps {
   /** Tidak dipakai lagi: tidak ada slide/narasi yang disimpan. */
   onUpdate?: (d: Dashboard) => void;
   /**
-   * Pratinjau dari galeri template: angka masih contoh, jadi diberi penanda.
-   * Kartu juga tidak menampilkan menu ⋯ karena widget belum nyata.
+   * Pratinjau dari galeri template: kartu tidak menampilkan menu ⋯ karena
+   * widget belum nyata.
    */
   pratinjau?: boolean;
-  /** Teks penanda pratinjau (default: angka contoh). */
-  labelPratinjau?: string;
   /**
    * Isi pengganti kanvas. Dipakai galeri template yang menampilkan TAMPILAN
    * REFERENSI (bukan widget kanvas biasa): presentasi menampilkan tampilan itu
@@ -51,7 +49,6 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   tenantName,
   onExit,
   pratinjau = false,
-  labelPratinjau = 'Pratinjau template · angka contoh',
   konten,
   halaman,
 }) => {
@@ -110,7 +107,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       }`}
     >
       <KanvasTemaContext.Provider
-        value={dashboard.tema ? { mode: 'dark', aksen: AKSEN_TEMA[dashboard.tema] } : null}
+        value={dashboard.tema ? { mode: MODE_TEMA[dashboard.tema] ?? 'dark', aksen: AKSEN_TEMA[dashboard.tema] } : null}
       >
       {/* ===== Bilah atas ===== */}
       <header className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 bg-surface border-b border-line">
@@ -153,12 +150,6 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-            </span>
-          )}
-          {pratinjau && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-chip text-[10px] font-bold text-warn bg-warn/10 border border-warn/30">
-              <Sparkles className="w-3 h-3" />
-              {labelPratinjau}
             </span>
           )}
           <button

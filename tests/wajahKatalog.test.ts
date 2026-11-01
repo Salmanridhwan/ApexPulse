@@ -26,17 +26,20 @@ test('batang status Lensa aman walau datanya lebih panjang dari jumlah status', 
     seri: [{ nama: 'Pesanan', data: Array.from({ length: 29 }, (_, i) => i * 10) }],
     dariDokumen: true,
   };
-  const hasil = buildOpsi('bar-tegak-sorot', panjang as any, 'analitik', 1);
+  const hasil = buildOpsi('bar-tegak-sorot', panjang as any, 'analitik', 1, undefined, true);
   const seri = (hasil.opsi as any).series[0];
   // Satu batang per status; data selebihnya dipotong, bukan dibaca mentah.
   assert.equal(seri.data.length, PESANAN_STATUS.length);
 });
 
 test('kartu KPI punya wajah sendiri per template', () => {
-  const jenis = (varian: 'default' | 'ringkasan' | 'analitik' | 'trafik') =>
+  const jenis = (varian: 'default' | 'ringkasan' | 'analitik' | 'trafik' | 'kaca') =>
     (buildOpsi('kpi-kartu', contohData('kpi-kartu'), varian, 1).opsi as any).jenis;
-  assert.equal(jenis('default'), 'kpi-kartu');
-  assert.equal(jenis('ringkasan'), 'kpi-kartu');
+  assert.equal(jenis('default'), 'kpi-netral');
+  assert.equal(jenis('ringkasan'), 'kpi-pijar');
+  assert.equal(jenis('kaca'), 'kpi-kaca');
+  // Replika halaman 1 Pijar (khas) tetap memakai kartu acuan.
+  assert.equal((buildOpsi('kpi-kartu', contohData('kpi-kartu'), 'ringkasan', 1, undefined, true).opsi as any).jenis, 'kpi-kartu');
   // Lensa dan Nadi tidak lagi menggambar kartunya sendiri di halaman.
   assert.equal(jenis('analitik'), 'kpi-lensa');
   assert.equal(jenis('trafik'), 'kpi-nadi');

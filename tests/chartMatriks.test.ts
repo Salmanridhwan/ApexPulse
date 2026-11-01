@@ -6,7 +6,7 @@ import { chartIdDariTipe } from '../src/services/chart/petaTipe';
 import { SEL_TERISI } from '../src/services/chart/chartTemplate';
 import { GAYA, VARIAN } from '../src/services/chart/gayaVarian';
 import { statusDefaultChart } from '../src/services/chart/status';
-import type { DataChart } from '../src/services/chart/pembangunOpsi';
+import { ringkasSumbu, type DataChart } from '../src/services/chart/pembangunOpsi';
 
 const dataContoh = (): DataChart => ({
   kategori: ['A', 'B', 'C', 'D'],
@@ -65,17 +65,36 @@ test('angka yang masuk sama dengan angka yang keluar', () => {
   assert.deepEqual(nilai, d.seri[0].data);
 });
 
-test('varian yang belum ada memakai cadangan dan ditandai', () => {
-  const hasil = buildOpsi('bar-tegak-sorot', dataContoh(), 'default', 1);
-  assert.equal(hasil.cadangan, true);
-  assert.notEqual(hasil.varian, 'default');
-  assert.ok(hasil.opsi);
+test('satu chart = empat gaya: setiap chart punya keempat varian', () => {
+  for (const id of DAFTAR_CHART) {
+    assert.deepEqual(varianTersedia(id), [...VARIAN], `${id} belum lengkap di keempat gaya`);
+  }
 });
 
-test('varian tersedia hanya berisi varian yang punya desain', () => {
-  assert.deepEqual(varianTersedia('bar-tegak'), ['default', 'ringkasan']);
-  assert.deepEqual(varianTersedia('bar-tegak-sorot'), ['ringkasan', 'analitik', 'trafik']);
-  assert.deepEqual(varianTersedia('bar-mendatar-target'), ['default', 'ringkasan']);
+test('jumlah chart sama di keempat gaya', () => {
+  const per = VARIAN.map((v) => SEL_TERISI.filter((s) => s.varian === v).length);
+  assert.ok(per.every((n) => n === DAFTAR_CHART.length), `jumlah per gaya: ${per.join('/')}`);
+});
+
+test('tidak ada chart yang jatuh ke gaya cadangan', () => {
+  for (const id of DAFTAR_CHART) {
+    for (const v of VARIAN) {
+      assert.equal(buildOpsi(id, dataContoh(), v, 1).cadangan, false, `${id}/${v}`);
+    }
+  }
+});
+
+test('wajah khas hanya dipakai bila diminta', () => {
+  const biasa = buildOpsi('bar-mendatar-peringkat', dataContoh(), 'trafik', 1) as any;
+  const khas = buildOpsi('bar-mendatar-peringkat', dataContoh(), 'trafik', 1, undefined, true) as any;
+  assert.notEqual(biasa.opsi.series[0].type, 'pie', 'dashboard biasa tidak boleh memakai wajah persen trafik');
+  assert.equal(khas.opsi.series[0].type, 'pie');
+});
+
+test('label sumbu angka besar diringkas', () => {
+  assert.equal(ringkasSumbu(612400000), '612,4 jt');
+  assert.equal(ringkasSumbu(2059000000000), '2,1 T');
+  assert.equal(ringkasSumbu(950), '950');
 });
 
 test('data kosong tidak membuat pembangun gagal', () => {
@@ -104,24 +123,6 @@ test('katalog default chart berstatus final', () => {
   assert.equal(statusDefaultChart(), 'final');
 });
 
-test('katalog Pijar sama dengan chart yang dipakai template Pijar', () => {
-  const ids = SEL_TERISI.filter((s) => s.varian === 'ringkasan').map((s) => s.chartId).sort();
-  assert.deepEqual(ids, [
-    'area-gradasi',
-    'bar-mendatar-peringkat',
-    'bar-mendatar-target',
-    'bar-tegak',
-    'bar-tegak-sorot',
-    'bar-tegak-target',
-    'donat-tebal',
-    'gauge-target',
-    'kpi-kartu',
-    'kpi-strip',
-    'narasi-insight',
-    'progres-target',
-    'tabel-ringkas',
-  ]);
-});
 
 test('tipe widget kanvas memakai wajah katalog bila sudah ada', () => {
   // Dashboard biasa harus memakai desain template chart, bukan penyusun lama.
@@ -133,4 +134,11 @@ test('tipe widget kanvas memakai wajah katalog bila sudah ada', () => {
   // Tipe yang belum punya wajah dibiarkan memakai penyusun lama.
   assert.equal(chartIdDariTipe('radar'), null);
   assert.equal(chartIdDariTipe('sankey'), null);
+});
+
+test('batang tegak dan garis tren menggambar semua seri', () => {
+  for (const id of ['bar-tegak', 'garis-tren'] as const) {
+    const hasil = buildOpsi(id, dataContoh(), 'default', 1) as any;
+    assert.equal(hasil.opsi.series.length, 2, `${id} membuang seri kedua`);
+  }
 });

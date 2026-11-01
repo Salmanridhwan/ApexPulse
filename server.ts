@@ -78,6 +78,9 @@ import {
   nilaiDariWidgets,
   nilaiTrafikDariWidgets,
 } from './src/services/templates/nilaiTemplate';
+import { nilaiOperasionalDariWidgets } from './src/services/templates/nilaiOperasional';
+import { gayaDariPermintaan, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
+import { GAYA } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import {
   ambilPratinjau,
@@ -423,6 +426,24 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
 }
 
 /**
+ * DOKUMEN INSTANSI BERUBAH (unggah, hapus, impor).
+ *
+ * Geser penanda versi DULU, baru siapkan ulang semua template sekali dengan
+ * instansi versi baru. Dulu template dihangatkan dengan versi lama lalu versi
+ * digeser, sehingga hasil pertama langsung basi dan penyiapan berjalan dua kali.
+ */
+function segarkanSetelahDokumen(tenantId: string): void {
+  void (async () => {
+    try {
+      const segar = await db.updateTenant(tenantId, { kbTersinkronPada: new Date().toISOString() });
+      if (segar) hangatkanTemplateTenant(segar);
+    } catch (err: any) {
+      console.warn('[pratinjau] gagal menyegarkan setelah dokumen berubah:', err?.message || err);
+    }
+  })();
+}
+
+/**
  * Hangatkan SEMUA template untuk satu instansi, berurutan di latar belakang.
  * Dipanggil saat server hidup, saat dokumen baru disinkronkan, dan saat galeri
  * template dibuka — jadi pengguna tidak pernah menunggu di depan tombol.
@@ -685,6 +706,9 @@ const app = express();
   const pembatasIp = buatPembatas(30, 15 * 60 * 1000);
   const pembatasAkun = buatPembatas(10, 15 * 60 * 1000);
   const pembatasDaftar = buatPembatas(5, 60 * 60 * 1000);
+  // Permintaan lupa sandi: 5 per IP dan 2 per akun tiap jam, supaya admin tidak dibanjiri notifikasi.
+  const pembatasLupa = buatPembatas(5, 60 * 60 * 1000);
+  const pembatasLupaAkun = buatPembatas(2, 60 * 60 * 1000);
   // Unggah berkas memakan memori + kuota penyimpanan: 20 berkas/jam per akun.
   const pembatasUnggah = buatPembatas(20, 60 * 60 * 1000);
   // PIN tautan hanya 6 angka (1 juta kemungkinan). Tanpa batas percobaan,
@@ -726,6 +750,8 @@ const app = express();
     pembatasIp.sapu();
     pembatasAkun.sapu();
     pembatasDaftar.sapu();
+    pembatasLupa.sapu();
+    pembatasLupaAkun.sapu();
     pembatasUnggah.sapu();
   }, 10 * 60 * 1000).unref();
 
@@ -805,6 +831,78 @@ const app = express();
       return res.json(db.tenants.filter((t) => t.id === session.tenantId));
     }
     res.json(db.tenants);
+  });
+
+  /**
+   * Lupa kata sandi. Aplikasi belum mengirim email ke pengguna, jadi permintaan
+   * diteruskan ke admin instansi (notifikasi + jejak audit, dan email ke
+   * ALERT_EMAIL_TO bila SMTP aktif). Admin lalu memakai "Reset kata sandi" di
+   * panel Admin, yang membuat sandi sementara wajib-ganti.
+   *
+   * Jawaban SELALU sama, terdaftar atau tidak, supaya halaman ini tidak bisa
+   * dipakai menebak email mana yang punya akun.
+   */
+  app.post('/api/auth/lupa-sandi', async (req: Request, res: Response) => {
+    const jawaban = {
+      ok: true,
+      pesan:
+        'Jika email tersebut terdaftar, permintaan Anda sudah diteruskan ke admin instansi. Admin akan memberikan kata sandi sementara.',
+    };
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@') || email.length > 200) {
+      return res.status(400).json({ error: 'Masukkan email akun Anda.' });
+    }
+    const kunciIp = `lupa-ip:${req.ip || 'lokal'}`;
+    const cek = pembatasLupa.cek(kunciIp);
+    if (!cek.boleh) {
+      res.setHeader('Retry-After', String(cek.tungguDetik));
+      return res.status(429).json({
+        error: `Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(cek.tungguDetik / 60)} menit.`,
+      });
+    }
+    pembatasLupa.gagal(kunciIp);
+
+    const user = await db.findUserForLogin(email);
+    const kunciAkun = `lupa-akun:${email}`;
+    // Akun Google tidak punya sandi untuk direset; permintaan berulang diabaikan diam-diam.
+    if (!user || user.googleSub || !pembatasLupaAkun.cek(kunciAkun).boleh) return res.json(jawaban);
+    pembatasLupaAkun.gagal(kunciAkun);
+
+    const waktu = new Date().toISOString();
+    const judul = `Permintaan atur ulang kata sandi: ${user.name}`;
+    const isi = `${user.name} (${user.email}) lupa kata sandi. Buka Admin > Pengguna, lalu pilih Reset kata sandi untuk akun ini.`;
+    const notif: NotificationItem = {
+      id: `notif-${Date.now()}-lupa-${user.id}`,
+      tenantId: user.tenantId,
+      title: judul,
+      message: isi,
+      severity: 'warning',
+      timestamp: waktu,
+      isRead: false,
+      sentEmail: false,
+    };
+    db.notifications.unshift(notif);
+    db.simpanNotifikasi(notif);
+    db.addAuditLog({
+      tenantId: user.tenantId,
+      userId: user.id,
+      userName: user.name,
+      action: 'Permintaan Reset Kata Sandi',
+      target: user.email,
+      details: 'Diajukan dari halaman masuk; menunggu admin instansi mereset kata sandi.',
+    });
+    if (mailerAktif()) {
+      const aman = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+      antreEmail({
+        subject: `[Aiones Boards] ${judul}`,
+        text: isi,
+        html: `<p>${aman(isi)}</p>`,
+        onSent: () => {
+          notif.sentEmail = true;
+        },
+      });
+    }
+    res.json(jawaban);
   });
 
   app.post('/api/auth/login', async (req: Request, res: Response) => {
@@ -1436,20 +1534,18 @@ const app = express();
    * Hasilnya disimpan 10 menit supaya pindah tab tidak memanggil RAG terus.
    */
   const cacheWilayah = new Map<string, { waktu: number; data: any }>();
-  app.get('/api/templates/wilayah', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    const tenantId = effectiveTenantId(req, session);
-    const tenant = db.tenants.find((t) => t.id === tenantId);
-    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
-
+  /** Buang cache halaman 3 satu instansi (dipanggil saat dokumen berubah). */
+  const basiikanWilayah = (tenantId: string) => {
+    for (const k of [...cacheWilayah.keys()]) if (k.startsWith(`${tenantId}|`)) cacheWilayah.delete(k);
+  };
+  async function ambilWilayah(tenant: Tenant): Promise<any> {
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
     if (!kbId) {
-      return res.json({ status: 'kosong', catatan: 'Knowledge Base instansi belum diatur.' });
+      return { status: 'kosong', catatan: 'Dokumen instansi belum dihubungkan.' };
     }
     const kunci = `${tenant.id}|${kbId}`;
     const ada = cacheWilayah.get(kunci);
-    if (ada && Date.now() - ada.waktu < 10 * 60_000) return res.json(ada.data);
+    if (ada && Date.now() - ada.waktu < 10 * 60_000) return ada.data;
 
     const cari = await ragClient.cariPotongan(
       kbId,
@@ -1460,10 +1556,10 @@ const app = express();
     if (!kandidat.length) {
       const kosong = {
         status: 'kosong',
-        catatan: 'Tabel kinerja per wilayah tidak ditemukan di dokumen Knowledge Base.',
+        catatan: 'Tabel kinerja per wilayah tidak ditemukan di dokumen instansi.',
       };
       cacheWilayah.set(kunci, { waktu: Date.now(), data: kosong });
-      return res.json(kosong);
+      return kosong;
     }
 
     const p = kandidat[0];
@@ -1487,8 +1583,45 @@ const app = express();
         : [],
     };
     cacheWilayah.set(kunci, { waktu: Date.now(), data });
-    return res.json(data);
+    return data;
+  }
+  app.get('/api/templates/wilayah', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    try {
+      return res.json(await ambilWilayah(tenant));
+    } catch (err) {
+      return res.json({ status: 'gagal', catatan: err instanceof Error ? err.message : 'Dokumen tidak bisa dibaca.' });
+    }
   });
+
+  /**
+   * HALAMAN 2 TEMPLATE — angka dokumen yang belum dipakai halaman 1.
+   *
+   * Diambil dari data siap pakai template LAIN (sudah diekstrak dari dokumen
+   * instansi), dibuang bila judulnya sudah muncul di halaman 1. Dipakai galeri
+   * dan saat menyimpan dashboard, jadi isinya sama persis.
+   */
+  function widgetHalaman2(tenant: Tenant, template: (typeof DASHBOARD_TEMPLATES)[number], kbId: string, seed: number): any[] {
+    const judulDipakai = new Set(
+      template.widgets.map((w: any) => String(w.title || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const calon: any[] = [];
+    for (const t of DASHBOARD_TEMPLATES) {
+      if (t.id === template.id) continue;
+      const e = ambilPratinjau(tenant.id, t.id, kbId);
+      if (!e || e.status !== 'siap' || !Array.isArray(e.widgets)) continue;
+      calon.push(...e.widgets);
+    }
+    return pilihWidgetOperasional(calon, judulDipakai).map((w, i) => ({
+      ...w,
+      id: `tpl2-${seed}-${i + 1}`,
+      grid: { ...(w.grid || {}) },
+    }));
+  }
 
   app.get('/api/templates/pratinjau', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -1522,31 +1655,7 @@ const app = express();
      * tetap desain template yang sedang dibuka; yang berbeda hanya isinya.
      */
     if (String(req.query.halaman || '1') === '2') {
-      const judulDipakai = new Set(
-        template.widgets.map((w: any) => String(w.title || '').trim().toLowerCase()).filter(Boolean)
-      );
-      const calon: any[] = [];
-      for (const t of DASHBOARD_TEMPLATES) {
-        if (t.id === template.id) continue;
-        // Sisa angka hanya dipakai sebagai BAHAN halaman 2, bukan untuk tampilan
-        // template itu sendiri: cukup sudah pernah siap diekstrak dari dokumen.
-        // Pemeriksaan versi KB tidak dipakai di sini, karena versi template lain
-        // sering sudah berganti sehingga datanya dianggap basi padahal angkanya
-        // tetap berasal dari dokumen instansi ini.
-        const e = ambilPratinjau(tenant.id, t.id, kbId);
-        if (!e || e.status !== 'siap' || !Array.isArray(e.widgets)) continue;
-        calon.push(...e.widgets);
-      }
-      const seed = Date.now();
-      // Halaman 2 SEMUA template memakai penyaring yang sama: hanya widget
-      // operasional/pelayanan yang saling berhubungan, supaya desain halaman 2
-      // (volume air, NRW, indikator, anggaran) berisi angka yang nyambung.
-      const terpilih = pilihWidgetOperasional(calon, judulDipakai);
-      const dipakai = terpilih.map((w, i) => ({
-        ...w,
-        id: `tpl2-${seed}-${i + 1}`,
-        grid: { ...(w.grid || {}) },
-      }));
+      const dipakai = widgetHalaman2(tenant, template, kbId, Date.now());
       return res.json({
         templateId: template.id,
         halaman: 2,
@@ -1580,6 +1689,7 @@ const app = express();
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
     basiikanTenant(tenant.id);
+    basiikanWilayah(tenant.id);
     void siapkanTemplateTenant(tenant, template);
     return res.status(202).json({ status: 'proses' });
   });
@@ -1670,6 +1780,43 @@ const app = express();
     // Judul dashboard: buang penanda "(Contoh)" karena angkanya dari dokumen.
     const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
 
+    /**
+     * TIGA HALAMAN, sama persis dengan galeri: halaman 1 ringkasan, halaman 2
+     * operasional & pelayanan (angka dokumen yang belum dipakai halaman 1),
+     * halaman 3 kinerja per wilayah. Tiap halaman menyimpan replika desainnya
+     * sendiri sehingga kanvas menggambar tampilan yang sama dengan pratinjau.
+     */
+    const nilaiHal1 =
+      template.id === 'tpl-analitik'
+        ? nilaiAnalitikDariWidgets(widgets)
+        : template.id === 'tpl-trafik'
+          ? nilaiTrafikDariWidgets(widgets)
+          : nilaiDariWidgets(widgets);
+    const widgets2 = widgetHalaman2(tenant, template, kbId, seed);
+    let wilayah: any = null;
+    try {
+      wilayah = await ambilWilayah(tenant);
+    } catch {
+      wilayah = null;
+    }
+    const nilaiHal3 = {
+      baris: Array.isArray(wilayah?.baris) ? wilayah.baris : [],
+      total: wilayah?.total ?? null,
+      catatan: Array.isArray(wilayah?.catatan) ? wilayah.catatan : [],
+      satuanAir: wilayah?.satuanAir || 'm³',
+      sumber: Array.isArray(wilayah?.sumber) ? wilayah.sumber : [],
+    };
+    const halaman = [
+      { id: 'hlm-1', judul: 'Ringkasan', widgets, replika: { templateId: template.id, nilai: nilaiHal1 } },
+      {
+        id: 'hlm-2',
+        judul: 'Operasional & Pelayanan',
+        widgets: widgets2,
+        replika: { templateId: `${template.id}#2`, nilai: nilaiOperasionalDariWidgets(widgets2) },
+      },
+      { id: 'hlm-3', judul: 'Kinerja per Wilayah', widgets: [], replika: { templateId: `${template.id}#3`, nilai: nilaiHal3 } },
+    ];
+
     const newDash: Dashboard = {
       id: `dash-${Date.now()}`,
       tenantId,
@@ -1684,16 +1831,10 @@ const app = express();
       tema: template.tema,
       // Angka dokumen dipetakan ke slot replika template: dipakai kanvas
       // dashboard nyata supaya desainnya identik dengan pratinjau data asli.
-      replika: {
-        templateId: template.id,
-        nilai:
-          template.id === 'tpl-analitik'
-            ? nilaiAnalitikDariWidgets(widgets)
-            : template.id === 'tpl-trafik'
-              ? nilaiTrafikDariWidgets(widgets)
-              : nilaiDariWidgets(widgets),
-      },
+      replika: halaman[0].replika,
       widgets,
+      halaman,
+      halamanAktifId: 'hlm-1',
       globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -2934,21 +3075,38 @@ const app = express();
         return res.end();
       }
 
+      /**
+       * Data dokumen -> chart katalog -> beberapa halaman tanpa data kembar,
+       * judul mengikuti isi. Gaya bisa diminta di kalimat ("gaya lensa").
+       */
+      const desainDiminta = gayaDariPermintaan(prompt);
+      const susun = susunDashboardBerhalaman(genResult.dashboard.widgets, {
+        instansi: tenantAktif?.name,
+        desain: desainDiminta,
+        idAwal: `ast-${Date.now()}`,
+      });
+      const isiBaru = {
+        title: susun.title,
+        description: genResult.dashboard.description,
+        widgets: susun.halaman[0]?.widgets ?? [],
+        halaman: susun.halaman,
+        halamanAktifId: susun.halaman[0]?.id,
+        // Dashboard asisten bukan replika template: kanvas widget biasa.
+        replika: undefined,
+        tataLetak: undefined,
+        presentasi: undefined,
+        gaya: desainDiminta ? { desain: desainDiminta } : undefined,
+        sector,
+      };
+      // Setiap permintaan membuat dashboard BARU. Dashboard yang sedang dibuka
+      // hanya ditimpa bila pengguna jelas meminta memperbarui.
+      const mintaPerbarui = /(?:^|[^a-z])(?:perbarui|perbaharui|update|refresh|segarkan)/i.test(prompt);
+
       let dashboardTersimpan: Dashboard;
-      if (activeDash) {
-        dashboardTersimpan =
-          db.updateDashboard(
-            activeDash.id,
-            {
-              title: genResult.dashboard.title,
-              description: genResult.dashboard.description,
-              widgets: genResult.dashboard.widgets,
-              sector,
-            },
-            tenantId
-          ) || activeDash;
+      if (activeDash && mintaPerbarui) {
+        dashboardTersimpan = db.updateDashboard(activeDash.id, isiBaru, tenantId) || activeDash;
       } else {
-        dashboardTersimpan = db.createDashboard(genResult.dashboard);
+        dashboardTersimpan = db.createDashboard({ ...genResult.dashboard, ...isiBaru });
         chat = db.ensureChatForDashboard(
           dashboardTersimpan.id,
           tenantId,
@@ -2967,31 +3125,37 @@ const app = express();
         details: `Via ${genResult.modeUsed}, Sitasi: ${genResult.citationsCount}, Latensi: ${genResult.latencyMs}ms`,
       });
 
-      // Susun jawaban percakapan yang kontekstual, manusiawi, dan informatif (bukan template kaku)
-      const kpis = dashboardTersimpan.widgets.filter((w) => w.type === 'kpi');
-      const charts = dashboardTersimpan.widgets.filter((w) => ['bar', 'line', 'area', 'donut', 'heatmap'].includes(w.type));
-      const narasiWidget = dashboardTersimpan.widgets.find((w) => w.type === 'narasi');
+      // Balasan ringkas dalam bahasa pengguna: apa yang dibuat dan di halaman mana.
+      const daftarHalaman = (dashboardTersimpan.halaman ?? []).length ? dashboardTersimpan.halaman! : [{ judul: 'Halaman 1', widgets: dashboardTersimpan.widgets } as any];
+      const narasiWidget = daftarHalaman.flatMap((h: any) => h.widgets).find((w: any) => w.type === 'narasi');
+      const kpis = daftarHalaman.flatMap((h: any) => h.widgets).filter((w: any) => w.type === 'kpi');
+      const kpiItems = kpis.slice(0, 3).map((k: any) => `• **${k.title}**: ${k.kpi?.value} ${k.kpi?.unit || ''}`).join('\n');
+      const isiHalaman = daftarHalaman
+        .map((h: any, i: number) => `${i + 1}. **${h.judul}** — ${h.widgets.map((w: any) => w.title).slice(0, 4).join(', ')}${h.widgets.length > 4 ? ', …' : ''}`)
+        .join('\n');
 
-      const kpiItems = kpis.slice(0, 3).map((k) => `• **${k.title}**: ${k.kpi?.value} ${k.kpi?.unit || ''}`).join('\n');
-      const chartNames = charts.map((c) => `• ${c.title} (${c.type.toUpperCase()})`).join('\n');
-
-      let replyText = `Tentu! Dashboard **"${dashboardTersimpan.title}"** berhasil ${activeDash ? 'diperbarui' : 'disintesis'} ${
+      let replyText = `Dashboard **"${dashboardTersimpan.title}"** sudah ${activeDash && mintaPerbarui ? 'diperbarui' : 'dibuat'} ${
         genResult.modeUsed === 'Fallback (Template Snapshot)'
           ? 'dari TEMPLATE CONTOH (bukan dokumen instansi)'
-          : `menggunakan dokumen resmi ${sector.toUpperCase()}`
-      }.\n\n`;
+          : 'dari dokumen resmi instansi'
+      }, terbagi dalam **${daftarHalaman.length} halaman**:
+${isiHalaman}
+\n`;
 
       if (narasiWidget?.narasi?.text) {
-        replyText += `📋 **Ringkasan Temuan Dokumen:**\n${narasiWidget.narasi.text}\n\n`;
-      }
-
-      if (charts.length > 0) {
-        replyText += `📈 **Visualisasi Grafik:**\n${chartNames}\n\n`;
+        replyText += `📋 **Ringkasan temuan:**
+${narasiWidget.narasi.text}
+\n`;
       }
 
       if (kpiItems) {
-        replyText += `🎯 **Indikator Kunci Utama:**\n${kpiItems}\n\n`;
+        replyText += `🎯 **Angka utama:**
+${kpiItems}
+\n`;
       }
+
+      replyText += `Semua grafik memakai chart dari menu Template Chart${desainDiminta ? ` dengan gaya **${GAYA[desainDiminta].nama}**` : ''}. Gayanya bisa diganti lewat tombol **Gaya** di atas kanvas.
+`;
 
       replyText +=
         genResult.modeUsed === 'Jalur A (LLM JSON)'
@@ -4804,24 +4968,9 @@ const app = express();
       // belakang, supaya angka template ikut dokumen terbaru tanpa menunggu klik.
       if (tenant?.id) {
         basiikanTenant(tenant.id);
-        hangatkanTemplateTenant(tenant);
+        basiikanWilayah(tenant.id);
+        segarkanSetelahDokumen(tenant.id);
       }
-      // Dokumen baru berarti isi pengetahuan instansi berubah. Tanpa langkah
-      // ini, pratinjau template tetap memakai angka lama sampai admin menekan
-      // Sinkron RAG. Penanda versi digeser supaya entri pratinjau kedaluwarsa,
-      // lalu pengisian ulang dijalankan di latar belakang untuk semua template
-      // milik instansi ini. Balasan unggah tidak menunggu proses itu selesai.
-      const idTenantUnggah = tenant?.id;
-      void (async () => {
-        try {
-          if (!idTenantUnggah) return;
-          const segar = await db.updateTenant(idTenantUnggah, { kbTersinkronPada: new Date().toISOString() });
-          if (!segar) return;
-          for (const tpl of DASHBOARD_TEMPLATES) void siapkanTemplateTenant(segar, tpl);
-        } catch (err: any) {
-          console.warn('[pratinjau] gagal menyegarkan setelah unggah:', err?.message || err);
-        }
-      })();
 
       res.status(201).json({ success: true, berkas, knowledgeBase: kbTujuan || null });
     } catch (err: any) {
@@ -4854,6 +5003,13 @@ const app = express();
         target: req.params.id,
         details: `Berkas ${req.params.id} dihapus dari repositori KMS ${organizationId} (beserta CDN & RAG)`,
       });
+      // Dokumen hilang = angka template bisa berubah. Sama seperti unggah: tandai
+      // basi dan siapkan ulang di latar belakang.
+      if (tenant?.id) {
+        basiikanTenant(tenant.id);
+        basiikanWilayah(tenant.id);
+        segarkanSetelahDokumen(tenant.id);
+      }
       res.json({ success: true });
     } catch (err: any) {
       balasGalatKms(res, err);
@@ -5401,7 +5557,8 @@ ${navigasi}
             if (tenantImpor?.id) {
               // Dokumen baru masuk basis pengetahuan → pratinjau template ikut disegarkan.
               basiikanTenant(tenantImpor.id);
-              hangatkanTemplateTenant(tenantImpor);
+              basiikanWilayah(tenantImpor.id);
+              segarkanSetelahDokumen(tenantImpor.id);
             }
             db.addAuditLog({
               tenantId: effectiveTenantId(req, session),
@@ -6170,6 +6327,7 @@ ${navigasi}
       // Dokumen bisa bertambah/berkurang: pratinjau lama tidak lagi mewakili isi
       // dokumen, jadi ditandai basi lalu disiapkan ulang di latar belakang.
       basiikanTenant(tenant.id);
+      basiikanWilayah(tenant.id);
       hangatkanTemplateTenant(diperbarui || tenant);
 
       return {

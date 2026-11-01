@@ -67,8 +67,9 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
     }
     const t = window.setTimeout(() => onApply(adaGaya(style) ? style : undefined, target), 180);
     return () => window.clearTimeout(t);
+    // Target ikut dipantau: memilih grafik lain harus langsung menerapkan gaya ke sana.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [style, isOpen]);
+  }, [style, target, isOpen]);
 
   if (!isOpen) return null;
 

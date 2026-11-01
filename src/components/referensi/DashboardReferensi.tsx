@@ -374,6 +374,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
             key={k.label}
             chartId="kpi-kartu"
             varian="ringkasan"
+            khas
             data={{
               kategori: [k.label],
               seri: [{ nama: k.label, data: [Number(String(k.nilai).replace(/\./g, '').replace(',', '.'))] }],

@@ -85,6 +85,7 @@ export function warnaPalet(palette?: WidgetStyle['palette']): string[] {
 export function adaGaya(style?: WidgetStyle): boolean {
   if (!style) return false;
   return Boolean(
+    style.desain ||
     (style.palette && style.palette !== 'default') ||
       style.warnaSeri?.length ||
       style.font ||

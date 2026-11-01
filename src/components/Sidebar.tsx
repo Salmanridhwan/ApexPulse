@@ -7,7 +7,6 @@ import {
   History,
   Layers,
   LayoutTemplate,
-  LogOut,
   Shield,
   ShieldAlert,
   Boxes,
@@ -17,7 +16,8 @@ import {
   Building2,
   ChevronDown,
 } from 'lucide-react';
-import { LogoTile, AvatarTile } from './BrandMark';
+import { LogoTile } from './BrandMark';
+import { AkunMenu } from './AkunMenu';
 import { Dashboard, Tenant, User } from '../types';
 import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
 import { ADMIN_TABS, AdminTabId } from './adminTabs';
@@ -113,24 +113,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={`h-14 border-b border-shell-line flex items-center shrink-0 ${'justify-center px-4'}`}>
         {!isCollapsed ? (
           <div className="flex items-center justify-center min-w-0">
-            {/* Sidebar selalu berlatar navy, jadi dipakai lockup versi putih. */}
+            {/* Latar sidebar ikut tema: putih di mode terang, gelap di mode gelap.
+                Lockup navy untuk latar terang, versi putih untuk latar gelap. */}
+            <img
+              src="/brand/logo-lockup.png"
+              alt="Aiones Boards"
+              width={140}
+              height={36}
+              className="h-9 w-auto shrink-0 dark:hidden"
+            />
             <img
               src="/brand/logo-lockup-terang.png"
               alt="Aiones Boards"
               width={140}
               height={36}
-              className="h-9 w-auto shrink-0"
+              className="h-9 w-auto shrink-0 hidden dark:block"
             />
           </div>
         ) : (
-          <img
-            src="/brand/logo-mark-terang.png"
-            alt="Aiones Boards"
-            width={32}
-            height={32}
-            className="w-8 h-8"
-            title="Aiones Boards"
-          />
+          <>
+            <img
+              src="/brand/logo-mark.png"
+              alt="Aiones Boards"
+              width={32}
+              height={32}
+              className="w-8 h-8 dark:hidden"
+              title="Aiones Boards"
+            />
+            <img
+              src="/brand/logo-mark-terang.png"
+              alt="Aiones Boards"
+              width={32}
+              height={32}
+              className="w-8 h-8 hidden dark:block"
+              title="Aiones Boards"
+            />
+          </>
         )}
       </div>
 
@@ -405,34 +423,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* 4. FOOTER: Profil (Shrink-0 / Fixed height) */}
       <div className="p-3 border-t border-shell-line bg-shell-2 shrink-0">
-        {!isCollapsed ? (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative shrink-0">
-                <AvatarTile name={currentUser?.name} id={currentUser?.id} size="sm" />
-                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-pos ring-2 ring-shell-2" title="Sesi Pengguna Aktif" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-shell-ink truncate" title={currentUser?.name}>{currentUser?.name || 'Pengguna'}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[9px] font-semibold text-shell-ink-2 uppercase tracking-wider block">{currentUser?.role === 'admin' ? 'Admin' : 'Pengguna'}</span>
-                  <span className="w-1 h-1 rounded-full bg-shell-ink-2" />
-                  <span className="text-[9px] text-pos font-medium">Online</span>
-                </div>
-              </div>
-            </div>
-            <button onClick={onLogout} className="p-1.5 rounded-control text-shell-ink-2 hover:text-neg hover:bg-shell-hover transition-colors shrink-0" title="Keluar dari Sistem (Logout)" aria-label="Logout">
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2.5">
-            <div className="relative" title={`${currentUser?.name} (${currentUser?.role})`}>
-              <AvatarTile name={currentUser?.name} id={currentUser?.id} size="sm" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-pos ring-2 ring-shell-2" />
-            </div>
-          </div>
-        )}
+        {/* Kartu pengguna = tombol menu akun (profil, kata sandi, tema, panduan, keluar). */}
+        <AkunMenu user={currentUser} tenant={currentTenant} ciut={isCollapsed} onLogout={onLogout} />
       </div>
     </aside>
   );

@@ -73,6 +73,7 @@ const KARTU: DataChart = {
   maks: 500,
   desimal: 0,
   delta: 4.2,
+  deretKecil: [[318, 331, 326, 344, 352, 349, 363, 377]],
 };
 
 const INDIKATOR: DataChart = {
@@ -89,9 +90,9 @@ const INDIKATOR: DataChart = {
 };
 
 const PERINGKAT: DataChart = {
-  kategori: ['Halaman depan', 'Katalog', 'Berita', 'Profil', 'Kontak'],
-  seri: [{ nama: 'Kunjungan', data: [4820, 3110, 2470, 1690, 980] }],
-  satuan: 'kunjungan',
+  kategori: ['Pipa bocor', 'Air keruh', 'Meter rusak', 'Tagihan', 'Tekanan rendah'],
+  seri: [{ nama: 'Pengaduan', data: [4820, 3110, 2470, 1690, 980] }],
+  satuan: 'aduan',
   total: 13070,
   desimal: 0,
 };
@@ -159,10 +160,70 @@ const PETA: Record<ChartId, DataChart> = {
   'donat-tebal': BEBAN_DONAT,
   'donat-tipis': BEBAN_DONAT,
   'gauge-target': NRW,
-  'strip-os': {
-    kategori: ['Android', 'iOS', 'Windows', 'macOS'],
+  'bar-kapsul': VOLUME,
+  'area-banding': {
+    kategori: BULAN,
     seri: [
-      { nama: 'Pangsa', data: [48.2, 31.4, 12.6, 7.8] },
+      { nama: 'Pendapatan', data: [128, 142, 136, 168, 155, 191] },
+      { nama: 'Beban', data: [96, 101, 99, 112, 108, 117] },
+    ],
+    satuan: 'miliar Rp',
+    desimal: 0,
+  },
+  'air-terjun': {
+    kategori: ['Air diproduksi', 'Kebocoran pipa', 'Meter tak akurat', 'Pemakaian tak resmi', 'Air terjual'],
+    seri: [{ nama: 'Volume', data: [512, -96, -24, -15, 377] }],
+    satuan: 'juta m³',
+    desimal: 0,
+  },
+  'sankey-alur': {
+    kategori: [
+      'Produksi>Terjual',
+      'Produksi>Air hilang',
+      'Terjual>Rumah tangga',
+      'Terjual>Niaga',
+      'Terjual>Instansi',
+      'Terjual>Sosial',
+      'Air hilang>Kebocoran',
+      'Air hilang>Meter & ilegal',
+    ],
+    seri: [{ nama: 'Volume', data: [377, 135, 248, 86, 31, 12, 96, 39] }],
+    satuan: 'juta m³',
+    desimal: 0,
+  },
+  'radar-aspek': {
+    kategori: ['Keuangan', 'Pelayanan', 'Operasional', 'SDM'],
+    seri: [
+      { nama: '2025', data: [3.4, 3.9, 3.1, 3.6] },
+      { nama: '2024', data: [3.1, 3.6, 2.9, 3.4] },
+    ],
+    maks: 5,
+    desimal: 1,
+  },
+  'gauge-kesehatan': { kategori: ['Skor kinerja'], seri: [{ nama: 'Skor', data: [3.42] }], maks: 5, desimal: 2 },
+  'peta-panas': {
+    kategori: BULAN,
+    seri: [
+      { nama: 'Jakarta Pusat', data: [42, 38, 51, 47, 33, 29] },
+      { nama: 'Jakarta Utara', data: [65, 72, 80, 61, 58, 54] },
+      { nama: 'Jakarta Barat', data: [48, 44, 39, 52, 46, 41] },
+      { nama: 'Jakarta Selatan', data: [31, 29, 35, 28, 26, 24] },
+      { nama: 'Jakarta Timur', data: [55, 49, 58, 63, 51, 47] },
+    ],
+    satuan: 'aduan',
+    desimal: 0,
+  },
+  'treemap-porsi': {
+    kategori: ['Rumah tangga', 'Niaga', 'Industri', 'Instansi', 'Sosial'],
+    seri: [{ nama: 'Pendapatan', data: [612, 284, 121, 88, 34] }],
+    satuan: 'miliar Rp',
+    desimal: 0,
+  },
+  'cincin-progres': { kategori: ['Penyelesaian SLA'], seri: [{ nama: 'Capaian', data: [86] }], satuan: '%', desimal: 0 },
+  'strip-os': {
+    kategori: ['Rumah tangga', 'Niaga', 'Instansi', 'Sosial'],
+    seri: [
+      { nama: 'Porsi pelanggan', data: [48.2, 31.4, 12.6, 7.8] },
       { nama: 'Delta', data: [2.4, -1.2, 0.8, 0.3] },
     ],
     satuan: '%',

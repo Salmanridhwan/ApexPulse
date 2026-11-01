@@ -356,6 +356,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
       >
         {KPI.map((k) => (
           <WidgetChart
+            khas
             key={k.label}
             chartId="kpi-kartu"
             varian="analitik"
@@ -413,6 +414,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
           <div className={`relative ${bidang('h-[10.5em]')}`}>
             {dataArea ? (
               <WidgetChart
+                khas
                 chartId="area-gradasi"
                 varian="analitik"
                 skala={skala}
@@ -443,6 +445,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
           <div className={`relative ${bidang('h-[10.5em]')}`}>
             {dataBatang ? (
               <WidgetChart
+                khas
                 chartId="bar-tegak-sorot"
                 varian="analitik"
                 skala={skala}
@@ -470,6 +473,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
             )}
           />
           <WidgetChart
+            khas
             chartId="donat-tebal"
             varian="analitik"
             skala={skala}
@@ -609,6 +613,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
               }
             />
             <WidgetChart
+              khas
               chartId="bar-mendatar-peringkat"
               varian="analitik"
               skala={skala}
@@ -636,6 +641,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
               }
             />
             <WidgetChart
+              khas
               chartId="scatter-gelembung"
               varian="analitik"
               skala={skala}
@@ -674,6 +680,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
               </span>
             </div>
             <WidgetChart
+              khas
               chartId="bar-mendatar-peringkat"
               varian="analitik"
               skala={skala}
@@ -701,6 +708,7 @@ export const DashboardAnalitik: React.FC<DashboardAnalitikProps> = ({
               }
             />
             <WidgetChart
+              khas
               chartId="garis-tren"
               varian="analitik"
               skala={skala}
