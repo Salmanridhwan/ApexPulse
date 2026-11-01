@@ -10,6 +10,7 @@ import {
   judulUntukButir,
   labelPeriodeSumber,
   mintaBanyakHalaman,
+  periodeSeragam,
   rapikanJudulButir,
   tipeButir,
   validasiDataButir,
@@ -236,4 +237,24 @@ test('P2-8: kartu bertopik halaman lain dipindah ke halaman itu', () => {
 test('P1-5: kartu diberi label periode + sumber', () => {
   const w = kpiSumber('Pendapatan usaha Okt 2026', 1244.7, 'Rp miliar', 'Pendapatan usaha s.d. Oktober 2026');
   assert.equal(labelPeriodeSumber({ ...w, citations: [{ ...w.citations[0], docName: 'kpi-okt-2026.md' }] } as any), 'Okt 2026 · kpi-okt-2026.md');
+});
+
+// ===== Uji ulang T3/T4: penolakan berlebihan, label periode =====
+
+test('P0-A: sinonim istilah dokumen menyelamatkan butir yang benar', () => {
+  assert.equal(validasiDataButir('komposisi beban', kpiSumber('Rincian beban', 1, 'Rp miliar', 'Rincian Beban usaha 2024: pegawai, kimia, listrik')).ok, true);
+  assert.equal(validasiDataButir('waktu penyelesaian', kpiSumber('Tepat waktu', 92, '%', 'Pengaduan selesai tepat waktu 92%')).ok, true);
+  const jenis = { ...grafik('g', 'Keluhan per jenis', 'bar'), citations: [{ id: 'c', docName: 'd', page: 1, chunkSnippet: 'Jenis keluhan: air keruh, air mati, tagihan', confidenceScore: 1, date: '' }] } as any;
+  assert.equal(validasiDataButir('tren keluhan per kategori', jenis).ok, true);
+  assert.equal(validasiDataButir('kepatuhan mutu air', kpiSumber('Kualitas air', 98, '%', 'Kualitas Air memenuhi baku mutu 98%')).ok, true);
+  // Penolakan yang benar tetap.
+  assert.equal(validasiDataButir('jumlah pegawai', kpiSumber('Jumlah pegawai', 386.2, 'Rp miliar', 'Rincian beban: Pegawai | 386,2')).ok, false);
+});
+
+test('P2-D: periode ditulis seragam', () => {
+  assert.equal(periodeSeragam('Air terdistribusi Januari–Desember 2024 (total tahunan)'), '2024');
+  assert.equal(periodeSeragam('Pendapatan s.d. Oktober 2026'), 's.d. Okt 2026');
+  assert.equal(periodeSeragam('Penerimaan Oktober 2026'), 'Okt 2026');
+  assert.equal(periodeSeragam('Laporan Tahunan 2024'), '2024');
+  assert.equal(periodeSeragam('tanpa periode'), undefined);
 });

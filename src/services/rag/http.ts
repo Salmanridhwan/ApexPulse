@@ -1546,7 +1546,7 @@ export class ConfigurableRagClient implements RagClient {
    * Cache hasil mode ketat per indikator (kb + sektor + tipe + pertanyaan).
    * Pertanyaan yang sama dulu bisa dijawab angka berbeda tiap kali dashboard
    * dibuat ulang (arus kas 24,8 lalu 7,5); hasil yang sudah ada dipakai lagi
-   * selama 6 jam, sama seperti cache sapuan. Galat layanan tidak disimpan.
+   * selama 6 jam, sama seperti cache sapuan. Galat layanan dan hasil kosong tidak disimpan.
    */
   private cacheIndikator = new Map<string, { waktu: number; hasil: Awaited<ReturnType<ConfigurableRagClient['ambilDataWidgetMentah']>> }>();
 
@@ -1564,7 +1564,9 @@ export class ConfigurableRagClient implements RagClient {
     const tersimpan = this.cacheIndikator.get(kunci);
     if (tersimpan && Date.now() - tersimpan.waktu < this.statisCacheSapuan) return tersimpan.hasil;
     const hasil = await this.ambilDataWidgetMentah(query, sector, tipeTarget, instansi, kbId, opsi);
-    this.cacheIndikator.set(kunci, { waktu: Date.now(), hasil });
+    // Hanya hasil berisi yang disimpan: "tidak ada" bisa jadi akibat layanan sedang
+    // sibuk, dan tidak boleh membekukan kartu kosong selama 6 jam.
+    if (hasil?.data) this.cacheIndikator.set(kunci, { waktu: Date.now(), hasil });
     return hasil;
   }
 

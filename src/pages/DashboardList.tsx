@@ -15,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { BumdSector, Dashboard, Tenant } from '../types';
+import { semuaWidget } from '../services/dashboard/halaman';
 
 interface DashboardListProps {
   dashboards: Dashboard[];
@@ -60,14 +61,14 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   });
 
   // Calculate statistics
-  const totalWidgets = dashboards.reduce((acc, d) => acc + (d.widgets?.length || 0), 0);
+  const totalWidgets = dashboards.reduce((acc, d) => acc + semuaWidget(d).length, 0);
   const totalCharts = dashboards.reduce(
     (acc, d) =>
-      acc + (d.widgets?.filter((w) => ['line', 'bar', 'donut', 'radar'].includes(w.type)).length || 0),
+      acc + semuaWidget(d).filter((w) => ['line', 'bar', 'donut', 'radar'].includes(w.type)).length,
     0
   );
   const totalKpis = dashboards.reduce(
-    (acc, d) => acc + (d.widgets?.filter((w) => w.type === 'kpi').length || 0),
+    (acc, d) => acc + semuaWidget(d).filter((w) => w.type === 'kpi').length,
     0
   );
 
@@ -153,8 +154,9 @@ export const DashboardList: React.FC<DashboardListProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredDashboards.map((dash) => {
-              const kpiCount = dash.widgets.filter((w) => w.type === 'kpi').length;
-              const chartCount = dash.widgets.filter((w) =>
+              const widgetSemua = semuaWidget(dash);
+              const kpiCount = widgetSemua.filter((w) => w.type === 'kpi').length;
+              const chartCount = widgetSemua.filter((w) =>
                 ['line', 'bar', 'donut', 'radar'].includes(w.type)
               ).length;
               const tableCount = dash.widgets.filter((w) => w.type === 'table').length;
@@ -203,7 +205,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     {/* Widget Composition Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-surface-2 border border-line/80 text-ink-2 rounded-control">
-                        {dash.widgets.length} Total Widget
+                        {widgetSemua.length} Total Widget
                       </span>
                       {kpiCount > 0 && (
                         <span className="text-[11px] font-semibold px-2 py-0.5 bg-surface-2 border border-line/60 text-brand-ink rounded-control">

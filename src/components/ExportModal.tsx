@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { Dashboard, Tenant } from '../types';
+import { semuaWidget } from '../services/dashboard/halaman';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -41,8 +42,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     downloadAnchor.remove();
   };
 
+  // Semua halaman, bukan hanya halaman yang sedang dibuka.
+  const widgetSemua = semuaWidget(dashboard);
   // Compile all citations across widgets
-  const allCitations = dashboard.widgets.flatMap((w) => w.citations || []);
+  const allCitations = widgetSemua.flatMap((w) => w.citations || []);
   const uniqueCitations = Array.from(
     new Map(allCitations.map((c) => [`${c.docName}-${c.page}`, c])).values()
   );
@@ -125,7 +128,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {dashboard.widgets.map((w, idx) => (
+                  {widgetSemua.map((w, idx) => (
                     <tr key={w.id}>
                       <td className="p-2 text-ink-3">{idx + 1}</td>
                       <td className="p-2 font-medium">{w.title}</td>

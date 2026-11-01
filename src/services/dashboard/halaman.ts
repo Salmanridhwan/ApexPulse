@@ -1,4 +1,4 @@
-import type { Dashboard, HalamanDashboard } from '../../types';
+import type { Dashboard, HalamanDashboard, WidgetSpec } from '../../types';
 
 /**
  * HALAMAN DASHBOARD.
@@ -93,4 +93,14 @@ export function halamanBaru(nomor: number, acuan?: HalamanDashboard): HalamanDas
     tataLetak: acuan?.tataLetak ? { ...acuan.tataLetak } : undefined,
     globalFilters: acuan?.globalFilters ? { ...acuan.globalFilters } : undefined,
   };
+}
+
+/**
+ * Widget dari SEMUA halaman (halaman aktif memakai isi terbarunya).
+ * `d.widgets` hanya cermin halaman aktif, jadi hitungan, ekspor, dan statistik
+ * yang membacanya langsung melewatkan halaman lain.
+ */
+export function semuaWidget(d?: Dashboard | null): WidgetSpec[] {
+  if (!d) return [];
+  return tulisProyeksi(d).flatMap((h) => h.widgets || []);
 }

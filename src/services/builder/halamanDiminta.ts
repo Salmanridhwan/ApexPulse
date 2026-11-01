@@ -57,6 +57,16 @@ const KATA_SAMA: Record<string, string> = {
   realisasi: 'progres',
   capaian: 'progres',
   karyawan: 'pegawai',
+  // Istilah dokumen yang berbeda dari kalimat pengguna (laporan uji T3).
+  komposisi: 'rincian',
+  struktur: 'rincian',
+  penyelesaian: 'selesai',
+  diselesaikan: 'selesai',
+  kategori: 'jenis',
+  mutu: 'kualitas',
+  kontribusi: 'porsi',
+  proporsi: 'porsi',
+  sebaran: 'porsi',
 };
 
 /**
@@ -336,7 +346,9 @@ export function validasiDataButir(butir: string, w: WidgetSpec): { ok: boolean; 
     const kunci = tokenBermakna(butir.replace(/\(.*?\)/g, ' ')).filter((t) => t !== 'progres');
     const ada = tokenBermakna(potongan);
     const kena = kunci.filter((k) => ada.some((t) => kataSama(k, t))).length;
-    if (kunci.length > 0 && kena / kunci.length < 0.6) return { ok: false, alasan: `sumber tidak menyebut ${butir}` };
+    // Butir panjang (3+ kata kunci) cukup separuh: dokumen jarang memakai semua katanya.
+    const ambang = kunci.length >= 3 ? 0.5 : 0.6;
+    if (kunci.length > 0 && kena / kunci.length < ambang) return { ok: false, alasan: `sumber tidak menyebut ${butir}` };
   }
   return { ok: true };
 }
@@ -357,11 +369,34 @@ export function rapikanJudulButir(butir: string): string {
  * label ini angka 2026 dan 2024 tampak setara.
  */
 export function labelPeriodeSumber(w: WidgetSpec): string | undefined {
-  const bulan = '(?:jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*';
-  const pola = new RegExp(`(?:${bulan}\\s+)?20\\d\\d`, 'i');
   const sumber = w.citations?.[0]?.docName;
-  const teks = [w.title, w.citations?.[0]?.chunkSnippet ?? ''].join(' ');
-  const periode = teks.match(pola)?.[0];
-  const bagian = [periode ? kapital(periode.replace(/\s+/g, ' ')) : '', sumber ?? ''].filter(Boolean);
+  // Judul RAG dulu (biasanya menyebut periode angkanya), baru potongan sumber.
+  const periode = periodeSeragam(w.title) ?? periodeSeragam(w.citations?.[0]?.chunkSnippet ?? '');
+  const bagian = [periode ?? '', sumber ?? ''].filter(Boolean);
   return bagian.length ? bagian.join(' · ') : undefined;
+}
+
+const BULAN = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agu', 'sep', 'okt', 'nov', 'des'];
+const POLA_BULAN = '(jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|des|dec)[a-z]*';
+
+/** Bulan apa pun ditulis tiga huruf baku: "Oktober"/"Oct" -> "Okt". */
+const bulanBaku = (b: string) => {
+  const k = b.toLowerCase().slice(0, 3);
+  const baku = ({ may: 'mei', agt: 'agu', aug: 'agu', oct: 'okt', dec: 'des' } as Record<string, string>)[k] ?? k;
+  return BULAN.includes(baku) ? kapital(baku) : kapital(k);
+};
+
+/**
+ * Periode dalam satu bentuk seragam: "2024" (setahun penuh, termasuk
+ * "Januari–Desember 2024"), "s.d. Okt 2026" (kumulatif), atau "Okt 2026".
+ */
+export function periodeSeragam(teks: string): string | undefined {
+  const t = String(teks ?? '').toLowerCase();
+  const setahun = new RegExp(`jan[a-z]*\\s*(?:[–—-]|s\\.?\\s?d\\.?|sampai|hingga)\\s*des[a-z]*\\s+(20\\d\\d)`).exec(t);
+  if (setahun) return setahun[1];
+  const kumulatif = new RegExp(`(?:s\\.?\\s?d\\.?|sampai(?: dengan)?|hingga)\\s+${POLA_BULAN}\\s+(20\\d\\d)`).exec(t);
+  if (kumulatif) return `s.d. ${bulanBaku(kumulatif[1])} ${kumulatif[2]}`;
+  const bulanan = new RegExp(`\\b${POLA_BULAN}\\s+(20\\d\\d)`).exec(t);
+  if (bulanan) return `${bulanBaku(bulanan[1])} ${bulanan[2]}`;
+  return /\b(20\d\d)\b/.exec(t)?.[1];
 }

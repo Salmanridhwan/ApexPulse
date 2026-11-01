@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { daftarHalaman } from './src/services/dashboard/halaman';
+import { daftarHalaman, semuaWidget } from './src/services/dashboard/halaman';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
@@ -3152,9 +3152,12 @@ ${isiHalaman}
 
       // Butir yang tidak terisi disebut apa adanya: kartunya tidak dibuat,
       // BUKAN diisi angka indikator lain.
-      const { tidakAda, gagalLayanan } = genResult.laporanButir;
+      const { tidakAda, ditolak, gagalLayanan } = genResult.laporanButir;
       if (tidakAda.length) {
         replyText += `Tidak ditemukan di dokumen (kartunya tidak dibuat): ${tidakAda.join(', ')}.\n\n`;
+      }
+      if (ditolak.length) {
+        replyText += `Ada angka di dokumen tetapi bukan indikator yang diminta, jadi tidak dipakai: ${ditolak.join(', ')}.\n\n`;
       }
       if (gagalLayanan.length) {
         replyText += `⚠️ ${gagalLayanan.length} indikator gagal diambil karena layanan dokumen sedang sibuk: ${gagalLayanan.join(', ')}. Minta ulang beberapa saat lagi untuk melengkapinya.\n\n`;
@@ -3189,17 +3192,20 @@ ${kpiItems}
       // JUJUR soal jumlah widget: kalau pengguna meminta jumlah tertentu
       // ("dashboard dengan 15-20 widget"), katakan berapa yang benar-benar
       // tersusun — jangan menjanjikan angka yang tidak ada di kanvas.
+      // Dihitung dari halaman FINAL: genResult.jumlahWidget dihitung sebelum
+      // penyusun halaman membuang widget kembar / tanpa halaman.
+      const jumlahFinal = daftarHalaman.reduce((n: number, h: any) => n + (h.widgets?.length ?? 0), 0);
       if (genResult.permintaanJumlah) {
         const diminta = labelJumlahWidget(genResult.permintaanJumlah);
-        if (genResult.jumlahKurang) {
+        if (jumlahFinal < genResult.permintaanJumlah.max) {
           replyText +=
-            `⚠️ Anda meminta **${diminta} widget**, tetapi dokumen instansi ini baru memuat data untuk **${genResult.jumlahWidget} widget**. ` +
+            `⚠️ Anda meminta **${diminta} widget**, tetapi dokumen instansi ini baru memuat data untuk **${jumlahFinal} widget**. ` +
             `Sisanya tidak ditambahkan supaya tidak ada angka contoh. Tambahkan/rapikan dokumen di knowledge base lalu minta lagi.\n`;
         } else {
-          replyText += `Dashboard berisi **${genResult.jumlahWidget} widget** sesuai permintaan Anda.\n`;
+          replyText += `Dashboard berisi **${jumlahFinal} widget** sesuai permintaan Anda.\n`;
         }
       } else {
-        replyText += `Dashboard berisi **${genResult.jumlahWidget} widget** dari dokumen instansi ini.\n`;
+        replyText += `Dashboard berisi **${jumlahFinal} widget** di ${daftarHalaman.length} halaman, dari dokumen instansi ini.\n`;
       }
       // Durasi nyata penyusunan — melengkapi estimasi yang tampil saat proses
       // berjalan, supaya pengguna tahu berapa lama sebenarnya.
@@ -5951,9 +5957,9 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
-    const totalWidgets = db.dashboards.reduce((acc, d) => acc + d.widgets.length, 0);
+    const totalWidgets = db.dashboards.reduce((acc, d) => acc + semuaWidget(d).length, 0);
     const totalCitations = db.dashboards.reduce(
-      (acc, d) => acc + d.widgets.reduce((wAcc, w) => wAcc + (w.citations?.length || 0), 0),
+      (acc, d) => acc + semuaWidget(d).reduce((wAcc, w) => wAcc + (w.citations?.length || 0), 0),
       0
     );
     res.json({

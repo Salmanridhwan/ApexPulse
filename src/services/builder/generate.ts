@@ -55,9 +55,16 @@ export type GenerateMode =
   | 'Gagal (Layanan RAG)'
   | 'Gagal (Dokumen Tidak Memadai)';
 
-/** Butir yang tidak ada di dokumen (atau datanya bukan tentang butir itu) dan yang gagal karena layanan sibuk. */
+/**
+ * Nasib butir halaman yang tidak jadi kartu, dibedakan supaya pengguna tahu
+ * mana yang memang tidak ada (tidak perlu diulang) dan mana yang bisa diulang.
+ */
 export interface LaporanButir {
+  /** Dokumen tidak memuat indikator ini. */
   tidakAda: string[];
+  /** Ada angka, tetapi satuan/sumbernya bukan indikator ini (angka tetangga). */
+  ditolak: string[];
+  /** Layanan RAG sibuk / timeout setelah dicoba ulang. */
   gagalLayanan: string[];
 }
 
@@ -108,7 +115,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
   const { halaman: halamanDiminta, bawaan: halamanBawaan } = halamanUntukPermintaan(userPrompt, sector);
   const halamanWidget: Record<string, number> = {};
-  const laporanButir: LaporanButir = { tidakAda: [], gagalLayanan: [] };
+  const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [] };
   if (permintaanJumlah) {
     logSummary.push(
       `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`
@@ -311,14 +318,15 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
       const judul = valid.ok ? judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul) : null;
       if (!judul) {
-        laporanButir.tidakAda.push(t.butir);
+        laporanButir.ditolak.push(t.butir);
         logSummary.push(`[Halaman Diminta] "${t.butir}" ditolak: ${valid.alasan ?? 'data bukan tentang butir ini'}.`);
         return;
       }
       const kartu: WidgetSpec = {
         ...w,
         title: judul,
-        subtitle: w.subtitle || labelPeriodeSumber(w),
+        // Label kita lebih dulu: subtitle RAG bentuknya tidak seragam ("Januari–Des…").
+        subtitle: labelPeriodeSumber(w) ?? w.subtitle,
         id: `hd-${t.halaman + 1}-${k + 1}`,
       };
       // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
@@ -329,7 +337,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     });
     logSummary.push(
       `[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan; ` +
-        `${laporanButir.tidakAda.length} tidak ada di dokumen, ${laporanButir.gagalLayanan.length} gagal karena layanan sibuk.`
+        `${laporanButir.tidakAda.length} tidak ada di dokumen, ${laporanButir.ditolak.length} ditolak (bukan indikatornya), ${laporanButir.gagalLayanan.length} gagal karena layanan sibuk.`
     );
     onProgress?.({
       id: 'step-3a',
