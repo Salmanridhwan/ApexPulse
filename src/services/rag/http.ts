@@ -6,6 +6,7 @@ import { SectorDocumentChunk } from './mockData';
 import { KB_CAMPUR } from './kbDefaults';
 import { angkaDariTeks } from '../spec/kpiSparkline';
 import { selaraskanTipe } from '../spec/tipeSelaras';
+import { bersihkanRancangan } from '../chart/rancanganRag';
 
 /**
  * Galat layanan RAG. Dipakai supaya pemanggil bisa MEMBEDAKAN "layanan tidak
@@ -86,11 +87,38 @@ const TIPE_GRAFIK_DIIZINKAN = [
   'radar', 'scatter', 'bubble', 'waterfall', 'histogram', 'boxplot', 'heatmap',
 ];
 
+/**
+ * Rancangan chart yang dipilih asisten sendiri dari isi dokumen (bukan dari
+ * katalog Template Chart). Lihat `services/chart/rancanganRag.ts`.
+ */
+const SKEMA_DESAIN_GRAFIK = {
+  type: 'object',
+  properties: {
+    warna: { type: 'array', items: { type: 'string' } },
+    judulSumbuKategori: { type: 'string' },
+    judulSumbuNilai: { type: 'string' },
+    tumpuk: { type: 'boolean' },
+    tampilkanNilai: { type: 'boolean' },
+    legenda: { type: 'string', enum: ['atas', 'bawah', 'kanan', 'tidak'] },
+    garisHalus: { type: 'boolean' },
+    alasan: { type: 'string' },
+  },
+};
+
+/** Instruksi agar asisten merancang chart-nya sendiri (dipakai Jalur A dan ekstraksi per widget). */
+const ATURAN_DESAIN_GRAFIK =
+  'Rancang sendiri chart-nya dari isi data: pilih "tipe" yang paling tepat untuk bentuk datanya, lalu isi "desain": ' +
+  '"warna" 2-6 kode heksadesimal (#rrggbb) yang serasi dan kontras satu sama lain, "judulSumbuKategori" dan ' +
+  '"judulSumbuNilai" (sebut satuannya), "tumpuk" true hanya bila seri adalah bagian dari satu total, ' +
+  '"tampilkanNilai" true bila kategorinya sedikit (6 atau kurang), "legenda" ("tidak" bila hanya satu seri), ' +
+  '"garisHalus" untuk garis, dan "alasan" maksimal 15 kata. ';
+
 const SKEMA_GRAFIK_OBJ = {
   type: 'object',
   properties: {
     judul: { type: 'string' },
     tipe: { type: 'string', enum: TIPE_GRAFIK_DIIZINKAN },
+    desain: SKEMA_DESAIN_GRAFIK,
     satuan: { type: 'string' },
     kategori: { type: 'array', items: { type: 'string' } },
     seri: {
@@ -708,6 +736,8 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       subtitle: unitDisplay,
       grid: penata.kotak(12, 4),
       chart: { xAxis: kategori, series: seri, unit: unitDisplay, showLegend: seri.length > 1 },
+      // Rancangan asisten (bentuk, warna, judul sumbu, ...) digambar apa adanya di kanvas.
+      rancangan: bersihkanRancangan(g?.desain, tipeDiminta),
       citations: [kutipanExtract(`grafik-${indeks + 1}`, g?.docName, g?.page, g?.chunkSnippet)],
       periode: potong(g?.periode, 12) || '',
     };
@@ -1056,6 +1086,7 @@ export class ConfigurableRagClient implements RagClient {
       `"combo" untuk dua metrik berbeda satuan. ` +
       `Setiap grafik: kategori 3 sampai 12 label, setiap seri panjangnya sama dengan kategori, semua angka dari dokumen. ` +
       `Pakai tipe yang benar-benar didukung data; kalau ragu, pakai "bar" atau "line". ` +
+      ATURAN_DESAIN_GRAFIK +
       `(6) tabel: maksimal 8 kolom, maksimal 14 baris (cukup untuk 12 bulan atau 5 wilayah), isinya angka atau nama entitas pendek. ` +
       `(7) narasi: maksimal 45 kata berisi ringkasan kinerja dari dokumen. Jangan menyalin visi misi, syarat sandi, atau kebijakan internal. ` +
       `Angka wajib berasal dari dokumen yang benar-benar ada. Untuk setiap angka sertakan docName, page, dan chunkSnippet aslinya.`;
@@ -1215,7 +1246,8 @@ export class ConfigurableRagClient implements RagClient {
         ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". ' +
           'Kalau dokumen juga memuat angka PERIODE SEBELUMNYA untuk indikator ini (tahun lalu/triwulan lalu), isi "nilaiLalu" dengan angka itu; kalau tidak ada, kosongkan. '
         : fokus === 'grafik'
-          ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. '
+          ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. ' +
+            ATURAN_DESAIN_GRAFIK
           : fokus === 'tabel'
             ? 'Isi maksimal 8 kolom dan 14 baris dengan angka nyata dari dokumen; jangan potong seri 12 bulan atau 5 wilayah. '
             : 'Isi maksimal 45 kata ringkasan dari dokumen, bukan visi misi atau kebijakan internal. ';
@@ -1556,7 +1588,7 @@ export class ConfigurableRagClient implements RagClient {
     tipeTarget: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean; bebasBentuk?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
     if (!opsi?.ketat) return this.ambilDataWidgetMentah(query, sector, tipeTarget, instansi, kbId, opsi);
     const cfg = this.getRagConfig();
@@ -1576,7 +1608,7 @@ export class ConfigurableRagClient implements RagClient {
     tipeTarget: string,
     instansi?: string,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean }
+    opsi?: { lemparSaatGagal?: boolean; batasMs?: number; turunkanTipe?: boolean; ketat?: boolean; bebasBentuk?: boolean }
   ): Promise<{ data: any | null; judul?: string; deskripsi?: string; alasan?: string } | null> {
     const cfg = this.getRagConfig();
     if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
@@ -1680,14 +1712,17 @@ export class ConfigurableRagClient implements RagClient {
     // mendukung (mis. peta tanpa rincian wilayah), jangan diam-diam mengembalikan
     // batang — kembalikan alasan supaya katalog jujur dan kartu di kanvas sama
     // dengan pratinjaunya.
-    const selaras = selaraskanTipe(cocok, tipeTarget);
+    // Bentuk bebas: grafik memakai tipe rancangan asisten sendiri; `tipeTarget`
+    // hanya menentukan fokus (angka / grafik / tabel) yang diminta.
+    const tipeAkhir = opsi?.bebasBentuk && cocok.chart && cocok.rancangan ? String(cocok.type) : tipeTarget;
+    const selaras = selaraskanTipe(cocok, tipeAkhir);
     if (!selaras.ok || !selaras.widget) {
       // Pengisi template minta penurunan bentuk: datanya ADA, hanya bentuk
       // tampilannya yang tidak cocok (donut untuk 2 seri, heatmap tanpa 2 baris,
       // gauge tanpa seri). Katalog TIDAK memakai ini — di sana tipe pilihan
       // pengguna harus dihormati apa adanya.
       if (opsi?.turunkanTipe) {
-        const turun = turunkanTipeAman(cocok, tipeTarget);
+        const turun = turunkanTipeAman(cocok, tipeAkhir);
         if (turun) {
           return { data: turun, judul: item.dashboardTitle, deskripsi: item.description };
         }
@@ -1696,7 +1731,7 @@ export class ConfigurableRagClient implements RagClient {
         data: null,
         judul: item.dashboardTitle,
         deskripsi: item.description,
-        alasan: selaras.alasan || `Tipe ${tipeTarget} tidak bisa dibuat dari data dokumen ini.`,
+        alasan: selaras.alasan || `Tipe ${tipeAkhir} tidak bisa dibuat dari data dokumen ini.`,
       };
     }
     return { data: selaras.widget, judul: item.dashboardTitle, deskripsi: item.description };

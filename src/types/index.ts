@@ -267,6 +267,13 @@ export interface WidgetSpec {
   insight?: string;
   /** Asal insight: 'rag' (dari layanan) | 'otomatis' (dihitung dari data) | 'manual' (diedit user). */
   insightAsal?: 'rag' | 'otomatis' | 'manual';
+  /**
+   * Rancangan chart dari asisten (RAG): bentuk, warna, judul sumbu, dll. dipilih
+   * sendiri dari isi dokumen. Selama widget tidak memakai chart katalog
+   * (`chartId`) atau gaya template (`style.desain`), kanvas menggambar chart
+   * persis seperti rancangan ini. Lihat `services/chart/rancanganRag.ts`.
+   */
+  rancangan?: RancanganChart;
   kpi?: {
     value: number | string;
     unit?: string;
@@ -1449,4 +1456,25 @@ export interface ProgresIsiTemplate {
   judul: string;
   /** Detik berjalan sejak pengisian dimulai. */
   detik: number;
+}
+
+/** Rancangan chart yang dipilih asisten (RAG) sendiri untuk satu widget. */
+export interface RancanganChart {
+  /** Bentuk chart pilihan asisten (line, bar, donut, ...). Sama dengan `type` widget. */
+  bentuk: string;
+  /** Warna seri / potongan, heksadesimal (#rrggbb), berurutan. */
+  warna?: string[];
+  /** Judul sumbu kategori (mis. "Bulan") dan sumbu nilai (mis. "Juta m³"). */
+  judulSumbuKategori?: string;
+  judulSumbuNilai?: string;
+  /** Seri ditumpuk (bagian dari satu total). */
+  tumpuk?: boolean;
+  /** Tampilkan angka di atas batang / titik / potongan. */
+  tampilkanNilai?: boolean;
+  /** Letak legenda. */
+  legenda?: 'atas' | 'bawah' | 'kanan' | 'tidak';
+  /** Garis dilengkungkan (khusus line/area). */
+  garisHalus?: boolean;
+  /** Alasan singkat asisten memilih bentuk ini (ditampilkan sebagai keterangan). */
+  alasan?: string;
 }

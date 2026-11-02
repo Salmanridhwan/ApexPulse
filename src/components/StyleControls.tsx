@@ -25,6 +25,8 @@ export interface StyleControlsProps {
   mode?: 'widget' | 'global';
   /** Tipe widget aktif (hanya dipakai di mode `widget`). */
   tipeWidget?: WidgetType;
+  /** Widget punya rancangan chart dari asisten: pilihan tanpa gaya menampilkan rancangan itu. */
+  adaRancangan?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   namaSeri,
   mode = 'widget',
   tipeWidget,
+  adaRancangan = false,
 }) => {
   const ubah = (patch: Partial<WidgetStyle>) => onChange(bersihkanGaya({ ...style, ...patch }));
 
@@ -71,7 +74,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 onClick={() => ubah({ desain: v })}
                 className={`p-2 rounded-card border text-left transition-all ${aktif ? 'border-brand ring-1 ring-brand' : 'border-line hover:bg-surface-2'}`}
               >
-                <span className="block text-[10px] font-semibold text-ink mb-1.5">{g ? g.nama : 'Ikut tema'}</span>
+                <span className="block text-[10px] font-semibold text-ink mb-1.5">{g ? g.nama : adaRancangan ? 'Rancangan asisten' : 'Ikut tema'}</span>
                 <span
                   className="flex items-end gap-0.5 h-5 rounded-xs px-1 py-0.5 border border-line"
                   style={{ background: g ? g.kartu : 'var(--color-surface)' }}
@@ -89,7 +92,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           })}
         </div>
         <p className="text-[10px] text-ink-3 mt-1.5">
-          Sama dengan pilihan gaya di menu Template Chart. Warna kartu dan palet di bawah tetap bisa diubah setelahnya.
+          {adaRancangan
+            ? 'Chart ini dirancang asisten dari isi dokumen. Pilih gaya untuk memakai chart dari menu Template Chart; "Rancangan asisten" mengembalikannya.'
+            : 'Sama dengan pilihan gaya di menu Template Chart. Warna kartu dan palet di bawah tetap bisa diubah setelahnya.'}
         </p>
       </div>
 

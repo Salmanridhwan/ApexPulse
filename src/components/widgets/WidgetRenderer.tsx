@@ -1,6 +1,7 @@
 import React from 'react';
 import { WidgetSpec } from '../../types';
 import { ChartEcharts } from './ChartEcharts';
+import { pakaiRancangan } from '../../services/chart/rancanganRag';
 import { DataTable } from './DataTable';
 import { KpiCard } from './KpiCard';
 import { NarasiCard } from './NarasiCard';
@@ -103,9 +104,14 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
     // Warna seri hanya diatur otomatis kalau pengguna belum memilih palet /
     // warna seri sendiri. Dua seri (mis. Target vs Realisasi) memakai pasangan
     // warna kontras yang bergiliran per kartu — dulu semuanya biru + kuning.
-    const warnaOtomatis = !widget.style?.warnaSeri?.length && (!widget.style?.palette || widget.style.palette === 'default');
-    const seriBerwarna =
-      warnaOtomatis && seri.length >= 2
+    // Rancangan asisten dipakai selama pengguna belum memilih chart katalog / gaya template.
+    const rancangan = pakaiRancangan(widget) ? widget.rancangan : undefined;
+    const warnaOtomatis =
+      !rancangan?.warna?.length && !widget.style?.warnaSeri?.length && (!widget.style?.palette || widget.style.palette === 'default');
+    const warnaRancangan = rancangan?.warna;
+    const seriBerwarna = warnaRancangan?.length
+      ? seri.map((s, i) => ({ ...s, color: warnaRancangan[i % warnaRancangan.length] }))
+      : warnaOtomatis && seri.length >= 2
         ? seri.map((s, i) => ({ ...s, color: pasanganUntuk(seed)[i % 2] }))
         : seri;
     return (
@@ -139,6 +145,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
         warnaSeed={seed}
         padat={padat}
         chartId={widget.chartId}
+        rancangan={rancangan}
       />
     );
   }

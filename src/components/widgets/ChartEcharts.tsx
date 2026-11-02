@@ -7,9 +7,10 @@ import { useAksenKanvas, useThemeMode } from '../../theme';
 import { buildChartOption, chartTheme, type ChartData } from './chartOptions';
 import { buildOpsi, DAFTAR_CHART, type ChartId } from '../../services/chart/chartDefault';
 import { chartIdDariTipe } from '../../services/chart/petaTipe';
+import { terapkanRancangan } from '../../services/chart/rancanganRag';
 import { GAYA } from '../../services/chart/gayaVarian';
 import { terapkanGaya } from './widgetStyle';
-import { WidgetType, type WidgetStyle } from '../../types';
+import { WidgetType, type RancanganChart, type WidgetStyle } from '../../types';
 
 // echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
 // awal. Modul tree-shaken (lihat echartsSetup.ts) supaya bundel tidak 1 MB.
@@ -58,7 +59,9 @@ function normalizeSeriesData(
 ) {
   const multipliers = series.map((s) => unitMultiplier(s.unit || widgetUnit || ''));
   const allSame = multipliers.every((m) => m === multipliers[0]);
-  if (allSame && multipliers[0] === 1) {
+  // Satuan seragam (mis. semua "juta m³") tidak perlu dikonversi: dulu tetap
+  // dikali 0,001 sehingga 30 juta m³ tampil 0,03 dengan label "juta m³".
+  if (allSame) {
     return { normalizedSeries: series, displayUnit: widgetUnit || '' };
   }
   const normalizedSeries = series.map((s, i) => ({ ...s, data: s.data.map((v) => v * multipliers[i]) }));
@@ -125,6 +128,11 @@ export interface ChartEchartsProps {
   padat?: boolean;
   /** Chart katalog yang dipilih widget. Kosong = dipilih otomatis dari `type`. */
   chartId?: string;
+  /**
+   * Rancangan chart dari asisten. Diisi pemanggil HANYA bila widget belum memakai
+   * chart katalog / gaya template; selama ada, wajah katalog tidak dipakai.
+   */
+  rancangan?: RancanganChart;
 }
 
 export const ChartEcharts: React.FC<ChartEchartsProps> = ({
@@ -151,6 +159,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
   warnaSeed = 0,
   padat = false,
   chartId,
+  rancangan,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
@@ -259,7 +268,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       // Dashboard biasa memakai wajah katalog bila tipenya sudah punya wajah.
       // Warnanya mengikuti tema kanvas, bentuknya tetap milik template chart.
       const wajah = (chartId && DAFTAR_CHART.includes(chartId as ChartId) ? (chartId as ChartId) : null) ?? chartIdDariTipe(type);
-      const pakaiKatalog = Boolean(wajah) && seriesView.length > 0 && (xView.length > 0 || type === 'pie' || type === 'donut');
+      // Chart rancangan asisten digambar apa adanya, tidak dipetakan ke wajah katalog.
+      const pakaiKatalog = !rancangan && Boolean(wajah) && seriesView.length > 0 && (xView.length > 0 || type === 'pie' || type === 'donut');
       const gayaKanvas = desain && !style?.kartu
         ? GAYA[desain]
         : ({
@@ -304,6 +314,8 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       } else {
         option = buildChartOption(type, chartData, T);
       }
+
+      option = terapkanRancangan(option, rancangan) as EChartsOption;
 
       // Gaya pilihan pengguna (warna/font/ketebalan) diterapkan SETELAH opsi jadi,
       // supaya semua tipe chart ikut tanpa perlu tahu soal fitur ini.
@@ -355,7 +367,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style, chartId]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style, chartId, rancangan]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {

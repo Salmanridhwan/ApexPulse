@@ -291,6 +291,19 @@ export function bagiHalamanDiminta(
 
 const NAMA_GAYA: Record<string, Varian> = { pijar: 'ringkasan', lensa: 'analitik', nadi: 'trafik', kaca: 'kaca', glassy: 'kaca', glass: 'kaca', bening: 'kaca', tirta: 'tirta', samudra: 'tirta', aurora: 'aurora', neon: 'neon', blok: 'blok', brutal: 'blok', neubrutalism: 'blok', bento: 'bento', pastel: 'bento', koran: 'koran', editorial: 'koran', default: 'default', netral: 'default' };
 
+/**
+ * Apakah pengguna meminta chart dari menu Template Chart? Ya bila menyebut gaya
+ * ("gaya lensa") atau template chart / katalog. Selain itu asisten merancang
+ * chart-nya sendiri dari isi dokumen (lihat `services/chart/rancanganRag.ts`).
+ */
+export function mintaTemplateChart(prompt: string): boolean {
+  const t = String(prompt ?? '').toLowerCase();
+  return (
+    Boolean(gayaDariPermintaan(t)) ||
+    /template\s*chart|chart\s*(?:dari\s*)?(?:katalog|template)|(?:pakai|gunakan|dengan)\s+(?:template|katalog)|gaya\s+template/.test(t)
+  );
+}
+
 /** Gaya yang diminta di kalimat pengguna ("pakai gaya lensa"), bila ada. */
 export function gayaDariPermintaan(prompt: string): Varian | undefined {
   const m = String(prompt).toLowerCase().match(/(?:^|[^a-z])(pijar|lensa|nadi|kaca|glassy|glass|bening|tirta|samudra|aurora|neon|blok|brutal|neubrutalism|bento|pastel|koran|editorial)(?:[^a-z]|$)/);
@@ -333,11 +346,18 @@ export function susunDashboardBerhalaman(
     halamanDiminta?: HalamanDiminta[];
     /** Widget yang diambil khusus untuk satu halaman: id -> indeks halaman. */
     halamanWidget?: Record<string, number>;
+    /**
+     * false = grafik memakai rancangan asisten (tanpa chart katalog). Bawaan true
+     * (perilaku lama): semua grafik dipetakan ke chart katalog.
+     */
+    chartTemplate?: boolean;
   } = {}
 ): HasilSusun {
   const dasar = opsi.idAwal ?? `w${Date.now()}`;
   const terpilih = buangKembar(widgets).map((w, i) => {
-    const pilih = pilihChart(w);
+    // Grafik rancangan asisten tetap apa adanya (bentuk & desain dari RAG), kecuali
+    // pengguna meminta chart dari menu Template Chart.
+    const pilih = opsi.chartTemplate === false && w.rancangan && w.chart ? { type: w.type } : pilihChart(w);
     return {
       ...w,
       id: w.id || `${dasar}-${i + 1}`,

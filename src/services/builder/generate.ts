@@ -15,6 +15,7 @@ import {
   widgetKembar,
   type HalamanDiminta,
 } from './halamanDiminta';
+import { mintaTemplateChart } from './susunHalaman';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
@@ -280,7 +281,8 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
           instansi,
           kbId,
           // Ketat: tanpa "angka terdekat"; hasilnya di-cache supaya angka sama tiap dibuat ulang.
-          { batasMs: 120_000, turunkanTipe: true, ketat: true, lemparSaatGagal: true }
+          // Bentuk bebas: asisten merancang grafik sendiri, kecuali pengguna minta Template Chart.
+          { batasMs: 120_000, turunkanTipe: true, ketat: true, lemparSaatGagal: true, bebasBentuk: !mintaTemplateChart(userPrompt) }
         );
         sibuk.delete(k);
         if (r?.data) hasil[k] = r.data as WidgetSpec;

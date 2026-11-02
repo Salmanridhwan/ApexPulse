@@ -79,7 +79,7 @@ import {
   nilaiTrafikDariWidgets,
 } from './src/services/templates/nilaiTemplate';
 import { nilaiOperasionalDariWidgets } from './src/services/templates/nilaiOperasional';
-import { gayaDariPermintaan, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
+import { gayaDariPermintaan, mintaTemplateChart, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
 import { GAYA } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import {
@@ -3080,12 +3080,15 @@ const app = express();
        * judul mengikuti isi. Gaya bisa diminta di kalimat ("gaya lensa").
        */
       const desainDiminta = gayaDariPermintaan(prompt);
+      const chartTemplate = mintaTemplateChart(prompt);
       const susun = susunDashboardBerhalaman(genResult.dashboard.widgets, {
         instansi: tenantAktif?.name,
         desain: desainDiminta,
         idAwal: `ast-${Date.now()}`,
         halamanDiminta: genResult.halamanDiminta,
         halamanWidget: genResult.halamanWidget,
+        // Asisten merancang chart sendiri kecuali pengguna meminta Template Chart / gaya.
+        chartTemplate: chartTemplate,
       });
       const isiBaru = {
         title: susun.title,
@@ -3181,7 +3184,10 @@ ${kpiItems}
 \n`;
       }
 
-      replyText += `Semua grafik memakai chart dari menu Template Chart${desainDiminta ? ` dengan gaya **${GAYA[desainDiminta].nama}**` : ''}. Gayanya bisa diganti lewat tombol **Gaya** di atas kanvas.
+      replyText += chartTemplate
+        ? `Semua grafik memakai chart dari menu Template Chart${desainDiminta ? ` dengan gaya **${GAYA[desainDiminta].nama}**` : ''}. Gayanya bisa diganti lewat tombol **Gaya** di atas kanvas.
+`
+        : `Grafik dirancang asisten sendiri dari isi dokumen (bentuk, warna, dan judul sumbu). Untuk memakai chart dari menu Template Chart, pilih gaya lewat tombol **Gaya** di atas kanvas, atau sebut "pakai template chart" / nama gayanya di permintaan.
 `;
 
       replyText +=

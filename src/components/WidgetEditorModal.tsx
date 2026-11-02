@@ -341,6 +341,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               namaSeri={widget?.chart?.series?.map((s) => s.name)}
               mode="widget"
               tipeWidget={type}
+              adaRancangan={Boolean(widget?.rancangan && !widget?.chartId)}
             />
           ) : (
             /* TAB KOREKSI MANUAL (F-14 PRD) */
