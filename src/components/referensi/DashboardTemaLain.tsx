@@ -213,7 +213,9 @@ export const OperasionalTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiO
   return (
     <div
       ref={akarRef}
-      className={penuh ? 'h-full w-full p-[0.85em] overflow-hidden flex flex-col gap-[0.8em]' : `${d.radius} p-[1.2em]`}
+      // Pratinjau (bukan presentasi) juga memakai gap: dulu jarak hanya ditempel
+      // per baris (mt-...) dan sebagian baris lupa, sehingga kartu saling menempel.
+      className={penuh ? 'h-full w-full p-[0.85em] overflow-hidden flex flex-col gap-[0.8em]' : `${d.radius} p-[1.2em] flex flex-col gap-[0.8em]`}
       style={{
         backgroundColor: d.latar,
         color: d.teks,
@@ -347,7 +349,7 @@ export const OperasionalTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiO
             />
           </KartuSumber>
 
-          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-[0.8em]${penuh ? ' flex-1 min-h-0' : ' mt-[0.8em]'}`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-[0.8em]${penuh ? ' flex-1 min-h-0' : ''}`}>
             <KartuSumber
               aktif={sumberAktif}
               judul="Indikator pelayanan"
@@ -566,7 +568,9 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
   return (
     <div
       ref={akarRef}
-      className={penuh ? 'h-full w-full p-[0.85em] overflow-hidden flex flex-col gap-[0.8em]' : `${d.radius} p-[1.2em]`}
+      // Pratinjau (bukan presentasi) juga memakai gap: dulu jarak hanya ditempel
+      // per baris (mt-...) dan sebagian baris lupa, sehingga kartu saling menempel.
+      className={penuh ? 'h-full w-full p-[0.85em] overflow-hidden flex flex-col gap-[0.8em]' : `${d.radius} p-[1.2em] flex flex-col gap-[0.8em]`}
       style={{
         backgroundColor: d.latar,
         color: d.teks,
@@ -642,13 +646,14 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
               </div>
               {/* Bilah HTML, bukan grafik polar: grafik polar butuh modul ECharts
                   tambahan dan pernah membuat kanvas kosong. */}
-              <ul className="mt-[0.4em] space-y-[0.4em] overflow-auto">
+              {/* Baris dibagi rata setinggi kartu supaya tidak ada ruang kosong di bawah. */}
+              <ul className="mt-[0.4em] flex-1 min-h-0 flex flex-col justify-around gap-[0.4em] overflow-hidden">
                 {[...baris]
                   .sort((a, b) => b.nrw - a.nrw)
                   .map((b) => {
                     const lebar = Math.min(100, (b.nrw / Math.max(50, (total?.nrw ?? 40) + 8)) * 100);
                     return (
-                      <li key={b.wilayah} className="text-[0.7em]">
+                      <li key={b.wilayah} className={penuh ? 'text-[0.92em]' : 'text-[0.7em]'}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate" style={{ color: d.teks2 }}>
                             {b.wilayah.replace('Jakarta ', '')}
@@ -657,7 +662,10 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
                             {b.nrw.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%
                           </span>
                         </div>
-                        <span className="block h-[0.4em] rounded-full overflow-hidden mt-[0.15em]" style={{ backgroundColor: d.kartu2 }}>
+                        <span
+                          className={`block ${penuh ? 'h-[0.6em] mt-[0.3em]' : 'h-[0.4em] mt-[0.15em]'} rounded-full overflow-hidden`}
+                          style={{ backgroundColor: d.kartu2 }}
+                        >
                           <span
                             className="block h-full rounded-full"
                             style={{ width: `${lebar}%`, backgroundColor: b.nrw > (total?.nrw ?? 0) ? d.merah : d.aksen }}
@@ -711,7 +719,7 @@ export const WilayahTema: React.FC<DasarProps & { tema: Tema; nilai?: NilaiWilay
 
           {stripKpi}
 
-          <div className={`grid grid-cols-1 lg:grid-cols-12 gap-[0.8em]${penuh ? ' flex-1 min-h-0' : ' mt-[0.8em]'}`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-12 gap-[0.8em]${penuh ? ' flex-1 min-h-0' : ''}`}>
             <KartuSumber
               aktif={sumberAktif}
               judul="Pengaduan per 1.000"
