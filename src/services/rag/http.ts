@@ -7,6 +7,7 @@ import { KB_CAMPUR } from './kbDefaults';
 import { angkaDariTeks } from '../spec/kpiSparkline';
 import { selaraskanTipe } from '../spec/tipeSelaras';
 import { bersihkanRancangan } from '../chart/rancanganRag';
+import { periodeSeragam } from '../builder/halamanDiminta';
 
 /**
  * Galat layanan RAG. Dipakai supaya pemanggil bisa MEMBEDAKAN "layanan tidak
@@ -364,6 +365,30 @@ export function potong(teks: unknown, maks: number): string {
 }
 
 /**
+ * Potong JUDUL / LABEL / PERIODE di batas kata TANPA elipsis. Elipsis yang ikut
+ * tersimpan ("Januari\u2026", "Sampel memenuhi baku mutu (Kualitas Air)\u2026") membuat
+ * tahunnya hilang permanen; tampilan yang perlu memotong cukup memakai CSS.
+ * Kurung yang terbuka tanpa penutup ikut dibuang.
+ */
+export function potongJudul(teks: unknown, maks: number): string {
+  let s = String(teks ?? '').replace(/\s+/g, ' ').replace(/\u2026|\.{3}/g, '').trim();
+  if (s.length > maks) {
+    const mentah = s.slice(0, maks);
+    // Batas jatuh tepat di spasi: kata terakhir utuh, tidak perlu dipangkas.
+    const spasi = s[maks] === ' ' ? maks : mentah.lastIndexOf(' ');
+    s = spasi > maks * 0.55 ? mentah.slice(0, spasi) : mentah;
+  }
+  while ((s.match(/\(/g)?.length ?? 0) > (s.match(/\)/g)?.length ?? 0)) s = s.slice(0, s.lastIndexOf('('));
+  return s.replace(/[\s,;:\-\u2013\u2014]+$/, '').trim();
+}
+
+/** Periode seragam dari teks bebas model ("Januari\u2013Oktober 2026" -> "s.d. Okt 2026" / "2024"). */
+function periodeBersih(teks: unknown): string {
+  const mentah = potongJudul(teks, 40);
+  return periodeSeragam(mentah) ?? potongJudul(mentah, 24);
+}
+
+/**
  * Baca angka keuangan dari keluaran model. Menangani format Indonesia
  * (`1.234,56`), internasional (`1,234.56`), "Rp 1.500.000", tanda kurung
  * akuntansi `(2.500)`, dan satuan juta/miliar/triliun. Mengembalikan `null`
@@ -536,19 +561,19 @@ export function angkaGayaIndonesia(teks: string): string {
 
 /** Judul grafik: pakai judul model hanya kalau bersih, kalau tidak susun dari serinya. */
 export function judulGrafik(judul: unknown, seri: { name: string }[], kategori: string[]): string {
-  const bersih = potong(judul, BATAS_TEKS.judul);
+  const bersih = potongJudul(judul, BATAS_TEKS.judul);
   const kotor = !bersih || /according to|\bvs\b|\bthe\b|\band\b/i.test(bersih) || /^\d{4}\b/.test(bersih);
   if (!kotor) return bersih;
   const tahun = seri.map((x) => x.name).filter((n) => /^\d{4}$/.test(n));
   const namaSeri = seri.map((x) => x.name).filter((n) => !/^\d{4}$/.test(n));
   // Kategori berupa tahun: judul dari nama seri, periode di dalam tanda kurung.
   if (kategori.length >= 2 && kategori.every((k) => /^\d{4}$/.test(k)) && namaSeri.length > 0) {
-    return potong(`${namaSeri.slice(0, 2).join(' dan ')} (${kategori[0]}\u2013${kategori[kategori.length - 1]})`, BATAS_TEKS.judul);
+    return potongJudul(`${namaSeri.slice(0, 2).join(' dan ')} (${kategori[0]}\u2013${kategori[kategori.length - 1]})`, BATAS_TEKS.judul);
   }
   // Kategori berupa label: judul dari rentang label, tahun dari nama seri.
   const rentang = kategori.length >= 2 ? `${kategori[0]} s.d. ${kategori[kategori.length - 1]}` : kategori[0] || 'Tren Indikator';
   const ekor = tahun.length ? `(${tahun.join(', ')})` : namaSeri.slice(0, 2).join(' dan ');
-  return potong(`${rentang} ${ekor}`.trim(), BATAS_TEKS.judul);
+  return potongJudul(`${rentang} ${ekor}`.trim(), BATAS_TEKS.judul);
 }
 
 /** Satuan seragam: "juta Rp" jadi "Rp juta", "jutaan Rupiah" jadi "Rp juta". */
@@ -636,10 +661,10 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
     const value = angkaGayaIndonesia(bersih.value);
     const unit = satuanSeragam(bersih.unit);
     if (!value) return;
-    let judul = potong(k?.label || `Indikator ${i + 1}`, BATAS_TEKS.label);
+    let judul = potongJudul(k?.label || `Indikator ${i + 1}`, BATAS_TEKS.label);
     if (judulTerpakai.has(judul.toLowerCase())) {
-      const periode = potong(k?.periode, 10);
-      judul = potong(periode ? `${judul} ${periode}` : `${judul} ${i + 1}`, BATAS_TEKS.label);
+      const periode = periodeBersih(k?.periode);
+      judul = potongJudul(periode ? `${judul} ${periode}` : `${judul} ${i + 1}`, BATAS_TEKS.label);
     }
     judulTerpakai.add(judul.toLowerCase());
     widgets.push({
@@ -667,7 +692,7 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       })(),
       citations: [kutipanExtract(`kpi-${i + 1}`, k?.docName, k?.page, k?.chunkSnippet)],
       unitKerja: potong(k?.unitKerja, 40) || undefined,
-      periode: potong(k?.periode, 12) || '',
+      periode: periodeBersih(k?.periode),
     });
   });
 
@@ -739,7 +764,7 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       // Rancangan asisten (bentuk, warna, judul sumbu, ...) digambar apa adanya di kanvas.
       rancangan: bersihkanRancangan(g?.desain, tipeDiminta),
       citations: [kutipanExtract(`grafik-${indeks + 1}`, g?.docName, g?.page, g?.chunkSnippet)],
-      periode: potong(g?.periode, 12) || '',
+      periode: periodeBersih(g?.periode),
     };
   }
 
@@ -764,7 +789,7 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       ...dasar,
       id: 'w-tabel-1',
       type: 'table',
-      title: potong(t?.judul || 'Rincian Angka', BATAS_TEKS.judul),
+      title: potongJudul(t?.judul || 'Rincian Angka', BATAS_TEKS.judul),
       subtitle: potong(t?.docName, 32) || undefined,
       grid: penata.kotak(6, 4),
       table: {
@@ -774,7 +799,7 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
         ),
       },
       citations: [kutipanExtract('tabel-1', t?.docName, t?.page, t?.chunkSnippet)],
-      periode: potong(t?.periode, 12) || '',
+      periode: periodeBersih(t?.periode),
     });
   }
 
@@ -787,12 +812,12 @@ export function payloadKeWidgetSpec(payload: any, sector: string) {
       ...dasar,
       id: 'w-narasi-1',
       type: 'narasi',
-      title: potong(n?.judul || 'Catatan Penting', BATAS_TEKS.judul),
+      title: potongJudul(n?.judul || 'Catatan Penting', BATAS_TEKS.judul),
       subtitle: potong(n?.docName, 32) || undefined,
       grid: penata.kotak(adaTabel ? 6 : 12, 4),
       narasi: { text: teksNarasi },
       citations: [kutipanExtract('narasi-1', n?.docName, n?.page, n?.chunkSnippet)],
-      periode: potong(n?.periode, 12) || '',
+      periode: periodeBersih(n?.periode),
     });
   }
 
@@ -1102,7 +1127,7 @@ export class ConfigurableRagClient implements RagClient {
     base: string,
     cfg: { apiKey: string; kbId?: string; timeoutMs: number },
     options: RagQueryOptions
-  ): Promise<{ structuredJson: any; citations: Citation[]; chunks: SectorDocumentChunk[] } | null> {
+  ): Promise<{ structuredJson: any; citations: Citation[]; chunks: SectorDocumentChunk[]; areaSibuk: string[] } | null> {
     // Skema UTUH (satu dashboard) dan 4 ekstraksi FOKUS berjalan BERBARENGAN.
     //
     // Uji E2E 2026-10-20: untuk skema besar, layanan RAG sering membalas 200 dengan
@@ -1219,7 +1244,9 @@ export class ConfigurableRagClient implements RagClient {
         satuan: undefined,
       },
     } as unknown as SectorDocumentChunk));
-    return { structuredJson, citations, chunks };
+    // Area sapuan yang kosong karena LAYANAN (galat / tenggat), bukan karena dokumen.
+    const areaSibuk = (sapuan.areaKosong || []).filter((a: string) => /^(gagal|lewat-tenggat)\(/.test(a));
+    return { structuredJson, citations, chunks, areaSibuk };
   }
 
   /**
@@ -1580,6 +1607,9 @@ export class ConfigurableRagClient implements RagClient {
    * dibuat ulang (arus kas 24,8 lalu 7,5); hasil yang sudah ada dipakai lagi
    * selama 6 jam, sama seperti cache sapuan. Galat layanan dan hasil kosong tidak disimpan.
    */
+  /** Jeda sebelum percobaan ulang ke-2 dan ke-3 saat layanan sibuk. Diubah hanya oleh tes. */
+  static jedaCobaUlangMs: [number, number] = [4000, 8000];
+
   private cacheIndikator = new Map<string, { waktu: number; hasil: Awaited<ReturnType<ConfigurableRagClient['ambilDataWidgetMentah']>> }>();
 
   async ambilDataWidget(
@@ -1655,7 +1685,7 @@ export class ConfigurableRagClient implements RagClient {
           pesanTerakhir = jelaskanError(err);
           const sibuk = /429|502|503|504|timeout/i.test(pesanTerakhir);
           if (!sibuk || coba === 3) break;
-          await new Promise((r) => setTimeout(r, coba === 1 ? 4000 : 8000));
+          await new Promise((r) => setTimeout(r, ConfigurableRagClient.jedaCobaUlangMs[coba === 1 ? 0 : 1]));
         }
       }
       if (pesanTerakhir) throw new Error(pesanTerakhir);
@@ -1846,6 +1876,7 @@ export class ConfigurableRagClient implements RagClient {
             structuredJson: hasil.structuredJson,
             chunks: hasil.chunks,
             citations: hasil.citations,
+            areaSibuk: hasil.areaSibuk,
           };
         }
       }

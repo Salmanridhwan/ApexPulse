@@ -55,6 +55,8 @@ export interface RagResult {
   latencyMs: number;
   answer?: string;
   structuredJson?: any;
+  /** Area sapuan dokumen yang kosong karena layanan sibuk / tenggat, bukan karena isi dokumen. */
+  areaSibuk?: string[];
   chunks: SectorDocumentChunk[];
   citations: Citation[];
   /**

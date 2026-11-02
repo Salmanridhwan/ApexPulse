@@ -10,6 +10,7 @@ import {
   halamanUntukPermintaan,
   judulUntukButir,
   labelPeriodeSumber,
+  periodeWidget,
   validasiDataButir,
   tipeButir,
   widgetKembar,
@@ -47,6 +48,8 @@ export interface GenerateOptions {
   onProgress?: (step: ProgressStep) => void;
   /** Klien RAG aktif (mock atau HTTP sesuai konfigurasi admin). */
   ragClient?: RagClient;
+  /** Jeda sebelum putaran ulang butir yang kena layanan sibuk (bawaan 5 dtk; tes memakai 0). */
+  jedaUlangMs?: number;
 }
 
 /** Cara sebuah dashboard diperoleh — dipakai untuk pesan jujur ke pengguna. */
@@ -67,6 +70,8 @@ export interface LaporanButir {
   ditolak: string[];
   /** Layanan RAG sibuk / timeout setelah dicoba ulang. */
   gagalLayanan: string[];
+  /** Jumlah area sapuan dokumen awal yang gagal dibaca karena layanan sibuk / tenggat. */
+  areaSapuanSibuk: number;
 }
 
 export interface GenerateResult {
@@ -116,7 +121,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
   const { halaman: halamanDiminta, bawaan: halamanBawaan } = halamanUntukPermintaan(userPrompt, sector);
   const halamanWidget: Record<string, number> = {};
-  const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [] };
+  const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [], areaSapuanSibuk: 0 };
   if (permintaanJumlah) {
     logSummary.push(
       `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`
@@ -196,7 +201,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
         description: '',
         sector,
         widgets: [],
-        globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+        globalFilters: { periode: 'Semua', unitKerja: 'Semua', kategori: 'Semua' },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -216,6 +221,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     };
   }
 
+  laporanButir.areaSapuanSibuk = ragRes.areaSibuk?.length ?? 0;
   logSummary.push(`[RAG Client] Respons diterima dalam ${ragRes.latencyMs}ms. Mode: ${ragRes.mode}`);
   onProgress?.({
     id: 'step-2',
@@ -299,7 +305,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     await Promise.all(pekerja);
     // Putaran kedua untuk butir yang kena layanan sibuk: satu per satu setelah jeda.
     if (sibuk.size > 0) {
-      await new Promise((r) => setTimeout(r, 5000));
+      await new Promise((r) => setTimeout(r, options.jedaUlangMs ?? 5000));
       for (const k of [...sibuk]) await ambil(k);
     }
 
@@ -328,7 +334,9 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
         ...w,
         title: judul,
         // Label kita lebih dulu: subtitle RAG bentuknya tidak seragam ("Januari–Des…").
+        // Periode dan subtitle dari fungsi yang sama supaya selalu cocok.
         subtitle: labelPeriodeSumber(w) ?? w.subtitle,
+        periode: periodeWidget(w) ?? '',
         id: `hd-${t.halaman + 1}-${k + 1}`,
       };
       // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
@@ -550,7 +558,9 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     sector,
     widgets: synthesizedWidgets,
     globalFilters: {
-      periode: '2026-Q1',
+      // 'Semua': filter bawaan tidak boleh menyembunyikan kartu (dulu '2026-Q1'
+      // tidak cocok dengan kartu mana pun).
+      periode: 'Semua',
       unitKerja: 'Semua',
       kategori: 'Semua',
     },

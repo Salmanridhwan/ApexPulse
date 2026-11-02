@@ -126,6 +126,8 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   const lowerIsBetter = /nrw|kebocoran|tunggakan|kehilangan|waktu tunggu|keluhan|kepadatan/i.test(
     `${title || ''} ${deltaLabel || ''}`
   );
+  /** Keterangan perubahan dari dokumen yang sudah memuat angka sendiri. */
+  const labelBerangka = Boolean(deltaLabel && /\d/.test(deltaLabel));
   const deltaGood = delta === undefined ? false : lowerIsBetter ? delta < 0 : delta > 0;
   const deltaBad = delta === undefined ? false : lowerIsBetter ? delta > 0 : delta < 0;
 
@@ -213,11 +215,15 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         </div>
 
         <div className="kpi-enter space-y-2">
+          {/* Satu representasi perubahan saja. Bila keterangan dokumen sudah memuat
+              angka ("+8,21%", "turun 1,77 poin persentase"), keterangan itu yang
+              masuk ke pil berwarna; dulu tampil berdampingan dengan delta persen
+              hitungan sendiri ("+8,2%" + "+8,21%"). */}
           {(delta !== undefined || deltaLabel) && (
             <div className="flex items-center gap-1.5 min-w-0">
               {delta !== undefined && (
                 <span
-                  className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums shrink-0 border ${
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-chip ${chipKelas} font-bold tabular-nums ${labelBerangka ? 'min-w-0' : 'shrink-0'} border ${
                     deltaGood
                       ? 'border-pos/40 text-pos bg-surface'
                       : deltaBad
@@ -233,10 +239,16 @@ export const KpiCard: React.FC<KpiCardProps> = ({
                   ) : (
                     <Minus className="w-3 h-3 mr-0.5" />
                   )}
-                  {delta > 0 ? `+${fmtDelta(delta)}%` : `${fmtDelta(delta)}%`}
+                  {labelBerangka ? (
+                    <span className="truncate" title={deltaLabel}>{deltaLabel}</span>
+                  ) : delta > 0 ? (
+                    `+${fmtDelta(delta)}%`
+                  ) : (
+                    `${fmtDelta(delta)}%`
+                  )}
                 </span>
               )}
-              {deltaLabel && (
+              {deltaLabel && !(delta !== undefined && labelBerangka) && (
                 <span className={`${chipKelas} font-medium text-ink-2 truncate`} title={deltaLabel}>
                   {deltaLabel}
                 </span>

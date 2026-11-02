@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Dashboard, Tenant } from '../types';
 import { semuaWidget } from '../services/dashboard/halaman';
+import { nilaiRingkas } from '../services/dashboard/nilaiRingkas';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -134,7 +135,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       <td className="p-2 font-medium">{w.title}</td>
                       <td className="p-2 uppercase text-[10px] text-ink-2">{w.type}</td>
                       <td className="p-2 font-bold text-ink">
-                        {String(w.kpi?.value ?? w.chart?.series[0]?.data.slice(-1)[0] ?? '-')} {w.kpi?.unit || ''}
+                        {nilaiRingkas(w)}
                       </td>
                       <td className="p-2">
                         {/* Tanpa label provenans (mis. "Inferensi AI"): hanya penanda koreksi manual. */}

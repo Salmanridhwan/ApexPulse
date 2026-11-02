@@ -316,11 +316,13 @@ export function kelasSatuan(unit: string | undefined): KelasSatuan | null {
  */
 export function satuanUntukButir(butir: string): KelasSatuan[] | null {
   const b = butir.toLowerCase();
-  const uang = /pendapatan|penerimaan|beban|biaya|laba|rugi|arus kas|\bkas\b|aset|modal|utang|ekuitas|belanja|dividen|investasi|gaji/.test(b);
+  const uang = /pendapatan|penerimaan|beban|biaya|laba|rugi|arus kas|\bkas\b|aset|modal|utang|ekuitas|belanja|ongkos|dividen|investasi|gaji/.test(b);
   if (/komposisi|porsi|proporsi|struktur|bauran|status|daftar|rincian/.test(b)) return null;
-  if (/waktu|durasi|lama|jam operasi/.test(b)) return ['waktu', 'persen'];
+  if (/waktu|durasi|\blama\b|jam operasi/.test(b)) return ['waktu', 'persen'];
   if (/progres|capaian|realisasi|terhadap target/.test(b)) return uang ? ['persen', 'uang'] : ['persen', 'jumlah'];
-  if (/nrw|kehilangan air|cakupan|kepatuhan|rasio|persentase|tingkat|margin/.test(b)) return ['persen'];
+  // Batas kata wajib: tanpa itu "operasional" terbaca "ope-rasio-nal" dan
+  // "beban operasional" (Rp) dipaksa persen lalu ditolak.
+  if (/\b(?:nrw|kehilangan air|cakupan|kepatuhan|rasio|persentase|tingkat|margin)\b/.test(b)) return ['persen'];
   if (uang) return ['uang'];
   if (/pegawai|karyawan|sdm|pekerja|pelatihan/.test(b)) return ['orang', 'jumlah', 'waktu'];
   if (/\bair\b|produksi|kapasitas|volume/.test(b)) return ['volume'];
@@ -370,10 +372,22 @@ export function rapikanJudulButir(butir: string): string {
  */
 export function labelPeriodeSumber(w: WidgetSpec): string | undefined {
   const sumber = w.citations?.[0]?.docName;
-  // Judul RAG dulu (biasanya menyebut periode angkanya), baru potongan sumber.
-  const periode = periodeSeragam(w.title) ?? periodeSeragam(w.citations?.[0]?.chunkSnippet ?? '');
+  const periode = periodeWidget(w);
   const bagian = [periode ?? '', sumber ?? ''].filter(Boolean);
   return bagian.length ? bagian.join(' · ') : undefined;
+}
+
+/**
+ * Periode satu widget dalam bentuk seragam. Satu sumber untuk field `periode`
+ * DAN label subtitle, supaya keduanya tidak pernah berbeda. Urutan: judul RAG
+ * (biasanya menyebut periode angkanya), field periode dari RAG, lalu potongan sumber.
+ */
+export function periodeWidget(w: Pick<WidgetSpec, 'title' | 'citations'> & { periode?: string }): string | undefined {
+  return (
+    periodeSeragam(w.title) ??
+    periodeSeragam(w.periode ?? '') ??
+    periodeSeragam(w.citations?.[0]?.chunkSnippet ?? '')
+  );
 }
 
 const BULAN = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agu', 'sep', 'okt', 'nov', 'des'];

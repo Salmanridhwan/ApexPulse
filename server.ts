@@ -505,6 +505,34 @@ function folderDist(): string {
   return terpilih || path.join(__dirname, 'dist');
 }
 
+/**
+ * Peringatan pengembangan: `dist/` lebih tua dari kode di `src/`. Server
+ * menyajikan antarmuka dari `dist/`, jadi uji UI tanpa `npm run build`
+ * mengukur kode lama (laporan QA F-09). Hanya peringatan, tidak menghentikan server.
+ */
+function peringatkanBundelUsang(): void {
+  try {
+    const waktuBundel = fs.statSync(path.join(folderDist(), 'index.html')).mtimeMs;
+    let terbaru = 0;
+    const telusuri = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) telusuri(p);
+        else terbaru = Math.max(terbaru, fs.statSync(p).mtimeMs);
+      }
+    };
+    telusuri(path.join(__dirname, 'src'));
+    if (terbaru > waktuBundel) {
+      console.warn(
+        '[ui] PERINGATAN: dist/ lebih tua dari src/ — antarmuka yang disajikan adalah bundel lama. ' +
+          'Jalankan `npm run build` (atau pakai `npm run dev`) sebelum menguji UI.'
+      );
+    }
+  } catch {
+    // Folder sumber tidak ada (mis. di server produksi): tidak perlu diperiksa.
+  }
+}
+
 function versiBundelSaatIni(): string {
   try {
     const html = fs.readFileSync(path.join(folderDist(), 'index.html'), 'utf8');
@@ -3162,6 +3190,11 @@ ${isiHalaman}
       if (ditolak.length) {
         replyText += `Ada angka di dokumen tetapi bukan indikator yang diminta, jadi tidak dipakai: ${ditolak.join(', ')}.\n\n`;
       }
+      if (genResult.laporanButir.areaSapuanSibuk > 0) {
+        replyText += `⚠️ ${genResult.laporanButir.areaSapuanSibuk} bagian dokumen gagal dibaca karena layanan dokumen sedang sibuk, jadi dashboard mungkin belum lengkap. Minta ulang beberapa saat lagi.
+
+`;
+      }
       if (gagalLayanan.length) {
         replyText += `⚠️ ${gagalLayanan.length} indikator gagal diambil karena layanan dokumen sedang sibuk: ${gagalLayanan.join(', ')}. Minta ulang beberapa saat lagi untuk melengkapinya.\n\n`;
       }
@@ -3241,6 +3274,9 @@ ${kpiItems}
         modeUsed: genResult.modeUsed,
         citationsCount: genResult.citationsCount,
         latencyMs: genResult.latencyMs,
+        // Nasib tiap butir halaman (tidak ada / ditolak / layanan sibuk) supaya
+        // klien dan pengujian bisa membedakannya tanpa membaca log server.
+        laporanButir: genResult.laporanButir,
       });
 
       sendEvent('done', { ok: true });
@@ -6632,6 +6668,7 @@ ${navigasi}
 
   // ================= VITE DEV MIDDLEWARE / STATIC =================
   const distExists = fs.existsSync(path.join(folderDist(), 'index.html'));
+  if (distExists && process.env.NODE_ENV !== 'production') peringatkanBundelUsang();
   if (process.env.NODE_ENV === 'production' || distExists) {
     app.use(
       express.static(folderDist(), {

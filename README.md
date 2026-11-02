@@ -20,8 +20,14 @@ berkas, pelaporan, dan pengelolaan pengguna per instansi.
 ```bash
 npm install
 cp .env.example .env      # isi koneksi MySQL (lihat docs/operasional.md)
-npm run dev               # antarmuka (Vite) + server API
+npm run dev               # build antarmuka (Vite) lalu jalankan server API
 ```
+
+> **Penting untuk uji UI:** server menyajikan antarmuka dari `dist/`, bukan dari
+> sumber. `npm run dev` selalu build dulu. Bila server dijalankan dengan
+> `npm run dev:server` / `npx tsx server.ts`, jalankan `npm run build` setiap kali
+> kode di `src/` berubah; tanpa itu yang diuji adalah bundel lama. Server juga
+> memberi peringatan di konsol bila `dist/` lebih tua dari `src/`.
 
 Alamat default: `http://127.0.0.1:3000`. Cek kesehatan: `GET /health`.
 
@@ -36,7 +42,8 @@ NODE_ENV=production npm start
 
 | Perintah | Kegunaan |
 |---|---|
-| `npm run dev` | Mode pengembangan |
+| `npm run dev` | Mode pengembangan: build antarmuka lalu jalankan server |
+| `npm run dev:server` | Jalankan server saja (cepat, TANPA build; jalankan `npm run build` sendiri bila `src/` berubah) |
 | `npm run build` | Build aset produksi ke `dist/` |
 | `npm test` | Uji unit (aturan sandi, pembatas percobaan, enkripsi, menu, backup) |
 | `npx tsc --noEmit` | Pemeriksaan tipe |

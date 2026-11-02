@@ -18,7 +18,7 @@ import type { HalamanDashboard, WidgetSpec, WidgetType } from '../../types';
 import type { ChartId } from '../chart/chartDefault';
 import type { Varian } from '../chart/gayaVarian';
 import { kategoriWidget, type KategoriDashboard } from '../spec/kategoriWidget';
-import { halamanUntukWidget, skorCocok, widgetKembar, type HalamanDiminta } from './halamanDiminta';
+import { halamanUntukWidget, periodeWidget, skorCocok, widgetKembar, type HalamanDiminta } from './halamanDiminta';
 
 /** Batas isi satu halaman supaya muat satu layar tanpa digulir. */
 export const MAKS_KPI_PER_HALAMAN = 4;
@@ -360,6 +360,10 @@ export function susunDashboardBerhalaman(
     const pilih = opsi.chartTemplate === false && w.rancangan && w.chart ? { type: w.type } : pilihChart(w);
     return {
       ...w,
+      // Penjaga terakhir sebelum disimpan: elipsis tidak boleh tersimpan di judul
+      // atau periode (tahunnya hilang permanen), dan periode memakai bentuk seragam.
+      title: tanpaElipsis(w.title),
+      periode: periodeWidget(w) ?? tanpaElipsis(w.periode ?? ''),
       id: w.id || `${dasar}-${i + 1}`,
       type: pilih.type,
       ...(pilih.chartId ? { chartId: pilih.chartId } : {}),
@@ -378,4 +382,11 @@ export function susunDashboardBerhalaman(
     halaman,
     halamanKosong: pakaiPermintaan ? sesuaiPermintaan.kosong : diminta.map((h) => h.judul),
   };
+}
+
+/** Buang elipsis ("…" / "...") dan kurung yang tertinggal terbuka di ujung teks. */
+export function tanpaElipsis(teks: string): string {
+  let t = String(teks ?? '').replace(/…|\.{3}/g, '').trim();
+  while ((t.match(/\(/g)?.length ?? 0) > (t.match(/\)/g)?.length ?? 0)) t = t.slice(0, t.lastIndexOf('('));
+  return t.replace(/[\s,;:\-–—]+$/, '').trim();
 }
