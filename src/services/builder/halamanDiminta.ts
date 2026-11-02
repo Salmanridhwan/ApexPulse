@@ -212,10 +212,11 @@ export function mintaBanyakHalaman(prompt: string): number | boolean {
  * berulang antarhalaman supaya data tidak kembar.
  */
 const SEGMEN_PDAM: HalamanDiminta[] = [
-  { judul: 'Ringkasan', butir: ['jumlah pelanggan', 'cakupan pelayanan', 'kapasitas produksi terpasang', 'tren jumlah pelanggan per tahun'] },
+  // Tiap halaman minimal dua butir grafik supaya dashboard tidak hanya berisi KPI.
+  { judul: 'Ringkasan', butir: ['jumlah pelanggan', 'cakupan pelayanan', 'kapasitas produksi terpasang', 'tren jumlah pelanggan per tahun', 'komposisi pelanggan per golongan'] },
   { judul: 'Keuangan', butir: ['pendapatan usaha', 'beban usaha', 'laba bersih', 'arus kas operasi', 'komposisi beban usaha', 'tren pendapatan per tahun'] },
-  { judul: 'Operasional & Produksi', butir: ['volume produksi air', 'volume air terjual', 'NRW (kehilangan air)', 'jam operasi pelayanan', 'tren produksi air per bulan'] },
-  { judul: 'Pelayanan Pelanggan', butir: ['jumlah pengaduan pelanggan', 'waktu penyelesaian pengaduan', 'kepatuhan mutu air', 'tren pengaduan per kategori'] },
+  { judul: 'Operasional & Produksi', butir: ['volume produksi air', 'volume air terjual', 'NRW (kehilangan air)', 'jam operasi pelayanan', 'tren produksi air per bulan', 'tren NRW per bulan'] },
+  { judul: 'Pelayanan Pelanggan', butir: ['jumlah pengaduan pelanggan', 'waktu penyelesaian pengaduan', 'kepatuhan mutu air', 'pengaduan per kategori', 'tren pengaduan per bulan'] },
   { judul: 'Wilayah', butir: ['sambungan pelanggan per wilayah', 'cakupan pelayanan per wilayah', 'air terjual per wilayah'] },
 ];
 

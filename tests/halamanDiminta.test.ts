@@ -258,3 +258,32 @@ test('P2-D: periode ditulis seragam', () => {
   assert.equal(periodeSeragam('Laporan Tahunan 2024'), '2024');
   assert.equal(periodeSeragam('tanpa periode'), undefined);
 });
+
+test('grafik sapuan tanpa butir cocok masuk halaman topiknya, KPI nyasar tetap dibuang', () => {
+  const diminta = [
+    { judul: 'Ringkasan', butir: ['jumlah pelanggan'] },
+    { judul: 'Keuangan', butir: ['pendapatan usaha'] },
+    { judul: 'Operasional & Produksi', butir: ['volume produksi air'] },
+  ];
+  const hasil = susunDashboardBerhalaman(
+    [
+      kpi('k1', 'Jumlah pelanggan', 951640),
+      kpi('k2', 'Pendapatan usaha', 3184),
+      grafik('g1', 'Tren beban operasional per bulan', 'line', [5, 7, 9]),
+      grafik('g2', 'Debit air distribusi per instalasi', 'bar', [40, 25, 35]),
+      kpi('k3', 'Target kegiatan setahun', 18000),
+    ],
+    { halamanDiminta: diminta, chartTemplate: false }
+  );
+  const di = (judul: string) => hasil.halaman.find((h) => h.judul === judul)?.widgets.map((w) => w.title) ?? [];
+  assert.ok(di('Keuangan').includes('Tren beban operasional per bulan'));
+  assert.ok(di('Operasional & Produksi').includes('Debit air distribusi per instalasi'));
+  assert.ok(hasil.halaman.flatMap((h) => h.widgets).every((w) => w.title !== 'Target kegiatan setahun'));
+});
+
+test('segmen bawaan PDAM: tiap halaman punya minimal dua butir grafik', () => {
+  for (const h of halamanUntukPermintaan('dashboard PAM Jaya beberapa halaman', 'pdam').halaman) {
+    const grafikButir = h.butir.filter((b) => !['kpi', 'bullet-target'].includes(tipeButir(b)));
+    assert.ok(grafikButir.length >= 2, `${h.judul}: ${grafikButir.join(', ')}`);
+  }
+});

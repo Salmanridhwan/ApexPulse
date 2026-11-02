@@ -270,6 +270,14 @@ export function bagiHalamanDiminta(
       );
       if (pemilik >= 0 && sendiri < 0.75) i = pemilik;
     }
+    // Grafik dari sapuan dokumen yang tidak cocok dengan butir mana pun masuk ke
+    // halaman yang judulnya topik grafik itu (tren beban -> "Keuangan"). Dulu
+    // grafik seperti ini dibuang sehingga dashboard hanya berisi 1-2 grafik.
+    // KPI tidak ikut: KPI nyasar membuat halaman campur topik.
+    if (i < 0 && !kpi) {
+      const t = topik(w);
+      if (t !== 'Umum') i = diminta.findIndex((h) => skorCocok(JUDUL_TOPIK[t], h.judul) >= 0.5 || skorCocok(t, h.judul) >= 0.5);
+    }
     const wadah = i >= 0 ? isi[i] : undefined;
     const daftar = wadah ? (kpi ? wadah.kpi : wadah.lain) : undefined;
     if (!daftar || daftar.length >= (kpi ? MAKS_KPI_DIMINTA : MAKS_KARTU_DIMINTA)) {
