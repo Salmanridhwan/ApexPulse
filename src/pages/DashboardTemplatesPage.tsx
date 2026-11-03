@@ -19,7 +19,7 @@ import {
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { ReplikaHalaman } from '../components/referensi/ReplikaHalaman';
-import { halamanTemplateBagian, templateUntukInstansi } from '../services/templates/templateBagian';
+import { halamanTemplateBagian } from '../services/templates/templateBagian';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 import { HalamanTabs } from '../components/HalamanTabs';
@@ -185,14 +185,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     return () => clearInterval(t);
   }, [muatStatus]);
 
-  /** Template galeri; template rapat memakai nama instansi yang login. */
-  const daftarTemplate = useMemo(
-    () => DASHBOARD_TEMPLATES.map((t) => templateUntukInstansi(t, currentTenant?.name)),
-    [currentTenant?.name]
-  );
   const aktif = useMemo(
-    () => daftarTemplate.find((t) => t.id === aktifId) ?? daftarTemplate[0],
-    [aktifId, daftarTemplate]
+    () => DASHBOARD_TEMPLATES.find((t) => t.id === aktifId) ?? DASHBOARD_TEMPLATES[0],
+    [aktifId]
   );
 
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
@@ -533,7 +528,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             <h2 className="text-sm font-bold text-ink flex items-center gap-2 flex-wrap">
               <span>Template Dashboard</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-line text-ink-2 font-semibold">
-                {daftarTemplate.length} template
+                {DASHBOARD_TEMPLATES.length} template
               </span>
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
@@ -558,7 +553,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           aria-label="Pilih template dashboard"
           className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 border-b border-line"
         >
-          {daftarTemplate.map((t) => {
+          {DASHBOARD_TEMPLATES.map((t) => {
             const terpilih = t.id === aktif.id;
             // Tiap tab memakai warna template-nya sendiri; campuran dengan token
             // tema (ink/surface) membuat teks & latar tetap terbaca di gelap maupun terang.

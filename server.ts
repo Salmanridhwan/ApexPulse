@@ -73,7 +73,7 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
-import { bagianDariPermintaan, halamanTemplateBagian, templateUntukInstansi } from './src/services/templates/templateBagian';
+import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
   nilaiDariWidgets,
@@ -1813,8 +1813,7 @@ const app = express();
     }));
 
     // Judul dashboard: buang penanda "(Contoh)" karena angkanya dari dokumen.
-    // Template rapat memakai nama instansi, sama dengan label di galeri.
-    const judulBersih = templateUntukInstansi(template, tenant.name).judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
+    const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
 
     /**
      * TIGA HALAMAN, sama persis dengan galeri: halaman 1 ringkasan, halaman 2
@@ -2582,13 +2581,8 @@ const app = express();
           sendEvent('done', { ok: false });
           return res.end();
         }
-        if (!activeDash) {
-          const pesan = 'Buka dulu salah satu dashboard, baru saya bisa menambahkan widget ke kanvasnya.';
-          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
-          sendEvent('result', { actionTaken: 'none', message: pesan });
-          sendEvent('done', { ok: false });
-          return res.end();
-        }
+        // Tanpa dashboard terbuka, "buat chart pendapatan" membuat dashboard baru
+        // berisi chart itu saja (bukan dashboard penuh, bukan penolakan).
         // Indikator = sisa kalimat setelah kata kunci, tanpa embel-embel tujuan.
         let indikator = indikatorTambahWidget(prompt);
         // Perintah lanjutan seperti "buatkan widgetnya untuk kurun waktu
@@ -2665,6 +2659,38 @@ const app = express();
           // Tolak KEMBARAN: kalau kanvas sudah punya widget dengan isi yang sama
           // (judul + subjudul + periode + tipe), jangan tambah duplikat. Menambah
           // kartu kedua yang menanyakan hal sama membuat jumlah widget menipu.
+          if (!activeDash) {
+            const sekarang = new Date().toISOString();
+            const desainDiminta = gayaDariPermintaan(prompt) ?? (bagianDariPermintaan(prompt) ? 'korporat' : undefined);
+            const dashBaru = db.createDashboard({
+              id: `dash-${Date.now()}`,
+              tenantId,
+              title: widgetBaru.title,
+              description: `Dibuat asisten dari permintaan: "${prompt.slice(0, 120)}"`,
+              sector,
+              gaya: desainDiminta ? { desain: desainDiminta } : undefined,
+              widgets: [{ ...widgetBaru, grid: { x: 0, y: 0, w: widgetBaru.type === 'kpi' ? 4 : 8, h: widgetBaru.type === 'kpi' ? 2 : 4 } }],
+              globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+              createdAt: sekarang,
+              updatedAt: sekarang,
+            } as Dashboard);
+            chat = db.ensureChatForDashboard(dashBaru.id, tenantId, session.userId, dashBaru.title);
+            pesanUserTercatat = false;
+            db.addAuditLog({
+              tenantId,
+              userId: session.userId,
+              userName: session.name,
+              action: 'Buat Dashboard Satu Widget via Chat (RAG)',
+              target: widgetBaru.title,
+              details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
+            });
+            const pesan = `Dashboard baru **"${dashBaru.title}"** dibuat berisi satu widget dari data dokumen instansi. Minta widget lain kapan saja untuk menambahkannya.`;
+            sendEvent('step', { id: 's0', title: 'Widget dibuat dari dokumen', status: 'completed' });
+            catatAsisten({ sender: 'system', text: pesan, actionTaken: 'create_dashboard' } as any);
+            sendEvent('result', { actionTaken: 'create_dashboard', message: pesan, dashboard: dashBaru });
+            sendEvent('done', { ok: true });
+            return res.end();
+          }
           const kunciBaru = kunciKembarWidget(widgetBaru);
           // Kunci kembar butuh subjudul & periode identik, sehingga indikator yang
           // sama dengan judul sedikit berbeda ("Kepuasan Pengguna Penanganan" vs

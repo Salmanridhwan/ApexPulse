@@ -16,6 +16,7 @@
 
 import type { WidgetSpec } from '../../types';
 import { bagianDariPermintaan, halamanTemplateBagian } from '../templates/templateBagian';
+import { parsePermintaanJumlahWidget } from './permintaanWidget';
 
 export interface HalamanDiminta {
   judul: string;
@@ -332,6 +333,10 @@ export function dashboardUmum(prompt: string, segmen: HalamanDiminta[] = []): bo
 export function halamanUntukPermintaan(prompt: string, sector: string): { halaman: HalamanDiminta[]; bawaan: boolean } {
   const tertulis = bacaHalamanDiminta(prompt);
   if (tertulis.length > 0) return { halaman: tertulis, bawaan: false };
+  // Jumlah kecil disebut ("1 chart pendapatan", "3 grafik"): satu halaman saja,
+  // tanpa deck rapat atau segmentasi bawaan yang memaksa banyak halaman.
+  const jumlah = parsePermintaanJumlahWidget(prompt);
+  if (jumlah && jumlah.max <= 6) return { halaman: [], bawaan: false };
   // "Dashboard rapat procurement": susunan halaman deck template bagian, butirnya judul kartu.
   const bagian = bagianDariPermintaan(prompt);
   if (bagian) {

@@ -509,6 +509,18 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     });
   }
 
+  // Step 3b2: BATASI ke jumlah yang diminta. "Buat 1 chart pendapatan" harus
+  // menghasilkan satu kartu, bukan dashboard penuh. Kalimat yang menyebut
+  // chart/grafik mendahulukan grafik daripada kartu KPI.
+  if (permintaanJumlah && synthesizedWidgets.length > permintaanJumlah.max) {
+    const mintaGrafik = /(?:^|[^a-z])(?:chart|grafik|diagram)/i.test(userPrompt);
+    const urut = mintaGrafik
+      ? [...synthesizedWidgets.filter((w) => w.type !== 'kpi'), ...synthesizedWidgets.filter((w) => w.type === 'kpi')]
+      : synthesizedWidgets;
+    synthesizedWidgets = urut.slice(0, permintaanJumlah.max);
+    logSummary.push(`[Permintaan Jumlah] Dipangkas menjadi ${synthesizedWidgets.length} widget sesuai permintaan.`);
+  }
+
   // Step 3c: RAPIKAN TATA LETAK.
   // Kanvas mengabaikan x/y dan menyusun dari URUTAN + lebar (grid.w). Tanpa
   // langkah ini urutan widget hasil gabungan (Jalur A + pelengkap katalog) acak

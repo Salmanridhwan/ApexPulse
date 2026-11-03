@@ -8,7 +8,6 @@ import {
   halamanTemplateBagian,
   nomorHalamanBagian,
   templateBagianId,
-  templateUntukInstansi,
 } from '../src/services/templates/templateBagian';
 import { buildOpsi, CHART_DEFAULT, DAFTAR_CHART, type ChartId } from '../src/services/chart/chartDefault';
 import { contohData } from '../src/services/chart/contohData';
@@ -90,12 +89,21 @@ test('asisten memakai susunan deck untuk rapat, bukan untuk kata umum', () => {
   assert.equal(gayaDariPermintaan('pakai gaya korporat'), 'korporat');
 });
 
-test('nama template rapat mengikuti instansi yang login', () => {
-  const t = templateUntukInstansi(TEMPLATE_BAGIAN[0], 'Perumda Tirta Kencana');
-  assert.equal(t.nama, 'Rapat Perumda Tirta Kencana');
-  assert.match(t.judulDashboard, /Perumda Tirta Kencana/);
-  assert.equal(t.bagian!.unit, 'Rapat Manajemen Perumda Tirta Kencana');
-  assert.equal(templateUntukInstansi(TEMPLATE_BAGIAN[0], undefined), TEMPLATE_BAGIAN[0]);
-  const lain = DASHBOARD_TEMPLATES.find((x) => !x.bagian)!;
-  assert.equal(templateUntukInstansi(lain, 'X'), lain);
+test('nama template rapat generik, tanpa nama instansi', () => {
+  const t = TEMPLATE_BAGIAN[0];
+  assert.equal(t.nama, 'Rapat Manajemen');
+  assert.equal(t.bagian!.unit, 'Rapat Manajemen');
+  assert.doesNotMatch(JSON.stringify(t), /perumda|tirta|pdam/i);
+});
+
+test('jumlah chart mengikuti kalimat: dashboard penuh vs satu chart', async () => {
+  const { parsePermintaanJumlahWidget } = await import('../src/services/builder/permintaanWidget');
+  assert.deepEqual(parsePermintaanJumlahWidget('buat 1 chart pendapatan aja'), { min: 1, max: 1 });
+  assert.deepEqual(parsePermintaanJumlahWidget('bikin satu grafik laba'), { min: 1, max: 1 });
+  assert.deepEqual(parsePermintaanJumlahWidget('tiga kartu kpi'), { min: 3, max: 3 });
+  assert.equal(parsePermintaanJumlahWidget('buatkan dashboard rapat'), null);
+  // Dashboard rapat tanpa jumlah: deck penuh 5 halaman.
+  assert.equal(halamanUntukPermintaan('buatkan dashboard rapat', 'pdam').halaman.length, 5);
+  // Satu chart di kalimat rapat: satu halaman saja, bukan deck.
+  assert.deepEqual(halamanUntukPermintaan('dashboard rapat 1 chart pendapatan saja', 'pdam'), { halaman: [], bawaan: false });
 });

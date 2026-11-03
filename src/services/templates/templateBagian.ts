@@ -6,8 +6,8 @@ import type { DashboardTemplate } from './dashboardTemplates';
  *
  * Diturunkan dari deck "Management Meeting 2026 / RKA 2027". Deck aslinya per
  * bagian (General Support, Procurement, ...); di sini disatukan menjadi SATU
- * deck umum yang cocok untuk instansi mana pun, dan namanya mengikuti instansi
- * yang login (`templateUntukInstansi`). Tiap halaman dashboard = satu kelompok
+ * deck umum "Rapat Manajemen" yang cocok untuk instansi mana pun (nama
+ * instansi sengaja tidak dipakai). Tiap halaman dashboard = satu kelompok
  * slide (Executive Summary, operasional, keuangan, isu & action plan, KPI 2027).
  * Cover, agenda, dan closing tidak dijadikan halaman.
  *
@@ -26,7 +26,7 @@ export interface HalamanBagian {
 }
 
 export interface InfoBagian {
-  /** Nama rapat di kaki halaman, mis. "Rapat Manajemen Perumda Tirta Kencana". */
+  /** Nama rapat di kaki halaman, mis. "Rapat Manajemen". */
   unit: string;
   halaman: HalamanBagian[];
   /** Kata di kalimat asisten yang memilih template ini ("dashboard rapat ..."). */
@@ -256,19 +256,4 @@ export function halamanTemplateBagian(
 export function bagianDariPermintaan(prompt: string): DashboardTemplate | undefined {
   const t = String(prompt ?? '').toLowerCase();
   return TEMPLATE_BAGIAN.find((x) => x.bagian?.kunci.test(t));
-}
-
-/**
- * Template rapat dengan nama instansi yang login: label tab, judul dashboard,
- * dan kaki halaman. Template lain dikembalikan apa adanya.
- */
-export function templateUntukInstansi(t: DashboardTemplate, namaInstansi: string | undefined): DashboardTemplate {
-  const nama = String(namaInstansi ?? '').trim();
-  if (!t.bagian || !nama) return t;
-  return {
-    ...t,
-    nama: `Rapat ${nama}`,
-    judulDashboard: `Rapat Manajemen ${nama} — Kinerja & RKA 2027`,
-    bagian: { ...t.bagian, unit: `Rapat Manajemen ${nama}` },
-  };
 }

@@ -69,8 +69,20 @@ export function parsePermintaanJumlahWidget(prompt: string): PermintaanJumlahWid
     }
   }
 
+  // Angka ditulis dengan kata: "satu chart", "sebuah grafik", "tiga kartu".
+  const kata = teks.match(new RegExp(`(?:^|[^a-z])(${Object.keys(ANGKA_KATA).join('|')})\\s+${SATUAN}`, 'i'));
+  if (kata) {
+    const v = ANGKA_KATA[kata[1].toLowerCase()];
+    return { min: v, max: v };
+  }
+
   return null;
 }
+
+/** Angka kata yang dikenali sebelum satuan widget. */
+const ANGKA_KATA: Record<string, number> = {
+  satu: 1, sebuah: 1, dua: 2, tiga: 3, empat: 4, lima: 5, enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10,
+};
 
 /** Teks rentang untuk ditampilkan ke pengguna ("15–20" atau "12"). */
 export function labelJumlahWidget(p: PermintaanJumlahWidget): string {
