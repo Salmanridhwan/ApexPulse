@@ -6,6 +6,12 @@ import { DataTable } from './DataTable';
 import { KpiCard } from './KpiCard';
 import { NarasiCard } from './NarasiCard';
 import { pasanganUntuk } from './paletPasangan';
+import { WidgetChart } from './WidgetChart';
+import { gayaKartuReplika } from './konteksGayaReplika';
+import { propsKatalogHtml, type PropsKatalog } from '../../services/chart/dataKatalogWidget';
+import type { ChartId } from '../../services/chart/chartDefault';
+import { VARIAN, gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { useThemeMode } from '../../theme';
 
 /** Warna & keterangan status capaian target (sama seperti pratinjau template). */
 const WARNA_TARGET: Record<string, string> = {
@@ -97,7 +103,28 @@ const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
   return h;
 };
 
+/**
+ * Kartu berwajah HTML dari Template Chart (KPI, tabel, narasi, progres,
+ * peringkat): digambar `WidgetChart` yang sama dengan halaman Template Chart,
+ * bukan komponen kanvas sendiri. Gaya Semua (desain & warna kartu) ikut berlaku.
+ */
+const KartuKatalogHtml: React.FC<{ widget: WidgetSpec; props: PropsKatalog }> = ({ widget, props }) => {
+  const mode = useThemeMode();
+  const desain = widget.style?.desain;
+  const varian: Varian = desain && VARIAN.includes(desain as Varian) ? (desain as Varian) : 'default';
+  const dasar = gayaMode(varian, mode);
+  const { varian: varianAkhir, gaya } = gayaKartuReplika(widget.style, varian, dasar);
+  return (
+    <div className="w-full h-full min-h-0 flex flex-col" style={{ fontFamily: (gaya ?? dasar).huruf }}>
+      <WidgetChart chartId={widget.chartId as ChartId} varian={varianAkhir} gaya={gaya ?? dasar} {...props} />
+    </div>
+  );
+};
+
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false, preview = false }) => {
+  const katalog = widget.dataKosong ? null : propsKatalogHtml(widget);
+  if (katalog) return <KartuKatalogHtml widget={widget} props={katalog} />;
+
   if (TIPE_CHART.includes(widget.type)) {
     const seed = seedWarna(widget, urutan);
     const seri = widget.chart?.series || [];

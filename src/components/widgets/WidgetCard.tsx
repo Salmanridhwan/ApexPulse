@@ -29,6 +29,7 @@ import { WidgetRenderer } from './WidgetRenderer';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
+import { kartuBerjudulSendiri, propsKatalogHtml } from '../../services/chart/dataKatalogWidget';
 
 
 
@@ -182,24 +183,31 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       } as React.CSSProperties)
     : {};
 
+  // Kartu KPI/narasi berwajah Template Chart menggambar kotak & judulnya sendiri,
+  // jadi bingkai dan kepala kartu kanvas tidak dipasang (tanpa judul dobel).
+  const tanpaKepala = !widget.dataKosong && kartuBerjudulSendiri(widget) && propsKatalogHtml(widget) !== null;
+
   return (
     <div
-      className="relative card-tegas flex flex-col h-full overflow-hidden group"
-      style={gayaKartu}
+      className={tanpaKepala ? 'relative flex flex-col h-full group' : 'relative card-tegas flex flex-col h-full overflow-hidden group'}
+      style={tanpaKepala ? undefined : gayaKartu}
       data-kartu-warna={pakaiWarnaKartu ? kartuEfektif : undefined}
     >
       {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
-      <span aria-hidden="true" className="accent-bar" />
+      {!tanpaKepala && <span aria-hidden="true" className="accent-bar" />}
 
       {/* Widget Header — pita judul terpisah dari badan kartu oleh garis 1px,
           supaya judul tidak "berenang" bersama grafiknya. */}
       <div
         className={
-          padat
-            ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b border-line'
-            : 'px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line'
+          tanpaKepala
+            ? 'absolute top-1.5 right-1.5 z-10 rounded-chip bg-surface/90 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity'
+            : padat
+              ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b border-line'
+              : 'px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line'
         }
       >
+        {!tanpaKepala && (
         <div className="min-w-0">
           {/* Ikon kartu (khusus template): kotak kecil beraksen di atas judul,
               meniru pratinjau template agar kanvas nyata terlihat sama. */}
@@ -234,6 +242,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             </p>
           )}
         </div>
+        )}
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Hanya penanda koreksi manual yang tersisa — tanpa label provenans AI/sumber. */}
@@ -350,7 +359,9 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
         className={`flex-1 flex flex-col ${
-          padat
+          tanpaKepala
+            ? 'min-h-0'
+            : padat
             ? 'px-2 pb-1 pt-0.5 min-h-0'
             : `px-5 pb-4 pt-3 ${
                 ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
