@@ -10,7 +10,8 @@ import { WidgetChart } from './WidgetChart';
 import { gayaKatalogWidget } from './bingkaiKatalog';
 import { normalizeSeriesData } from './ChartEcharts';
 import { useChartSelection } from './ChartSelection';
-import { adaGaya, terapkanGaya } from './widgetStyle';
+import { adaGaya } from './widgetStyle';
+import { gayaReplika } from '../referensi/gayaReplika';
 import { grafikKatalog, propsKatalogHtml, type PropsKatalog } from '../../services/chart/dataKatalogWidget';
 import type { ChartId } from '../../services/chart/chartDefault';
 import type { DataChart } from '../../services/chart/pembangunOpsi';
@@ -147,8 +148,10 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec }> = ({ widget }) => {
   }, [widget.chart, ikutSeleksi, selected]);
   // Gaya pengguna selain desain & warna kartu (keduanya sudah ada di `g`).
   const gayaLain = widget.style ? { ...widget.style, desain: undefined, kartu: undefined } : undefined;
+  // gayaReplika (bukan terapkanGaya): wajah katalog mewarnai tiap batang/potongan
+  // lewat itemStyle, yang harus dibuang dulu supaya palet Warna Grafik berlaku.
   const pembungkus = useMemo(
-    () => (adaGaya(gayaLain) ? (opsi: any) => terapkanGaya(opsi, gayaLain, g.palet) : undefined),
+    () => (adaGaya(gayaLain) ? (opsi: any) => gayaReplika(opsi, gayaLain) : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(gayaLain), g]
   );
