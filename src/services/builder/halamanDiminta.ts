@@ -314,12 +314,30 @@ export function butirCadangan(h: HalamanDiminta, sector: string): string[] {
  * pengguna hanya meminta "beberapa halaman", segmentasi bawaan sektornya
  * (dipotong sesuai jumlah yang disebut); selain itu kosong (dibagi otomatis).
  */
+/** Kata yang menandai dashboard satu topik, bukan dashboard kinerja umum. */
+const KATA_TOPIK = /\b(keuangan|finansial|pendapatan|laba|beban|arus kas|aset|operasional|operasi|produksi|distribusi|pelayanan|layanan|pelanggan|pengaduan|wilayah|sdm|sumber daya|pegawai|karyawan|risiko|kredit|dana|pembiayaan|nrw|kehilangan air)\b/;
+
+/**
+ * Apakah kalimatnya meminta dashboard kinerja umum tanpa topik tertentu
+ * ("buatkan saya dashboard PDAM")? Judul segmen sektor ikut dianggap topik.
+ */
+export function dashboardUmum(prompt: string, segmen: HalamanDiminta[] = []): boolean {
+  const t = String(prompt ?? '').toLowerCase();
+  if (/\b(?:satu|1|sebuah)\s+halaman\b/.test(t)) return false;
+  if (KATA_TOPIK.test(t)) return false;
+  return !segmen.some((s) => s.judul !== 'Ringkasan' && t.includes(s.judul.toLowerCase()));
+}
+
 export function halamanUntukPermintaan(prompt: string, sector: string): { halaman: HalamanDiminta[]; bawaan: boolean } {
   const tertulis = bacaHalamanDiminta(prompt);
   if (tertulis.length > 0) return { halaman: tertulis, bawaan: false };
-  const minta = mintaBanyakHalaman(prompt);
-  if (!minta) return { halaman: [], bawaan: false };
   const segmen = segmenBawaan(sector);
+  // Dashboard umum ("buatkan dashboard PDAM") juga memakai segmentasi bawaan:
+  // tanpa itu hanya hasil sapuan yang dipakai, dan uji 3 Nov 2026 menghasilkan
+  // 2 halaman berisi 5 kartu KPI tanpa grafik. Permintaan satu topik
+  // ("dashboard keuangan") atau "satu halaman" tetap satu halaman.
+  const minta = mintaBanyakHalaman(prompt) || (dashboardUmum(prompt, segmen) && true);
+  if (!minta) return { halaman: [], bawaan: false };
   return { halaman: typeof minta === 'number' ? segmen.slice(0, minta) : segmen, bawaan: true };
 }
 

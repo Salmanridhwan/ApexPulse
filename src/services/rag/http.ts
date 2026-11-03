@@ -1187,23 +1187,40 @@ export class ConfigurableRagClient implements RagClient {
       sudahAda.add(k);
       gabungSemua.push(w);
     };
+    // Kuota KPI dan grafik/tabel DIHITUNG TERPISAH. Dulu kuota "3 widget pertama
+    // per area" selalu habis untuk KPI (payloadKeWidgetSpec menaruh KPI paling
+    // depan), lalu KPI dipotong jadi 6 oleh susunUlangWidget: uji 3 Nov 2026,
+    // sapuan 90 widget berakhir jadi 6 kartu KPI tanpa satu grafik pun.
     (sapuan.kelompok || []).forEach((g: any) => {
-      const batasArea = g.id === 'kpi' ? 5 : 3;
-      g.widgets.forEach((w: any, i: number) => (i < batasArea ? tambahWidget(w) : sisaKuota.push(w)));
+      const batasKpi = g.id === 'kpi' ? 5 : 1;
+      let kpiArea = 0;
+      let lainArea = 0;
+      g.widgets.forEach((w: any) => {
+        const masuk = w?.type === 'kpi' ? kpiArea++ < batasKpi : lainArea++ < 2;
+        if (masuk) tambahWidget(w);
+        else sisaKuota.push(w);
+      });
     });
     widgetsUtama.forEach(tambahWidget);
     fokus.widgets.forEach(tambahWidget);
 
     // Batas atas: dashboard tetap terbaca. Kuota per area di atas memastikan
     // setiap area dapat jatah, jadi yang dipotong hanya kelebihan — bukan
-    // seluruh area yang kebetulan urutannya belakangan.
+    // seluruh area yang kebetulan urutannya belakangan. Sisa grafik/tabel lebih
+    // dulu dari sisa KPI, karena KPI tetap dibatasi 6 kartu.
     const MAKS_WIDGET = 26;
+    sisaKuota.sort((a, b) => Number(a?.type === 'kpi') - Number(b?.type === 'kpi'));
+    // Hitungan yang tampil: KPI di atas 6 dibuang susunUlangWidget, jadi tidak memakan slot.
+    const terpakai = () => {
+      const kpi = gabungSemua.filter((x) => x?.type === 'kpi').length;
+      return gabungSemua.length - kpi + Math.min(6, kpi);
+    };
     for (const w of sisaKuota) {
-      if (gabungSemua.length >= MAKS_WIDGET) break;
+      if (terpakai() >= MAKS_WIDGET) break;
       tambahWidget(w);
     }
     // KPI maksimal 6 kartu dan semuanya di paling atas; grafik/tabel menyusul.
-    const widgets = susunUlangWidget(gabungSemua.slice(0, MAKS_WIDGET));
+    const widgets = susunUlangWidget(gabungSemua).slice(0, MAKS_WIDGET);
     if (widgets.length === 0) {
       console.warn('[rag] /extract tidak menghasilkan widget (sapuan, skema utuh & fokus sama-sama kosong)');
       return null;
