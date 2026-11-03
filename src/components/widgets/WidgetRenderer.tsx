@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { WidgetSpec } from '../../types';
 import { ChartEcharts } from './ChartEcharts';
 import { pakaiRancangan } from '../../services/chart/rancanganRag';
@@ -7,10 +7,13 @@ import { KpiCard } from './KpiCard';
 import { NarasiCard } from './NarasiCard';
 import { pasanganUntuk } from './paletPasangan';
 import { WidgetChart } from './WidgetChart';
-import { gayaKartuReplika } from './konteksGayaReplika';
-import { propsKatalogHtml, type PropsKatalog } from '../../services/chart/dataKatalogWidget';
+import { gayaKatalogWidget } from './bingkaiKatalog';
+import { normalizeSeriesData } from './ChartEcharts';
+import { useChartSelection } from './ChartSelection';
+import { adaGaya, terapkanGaya } from './widgetStyle';
+import { grafikKatalog, propsKatalogHtml, type PropsKatalog } from '../../services/chart/dataKatalogWidget';
 import type { ChartId } from '../../services/chart/chartDefault';
-import { VARIAN, gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import type { DataChart } from '../../services/chart/pembangunOpsi';
 import { useThemeMode } from '../../theme';
 
 /** Warna & keterangan status capaian target (sama seperti pratinjau template). */
@@ -109,14 +112,60 @@ const seedWarna = (widget: WidgetSpec, urutan?: number): number => {
  * bukan komponen kanvas sendiri. Gaya Semua (desain & warna kartu) ikut berlaku.
  */
 const KartuKatalogHtml: React.FC<{ widget: WidgetSpec; props: PropsKatalog }> = ({ widget, props }) => {
-  const mode = useThemeMode();
-  const desain = widget.style?.desain;
-  const varian: Varian = desain && VARIAN.includes(desain as Varian) ? (desain as Varian) : 'default';
-  const dasar = gayaMode(varian, mode);
-  const { varian: varianAkhir, gaya } = gayaKartuReplika(widget.style, varian, dasar);
+  const { varian, g } = gayaKatalogWidget(widget.style, useThemeMode());
   return (
-    <div className="w-full h-full min-h-0 flex flex-col" style={{ fontFamily: (gaya ?? dasar).huruf }}>
-      <WidgetChart chartId={widget.chartId as ChartId} varian={varianAkhir} gaya={gaya ?? dasar} {...props} />
+    <div className="w-full h-full min-h-0 flex flex-col">
+      <WidgetChart chartId={widget.chartId as ChartId} varian={varian} gaya={g} {...props} />
+    </div>
+  );
+};
+
+/** Tipe yang ikut seleksi lintas-chart (klik kategori), sama seperti `ChartEcharts`. */
+const SELEKSI_KATALOG = ['line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'waterfall'];
+
+/**
+ * Grafik kanvas berwajah Template Chart: digambar `WidgetChart` dengan gaya
+ * yang sama seperti kartu di halaman Template Chart (`gayaKatalogWidget`), jadi
+ * bentuk, warna, legenda, dan label cincin tidak berbeda sedikit pun. Yang
+ * ditambahkan kanvas hanya seleksi lintas-chart dan gaya pengguna di luar
+ * desain (palet, huruf, ketebalan).
+ */
+const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec }> = ({ widget }) => {
+  const { varian, g } = gayaKatalogWidget(widget.style, useThemeMode());
+  const { selected, setSelected } = useChartSelection();
+  const ikutSeleksi = SELEKSI_KATALOG.includes(widget.type);
+  const data = useMemo<DataChart>(() => {
+    const { normalizedSeries, displayUnit } = normalizeSeriesData(widget.chart?.series ?? [], widget.chart?.unit);
+    let kategori = widget.chart?.xAxis ?? [];
+    let seri = normalizedSeries.map((x) => ({ nama: x.name, data: x.data as Array<number | null> }));
+    if (ikutSeleksi && selected && kategori.includes(selected)) {
+      const i = kategori.indexOf(selected);
+      kategori = [selected];
+      seri = seri.map((x) => ({ ...x, data: [x.data[i] ?? null] }));
+    }
+    return { kategori, seri, satuan: displayUnit, desimal: 1, dariDokumen: true };
+  }, [widget.chart, ikutSeleksi, selected]);
+  // Gaya pengguna selain desain & warna kartu (keduanya sudah ada di `g`).
+  const gayaLain = widget.style ? { ...widget.style, desain: undefined, kartu: undefined } : undefined;
+  const pembungkus = useMemo(
+    () => (adaGaya(gayaLain) ? (opsi: any) => terapkanGaya(opsi, gayaLain, g.palet) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(gayaLain), g]
+  );
+  const klik = useCallback(
+    (label: string) => setSelected(selected === label ? null : label),
+    [selected, setSelected]
+  );
+  return (
+    <div className="w-full flex-1 min-h-[120px] flex flex-col">
+      <WidgetChart
+        chartId={widget.chartId as ChartId}
+        varian={varian}
+        gaya={g}
+        data={data}
+        pembungkus={pembungkus}
+        onKlikKategori={ikutSeleksi ? klik : undefined}
+      />
     </div>
   );
 };

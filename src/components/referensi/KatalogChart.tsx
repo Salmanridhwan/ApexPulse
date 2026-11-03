@@ -1,6 +1,7 @@
 import React from 'react';
 import { CHART_DEFAULT, DAFTAR_CHART, LABEL_KELOMPOK, type ChartId, type KelompokChart } from '../../services/chart/chartDefault';
-import { GAYA, cukupTerang, gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { GAYA, gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { bingkaiKatalog } from '../widgets/bingkaiKatalog';
 import { useThemeMode } from '../../theme';
 import { PratinjauChart } from './PratinjauChart';
 
@@ -24,51 +25,23 @@ const Kartu: React.FC<{ chartId: ChartId; varian: Varian }> = ({ chartId, varian
   const mode = useThemeMode();
   const g = gayaMode(varian, mode);
   const gantiGaya = g !== GAYA[varian] ? g : undefined;
-  // Kartu bening: pinggiran putih di latar terang (Kaca), pinggiran berpendar di latar gelap (Tirta).
-  const bening = Boolean(g.kaca);
-  const terang = cukupTerang(g.padanan ?? g.latar);
-  const tepiBening = terang ? 'rgba(255,255,255,0.55)' : g.garis;
+  const bk = bingkaiKatalog(g);
   return (
     // Seluruh kartu (kepala + isi) memakai warna gaya yang dipilih, supaya judul
-    // selaras dengan latar chart: gaya ikut tema aplikasi, Kaca bening hangat, lainnya gelap.
-    <div
-      className="rounded-card border overflow-hidden flex flex-col"
-      style={{
-        background: g.latarCss ?? g.latar,
-        borderColor: bening ? tepiBening : g.tepi?.warna ?? g.garis,
-        borderWidth: g.tepi?.tebal,
-        boxShadow: g.tepi && g.tepi.bayangan !== 'none' ? g.tepi.bayangan : undefined,
-        borderRadius: g.sudutKartu,
-        fontFamily: g.huruf,
-      }}
-    >
-      <div
-        className="px-3.5 pt-3 pb-2.5 border-b"
-        style={{
-          backgroundColor: bening ? (terang ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.05)') : g.kartu,
-          borderColor: bening ? tepiBening : g.tepi?.warna ?? g.garis,
-          borderBottomWidth: g.tepi?.tebal,
-          backdropFilter: bening ? 'blur(16px)' : undefined,
-          WebkitBackdropFilter: bening ? 'blur(16px)' : undefined,
-        }}
-      >
-        <p className="text-[13px] font-bold leading-snug truncate" style={{ color: g.teks }}>
+    // selaras dengan latar chart. Bingkainya sama persis dengan kartu di kanvas
+    // dashboard (`bingkaiKatalog`).
+    <div className="rounded-card border overflow-hidden flex flex-col" style={bk.luar}>
+      <div className="px-3.5 pt-3 pb-2.5 border-b" style={bk.kepala}>
+        <p className="text-[13px] font-bold leading-snug truncate" style={bk.judul}>
           {entri.nama}
         </p>
-        <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: g.teks3 }}>
+        <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={bk.sub}>
           {entri.guna}
         </p>
       </div>
       <div className="p-2.5 flex-1">
         {/* Gaya bening: chart digambar di atas kartu kaca buram, seperti di dashboard. */}
-        <div
-          className={bening ? 'rounded-[16px] border p-2' : ''}
-          style={
-            bening
-              ? { backgroundColor: g.kartu, borderColor: tepiBening, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }
-              : undefined
-          }
-        >
+        <div className={bk.dalam ? 'rounded-[16px] border p-2' : ''} style={bk.dalam}>
           <PratinjauChart chartId={chartId} varian={varian} gaya={gantiGaya} tinggi={entri.mesin === 'html' ? 140 : 168} />
         </div>
       </div>

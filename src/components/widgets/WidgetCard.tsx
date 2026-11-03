@@ -29,7 +29,8 @@ import { WidgetRenderer } from './WidgetRenderer';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
-import { kartuBerjudulSendiri, propsKatalogHtml } from '../../services/chart/dataKatalogWidget';
+import { kartuBerjudulSendiri, pakaiWajahKatalog } from '../../services/chart/dataKatalogWidget';
+import { bingkaiKatalog, gayaKatalogWidget } from './bingkaiKatalog';
 
 
 
@@ -183,18 +184,21 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       } as React.CSSProperties)
     : {};
 
-  // Kartu KPI/narasi berwajah Template Chart menggambar kotak & judulnya sendiri,
-  // jadi bingkai dan kepala kartu kanvas tidak dipasang (tanpa judul dobel).
-  const tanpaKepala = !widget.dataKosong && kartuBerjudulSendiri(widget) && propsKatalogHtml(widget) !== null;
+  // Kartu berwajah Template Chart memakai bingkai kartu halaman Template Chart
+  // (`bingkaiKatalog`): latar, kepala, tepi, huruf, dan kotak kaca yang sama persis.
+  const katalog = pakaiWajahKatalog(widget);
+  const bk = katalog ? bingkaiKatalog(gayaKatalogWidget(widget.style, mode).g) : null;
+  // Kartu KPI/narasi menggambar judulnya sendiri: kepala bingkai tidak dipasang (tanpa judul dobel).
+  const tanpaKepala = katalog && kartuBerjudulSendiri(widget);
 
   return (
     <div
-      className={tanpaKepala ? 'relative flex flex-col h-full group' : 'relative card-tegas flex flex-col h-full overflow-hidden group'}
-      style={tanpaKepala ? undefined : gayaKartu}
+      className={bk ? 'relative flex flex-col h-full overflow-hidden group rounded-card border' : 'relative card-tegas flex flex-col h-full overflow-hidden group'}
+      style={bk ? bk.luar : gayaKartu}
       data-kartu-warna={pakaiWarnaKartu ? kartuEfektif : undefined}
     >
       {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
-      {!tanpaKepala && <span aria-hidden="true" className="accent-bar" />}
+      {!bk && <span aria-hidden="true" className="accent-bar" />}
 
       {/* Widget Header — pita judul terpisah dari badan kartu oleh garis 1px,
           supaya judul tidak "berenang" bersama grafiknya. */}
@@ -202,10 +206,15 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         className={
           tanpaKepala
             ? 'absolute top-1.5 right-1.5 z-10 rounded-chip bg-surface/90 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity'
-            : padat
-              ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b border-line'
-              : 'px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line'
+            : bk
+              ? padat
+                ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b'
+                : 'px-3.5 pt-3 pb-2.5 flex items-start justify-between gap-2 border-b'
+              : padat
+                ? 'px-2.5 py-1 flex items-center justify-between gap-1.5 border-b border-line'
+                : 'px-5 pt-4 pb-2.5 flex items-start justify-between gap-2 border-b border-line'
         }
+        style={bk && !tanpaKepala ? bk.kepala : undefined}
       >
         {!tanpaKepala && (
         <div className="min-w-0">
@@ -226,10 +235,15 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           )}
           <h3
             className={
-              padat
-                ? 'text-[11px] font-bold text-ink leading-tight line-clamp-1'
-                : 'text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]'
+              bk
+                ? padat
+                  ? 'text-[11px] font-bold leading-tight line-clamp-1'
+                  : 'text-[13px] font-bold leading-snug truncate'
+                : padat
+                  ? 'text-[11px] font-bold text-ink leading-tight line-clamp-1'
+                  : 'text-[15px] font-bold text-ink tracking-[-0.01em] leading-snug line-clamp-2 min-h-[2.5em]'
             }
+            style={bk?.judul}
             title={widget.title}
           >
             {widget.title}
@@ -237,7 +251,11 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           {/* Subtitle disembunyikan untuk KPI yang punya target — badan kartu sudah
               menampilkan baris target di progress bar, jadi tidak dobel. */}
           {!padat && widget.subtitle && !(widget.type === 'kpi' && widget.kpi?.target !== undefined) && (
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-2 truncate mt-1" title={widget.subtitle}>
+            <p
+              className={bk ? 'text-[11px] mt-0.5 leading-snug line-clamp-2' : 'text-[10px] font-bold uppercase tracking-[0.1em] text-ink-2 truncate mt-1'}
+              style={bk?.sub}
+              title={widget.subtitle}
+            >
               {widget.subtitle}
             </p>
           )}
@@ -264,6 +282,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
               ref={tombolMenuRef}
               onClick={() => (showMenu ? setShowMenu(false) : bukaMenu())}
               className="p-1 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              style={bk && !tanpaKepala ? bk.sub : undefined}
               title="Menu Opsi Widget"
             >
               <MoreVertical className="w-4 h-4" />
@@ -359,8 +378,8 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
         className={`flex-1 flex flex-col ${
-          tanpaKepala
-            ? 'min-h-0'
+          bk
+            ? padat ? 'p-1.5 min-h-0' : 'p-2.5 min-h-0'
             : padat
             ? 'px-2 pb-1 pt-0.5 min-h-0'
             : `px-5 pb-4 pt-3 ${
@@ -380,6 +399,11 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             <p className="text-[10px] text-ink-3 italic">
               Tidak ada angka contoh yang ditampilkan.
             </p>
+          </div>
+        ) : bk?.dalam ? (
+          // Gaya bening: chart digambar di atas kotak kaca buram, seperti di Template Chart.
+          <div className="rounded-[16px] border p-2 flex-1 min-h-0 flex flex-col" style={bk.dalam}>
+            <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} />
           </div>
         ) : (
           <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} />

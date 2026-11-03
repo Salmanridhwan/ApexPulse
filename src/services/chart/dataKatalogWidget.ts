@@ -12,7 +12,8 @@
  */
 
 import type { WidgetSpec } from '../../types';
-import { CHART_DEFAULT, type ChartId } from './chartDefault';
+import { CHART_DEFAULT, DAFTAR_CHART, type ChartId } from './chartDefault';
+import { pakaiRancangan } from './rancanganRag';
 import type { DataChart } from './pembangunOpsi';
 
 export interface PropsKatalog {
@@ -117,3 +118,18 @@ export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
     }
   }
 }
+
+/** Grafik berwajah ECharts dari Template Chart yang datanya cukup untuk digambar. */
+export const grafikKatalog = (w: WidgetSpec): boolean =>
+  Boolean(
+    w.chartId &&
+      DAFTAR_CHART.includes(w.chartId as ChartId) &&
+      CHART_DEFAULT[w.chartId as ChartId].mesin === 'echarts' &&
+      !pakaiRancangan(w) &&
+      (w.chart?.xAxis?.length ?? 0) > 0 &&
+      (w.chart?.series?.length ?? 0) > 0
+  );
+
+/** Kartu digambar wajah Template Chart (HTML atau ECharts), lengkap dengan bingkainya. */
+export const pakaiWajahKatalog = (w: WidgetSpec): boolean =>
+  !w.dataKosong && (propsKatalogHtml(w) !== null || grafikKatalog(w));

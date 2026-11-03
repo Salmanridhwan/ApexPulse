@@ -53,7 +53,7 @@ function unitMultiplier(unit: string): number {
   return 1;
 }
 
-function normalizeSeriesData(
+export function normalizeSeriesData(
   series: Array<{ name: string; data: number[]; color?: string; unit?: string; kind?: 'bar' | 'line'; yAxisIndex?: 0 | 1 }>,
   widgetUnit?: string
 ) {

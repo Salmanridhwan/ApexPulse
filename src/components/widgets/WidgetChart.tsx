@@ -40,6 +40,11 @@ export interface WidgetChartProps {
   spark?: Array<number | null>;
   /** Tautan kecil di kepala kartu, mis. "Lihat semua". */
   tautan?: { label: string; onClick: () => void; terbuka?: boolean };
+  /**
+   * Klik satu kategori di kanvas grafik (batang, titik, potongan). Dipakai kanvas
+   * dashboard untuk seleksi lintas-chart.
+   */
+  onKlikKategori?: (label: string) => void;
   /** Klik pada satu butir di dalam widget (mis. satu petak strip KPI). */
   onKlikItem?: (indeks: number) => void;
   /** Kartu bisa diklik (mis. membuka sumber dokumen). */
@@ -105,6 +110,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   baris,
   onKlik,
   onKlikItem,
+  onKlikKategori,
   sorot,
   warnaSorot,
   pembungkus,
@@ -145,6 +151,12 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
       if (batal || !wadah.current) return;
       instans = ec.init(wadah.current);
       instans.setOption(hasil.opsi as any, true);
+      if (onKlikKategori) {
+        instans.on('click', (p: any) => {
+          const label = typeof p?.name === 'string' && p.name ? p.name : data.kategori[p?.dataIndex];
+          if (label) onKlikKategori(label);
+        });
+      }
       pengamat = new ResizeObserver(() => instans?.resize?.());
       pengamat.observe(wadah.current);
     });
@@ -153,7 +165,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
       pengamat?.disconnect();
       instans?.dispose?.();
     };
-  }, [chartId, varian, skala, hasil, html]);
+  }, [chartId, varian, skala, hasil, html, onKlikKategori, data]);
 
   if (html) {
     return (
