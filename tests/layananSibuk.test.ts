@@ -16,7 +16,7 @@ test('timeout dan 429 dari /extract masuk gagalLayanan, bukan tidakAda', async (
   let panggilan = 0;
   globalThis.fetch = (async (url: any) => {
     const u = String(url);
-    if (u.endsWith('/health')) return new Response('{}', { status: 200 });
+    if (u.endsWith('/health')) return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
     panggilan++;
     // Butir "arus kas": timeout; butir lain: 429.
     if (panggilan % 2 === 0) {

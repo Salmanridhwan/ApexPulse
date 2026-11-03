@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useContext, useEffect, useMemo, useRef } from 'react';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Gauge } from 'lucide-react';
 import { loadEcharts } from './echartsSetup';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
 import { contohKartu } from '../../services/chart/contohData';
 import { ringkasWilayah } from '../../services/templates/wilayahLayanan';
 import type { DataChart, SpesifikasiHtml } from '../../services/chart/pembangunOpsi';
-import type { GayaVarian, Varian } from '../../services/chart/gayaVarian';
+import { cukupTerang, type GayaVarian, type Varian } from '../../services/chart/gayaVarian';
+import { KonteksGayaReplika, gayaKartuReplika } from './konteksGayaReplika';
+import { gayaReplika } from '../referensi/gayaReplika';
 
 /**
  * RENDERER TUNGGAL WIDGET.
@@ -89,7 +91,7 @@ function deretSpark(spark: Array<number | null> | undefined, data: DataChart): n
 
 export const WidgetChart: React.FC<WidgetChartProps> = ({
   chartId,
-  varian,
+  varian: varianProp,
   data,
   skala = 1,
   tinggi,
@@ -110,16 +112,28 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   legendaItem,
   className,
   khas = false,
-  gaya,
+  gaya: gayaProp,
 }) => {
   const wadah = useRef<HTMLDivElement | null>(null);
+  // Gaya Semua di dashboard dari Template Dashboard (lihat konteksGayaReplika.ts):
+  // desain chart, warna kartu, palet, dan font berlaku di setiap kartu replika.
+  const gayaHalaman = useContext(KonteksGayaReplika);
+  const { varian, gaya } = useMemo(
+    () => gayaKartuReplika(gayaHalaman, varianProp, gayaProp),
+    [gayaHalaman, varianProp, gayaProp]
+  );
   const hasil = useMemo(() => {
     const keluaran = buildOpsi(chartId, data, varian, skala, gaya, khas);
     const mentah: any = keluaran.opsi;
     // Bentuk HTML tidak pernah disentuh panel Gaya; hanya kanvas.
     if (pembungkus && mentah?.mesin !== 'html') return { ...keluaran, opsi: pembungkus(mentah) };
+    // Halaman replika yang tidak memasang pembungkus sendiri tetap menerima palet & font.
+    if (gayaHalaman && mentah && mentah.mesin !== 'html') {
+      const terang = Boolean(gayaHalaman.kartu && cukupTerang(gayaHalaman.kartu));
+      return { ...keluaran, opsi: gayaReplika(mentah, gayaHalaman, undefined, terang) };
+    }
     return keluaran;
-  }, [chartId, data, varian, skala, pembungkus, khas, gaya]);
+  }, [chartId, data, varian, skala, pembungkus, khas, gaya, gayaHalaman]);
   const html = (hasil.opsi as SpesifikasiHtml | null)?.mesin === 'html' ? (hasil.opsi as SpesifikasiHtml) : null;
 
   useEffect(() => {

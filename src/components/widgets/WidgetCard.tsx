@@ -1,5 +1,7 @@
 import { cukupTerang, GAYA } from '../../services/chart/gayaVarian';
 import React, { useEffect, useRef, useState } from 'react';
+import { CHART_DEFAULT } from '../../services/chart/chartDefault';
+import { chartKatalogCocok, pakaiChartKatalog } from '../../services/chart/katalogCocok';
 import { createPortal } from 'react-dom';
 import {
   Activity,
@@ -28,14 +30,6 @@ import { punyaDataChart } from '../../services/spec/widgetTypes';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
 
-/** Label pendek untuk tombol ganti tipe cepat di menu widget. */
-const LABEL_TIPE: Record<string, string> = {
-  line: 'Garis', bar: 'Batang', area: 'Area', pie: 'Pai', donut: 'Donat',
-  hbar: 'Horiz.', scatter: 'Sebar', bubble: 'Gelembung', funnel: 'Funnel',
-  treemap: 'Treemap', waterfall: 'Waterfall', sankey: 'Sankey', radar: 'Radar',
-  histogram: 'Histogram', boxplot: 'Box', combo: 'Combo', map: 'Peta',
-  gantt: 'Gantt', heatmap: 'Heatmap', gauge: 'Gauge', kpi: 'KPI',
-};
 
 
 /**
@@ -276,24 +270,27 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                   {punyaDataChart(widget) && (
                     <>
                       <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
-                        Tipe Grafik
+                        Template Chart
                       </div>
-                      {/* Grid 3 kolom: 7 pilihan tetap terbaca tanpa terpotong,
-                          berbeda dari deretan pil satu baris yang bikin sesak. */}
-                      <div className="px-3 pb-2 grid grid-cols-3 gap-1">
-                        {(['line', 'bar', 'area', 'pie', 'hbar', 'scatter', 'funnel'] as const).map((t) => (
+                      {/* Chart dari menu Template Chart yang datanya tersedia di kartu ini.
+                          Daftar lengkap ada di editor (Ganti Template Chart). */}
+                      <div className="px-3 pb-2 grid grid-cols-2 gap-1">
+                        {chartKatalogCocok(widget).slice(0, 6).map((id) => (
                           <button
-                            key={t}
+                            key={id}
                             type="button"
-                            onClick={() => onEdit({ ...widget, type: t })}
-                            className={`text-[11px] font-semibold px-1.5 py-1.5 rounded-chip border transition-colors truncate ${
-                              widget.type === t
+                            onClick={() => {
+                              setShowMenu(false);
+                              onEdit(pakaiChartKatalog(widget, id));
+                            }}
+                            className={`text-[11px] font-semibold px-1.5 py-1.5 rounded-chip border transition-colors truncate text-left ${
+                              widget.chartId === id
                                 ? 'bg-solid text-on-solid border-solid'
                                 : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
                             }`}
-                            title={LABEL_TIPE[t]}
+                            title={CHART_DEFAULT[id].guna}
                           >
-                            {LABEL_TIPE[t]}
+                            {CHART_DEFAULT[id].nama}
                           </button>
                         ))}
                       </div>
@@ -308,7 +305,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                     className="w-full text-left px-3 py-1.5 hover:bg-surface-2 flex items-center gap-2"
                   >
                     <Edit2 className="w-3.5 h-3.5 text-brand" />
-                    <span>Ubah Visualisasi & Tipe</span>
+                    <span>Ganti Template Chart & Judul</span>
                   </button>
                   <button
                     onClick={() => {

@@ -6,8 +6,11 @@ import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { rapikanTataLetak } from './tataLetak';
 import {
+  MIN_WIDGET_HALAMAN,
+  butirCadangan,
   butirTerwakili,
   halamanUntukPermintaan,
+  halamanUntukWidget,
   judulUntukButir,
   labelPeriodeSumber,
   periodeWidget,
@@ -16,7 +19,6 @@ import {
   widgetKembar,
   type HalamanDiminta,
 } from './halamanDiminta';
-import { mintaTemplateChart } from './susunHalaman';
 import { selaraskanDaftarWidget } from '../spec/tipeSelaras';
 import {
   PermintaanJumlahWidget,
@@ -273,78 +275,113 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       title: `Mengisi ${halamanDiminta.length} halaman yang diminta (${tugas.length} indikator)...`,
       status: 'in_progress',
     });
-    const hasil: Array<WidgetSpec | null> = new Array(tugas.length).fill(null);
-    /** Butir yang gagal karena layanan (429/timeout), bukan karena dokumen kosong. */
-    const sibuk = new Set<number>();
-    const ambil = async (k: number) => {
-      const t = tugas[k];
-      try {
-        const r = await ragClient.ambilDataWidget!(
-          // Butir saja: nama halaman di pertanyaan ikut terbawa ke judul balikan RAG.
-          t.butir,
-          sector,
-          tipeButir(t.butir),
-          instansi,
-          kbId,
-          // Ketat: tanpa "angka terdekat"; hasilnya di-cache supaya angka sama tiap dibuat ulang.
-          // Bentuk bebas: asisten merancang grafik sendiri, kecuali pengguna minta Template Chart.
-          { batasMs: 120_000, turunkanTipe: true, ketat: true, lemparSaatGagal: true, bebasBentuk: !mintaTemplateChart(userPrompt) }
-        );
-        sibuk.delete(k);
-        if (r?.data) hasil[k] = r.data as WidgetSpec;
-      } catch {
-        // Satu butir gagal tidak boleh menggagalkan halaman lain; dicoba ulang di bawah.
-        sibuk.add(k);
+    let didapat = 0;
+
+    /**
+     * Ambil satu daftar butir dari dokumen, lalu saring dan pasang kartunya.
+     * `cadangan` = putaran pelengkap: butir yang tidak ada di dokumen tidak
+     * dilaporkan sebagai "tidak ditemukan", karena pengguna tidak memintanya.
+     */
+    const isiButir = async (daftar: Array<{ halaman: number; butir: string }>, cadangan: boolean) => {
+      const hasil: Array<WidgetSpec | null> = new Array(daftar.length).fill(null);
+      /** Butir yang gagal karena layanan (429/timeout), bukan karena dokumen kosong. */
+      const sibuk = new Set<number>();
+      const ambil = async (k: number) => {
+        const t = daftar[k];
+        try {
+          const r = await ragClient.ambilDataWidget!(
+            // Butir saja: nama halaman di pertanyaan ikut terbawa ke judul balikan RAG.
+            t.butir,
+            sector,
+            tipeButir(t.butir),
+            instansi,
+            kbId,
+            // Ketat: tanpa "angka terdekat"; hasilnya di-cache supaya angka sama tiap dibuat ulang.
+            { batasMs: 120_000, turunkanTipe: true, ketat: true, lemparSaatGagal: true }
+          );
+          sibuk.delete(k);
+          if (r?.data) hasil[k] = r.data as WidgetSpec;
+        } catch {
+          // Satu butir gagal tidak boleh menggagalkan halaman lain; dicoba ulang di bawah.
+          sibuk.add(k);
+        }
+      };
+      let berikut = 0;
+      // Dua sekaligus: layanan RAG membalas 429 saat 3-4 permintaan berjalan bersamaan.
+      const pekerja = Array.from({ length: Math.min(2, daftar.length) }, async () => {
+        while (berikut < daftar.length) await ambil(berikut++);
+      });
+      await Promise.all(pekerja);
+      // Putaran kedua untuk butir yang kena layanan sibuk: satu per satu setelah jeda.
+      if (sibuk.size > 0) {
+        await new Promise((r) => setTimeout(r, options.jedaUlangMs ?? 5000));
+        for (const k of [...sibuk]) await ambil(k);
       }
+
+      hasil.forEach((w, k) => {
+        const t = daftar[k];
+        if (sibuk.has(k)) {
+          if (!cadangan) laporanButir.gagalLayanan.push(t.butir);
+          return;
+        }
+        if (!w) {
+          if (!cadangan) laporanButir.tidakAda.push(t.butir);
+          return;
+        }
+        // Satuan dan sumber harus tentang butir ini (bukan beban pegawai untuk "jumlah pegawai").
+        const valid = validasiDataButir(t.butir, w);
+        // Judul dari butir (atau judul RAG yang dibersihkan); null = RAG memberi data
+        // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
+        const judul = valid.ok ? judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul) : null;
+        if (!judul) {
+          if (!cadangan) laporanButir.ditolak.push(t.butir);
+          logSummary.push(`[Halaman Diminta] "${t.butir}" ditolak: ${valid.alasan ?? 'data bukan tentang butir ini'}.`);
+          return;
+        }
+        const kartu: WidgetSpec = {
+          ...w,
+          title: judul,
+          // Label kita lebih dulu: subtitle RAG bentuknya tidak seragam ("Januari–Des…").
+          // Periode dan subtitle dari fungsi yang sama supaya selalu cocok.
+          subtitle: labelPeriodeSumber(w) ?? w.subtitle,
+          periode: periodeWidget(w) ?? '',
+          id: `hd-${t.halaman + 1}-${cadangan ? 'c' : ''}${k + 1}`,
+        };
+        // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
+        if (widgetKembar(kartu, synthesizedWidgets)) return;
+        halamanWidget[kartu.id] = t.halaman;
+        synthesizedWidgets.push(kartu);
+        didapat++;
+      });
     };
-    let berikut = 0;
-    // Dua sekaligus: layanan RAG membalas 429 saat 3-4 permintaan berjalan bersamaan.
-    const pekerja = Array.from({ length: Math.min(2, tugas.length) }, async () => {
-      while (berikut < tugas.length) await ambil(berikut++);
+
+    await isiButir(tugas, false);
+
+    // Putaran pelengkap: halaman yang belum mencapai MIN_WIDGET_HALAMAN diisi butir
+    // cadangan satu topik. Kurang sedikit lebih baik daripada angka indikator lain.
+    const isiPerHalaman = halamanDiminta.map(() => 0);
+    for (const w of synthesizedWidgets) {
+      const i = halamanWidget[w.id] ?? halamanUntukWidget(w, halamanDiminta);
+      if (i >= 0) isiPerHalaman[i]++;
+    }
+    const pelengkap: Array<{ halaman: number; butir: string }> = [];
+    halamanDiminta.forEach((h, i) => {
+      const kurang = MIN_WIDGET_HALAMAN - isiPerHalaman[i];
+      if (kurang <= 0) return;
+      // Sedikit berlebih: sebagian cadangan biasanya tidak ada di dokumen.
+      const calon = butirCadangan(h, sector).filter((b) => !butirTerwakili(b, synthesizedWidgets));
+      for (const b of calon.slice(0, kurang + 2)) pelengkap.push({ halaman: i, butir: b });
     });
-    await Promise.all(pekerja);
-    // Putaran kedua untuk butir yang kena layanan sibuk: satu per satu setelah jeda.
-    if (sibuk.size > 0) {
-      await new Promise((r) => setTimeout(r, options.jedaUlangMs ?? 5000));
-      for (const k of [...sibuk]) await ambil(k);
+    if (pelengkap.length > 0) {
+      onProgress?.({
+        id: 'step-3a',
+        title: `Melengkapi halaman yang isinya kurang dari ${MIN_WIDGET_HALAMAN} (${pelengkap.length} indikator cadangan)...`,
+        status: 'in_progress',
+      });
+      // Batas waktu: paling banyak 16 indikator cadangan per permintaan.
+      await isiButir(pelengkap.slice(0, 16), true);
     }
 
-    let didapat = 0;
-    hasil.forEach((w, k) => {
-      const t = tugas[k];
-      if (sibuk.has(k)) {
-        laporanButir.gagalLayanan.push(t.butir);
-        return;
-      }
-      if (!w) {
-        laporanButir.tidakAda.push(t.butir);
-        return;
-      }
-      // Satuan dan sumber harus tentang butir ini (bukan beban pegawai untuk "jumlah pegawai").
-      const valid = validasiDataButir(t.butir, w);
-      // Judul dari butir (atau judul RAG yang dibersihkan); null = RAG memberi data
-      // tentang hal lain, jadi kartunya dibuang alih-alih diberi judul yang salah.
-      const judul = valid.ok ? judulUntukButir(t.butir, w, halamanDiminta[t.halaman].judul) : null;
-      if (!judul) {
-        laporanButir.ditolak.push(t.butir);
-        logSummary.push(`[Halaman Diminta] "${t.butir}" ditolak: ${valid.alasan ?? 'data bukan tentang butir ini'}.`);
-        return;
-      }
-      const kartu: WidgetSpec = {
-        ...w,
-        title: judul,
-        // Label kita lebih dulu: subtitle RAG bentuknya tidak seragam ("Januari–Des…").
-        // Periode dan subtitle dari fungsi yang sama supaya selalu cocok.
-        subtitle: labelPeriodeSumber(w) ?? w.subtitle,
-        periode: periodeWidget(w) ?? '',
-        id: `hd-${t.halaman + 1}-${k + 1}`,
-      };
-      // Metrik yang sama dengan nama lain ("Warga terlayani" vs "Jumlah Pelanggan") tidak ditambahkan lagi.
-      if (widgetKembar(kartu, synthesizedWidgets)) return;
-      halamanWidget[kartu.id] = t.halaman;
-      synthesizedWidgets.push(kartu);
-      didapat++;
-    });
     logSummary.push(
       `[Halaman Diminta] ${halamanDiminta.map((h) => h.judul).join(', ')}: ${didapat} dari ${tugas.length} indikator ditemukan; ` +
         `${laporanButir.tidakAda.length} tidak ada di dokumen, ${laporanButir.ditolak.length} ditolak (bukan indikatornya), ${laporanButir.gagalLayanan.length} gagal karena layanan sibuk.`

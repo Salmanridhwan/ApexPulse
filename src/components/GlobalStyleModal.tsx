@@ -15,10 +15,11 @@ interface GlobalStyleModalProps {
    * Dipanggil setiap pilihan berubah. Perubahan langsung terlihat di kanvas,
    * tetapi baru tersimpan permanen lewat tombol Simpan di baris filter kanvas.
    *
-   * `target` = `'semua'` atau id grafik/widget sasaran PALET WARNA. Font dan
-   * ukuran font selalu berlaku untuk seluruh widget.
+   * `target` = `'semua'` atau daftar id kartu / grafik template sasaran DESAIN dan
+   * PALET ("ganti beberapa saja"). Warna kartu, font, dan ukuran font selalu
+   * berlaku untuk seluruh widget.
    */
-  onApply: (style: WidgetStyle | undefined, target: string) => void;
+  onApply: (style: WidgetStyle | undefined, target: 'semua' | string[]) => void;
   /** Pilihan sasaran palet warna: grafik template atau widget dashboard. */
   targetPalet?: Array<{ id: string; label: string }>;
 }
@@ -40,16 +41,23 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
   targetPalet = [],
 }) => {
   const [style, setStyle] = useState<WidgetStyle>(styleAwal || {});
-  /** Grafik/widget yang palet warnanya diubah. `semua` = seluruh grafik. */
-  const [target, setTarget] = useState('semua');
-  /** Cegah penerapan saat panel baru dibuka dengan gaya yang sudah ada. */
-  const pertamaRef = useRef(true);
+  /** Kartu/grafik yang desain & paletnya diubah. Kosong = seluruh kartu. */
+  const [terpilih, setTerpilih] = useState<string[]>([]);
+  const [modePilih, setModePilih] = useState(false);
+  const target: 'semua' | string[] = modePilih && terpilih.length > 0 ? terpilih : 'semua';
+  /**
+   * Pilihan (gaya + sasaran) yang terakhir diterapkan, mula-mula gaya saat panel
+   * dibuka. Penerapan hanya terjadi bila pilihan berbeda dari ini: dulu penanda "render pertama" habis sebelum gaya awal terisi, sehingga
+   * membuka panel saja sudah memunculkan "Perubahan belum disimpan".
+   */
+  const awalRef = useRef('');
 
   useEffect(() => {
     if (!isOpen) return;
     setStyle(styleAwal || {});
-    setTarget('semua');
-    pertamaRef.current = true;
+    setTerpilih([]);
+    setModePilih(false);
+    awalRef.current = JSON.stringify([styleAwal || {}, 'semua']);
     // Sengaja bergantung pada `isOpen` saja: mengisi ulang saat objek gayaAwal
     // berubah akan menimpa pilihan pengguna yang sedang mengatur.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,15 +69,16 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
    */
   useEffect(() => {
     if (!isOpen) return;
-    if (pertamaRef.current) {
-      pertamaRef.current = false;
-      return;
-    }
-    const t = window.setTimeout(() => onApply(adaGaya(style) ? style : undefined, target), 180);
+    const kunci = JSON.stringify([style, target]);
+    if (kunci === awalRef.current) return;
+    const t = window.setTimeout(() => {
+      awalRef.current = kunci;
+      onApply(adaGaya(style) ? style : undefined, target);
+    }, 180);
     return () => window.clearTimeout(t);
     // Target ikut dipantau: memilih grafik lain harus langsung menerapkan gaya ke sana.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [style, target, isOpen]);
+  }, [style, JSON.stringify(target), isOpen]);
 
   if (!isOpen) return null;
 
@@ -109,19 +118,49 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
       <div className="flex-1 overflow-y-auto p-4 text-xs space-y-3">
         {targetPalet.length > 0 && (
           <div>
-            <label className="block text-ink-2 font-medium mb-2">Terapkan Palet Warna ke</label>
-            <select
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              className="field-lg"
-            >
-              <option value="semua">Semua grafik</option>
-              {targetPalet.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
+            <label className="block text-ink-2 font-medium mb-2">Terapkan Desain &amp; Palet ke</label>
+            <div className="flex gap-2" role="radiogroup">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!modePilih}
+                onClick={() => setModePilih(false)}
+                className={`flex-1 px-2 py-1.5 rounded-control border text-xs font-semibold ${!modePilih ? 'border-brand ring-1 ring-brand bg-surface-2' : 'border-line'}`}
+              >
+                Semua kartu
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={modePilih}
+                onClick={() => setModePilih(true)}
+                className={`flex-1 px-2 py-1.5 rounded-control border text-xs font-semibold ${modePilih ? 'border-brand ring-1 ring-brand bg-surface-2' : 'border-line'}`}
+              >
+                Pilih beberapa
+              </button>
+            </div>
+            {modePilih && (
+              <div className="mt-2 max-h-48 overflow-y-auto border border-line rounded-control divide-y divide-line" data-testid="pilih-kartu-gaya">
+                {targetPalet.map((t) => (
+                  <label key={t.id} className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-surface-2">
+                    <input
+                      type="checkbox"
+                      checked={terpilih.includes(t.id)}
+                      onChange={(e) =>
+                        setTerpilih((p) => (e.target.checked ? [...p, t.id] : p.filter((x) => x !== t.id)))
+                      }
+                    />
+                    <span className="truncate">{t.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
             <p className="text-[10px] text-ink-3 mt-1">
-              Font dan ukuran font berlaku untuk semua widget.
+              {modePilih
+                ? terpilih.length > 0
+                  ? `${terpilih.length} kartu dipilih. Warna kartu dan font tetap untuk semua kartu.`
+                  : 'Centang kartu yang ingin diganti desain chart-nya.'
+                : 'Desain chart dan palet berlaku untuk semua kartu di semua halaman.'}
             </p>
           </div>
         )}

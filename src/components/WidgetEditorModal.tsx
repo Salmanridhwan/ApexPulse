@@ -15,10 +15,11 @@ import {
   X,
 } from 'lucide-react';
 import { WidgetSpec, WidgetType, type WidgetStyle } from '../types';
-import { tipeKompatibel, GRUP_VISUALISASI } from '../services/spec/widgetTypes';
 import { selaraskanTipe } from '../services/spec/tipeSelaras';
 import { adaGaya, bersihkanGaya } from './widgets/widgetStyle';
 import { StyleControls } from './StyleControls';
+import { CHART_DEFAULT, LABEL_KELOMPOK, type ChartId, type KelompokChart } from '../services/chart/chartDefault';
+import { chartKatalogCocok, pakaiChartKatalog } from '../services/chart/katalogCocok';
 
 interface WidgetEditorModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
   const [title, setTitle] = useState(widget?.title || '');
   const [subtitle, setSubtitle] = useState(widget?.subtitle || '');
   const [type, setType] = useState<WidgetType>(widget?.type || 'kpi');
+  /** Chart dari menu Template Chart yang dipakai kartu ini. */
+  const [chartId, setChartId] = useState<ChartId | undefined>(widget?.chartId as ChartId | undefined);
   const [category, setCategory] = useState(widget?.category || 'Operasional');
   const [periode, setPeriode] = useState(widget?.periode || '2026-Q1');
   const [unitKerja, setUnitKerja] = useState(widget?.unitKerja || 'Semua Unit');
@@ -86,6 +89,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
     setTitle(widget.title || '');
     setSubtitle(widget.subtitle || '');
     setType(widget.type || 'kpi');
+    setChartId(widget.chartId as ChartId | undefined);
     setCategory(widget.category || 'Operasional');
     setPeriode(widget.periode || '2026-Q1');
     setUnitKerja(widget.unitKerja || 'Semua Unit');
@@ -103,13 +107,15 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
 
   if (!isOpen || !widget) return null;
 
-  // Hanya tipe yang datanya tersedia di widget ini — supaya tak ada pilihan
-  // yang berujung kartu kosong (mis. beralih ke Tabel pada widget garis).
-  const chartTypes = tipeKompatibel(widget);
+  // Chart katalog (menu Template Chart) yang datanya tersedia di kartu ini.
+  const chartKatalog = chartKatalogCocok(widget);
+  const kelompokKatalog = (Object.keys(LABEL_KELOMPOK) as KelompokChart[])
+    .map((k) => ({ k, ids: chartKatalog.filter((id) => CHART_DEFAULT[id].kelompok === k) }))
+    .filter((g) => g.ids.length > 0);
 
   const handleSave = () => {
     // Jaring pengaman: tipe yang dipilih tetap diperiksa gerbang yang sama dengan katalog.
-    // Chip di UI sudah disaring `tipeKompatibel`, jadi ini hanya mencegah tipe tak sah
+    // Pilihan di UI sudah disaring `chartKatalogCocok`, jadi ini hanya mencegah tipe tak sah
     // lolos kalau daftar chip berubah di kemudian hari.
     const gerbang = selaraskanTipe({ ...widget, type }, type);
     const updated: WidgetSpec = {
@@ -143,7 +149,8 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
       }
     }
 
-    onSave(updated);
+    // Chart dari menu Template Chart: tipe mengikuti chart katalog yang dipilih.
+    onSave(chartId && chartId !== widget.chartId ? pakaiChartKatalog(updated, chartId) : updated);
     onClose();
   };
 
@@ -262,45 +269,45 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                 </div>
               </div>
 
-              {/* Tipe Visualisasi Grid — dikelompokkan agar mudah dipindai */}
+              {/* Chart dari menu Template Chart, dikelompokkan seperti di katalog. */}
               <div>
-                <label className="block text-ink-2 font-medium mb-2">
-                  Pilih Tipe Visualisasi Chart
+                <label className="block text-ink-2 font-medium mb-1">
+                  Ganti Template Chart
                 </label>
-                {chartTypes.length === 1 && (
-                  <p className="text-[11px] text-ink-2 mb-2">
-                    Widget ini hanya punya data untuk tipe ini.
-                  </p>
-                )}
-                <div className="space-y-3">
-                  {GRUP_VISUALISASI.map((grup) => {
-                    const tipeGrup = chartTypes.filter((ct) => ct.grup === grup);
-                    if (!tipeGrup.length) return null;
-                    return (
-                      <div key={grup}>
-                        <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3 mb-1.5">
-                          {grup}
-                        </p>
+                <p className="text-[11px] text-ink-2 mb-2">
+                  Hanya chart yang datanya tersedia di kartu ini. Gaya (Pijar, Lensa, ...) diatur di tab Warna &amp; Font atau tombol Gaya Semua.
+                </p>
+                {kelompokKatalog.length === 0 ? (
+                  <p className="text-[11px] text-ink-3">Belum ada chart katalog yang cocok dengan data kartu ini.</p>
+                ) : (
+                  <div className="space-y-3" data-testid="pemilih-template-chart">
+                    {kelompokKatalog.map(({ k, ids }) => (
+                      <div key={k}>
+                        <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3 mb-1.5">{LABEL_KELOMPOK[k]}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {tipeGrup.map((ct) => (
+                          {ids.map((id) => (
                             <button
-                              key={ct.type}
+                              key={id}
                               type="button"
-                              onClick={() => setType(ct.type)}
-                              className={`p-2.5 rounded-card border text-left transition-all ${type === ct.type
+                              aria-pressed={chartId === id}
+                              onClick={() => {
+                                setChartId(id);
+                                setType(CHART_DEFAULT[id].tipe);
+                              }}
+                              className={`p-2.5 rounded-card border text-left transition-all ${chartId === id
                                   ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
                                   : 'border-line bg-surface hover:bg-surface-2'
                                 }`}
                             >
-                              <p className="font-semibold text-ink">{ct.label}</p>
-                              <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{ct.desc}</p>
+                              <p className="font-semibold text-ink">{CHART_DEFAULT[id].nama}</p>
+                              <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{CHART_DEFAULT[id].guna}</p>
                             </button>
                           ))}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Kategori & Periode */}

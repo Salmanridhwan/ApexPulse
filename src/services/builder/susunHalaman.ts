@@ -20,9 +20,9 @@ import type { Varian } from '../chart/gayaVarian';
 import { kategoriWidget, type KategoriDashboard } from '../spec/kategoriWidget';
 import { halamanUntukWidget, periodeWidget, skorCocok, widgetKembar, type HalamanDiminta } from './halamanDiminta';
 
-/** Batas isi satu halaman supaya muat satu layar tanpa digulir. */
+/** Batas isi satu halaman: satu baris KPI + tiga baris kartu (permintaan produk: lebih dari 5 widget). */
 export const MAKS_KPI_PER_HALAMAN = 4;
-export const MAKS_KARTU_PER_HALAMAN = 4;
+export const MAKS_KARTU_PER_HALAMAN = 6;
 
 /** Hanya `kpi` yang duduk di baris KPI kanvas; progres target adalah kartu biasa. */
 const TIPE_KPI: WidgetType[] = ['kpi'];

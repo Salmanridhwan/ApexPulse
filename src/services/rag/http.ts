@@ -7,6 +7,7 @@ import { KB_CAMPUR } from './kbDefaults';
 import { angkaDariTeks } from '../spec/kpiSparkline';
 import { selaraskanTipe } from '../spec/tipeSelaras';
 import { bersihkanRancangan } from '../chart/rancanganRag';
+import { namaSetara } from '../spec/namaSetara';
 import { periodeSeragam } from '../builder/halamanDiminta';
 
 /**
@@ -943,7 +944,9 @@ export class ConfigurableRagClient implements RagClient {
           headers: { Authorization: `Bearer ${cfg.apiKey}` },
           signal: AbortSignal.timeout(Math.min(Math.max(5, cfg.timeoutMs || 60) * 1000, 8000)),
         });
-        if (res.ok) {
+        // Harus JSON: domain yang dilindungi kata sandi situs membalas /health dengan
+        // halaman login HTML (200), padahal API-nya ada di /api/v1.
+        if (res.ok && /json/i.test(res.headers.get('content-type') || '')) {
           this.baseTerpakai = { dikonfigurasi, dipakai: k, disesuaikan: k !== dikonfigurasi };
           return this.baseTerpakai;
         }
@@ -1270,7 +1273,11 @@ export class ConfigurableRagClient implements RagClient {
   ): string {
     const aturanFokus =
       fokus === 'kpi'
-        ? 'Isi "nilai" hanya angka, satuan terpisah dan wajib salah satu bentuk: "Rp triliun", "Rp miliar", "Rp juta", "%", "unit", "orang". ' +
+        ? // Satuan dokumen apa adanya: dulu hanya Rp/%/unit/orang yang boleh, sehingga model
+          // mengosongkan indikator bersatuan lain (kapasitas liter/detik, penyelesaian 1,80 hari).
+          'Isi "nilai" hanya angka, satuan terpisah. Uang wajib salah satu bentuk "Rp triliun", "Rp miliar", "Rp juta" ' +
+          '(angka dalam Rupiah penuh, mis. 486.200.000.000, diubah ke "486,2" "Rp miliar"); ' +
+          'persen ditulis "%"; satuan lain ditulis seperti di dokumen (mis. "liter/detik", "hari", "jam", "km", "m³", "kasus", "sambungan", "orang", "indeks"). ' +
           'Kalau dokumen juga memuat angka PERIODE SEBELUMNYA untuk indikator ini (tahun lalu/triwulan lalu), isi "nilaiLalu" dengan angka itu; kalau tidak ada, kosongkan. '
         : fokus === 'grafik'
           ? 'Isi 3 sampai 6 label kategori dari dokumen, dan setiap seri panjangnya sama dengan jumlah kategori. Angka dari dokumen. ' +
@@ -1295,10 +1302,13 @@ export class ConfigurableRagClient implements RagClient {
       );
     }
     if (gaya === 'ketat') {
+      // Nama lain yang lazim di dokumen BUMD ("beban operasional" untuk "beban usaha").
+      const setara = namaSetara(query);
       return (
         `Ambil data untuk SATU widget dashboard dari dokumen resmi di knowledge base ini. ` +
         sebutanInstansi +
         `Indikator yang diminta: "${query}". ` +
+        (setara.length ? `Di dokumen indikator yang sama bisa bernama: ${setara.map((n) => `"${n}"`).join(', ')}; nama itu boleh dipakai. ` : '') +
         `Ambil HANYA angka untuk indikator itu persis. Kalau dokumen tidak memuat indikator ini, ` +
         `kosongkan semua isian; JANGAN memakai angka indikator lain (misalnya beban pegawai untuk jumlah pegawai, ` +
         `atau air terjual untuk kualitas layanan). Tulis label dengan nama indikator di dokumen dan periodenya ` +
@@ -1680,6 +1690,9 @@ export class ConfigurableRagClient implements RagClient {
           return await this.ambilPayloadExtract(dipakai, cfg, teks, SKEMA_FOKUS[fokus], kbId, {
             lemparSaatGagal: true,
             timeoutMs: Math.min(batasPercobaan, sisaDetik),
+            // Mode ketat: potongan lebih banyak, karena indikator sering ada di tabel
+            // rekapitulasi yang tidak masuk 8 potongan teratas (arus kas, kapasitas).
+            ...(opsi?.ketat ? { topK: 16 } : {}),
           });
         } catch (err) {
           pesanTerakhir = jelaskanError(err);

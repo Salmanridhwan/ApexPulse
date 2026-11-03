@@ -20,17 +20,28 @@ export interface HalamanDiminta {
   judul: string;
   /** Indikator yang disebut untuk halaman ini, mis. "arus kas", "tren produksi bulanan". */
   butir: string[];
+  /**
+   * Indikator cadangan satu topik: hanya diambil bila halaman belum mencapai
+   * `MIN_WIDGET_HALAMAN` karena sebagian butir tidak ada di dokumen.
+   */
+  cadangan?: string[];
 }
+
+/** Isi minimal satu halaman dari Asisten (permintaan produk: lebih dari 5 widget). */
+export const MIN_WIDGET_HALAMAN = 6;
 
 /** Halaman per permintaan paling banyak; lebih dari ini tidak muat di navigasi halaman. */
 const MAKS_HALAMAN = 8;
 /** Butir per halaman paling banyak: satu halaman harus muat satu layar. */
 export const MAKS_BUTIR = 7;
 
+/** Kata penjelas ranah BUMD: tidak wajib muncul di kalimat sumber bila ada kata inti lain. */
+const KATA_PENJELAS = new Set(['pelanggan', 'air', 'usaha', 'perusahaan', 'pdam']);
+
 const KATA_UMUM = new Set([
   'dan', 'per', 'di', 'ke', 'dari', 'yang', 'tiap', 'setiap', 'terhadap', 'untuk', 'dengan', 'atau', 'lalu', 'serta',
   'angka', 'kpi', 'tren', 'bulanan', 'bulan', 'tahunan', 'tahun', 'utama', 'total', 'nilai', 'data', 'grafik', 'chart',
-  'jumlah', 'tingkat', 'rasio', 'persentase',
+  'jumlah', 'tingkat', 'rasio', 'persentase', 'volume',
 ]);
 
 /**
@@ -41,6 +52,9 @@ const KATA_UMUM = new Set([
 const FRASA_SAMA: Array<[RegExp, string]> = [
   [/non[\s-]*revenue[\s-]*water|kehilangan air|air (?:yang )?hilang|air t(?:ak|idak) berekening/g, ' nrw '],
   [/(?:warga|penduduk|jiwa) terlayani|sambungan (?:rumah|langganan)/g, ' pelanggan '],
+  // Dokumen BUMD: "beban operasional" = "beban usaha"; "air diproduksi" = "produksi air".
+  [/beban (?:usaha|operasional|operasi)/g, ' beban '],
+  [/air (?:yang )?(?:di|ter)produksi/g, ' produksi air '],
 ];
 const KATA_SAMA: Record<string, string> = {
   sambungan: 'pelanggan',
@@ -64,6 +78,7 @@ const KATA_SAMA: Record<string, string> = {
   diselesaikan: 'selesai',
   kategori: 'jenis',
   mutu: 'kualitas',
+  pelayanan: 'layanan',
   kontribusi: 'porsi',
   proporsi: 'porsi',
   sebaran: 'porsi',
@@ -213,23 +228,85 @@ export function mintaBanyakHalaman(prompt: string): number | boolean {
  */
 const SEGMEN_PDAM: HalamanDiminta[] = [
   // Tiap halaman minimal dua butir grafik supaya dashboard tidak hanya berisi KPI.
-  { judul: 'Ringkasan', butir: ['jumlah pelanggan', 'cakupan pelayanan', 'kapasitas produksi terpasang', 'tren jumlah pelanggan per tahun', 'komposisi pelanggan per golongan'] },
-  { judul: 'Keuangan', butir: ['pendapatan usaha', 'beban usaha', 'laba bersih', 'arus kas operasi', 'komposisi beban usaha', 'tren pendapatan per tahun'] },
-  { judul: 'Operasional & Produksi', butir: ['volume produksi air', 'volume air terjual', 'NRW (kehilangan air)', 'jam operasi pelayanan', 'tren produksi air per bulan', 'tren NRW per bulan'] },
-  { judul: 'Pelayanan Pelanggan', butir: ['jumlah pengaduan pelanggan', 'waktu penyelesaian pengaduan', 'kepatuhan mutu air', 'pengaduan per kategori', 'tren pengaduan per bulan'] },
-  { judul: 'Wilayah', butir: ['sambungan pelanggan per wilayah', 'cakupan pelayanan per wilayah', 'air terjual per wilayah'] },
+  {
+    judul: 'Ringkasan',
+    butir: ['jumlah pelanggan', 'cakupan pelayanan', 'kapasitas produksi terpasang', 'tren jumlah pelanggan per tahun', 'komposisi pelanggan per golongan'],
+    cadangan: ['volume air terjual', 'NRW (kehilangan air)', 'pendapatan usaha', 'laba bersih', 'jumlah pengaduan pelanggan', 'tren air terjual per bulan'],
+  },
+  {
+    judul: 'Keuangan',
+    butir: ['pendapatan usaha', 'beban usaha', 'laba bersih', 'arus kas operasi', 'komposisi beban usaha', 'tren pendapatan per tahun'],
+    cadangan: ['total aset', 'ekuitas', 'rasio kas', 'tren laba bersih per tahun', 'komposisi pendapatan per golongan', 'realisasi pendapatan terhadap target'],
+  },
+  {
+    judul: 'Operasional & Produksi',
+    butir: ['volume produksi air', 'volume air terjual', 'NRW (kehilangan air)', 'jam operasi pelayanan', 'tren produksi air per bulan', 'tren NRW per bulan'],
+    cadangan: ['kapasitas produksi terpasang', 'jumlah sambungan baru', 'panjang jaringan pipa', 'produksi air per instalasi', 'komposisi sumber air baku', 'tren air terjual per bulan'],
+  },
+  {
+    judul: 'Pelayanan Pelanggan',
+    butir: ['jumlah pengaduan pelanggan', 'waktu penyelesaian pengaduan', 'kepatuhan mutu air', 'pengaduan per kategori', 'tren pengaduan per bulan'],
+    cadangan: ['persentase pengaduan selesai', 'indeks kepuasan pelanggan', 'jumlah sambungan baru', 'status pengaduan', 'pengaduan per wilayah', 'tren kepatuhan mutu air per bulan'],
+  },
+  {
+    judul: 'Wilayah',
+    butir: ['sambungan pelanggan per wilayah', 'cakupan pelayanan per wilayah', 'air terjual per wilayah'],
+    cadangan: ['NRW per wilayah', 'pendapatan per wilayah', 'pengaduan per wilayah', 'produksi air per wilayah', 'tunggakan per wilayah', 'perbandingan kinerja antar wilayah'],
+  },
 ];
 
 const SEGMEN_UMUM: HalamanDiminta[] = [
-  { judul: 'Ringkasan', butir: ['jumlah pelanggan', 'total aset', 'tren total aset per tahun'] },
-  { judul: 'Keuangan', butir: ['pendapatan usaha', 'beban usaha', 'laba bersih', 'arus kas operasi', 'komposisi beban usaha', 'tren pendapatan per tahun'] },
-  { judul: 'Operasional', butir: ['volume layanan', 'capaian target operasional', 'tren volume layanan per bulan', 'perbandingan kinerja per unit'] },
-  { judul: 'Pelayanan', butir: ['jumlah pengaduan', 'waktu penyelesaian pengaduan', 'tren pengaduan per kategori'] },
-  { judul: 'Sumber Daya Manusia', butir: ['jumlah pegawai', 'komposisi pegawai per pendidikan'] },
+  {
+    judul: 'Ringkasan',
+    butir: ['jumlah pelanggan', 'total aset', 'tren total aset per tahun'],
+    cadangan: ['pendapatan usaha', 'laba bersih', 'jumlah pegawai', 'capaian target operasional', 'tren pendapatan per tahun', 'komposisi pendapatan per sumber'],
+  },
+  {
+    judul: 'Keuangan',
+    butir: ['pendapatan usaha', 'beban usaha', 'laba bersih', 'arus kas operasi', 'komposisi beban usaha', 'tren pendapatan per tahun'],
+    cadangan: ['total aset', 'ekuitas', 'rasio kas', 'tren laba bersih per tahun', 'komposisi pendapatan per sumber', 'realisasi pendapatan terhadap target'],
+  },
+  {
+    judul: 'Operasional',
+    butir: ['volume layanan', 'capaian target operasional', 'tren volume layanan per bulan', 'perbandingan kinerja per unit'],
+    cadangan: ['kapasitas layanan', 'tingkat pemanfaatan', 'jumlah unit layanan', 'tren capaian target per bulan', 'komposisi layanan per jenis'],
+  },
+  {
+    judul: 'Pelayanan',
+    butir: ['jumlah pengaduan', 'waktu penyelesaian pengaduan', 'tren pengaduan per kategori'],
+    cadangan: ['persentase pengaduan selesai', 'indeks kepuasan pelanggan', 'pengaduan per kategori', 'tren pengaduan per bulan', 'status pengaduan'],
+  },
+  {
+    judul: 'Sumber Daya Manusia',
+    butir: ['jumlah pegawai', 'komposisi pegawai per pendidikan'],
+    cadangan: ['komposisi pegawai per jabatan', 'beban pegawai', 'tren jumlah pegawai per tahun', 'jumlah pelatihan pegawai', 'rasio pegawai per pelanggan'],
+  },
 ];
 
 export function segmenBawaan(sector: string): HalamanDiminta[] {
-  return (sector === 'pdam' ? SEGMEN_PDAM : SEGMEN_UMUM).map((h) => ({ ...h, butir: [...h.butir] }));
+  return (sector === 'pdam' ? SEGMEN_PDAM : SEGMEN_UMUM).map((h) => ({ ...h, butir: [...h.butir], cadangan: [...(h.cadangan ?? [])] }));
+}
+
+/**
+ * Butir cadangan satu halaman, urut prioritas. Halaman bawaan memakai daftar
+ * cadangannya; halaman yang DITULIS pengguna meminjam butir dari segmen bawaan
+ * yang judulnya paling cocok (mis. "Halaman Keuangan" -> segmen Keuangan),
+ * supaya tetap satu topik. Butir yang sudah ada di halaman tidak diulang.
+ */
+export function butirCadangan(h: HalamanDiminta, sector: string): string[] {
+  let daftar = h.cadangan;
+  if (!daftar) {
+    const segmen = segmenBawaan(sector);
+    let terbaik: HalamanDiminta | undefined;
+    let skor = 0;
+    for (const s of segmen) {
+      const k = Math.max(skorCocok(s.judul, h.judul), skorCocok(h.judul, s.judul));
+      if (k > skor) [terbaik, skor] = [s, k];
+    }
+    daftar = terbaik && skor >= 0.5 ? [...terbaik.butir, ...(terbaik.cadangan ?? [])] : [];
+  }
+  const ada = new Set(h.butir.map((b) => b.toLowerCase()));
+  return daftar.filter((b) => !ada.has(b.toLowerCase()));
 }
 
 /**
@@ -346,7 +423,13 @@ export function validasiDataButir(butir: string, w: WidgetSpec): { ok: boolean; 
   if (kelas && boleh && !boleh.includes(kelas)) return { ok: false, alasan: `satuan "${unit}" bukan satuan ${butir}` };
   const potongan = (w.citations ?? []).map((c) => c?.chunkSnippet ?? '').join(' ');
   if (potongan.trim().length >= 15) {
-    const kunci = tokenBermakna(butir.replace(/\(.*?\)/g, ' ')).filter((t) => t !== 'progres');
+    const semuaKunci = tokenBermakna(butir.replace(/\(.*?\)/g, ' ')).filter((t) => t !== 'progres');
+    // Kata penjelas ranah ("pengaduan PELANGGAN", "produksi AIR") jarang ditulis ulang di
+    // kalimat sumber; hanya kata inti yang wajib ada, kecuali butirnya hanya kata itu.
+    // Diambil yang paling longgar dari dua hitungan (dengan dan tanpa kata penjelas).
+    const inti = semuaKunci.filter((t) => !KATA_PENJELAS.has(t));
+    const porsi = (k: string[]) => (k.length ? k.filter((x) => tokenBermakna(potongan).some((t) => kataSama(x, t))).length / k.length : 1);
+    const kunci = inti.length > 0 && porsi(inti) > porsi(semuaKunci) ? inti : semuaKunci;
     const ada = tokenBermakna(potongan);
     const kena = kunci.filter((k) => ada.some((t) => kataSama(k, t))).length;
     // Butir panjang (3+ kata kunci) cukup separuh: dokumen jarang memakai semua katanya.

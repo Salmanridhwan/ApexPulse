@@ -54,14 +54,14 @@ import {
   semuaWidget,
   tulisProyeksi,
 } from './services/dashboard/halaman';
-import type { TataLetakBaris } from './types';
+import type { HalamanDashboard, TataLetakBaris } from './types';
+import { terapkanGayaSemua } from './services/dashboard/gayaSemua';
 import { PresentationMode } from './components/PresentationMode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
 
 import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { GlobalStyleModal } from './components/GlobalStyleModal';
-import { tipePunyaGaya } from './components/widgets/widgetStyle';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman';
 import { Login } from './pages/Login';
@@ -241,7 +241,10 @@ export default function App() {
       body: JSON.stringify({
         widgets,
         gaya: activeDashboard.gaya,
-        halaman: tulisProyeksi(activeDashboard),
+        // Widget yang baru disimpan ikut tertulis di halaman aktif: `activeDashboard`
+        // di sini masih versi sebelum perubahan, dan `halaman` adalah sumber kebenaran
+        // saat dashboard dibuka ulang (dulu perubahan editor hilang setelah muat ulang).
+        halaman: tulisProyeksi({ ...activeDashboard, widgets }),
         halamanAktifId: activeDashboard.halamanAktifId || daftarHalaman(activeDashboard)[0]?.id,
         tenantId: currentTenant.id,
       }),
@@ -259,17 +262,19 @@ export default function App() {
   /** Draft tata letak kartu desain template; null = belum ada perubahan. */
   const [drafTataLetak, setDrafTataLetak] = useState<Record<string, TataLetakBaris> | null>(null);
   /**
-   * Daftar widget SEBELUM perubahan yang belum disimpan. Selama tidak null, kanvas
-   * berisi perubahan (mis. widget baru dari katalog) yang menunggu tombol Simpan.
+   * Semua halaman SEBELUM perubahan yang belum disimpan. Selama tidak null, kanvas
+   * berisi perubahan (mis. widget baru dari katalog, Gaya Semua) yang menunggu
+   * tombol Simpan. Sengaja per dashboard, bukan per halaman: gaya berlaku ke semua
+   * halaman, dan pindah halaman tidak boleh membuang perubahan yang belum disimpan.
    */
-  const [drafWidgetAwal, setDrafWidgetAwal] = useState<WidgetSpec[] | null>(null);
+  const [drafHalamanAwal, setDrafHalamanAwal] = useState<HalamanDashboard[] | null>(null);
   /** Gaya dashboard sebelum diubah dari panel Gaya; null = belum ada perubahan. */
   const [drafGaya, setDrafGaya] = useState<{ nilai?: WidgetStyle } | null>(null);
   useEffect(() => {
     setTampilWidget(false);
     // Draft tata letak dan draft widget tidak boleh terbawa ke dashboard lain.
     setDrafTataLetak(null);
-    setDrafWidgetAwal(null);
+    setDrafHalamanAwal(null);
     setDrafGaya(null);
   }, [activeDashboard?.id]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -605,6 +610,8 @@ export default function App() {
       w.id === updatedWidget.id ? updatedWidget : w
     );
     terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets });
+    // Editor punya tombol "Simpan Perubahan" sendiri: langsung tersimpan ke server.
+    await simpanWidget(updatedWidgets);
   };
 
   /**
@@ -621,49 +628,13 @@ export default function App() {
    * template. Warna kartu, font, dan ukuran font SELALU berlaku untuk semua
    * widget — hanya palet yang bisa dibatasi ke satu grafik.
    */
-  const handleApplyStyleToAll = (style: WidgetStyle | undefined, target = 'semua') => {
+  const handleApplyStyleToAll = (style: WidgetStyle | undefined, target: string | string[] = 'semua') => {
     if (!activeDashboard || !currentTenant) return;
     // Seperti tambah widget: masuk kanvas dulu, penyimpanan lewat tombol Simpan.
-    setDrafWidgetAwal((awal) => awal ?? activeDashboard.widgets);
+    setDrafHalamanAwal((awal) => awal ?? tulisProyeksi(activeDashboard));
     setDrafGaya((awal) => awal ?? { nilai: activeDashboard.gaya });
-
-    const dasar = activeDashboard.gaya || {};
-    const palet = style?.palette;
-    const seri = style?.warnaSeri?.length ? style.warnaSeri : undefined;
-
-    const gayaDashboard: WidgetStyle = {
-      ...dasar,
-      desain: target === 'semua' ? style?.desain : dasar.desain,
-      kartu: style?.kartu,
-      font: style?.font,
-      fontUkuran: style?.fontUkuran,
-      palette: target === 'semua' ? palet : dasar.palette,
-      warnaSeri: target === 'semua' ? seri : dasar.warnaSeri,
-      chart:
-        target === 'semua'
-          ? dasar.chart
-          : { ...(dasar.chart || {}), [target]: palet || 'default' },
-    };
-
-    const updatedWidgets = activeDashboard.widgets.map((w) => {
-      const kenaPalet = target === 'semua' || w.id === target;
-      const gayaWidget: WidgetStyle = {
-        ...(w.style || {}),
-        desain: kenaPalet ? style?.desain : w.style?.desain,
-        kartu: gayaDashboard.kartu,
-        font: gayaDashboard.font,
-        fontUkuran: gayaDashboard.fontUkuran,
-        palette: kenaPalet ? palet : w.style?.palette,
-        warnaSeri: kenaPalet ? seri : w.style?.warnaSeri,
-      };
-      // Tabel/narasi tidak menggambar chart: simpan hanya warna kartunya.
-      // Tabel/narasi tetap menerima desain dan warna kartu: keduanya ikut desain katalog.
-      const gayaRingan: WidgetStyle | undefined =
-        gayaWidget.desain || gayaDashboard.kartu ? { desain: gayaWidget.desain, kartu: gayaDashboard.kartu } : undefined;
-      return { ...w, style: tipePunyaGaya(w.type) ? gayaWidget : gayaRingan };
-    });
-
-    terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets, gaya: gayaDashboard });
+    // Semua halaman, bukan hanya halaman yang sedang dibuka.
+    terapkanDashboard(terapkanGayaSemua(activeDashboard, style, target));
   };
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -746,9 +717,14 @@ export default function App() {
 
   const targetPalet = useMemo(() => {
     if (activeDashboard?.replika) return GRAFIK_TEMPLATE[activeDashboard.replika.templateId] || [];
-    return (activeDashboard?.widgets || []).map((w) => ({ id: w.id, label: w.title }));
+    // Kartu di SEMUA halaman, diberi nama halamannya, supaya "ganti beberapa saja" bisa lintas halaman.
+    if (!activeDashboard) return [];
+    const semua = tulisProyeksi(activeDashboard);
+    return semua.flatMap((h) =>
+      (h.widgets || []).map((w) => ({ id: w.id, label: semua.length > 1 ? `${h.judul} · ${w.title}` : w.title }))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDashboard?.replika?.templateId, activeDashboard?.widgets]);
+  }, [activeDashboard?.replika?.templateId, activeDashboard?.widgets, activeDashboard?.halaman]);
 
   const gayaDashboardAktif = useMemo(
     () => activeDashboard?.gaya ?? activeDashboard?.widgets?.find((w) => w.style)?.style,
@@ -814,11 +790,9 @@ export default function App() {
     const semua = tulisProyeksi(d);
     const tujuan = semua.find((h) => h.id === id);
     if (!tujuan) return;
-    // Perubahan yang belum disimpan tetap di memori (ikut tertulis di halaman),
-    // tetapi draft antar-halaman tidak boleh tercampur.
+    // Perubahan yang belum disimpan ikut tertulis di halaman dan draftnya tetap ada,
+    // supaya tombol Simpan/Reset tidak hilang. Tata letak template per halaman.
     setDrafTataLetak(null);
-    setDrafWidgetAwal(null);
-    setDrafGaya(null);
     terapkanDashboard({ ...d, ...proyeksi(tujuan, d), halaman: semua, halamanAktifId: id });
   };
 
@@ -906,7 +880,7 @@ export default function App() {
    */
   const handleAddWidgetFromCatalog = (widget: WidgetSpec) => {
     if (!activeDashboard || !currentTenant) return;
-    setDrafWidgetAwal((awal) => awal ?? activeDashboard.widgets);
+    setDrafHalamanAwal((awal) => awal ?? tulisProyeksi(activeDashboard));
     const updatedWidgets = [widget, ...activeDashboard.widgets];
     terapkanDashboard({ ...activeDashboard, widgets: updatedWidgets });
   };
@@ -998,11 +972,11 @@ export default function App() {
   const tataLetakTersimpan = templateAktif ? activeDashboard?.tataLetak?.[templateAktif] : undefined;
   const tataLetakAktif = drafTataLetak ?? tataLetakTersimpan ?? {};
   const tataLetakBerubah = useMemo(() => {
-    if (drafWidgetAwal || drafGaya) return true;
+    if (drafHalamanAwal || drafGaya) return true;
     if (!drafTataLetak) return false;
     return JSON.stringify(drafTataLetak) !== JSON.stringify(tataLetakTersimpan ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafTataLetak, drafWidgetAwal, drafGaya, activeDashboard?.tataLetak, templateAktif]);
+  }, [drafTataLetak, drafHalamanAwal, drafGaya, activeDashboard?.tataLetak, templateAktif]);
 
   /** Setiap gerakan kartu hanya memperbarui draft. */
   const ubahTataLetak = (baru: Record<string, TataLetakBaris>) => setDrafTataLetak(baru);
@@ -1013,9 +987,9 @@ export default function App() {
     if (!d) return;
 
     // Widget baru yang masih draft ikut disimpan di sini.
-    if (drafWidgetAwal || drafGaya) {
+    if (drafHalamanAwal || drafGaya) {
       void simpanWidget(d.widgets);
-      setDrafWidgetAwal(null);
+      setDrafHalamanAwal(null);
       setDrafGaya(null);
     }
 
@@ -1034,13 +1008,15 @@ export default function App() {
   /** Buang draft, kembali ke kondisi yang tersimpan. */
   const resetTataLetak = () => {
     setDrafTataLetak(null);
-    if (activeDashboard && (drafWidgetAwal || drafGaya)) {
-      terapkanDashboard({
+    if (activeDashboard && (drafHalamanAwal || drafGaya)) {
+      const kembali: Dashboard = {
         ...activeDashboard,
-        widgets: drafWidgetAwal ?? activeDashboard.widgets,
+        ...(drafHalamanAwal ? { halaman: drafHalamanAwal } : {}),
         gaya: drafGaya ? drafGaya.nilai : activeDashboard.gaya,
-      });
-      setDrafWidgetAwal(null);
+      };
+      const aktif = ambilHalamanAktif(kembali);
+      terapkanDashboard(aktif ? { ...kembali, ...proyeksi(aktif, kembali) } : kembali);
+      setDrafHalamanAwal(null);
       setDrafGaya(null);
     }
   };

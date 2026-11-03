@@ -7,6 +7,7 @@ import { OperasionalTema, WilayahTema } from './DashboardTemaLain';
 import { DashboardTrafik } from './DashboardTrafik';
 import { DashboardWilayah } from './DashboardWilayah';
 import { KacaOperasional, KacaRingkasan, KacaWilayah } from './DashboardKaca';
+import { KonteksGayaReplika } from '../widgets/konteksGayaReplika';
 import type { SumberDok } from '../../services/templates/nilaiOperasional';
 
 /**
@@ -37,7 +38,18 @@ export const pecahTemplateId = (templateId: string): { dasar: string; nomor: 1 |
   return { dasar, nomor: n === '2' ? 2 : n === '3' ? 3 : 1 };
 };
 
-export const ReplikaHalaman: React.FC<Props> = ({
+/**
+ * Gaya dashboard (panel Gaya Semua) dipasang di konteks supaya SETIAP kartu replika
+ * di setiap halaman template ikut: desain chart, warna kartu, palet, dan font.
+ * Pratinjau contoh di menu Template Dashboard tidak memakai gaya dashboard.
+ */
+export const ReplikaHalaman: React.FC<Props> = (props) => (
+  <KonteksGayaReplika.Provider value={props.contoh ? undefined : props.gaya}>
+    <IsiReplika {...props} />
+  </KonteksGayaReplika.Provider>
+);
+
+const IsiReplika: React.FC<Props> = ({
   replika,
   gaya,
   tataLetak,
@@ -69,7 +81,7 @@ export const ReplikaHalaman: React.FC<Props> = ({
     return tema ? (
       <WilayahTema tema={tema} nilai={nilai} penuh={penuh} warnaKartu={warnaKartu} {...sumber} />
     ) : (
-      <DashboardWilayah nilai={nilai} penuh={penuh} warnaKartu={warnaKartu} {...sumber} />
+      <DashboardWilayah nilai={nilai} penuh={penuh} gaya={gaya} warnaKartu={warnaKartu} {...sumber} />
     );
   }
   const umum = { nilai, warnaKartu, gaya, tataLetak, onTataLetak, penuh };
