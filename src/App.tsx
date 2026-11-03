@@ -58,6 +58,7 @@ import type { HalamanDashboard, TataLetakBaris } from './types';
 import { terapkanGayaSemua } from './services/dashboard/gayaSemua';
 import { PresentationMode } from './components/PresentationMode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from './components/widgets/ChartSelection';
+import { KonteksInstansi } from './components/referensi/DashboardBagian';
 import { preloadEcharts } from './components/widgets/ChartEcharts';
 
 import { WidgetEditorModal } from './components/WidgetEditorModal';
@@ -1062,6 +1063,7 @@ export default function App() {
   );
 
   return (
+    <KonteksInstansi.Provider value={currentTenant?.name}>
     <div className="fixed inset-0 text-ink flex flex-row font-sans antialiased overflow-hidden">
       {/* ================= LEFT SIDEBAR ================= */}
       {/* Sidebar utama juga tampil di mode admin: menu Panel Admin kini ada di sini,
@@ -1755,5 +1757,6 @@ export default function App() {
       />
 
     </div>
+    </KonteksInstansi.Provider>
   );
 }

@@ -73,7 +73,7 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
-import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
+import { bagianDariPermintaan, halamanTemplateBagian, templateUntukInstansi } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
   nilaiDariWidgets,
@@ -1813,7 +1813,8 @@ const app = express();
     }));
 
     // Judul dashboard: buang penanda "(Contoh)" karena angkanya dari dokumen.
-    const judulBersih = template.judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
+    // Template rapat memakai nama instansi, sama dengan label di galeri.
+    const judulBersih = templateUntukInstansi(template, tenant.name).judulDashboard.replace(/\s*\(Contoh\)\s*/i, '').trim();
 
     /**
      * TIGA HALAMAN, sama persis dengan galeri: halaman 1 ringkasan, halaman 2

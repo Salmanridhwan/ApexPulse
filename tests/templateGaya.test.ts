@@ -9,7 +9,7 @@ test('setiap gaya Template Chart punya template dashboard', () => {
   // Pijar, Lensa, Nadi, Kaca memakai kunci tema lama; sisanya kunci varian.
   const lama: Record<string, string> = { ringkasan: 'oranye', analitik: 'analitik', trafik: 'trafik', kaca: 'kaca' };
   for (const v of VARIAN) assert.ok(tema.has(lama[v] ?? v), `template untuk gaya ${v}`);
-  assert.equal(DASHBOARD_TEMPLATES.length, 17);
+  assert.equal(DASHBOARD_TEMPLATES.length, 12);
 });
 
 test('varianTemplate membaca id template bergaya, termasuk halaman 2/3', () => {

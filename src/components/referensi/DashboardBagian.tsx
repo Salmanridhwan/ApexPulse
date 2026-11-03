@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { FileSearch } from 'lucide-react';
 import type { WidgetSpec, WidgetStyle } from '../../types';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
@@ -7,16 +7,19 @@ import { bingkaiKatalog, gayaKatalogWidget } from '../widgets/bingkaiKatalog';
 import { useThemeMode } from '../../theme';
 import { kartuBerjudulSendiri } from '../../services/chart/dataKatalogWidget';
 import { templateBerdasarkanId } from '../../services/templates/dashboardTemplates';
-import { halamanTemplateBagian, nomorHalamanBagian } from '../../services/templates/templateBagian';
+import { halamanTemplateBagian, nomorHalamanBagian, templateUntukInstansi } from '../../services/templates/templateBagian';
 
 /**
  * SATU HALAMAN TEMPLATE RAPAT BAGIAN (`tpl-bagian-x#n`).
  *
  * Meniru slide deck rapat manajemen: badge nomor miring, judul & subjudul,
- * kartu-kartu dalam grid 12 kolom, dan kaki "Meeting Bagian … · Confidential".
+ * kartu-kartu dalam grid 12 kolom, dan kaki "Rapat Manajemen <instansi> · Confidential".
  * Setiap kartu digambar `WidgetRenderer` dengan desain gaya aktif (bawaan
  * Korporat), jadi bentuknya sama dengan menu Template Chart dan kanvas.
  */
+/** Nama instansi yang login; dipasang `App` supaya kaki halaman memakai namanya. */
+export const KonteksInstansi = createContext<string | undefined>(undefined);
+
 interface Props {
   templateId: string;
   /** Kartu halaman ini. Kosong = kartu contoh template. */
@@ -42,7 +45,9 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
   const mode = useThemeMode();
   const dasar = templateId.split('#')[0];
   const nomor = nomorHalamanBagian(templateId);
-  const template = templateBerdasarkanId(dasar);
+  const instansi = useContext(KonteksInstansi);
+  const asal = templateBerdasarkanId(dasar);
+  const template = asal ? templateUntukInstansi(asal, instansi) : undefined;
   const halaman = template ? halamanTemplateBagian(template)[nomor - 1] : undefined;
   const isi = widgets ?? halaman?.widgets ?? [];
   // Desain halaman ikut panel Gaya Semua; tanpa pilihan = Korporat.
@@ -90,7 +95,7 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
         className="relative mt-auto flex items-center justify-between gap-3 px-4 sm:px-5 py-2 text-[10px] font-semibold uppercase tracking-wider"
         style={{ color: g.teks3, borderTop: `1px solid ${g.garis}` }}
       >
-        <span className="truncate">{template?.bagian?.unit ?? template?.nama} 2026</span>
+        <span className="truncate">{template?.bagian?.unit ?? template?.nama} · 2026</span>
         <span className="shrink-0">Confidential · {nomor}</span>
       </footer>
     </div>
