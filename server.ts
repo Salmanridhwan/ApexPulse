@@ -544,7 +544,6 @@ function versiBundelSaatIni(): string {
   }
   return 'dev';
 }
-const VERSI_BUNDEL = versiBundelSaatIni();
 
 const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -814,7 +813,11 @@ const app = express();
    */
   app.get('/api/versi', (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ versi: VERSI_BUNDEL });
+    // Dibaca ulang tiap permintaan (index.html ~2 KB): `dist` bisa dibangun ulang
+    // tanpa server dimulai ulang, dan tab yang masih memakai bundel lama harus
+    // diberi tahu. Dulu versi dihitung sekali saat start, jadi tab lama terus
+    // memakai kode lama tanpa pemberitahuan (uji 3 Nov 2026).
+    res.json({ versi: versiBundelSaatIni() });
   });
 
   app.get('/health', async (_req: Request, res: Response) => {
