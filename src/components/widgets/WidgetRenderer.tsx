@@ -176,6 +176,8 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec }> = ({ widget }) => {
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false, preview = false }) => {
   const katalog = widget.dataKosong ? null : propsKatalogHtml(widget);
   if (katalog) return <KartuKatalogHtml widget={widget} props={katalog} />;
+  // Grafik ber-chartId: renderer yang sama dengan halaman Template Chart.
+  if (!widget.dataKosong && grafikKatalog(widget)) return <KartuKatalogGrafik widget={widget} />;
 
   if (TIPE_CHART.includes(widget.type)) {
     const seed = seedWarna(widget, urutan);
