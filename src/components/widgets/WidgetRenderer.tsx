@@ -71,6 +71,8 @@ function TargetList({
 
 interface WidgetRendererProps {
   widget: WidgetSpec;
+  /** Klik area kosong grafik katalog: kartu membuka panel sumber dokumen. */
+  onKlikKosong?: () => void;
   /** Posisi kartu di kanvas (opsional) — menggeser hue awal grafik. */
   urutan?: number;
   /** Mode padat (dashboard satu halaman) — diteruskan ke grafik & tabel. */
@@ -131,7 +133,7 @@ const SELEKSI_KATALOG = ['line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut',
  * ditambahkan kanvas hanya seleksi lintas-chart dan gaya pengguna di luar
  * desain (palet, huruf, ketebalan).
  */
-const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec }> = ({ widget }) => {
+const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec; onKlikKosong?: () => void }> = ({ widget, onKlikKosong }) => {
   const { varian, g } = gayaKatalogWidget(widget.style, useThemeMode());
   const { selected, setSelected } = useChartSelection();
   const ikutSeleksi = SELEKSI_KATALOG.includes(widget.type);
@@ -168,16 +170,17 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec }> = ({ widget }) => {
         data={data}
         pembungkus={pembungkus}
         onKlikKategori={ikutSeleksi ? klik : undefined}
+        onKlikKosong={onKlikKosong}
       />
     </div>
   );
 };
 
-export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false, preview = false }) => {
+export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, padat = false, preview = false, onKlikKosong }) => {
   const katalog = widget.dataKosong ? null : propsKatalogHtml(widget);
   if (katalog) return <KartuKatalogHtml widget={widget} props={katalog} />;
   // Grafik ber-chartId: renderer yang sama dengan halaman Template Chart.
-  if (!widget.dataKosong && grafikKatalog(widget)) return <KartuKatalogGrafik widget={widget} />;
+  if (!widget.dataKosong && grafikKatalog(widget)) return <KartuKatalogGrafik widget={widget} onKlikKosong={onKlikKosong} />;
 
   if (TIPE_CHART.includes(widget.type)) {
     const seed = seedWarna(widget, urutan);

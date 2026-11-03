@@ -1,4 +1,4 @@
-import { cukupTerang, GAYA } from '../../services/chart/gayaVarian';
+import { cukupTerang, GAYA, gayaMode } from '../../services/chart/gayaVarian';
 import React, { useEffect, useRef, useState } from 'react';
 import { CHART_DEFAULT } from '../../services/chart/chartDefault';
 import { chartKatalogCocok, pakaiChartKatalog } from '../../services/chart/katalogCocok';
@@ -12,6 +12,7 @@ import {
   Copy,
   Database,
   Edit2,
+  FileSearch,
   Gauge,
   MoreVertical,
   Percent,
@@ -29,7 +30,8 @@ import { WidgetRenderer } from './WidgetRenderer';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
-import { kartuBerjudulSendiri, pakaiWajahKatalog } from '../../services/chart/dataKatalogWidget';
+import { grafikKatalog, kartuBerjudulSendiri, pakaiWajahKatalog } from '../../services/chart/dataKatalogWidget';
+import { PanelSumber } from './PanelSumber';
 import { bingkaiKatalog, gayaKatalogWidget } from './bingkaiKatalog';
 
 
@@ -187,16 +189,39 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   // Kartu berwajah Template Chart memakai bingkai kartu halaman Template Chart
   // (`bingkaiKatalog`): latar, kepala, tepi, huruf, dan kotak kaca yang sama persis.
   const katalog = pakaiWajahKatalog(widget);
-  const bk = katalog ? bingkaiKatalog(gayaKatalogWidget(widget.style, mode).g) : null;
+  const gKatalog = gayaKatalogWidget(widget.style, mode).g;
+  const bk = katalog ? bingkaiKatalog(gKatalog) : null;
   // Kartu KPI/narasi menggambar judulnya sendiri: kepala bingkai tidak dipasang (tanpa judul dobel).
   const tanpaKepala = katalog && kartuBerjudulSendiri(widget);
 
+  // Panel sumber dokumen: dibuka dengan mengeklik kartu (grafik: area kosong,
+  // supaya klik batang tetap dipakai seleksi lintas-chart) atau ikon sumber.
+  const [bukaSumber, setBukaSumber] = useState(false);
+  const bisaSumber = !preview && !widget.dataKosong;
+  const grafikKanvas = katalog && grafikKatalog(widget);
+  const gPanel = bk ? gKatalog : gayaMode('default', mode);
+  const warnaSumber = {
+    panel: gPanel.kaca ? gPanel.padanan ?? gPanel.kartu : gPanel.kartu,
+    teks: gPanel.teks,
+    teks2: gPanel.teks2,
+    teks3: gPanel.teks3,
+    aksen: gPanel.aksen,
+    garis: gPanel.garis,
+  };
+
   return (
     <div
-      className={bk ? 'relative flex flex-col h-full overflow-hidden group rounded-card border' : 'relative card-tegas flex flex-col h-full overflow-hidden group'}
-      style={bk ? bk.luar : gayaKartu}
+      className={`${bk ? 'relative flex flex-col h-full overflow-hidden group rounded-card border' : 'relative card-tegas flex flex-col h-full overflow-hidden group'} kartu-sumber-kotak`}
+      style={{
+        ...(bk ? bk.luar : gayaKartu),
+        // Kartu terangkat sedikit saat sumbernya dibuka (umpan balik "angkat & singkap").
+        transform: bukaSumber ? 'translateY(-3px) scale(1.015)' : undefined,
+        boxShadow: bukaSumber ? '0 22px 48px -22px rgba(0,0,0,0.75)' : bk?.luar.boxShadow,
+        zIndex: bukaSumber ? 5 : undefined,
+      }}
       data-kartu-warna={pakaiWarnaKartu ? kartuEfektif : undefined}
     >
+      {bisaSumber && <PanelSumber widget={widget} buka={bukaSumber} onTutup={() => setBukaSumber(false)} warna={warnaSumber} />}
       {/* Penanda aksen: blok padat 48x3px di sudut kiri atas. */}
       {!bk && <span aria-hidden="true" className="accent-bar" />}
 
@@ -272,6 +297,20 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
               <UserCheck className="w-3 h-3 text-warn" />
               <span>Koreksi Manual</span>
             </span>
+          )}
+
+          {bisaSumber && (
+            <button
+              type="button"
+              onClick={() => setBukaSumber(true)}
+              className="p-1 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              style={bk && !tanpaKepala ? bk.sub : undefined}
+              title="Lihat sumber dokumen"
+              aria-label="Lihat sumber dokumen"
+              data-testid="tombol-sumber"
+            >
+              <FileSearch className="w-4 h-4" />
+            </button>
           )}
 
           {/* Menu opsi (⋯) — satu-satunya tombol yang selalu tampak. Disembunyikan
@@ -377,7 +416,15 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
 
       {/* Widget Content Body — tinggi minimum hanya untuk grafik/tabel; kartu KPI & narasi mengikuti isi */}
       <div
-        className={`flex-1 flex flex-col ${
+        onClick={bisaSumber && !grafikKanvas ? () => setBukaSumber(true) : undefined}
+        title={bisaSumber && !grafikKanvas ? 'Klik untuk melihat sumber dokumen' : undefined}
+        style={{
+          cursor: bisaSumber && !grafikKanvas ? 'pointer' : undefined,
+          opacity: bukaSumber ? 0 : 1,
+          filter: bukaSumber ? 'blur(4px)' : 'none',
+          transform: bukaSumber ? 'scale(1.04)' : 'none',
+        }}
+        className={`kartu-sumber-depan flex-1 flex flex-col ${
           bk
             ? padat ? 'p-1.5 min-h-0' : 'p-2.5 min-h-0'
             : padat
@@ -403,10 +450,10 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         ) : bk?.dalam ? (
           // Gaya bening: chart digambar di atas kotak kaca buram, seperti di Template Chart.
           <div className="rounded-[16px] border p-2 flex-1 min-h-0 flex flex-col" style={bk.dalam}>
-            <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} />
+            <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
           </div>
         ) : (
-          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} />
+          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
         )}
       </div>
     </div>

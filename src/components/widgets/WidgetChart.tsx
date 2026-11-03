@@ -45,6 +45,8 @@ export interface WidgetChartProps {
    * dashboard untuk seleksi lintas-chart.
    */
   onKlikKategori?: (label: string) => void;
+  /** Klik area grafik yang bukan batang/titik/potongan (mis. membuka sumber dokumen). */
+  onKlikKosong?: () => void;
   /** Klik pada satu butir di dalam widget (mis. satu petak strip KPI). */
   onKlikItem?: (indeks: number) => void;
   /** Kartu bisa diklik (mis. membuka sumber dokumen). */
@@ -111,6 +113,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   onKlik,
   onKlikItem,
   onKlikKategori,
+  onKlikKosong,
   sorot,
   warnaSorot,
   pembungkus,
@@ -151,6 +154,11 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
       if (batal || !wadah.current) return;
       instans = ec.init(wadah.current);
       instans.setOption(hasil.opsi as any, true);
+      if (onKlikKosong) {
+        instans.getZr().on('click', (e: any) => {
+          if (!e?.target) onKlikKosong();
+        });
+      }
       if (onKlikKategori) {
         instans.on('click', (p: any) => {
           const label = typeof p?.name === 'string' && p.name ? p.name : data.kategori[p?.dataIndex];
@@ -165,7 +173,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
       pengamat?.disconnect();
       instans?.dispose?.();
     };
-  }, [chartId, varian, skala, hasil, html, onKlikKategori, data]);
+  }, [chartId, varian, skala, hasil, html, onKlikKategori, onKlikKosong, data]);
 
   if (html) {
     return (
