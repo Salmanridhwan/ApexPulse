@@ -29,7 +29,7 @@ import {
 } from '../services/templates/nilaiOperasional';
 import { CONTOH_WILAYAH, type NilaiWilayah } from '../services/templates/wilayahLayanan';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
-import { GAYA, cukupTerang, type Varian } from '../services/chart/gayaVarian';
+import { GAYA, VARIAN, cukupTerang, type Varian } from '../services/chart/gayaVarian';
 
 /** Tema template ke gaya chart katalog (untuk contoh warna di tab). */
 const VARIAN_TEMA: Record<string, Varian> = { oranye: 'ringkasan', analitik: 'analitik', trafik: 'trafik', kaca: 'kaca' };
@@ -540,7 +540,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             const terpilih = t.id === aktif.id;
             // Tiap tab memakai warna template-nya sendiri; campuran dengan token
             // tema (ink/surface) membuat teks & latar tetap terbaca di gelap maupun terang.
-            const palet = GAYA[VARIAN_TEMA[t.tema] ?? 'ringkasan'].palet.filter(cukupTerang).slice(0, 3);
+            const palet = GAYA[VARIAN_TEMA[t.tema] ?? (VARIAN.includes(t.tema as Varian) ? (t.tema as Varian) : 'ringkasan')].palet.filter(cukupTerang).slice(0, 3);
             return (
               <button
                 key={t.id}

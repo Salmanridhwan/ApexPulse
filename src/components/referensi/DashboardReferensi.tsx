@@ -1,5 +1,8 @@
 import type { WidgetStyle } from '../../types';
-import React, { useEffect, useRef, useState } from 'react';
+import { KonteksVarianTemplate, warnaHalamanDariGaya } from '../widgets/konteksGayaReplika';
+import { gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { useThemeMode } from '../../theme';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import {
   ArrowDownRight,
   ArrowRight,
@@ -54,7 +57,7 @@ let INSIGHT = INSIGHT_CONTOH;
 /** Ikon cadangan bila nilai dari dokumen tidak menyebut ikon. */
 const IKON_KPI = [Wallet, TrendingUp, TrendingDown, PiggyBank];
 
-const WARNA = {
+const WARNA_PIJAR = {
   latar: '#0a0a0b',
   kartu: '#141518',
   kartu2: '#1b1d21',
@@ -146,11 +149,11 @@ let PUNCAK = 0;
 
 let RINCIAN_BEBAN: NilaiBeban[];
 const BEBAN_CONTOH = [
-  { nama: 'Operasional', nilai: 25.9, warna: WARNA.oranye },
-  { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA.teal },
-  { nama: 'Pegawai', nilai: 19.8, warna: WARNA.ungu },
-  { nama: 'Investasi', nilai: 17.0, warna: WARNA.kuning },
-  { nama: 'Lain-lain', nilai: 14.2, warna: WARNA.merah },
+  { nama: 'Operasional', nilai: 25.9, warna: WARNA_PIJAR.oranye },
+  { nama: 'Pemeliharaan', nilai: 23.1, warna: WARNA_PIJAR.teal },
+  { nama: 'Pegawai', nilai: 19.8, warna: WARNA_PIJAR.ungu },
+  { nama: 'Investasi', nilai: 17.0, warna: WARNA_PIJAR.kuning },
+  { nama: 'Lain-lain', nilai: 14.2, warna: WARNA_PIJAR.merah },
 ];
 
 let ARUS_KAS: number[];
@@ -177,9 +180,9 @@ const TRANSAKSI_LAIN_CONTOH = [
  */
 let TARGET: NilaiTarget[];
 const TARGET_CONTOH = [
-  { nama: 'Target Pendapatan', capai: 86, status: 'mendekati target', warna: WARNA.oranye },
-  { nama: 'Efisiensi Beban', capai: 92, status: 'sesuai target', warna: WARNA.hijau },
-  { nama: 'Target Laba Bersih', capai: 57, status: 'perlu perhatian', warna: WARNA.merah },
+  { nama: 'Target Pendapatan', capai: 86, status: 'mendekati target', warna: WARNA_PIJAR.oranye },
+  { nama: 'Efisiensi Beban', capai: 92, status: 'sesuai target', warna: WARNA_PIJAR.hijau },
+  { nama: 'Target Laba Bersih', capai: 57, status: 'perlu perhatian', warna: WARNA_PIJAR.merah },
 ];
 
 interface DashboardReferensiProps {
@@ -224,6 +227,29 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
   sumberAktif = false,
   sumberJudul,
 }) => {
+  // Template bergaya (tpl-gaya-<varian>): seluruh warna halaman & chart dari gaya
+  // Template Chart yang sama. Tanpa varian = warna Pijar asli.
+  const varianTpl = useContext(KonteksVarianTemplate);
+  const modeTpl = useThemeMode();
+  const gayaTpl = varianTpl ? gayaMode(varianTpl, modeTpl) : undefined;
+  const WARNA = {
+    ...WARNA_PIJAR,
+    latarCss: undefined as string | undefined,
+    huruf: undefined as string | undefined,
+    ...(gayaTpl ? warnaHalamanDariGaya(gayaTpl) : {}),
+  };
+  const VARIAN_TPL: Varian = varianTpl ?? 'ringkasan';
+  /** Tepi, bayangan, sudut, dan kaca kartu gaya aktif (Blok bertepi tebal, Bento bersudut besar). */
+  const TEPI_KARTU: React.CSSProperties = gayaTpl
+    ? {
+        borderWidth: gayaTpl.tepi?.tebal ?? 1,
+        borderStyle: 'solid',
+        boxShadow: gayaTpl.tepi && gayaTpl.tepi.bayangan !== 'none' ? gayaTpl.tepi.bayangan : undefined,
+        borderRadius: gayaTpl.sudutKartu,
+        backdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+        WebkitBackdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+      }
+    : {};
   /** Kartu memakai warna dari panel Gaya bila ada. */
   const KARTU = warnaKartu || WARNA.kartu;
   /**
@@ -356,7 +382,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           ? 'h-full w-full flex flex-col gap-[0.8em] p-[0.85em] overflow-hidden'
           : 'rounded-[1.4em] p-[1.2em]'
       }
-      style={{ backgroundColor: WARNA.latar, color: TEKS, fontSize: `${(13 * skala * ((gaya?.fontUkuran ?? 13) / 13)).toFixed(2)}px` }}
+      style={{ background: WARNA.latarCss ?? WARNA.latar, color: TEKS, fontFamily: gaya?.font ? `'${gaya.font}', 'Inter', system-ui, sans-serif` : WARNA.huruf, fontSize: `${(13 * skala * ((gaya?.fontUkuran ?? 13) / 13)).toFixed(2)}px` }}
     >
       {/* ===== Baris 1: 4 kartu KPI_CONTOH ===== */}
       <BarisGeser
@@ -373,7 +399,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           <WidgetChart
             key={k.label}
             chartId="kpi-kartu"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             khas
             data={{
               kategori: [k.label],
@@ -424,7 +451,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           judul="Ikhtisar Pendapatan"
           sumber={sumberJudul?.['ikhtisar pendapatan'] ?? []}
           className={`${penuh ? '' : 'lg:col-span-2'} ${kartu()}`}
-          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -447,7 +474,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           </div>
           <WidgetChart
             chartId="bar-tegak-sorot"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             skala={skala}
             data={{
               kategori: BULAN,
@@ -474,7 +502,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           judul="Rincian Beban"
           sumber={sumberJudul?.['rincian beban'] ?? []}
           className={kartu()}
-          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -493,7 +521,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
               tidak menyisakan ruang kosong di bawah. */}
           <WidgetChart
             chartId="donat-tebal"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             skala={skala}
             data={{
               kategori: RINCIAN_BEBAN.map((b) => b.nama),
@@ -523,7 +552,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           judul={nilai?.tabelJudul || 'Transaksi Terbaru'}
           sumber={sumberJudul?.[(nilai?.tabelJudul || 'Transaksi Terbaru').trim().toLowerCase()] ?? []}
           className={kartu()}
-          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -532,7 +561,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
         >
           <WidgetChart
             chartId="tabel-ringkas"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             data={{
               kategori: [nilai?.tabelJudul || 'Transaksi Terbaru'],
               seri: [{ nama: 'Nilai', data: [] }],
@@ -561,7 +591,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           judul="Arus Kas"
           sumber={sumberJudul?.['arus kas'] ?? []}
           className={kartu()}
-          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -581,7 +611,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           </div>
           <WidgetChart
             chartId="area-gradasi"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             skala={skala}
             data={{
               // Label tanggal dari dokumen bila panjangnya cocok. Kalau tidak,
@@ -604,7 +635,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           judul="Progres Target"
           sumber={sumberJudul?.['progres target'] ?? []}
           className={kartu()}
-          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+          style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -614,7 +645,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           <h3 className="text-[0.98em] font-semibold mb-[0.6em] shrink-0">Progres Target</h3>
           <WidgetChart
             chartId="progres-target"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             data={{
               kategori: TARGET.map((t) => t.nama),
               seri: [{ nama: 'Capaian', data: TARGET.map((t) => t.capai) }],
@@ -633,7 +665,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
         className="rounded-[1.1em] p-[0.95em] flex items-center justify-between gap-[0.7em] shrink-0"
         kelasIsi="flex items-center justify-between gap-[0.7em] w-full"
         tinggiBuka="9em"
-        style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}` }}
+        style={{ backgroundColor: KARTU, border: `1px solid ${GARIS}`, ...TEPI_KARTU }}
         warnaTeks={TEKS}
         warnaTeks2={TEKS2}
         warnaTeks3={TEKS3}
@@ -643,7 +675,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
         {/* Isi strip insight juga dari katalog (narasi-insight). */}
         <WidgetChart
           chartId="narasi-insight"
-          varian="ringkasan"
+          varian={VARIAN_TPL}
+            gaya={gayaTpl}
           judul="Insight Keuangan"
           ikon={TrendingUp}
           teks={INSIGHT || 'Belum ada insight keuangan di dokumen instansi.'}
@@ -655,7 +688,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
           onClick={() => setLaporanRinci(true)}
           title={pakaiData ? 'Buka laporan rinci berisi angka dokumen' : 'Buka laporan rinci (angka contoh)'}
           className="ml-auto inline-flex items-center gap-[0.35em] rounded-[0.75em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold shrink-0 whitespace-nowrap transition-transform hover:-translate-y-px hover:brightness-105 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-          style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
+          style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, ${gayaTpl?.aksen2 ?? '#ffa53d'})`, color: '#1a1206' }}
         >
           Lihat Laporan Rinci
           <ArrowRight className="w-[0.95em] h-[0.95em]" />
@@ -701,7 +734,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
                 <WidgetChart
                   key={k.label}
                   chartId="kpi-strip"
-                  varian="ringkasan"
+                  varian={VARIAN_TPL}
+            gaya={gayaTpl}
                   data={{
                     kategori: [k.label],
                     seri: [{ nama: k.label, data: [0] }],
@@ -716,7 +750,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
             <p className="text-[0.88em] font-semibold mb-[0.4em]">Rincian Beban Operasional</p>
             <WidgetChart
               chartId="tabel-ringkas"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               data={{
                 kategori: ['Rincian Beban Operasional', ...RINCIAN_BEBAN.map((r) => r.nama)],
                 seri: [
@@ -731,7 +766,8 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
             <p className="text-[0.88em] font-semibold mb-[0.4em]">Transaksi Terbaru</p>
             <WidgetChart
               chartId="tabel-ringkas"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               data={{
                 kategori: ['Transaksi Terbaru'],
                 seri: [{ nama: 'Nilai', data: [] }],
@@ -749,7 +785,7 @@ export const DashboardReferensi: React.FC<DashboardReferensiProps> = ({
                 type="button"
                 onClick={() => setLaporanRinci(false)}
                 className="rounded-[0.7em] px-[0.9em] py-[0.4em] text-[0.82em] font-bold"
-                style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, #ffa53d)`, color: '#1a1206' }}
+                style={{ background: `linear-gradient(135deg, ${WARNA.oranye}, ${gayaTpl?.aksen2 ?? '#ffa53d'})`, color: '#1a1206' }}
               >
                 Tutup
               </button>

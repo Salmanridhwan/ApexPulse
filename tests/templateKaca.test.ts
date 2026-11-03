@@ -7,7 +7,8 @@ import { buildOpsi, DAFTAR_CHART } from '../src/services/chart/chartDefault';
 import { contohData } from '../src/services/chart/contohData';
 
 test('template ke-4 Kaca terdaftar dengan tema sendiri', () => {
-  assert.equal(DASHBOARD_TEMPLATES.length, 4);
+  // Kaca tetap template ke-4; gaya Template Chart lainnya menyusul sesudahnya.
+  assert.equal(DASHBOARD_TEMPLATES[3].id, 'tpl-kaca');
   const kaca = DASHBOARD_TEMPLATES.find((t) => t.id === 'tpl-kaca');
   assert.ok(kaca, 'tpl-kaca tidak ada');
   assert.equal(kaca.tema, 'kaca');

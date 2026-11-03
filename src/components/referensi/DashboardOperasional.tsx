@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
+import { KonteksVarianTemplate, warnaHalamanDariGaya } from '../widgets/konteksGayaReplika';
+import { gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { useThemeMode } from '../../theme';
 import { Droplets, Gauge, Target, Wallet } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
 import { gayaReplika } from './gayaReplika';
@@ -25,7 +28,7 @@ import {
  * terjual, indikator pelayanan, indikator mutu, dan anggaran per program.
  */
 
-const WARNA = {
+const WARNA_PIJAR = {
   latar: '#0a0a0b',
   kartu: '#141518',
   kartu2: '#1b1d21',
@@ -41,7 +44,7 @@ const WARNA = {
   kuning: '#f5a524',
 };
 
-const PALET = [WARNA.oranye, WARNA.teal, WARNA.ungu, WARNA.kuning, WARNA.hijau, WARNA.merah];
+const PALET_PIJAR = [WARNA_PIJAR.oranye, WARNA_PIJAR.teal, WARNA_PIJAR.ungu, WARNA_PIJAR.kuning, WARNA_PIJAR.hijau, WARNA_PIJAR.merah];
 
 interface Props {
   nilai?: NilaiOperasional;
@@ -62,6 +65,35 @@ export const DashboardOperasional: React.FC<Props> = ({
   contoh = false,
   sumberAktif = false,
 }) => {
+  // Template bergaya (tpl-gaya-<varian>): seluruh warna halaman & chart dari gaya
+  // Template Chart yang sama. Tanpa varian = warna Pijar asli.
+  const varianTpl = useContext(KonteksVarianTemplate);
+  const modeTpl = useThemeMode();
+  const gayaTpl = varianTpl ? gayaMode(varianTpl, modeTpl) : undefined;
+  const WARNA = {
+    ...WARNA_PIJAR,
+    latarCss: undefined as string | undefined,
+    huruf: undefined as string | undefined,
+    ...(gayaTpl ? warnaHalamanDariGaya(gayaTpl) : {}),
+  };
+  const VARIAN_TPL: Varian = varianTpl ?? 'ringkasan';
+  /** Tepi, bayangan, sudut, dan kaca kartu gaya aktif (Blok bertepi tebal, Bento bersudut besar). */
+  const TEPI_KARTU: React.CSSProperties = gayaTpl
+    ? {
+        borderWidth: gayaTpl.tepi?.tebal ?? 1,
+        borderStyle: 'solid',
+        boxShadow: gayaTpl.tepi && gayaTpl.tepi.bayangan !== 'none' ? gayaTpl.tepi.bayangan : undefined,
+        borderRadius: gayaTpl.sudutKartu,
+        backdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+        WebkitBackdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+      }
+    : {};
+  /** Warna Pijar di data (legenda, progres) diganti warna setara gaya aktif. */
+  const petaWarna = (c: string): string => {
+    const k = (Object.keys(WARNA_PIJAR) as Array<keyof typeof WARNA_PIJAR>).find((x) => WARNA_PIJAR[x] === c);
+    return k ? WARNA[k] : c;
+  };
+  const PALET = PALET_PIJAR.map(petaWarna);
   const n = nilai;
   const [skala, setSkala] = useState(1);
   /** Label kartu KPI yang sumbernya sedang dibuka (null = tertutup). */
@@ -196,10 +228,10 @@ export const DashboardOperasional: React.FC<Props> = ({
           : 'rounded-[1.4em] p-[1.2em]'
       }
       style={{
-        backgroundColor: WARNA.latar,
+        background: WARNA.latarCss ?? WARNA.latar,
         color: TEKS,
         fontSize: `${(13 * skala * ((gaya?.fontUkuran ?? 13) / 13)).toFixed(2)}px`,
-        fontFamily: gaya?.font ? `'${gaya.font}', 'Inter', system-ui, sans-serif` : undefined,
+        fontFamily: gaya?.font ? `'${gaya.font}', 'Inter', system-ui, sans-serif` : WARNA.huruf,
       }}
     >
       {/* Tanpa judul di kanvas: judul halaman diurus panel luar. */}
@@ -211,7 +243,7 @@ export const DashboardOperasional: React.FC<Props> = ({
           judul="Volume air"
           sumber={n?.sumber.volume ?? []}
           className={`lg:col-span-8 ${kartuKelas} flex flex-col`}
-          style={{ backgroundColor: KARTU, borderColor: GARIS }}
+          style={{ backgroundColor: KARTU, borderColor: GARIS, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -231,7 +263,8 @@ export const DashboardOperasional: React.FC<Props> = ({
           {dataVolume && (
             <WidgetChart
               chartId="bar-tegak-sorot"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               skala={skala}
               data={dataVolume}
               pembungkus={(o) => gayaReplika(o, gaya, 'volume', kartuTerang)}
@@ -251,7 +284,7 @@ export const DashboardOperasional: React.FC<Props> = ({
           judul="Kehilangan air (NRW)"
           sumber={n?.sumber.nrw ?? []}
           className={`lg:col-span-4 ${kartuKelas} flex flex-col`}
-          style={{ backgroundColor: KARTU, borderColor: GARIS }}
+          style={{ backgroundColor: KARTU, borderColor: GARIS, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -264,7 +297,8 @@ export const DashboardOperasional: React.FC<Props> = ({
           {dataNrw && (
             <WidgetChart
               chartId="gauge-target"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               skala={skala}
               data={dataNrw}
               pembungkus={(o) => gayaReplika(o, gaya, 'nrw', kartuTerang)}
@@ -299,7 +333,8 @@ export const DashboardOperasional: React.FC<Props> = ({
           <WidgetChart
             key={k.label}
             chartId="kpi-strip"
-            varian="ringkasan"
+            varian={VARIAN_TPL}
+            gaya={gayaTpl}
             data={{
               kategori: [k.label],
               seri: [{ nama: k.label, data: [Number(String(k.nilai).replace(/\./g, '').replace(',', '.'))] }],
@@ -338,7 +373,7 @@ export const DashboardOperasional: React.FC<Props> = ({
           judul="Target vs realisasi"
           sumber={n?.sumber.indikator ?? []}
           className={`lg:col-span-7 ${kartuKelas} flex flex-col`}
-          style={{ backgroundColor: KARTU, borderColor: GARIS }}
+          style={{ backgroundColor: KARTU, borderColor: GARIS, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -363,7 +398,8 @@ export const DashboardOperasional: React.FC<Props> = ({
           {dataIndikator && (
             <WidgetChart
               chartId="bar-mendatar-target"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               skala={skala}
               data={dataIndikator}
               pembungkus={(o) => gayaReplika(o, gaya, 'indikator', kartuTerang)}
@@ -383,7 +419,7 @@ export const DashboardOperasional: React.FC<Props> = ({
           judul="Anggaran"
           sumber={n?.sumber.anggaran ?? []}
           className={`lg:col-span-5 ${kartuKelas} flex flex-col`}
-          style={{ backgroundColor: KARTU, borderColor: GARIS }}
+          style={{ backgroundColor: KARTU, borderColor: GARIS, ...TEPI_KARTU }}
           warnaTeks={TEKS}
           warnaTeks2={TEKS2}
           warnaTeks3={TEKS3}
@@ -397,7 +433,8 @@ export const DashboardOperasional: React.FC<Props> = ({
           {dataAnggaran && (
             <WidgetChart
               chartId="donat-tebal"
-              varian="ringkasan"
+              varian={VARIAN_TPL}
+            gaya={gayaTpl}
               skala={skala}
               data={dataAnggaran}
               pembungkus={(o) => gayaReplika(o, gaya, 'anggaran', kartuTerang)}
@@ -427,7 +464,7 @@ export const DashboardOperasional: React.FC<Props> = ({
         className={`${kartuKelas} shrink-0 flex items-start gap-[0.6em]${penuh ? '' : ' mt-[0.8em]'}`}
         kelasIsi="flex items-start gap-[0.6em]"
         tinggiBuka="9em"
-        style={{ backgroundColor: KARTU2, borderColor: GARIS }}
+        style={{ backgroundColor: KARTU2, borderColor: GARIS, ...TEPI_KARTU }}
         warnaTeks={TEKS}
         warnaTeks2={TEKS2}
         warnaTeks3={TEKS3}

@@ -7,7 +7,8 @@ import { OperasionalTema, WilayahTema } from './DashboardTemaLain';
 import { DashboardTrafik } from './DashboardTrafik';
 import { DashboardWilayah } from './DashboardWilayah';
 import { KacaOperasional, KacaRingkasan, KacaWilayah } from './DashboardKaca';
-import { KonteksGayaReplika } from '../widgets/konteksGayaReplika';
+import { KonteksGayaReplika, KonteksVarianTemplate } from '../widgets/konteksGayaReplika';
+import { varianTemplate } from '../../services/templates/dashboardTemplates';
 import type { SumberDok } from '../../services/templates/nilaiOperasional';
 
 /**
@@ -44,9 +45,11 @@ export const pecahTemplateId = (templateId: string): { dasar: string; nomor: 1 |
  * Pratinjau contoh di menu Template Dashboard tidak memakai gaya dashboard.
  */
 export const ReplikaHalaman: React.FC<Props> = (props) => (
-  <KonteksGayaReplika.Provider value={props.contoh ? undefined : props.gaya}>
-    <IsiReplika {...props} />
-  </KonteksGayaReplika.Provider>
+  <KonteksVarianTemplate.Provider value={varianTemplate(props.replika.templateId)}>
+    <KonteksGayaReplika.Provider value={props.contoh ? undefined : props.gaya}>
+      <IsiReplika {...props} />
+    </KonteksGayaReplika.Provider>
+  </KonteksVarianTemplate.Provider>
 );
 
 const IsiReplika: React.FC<Props> = ({

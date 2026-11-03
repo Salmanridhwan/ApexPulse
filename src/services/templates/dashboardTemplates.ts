@@ -1,4 +1,5 @@
 import { WidgetSpec, WidgetType } from '../../types';
+import { GAYA, VARIAN, type Varian } from '../chart/gayaVarian';
 
 /**
  * TEMPLATE DASHBOARD — template UMUM berdasarkan TUJUAN, bukan sektor BUMD.
@@ -362,7 +363,60 @@ const TEMPLATE_KACA: DashboardTemplate = {
   widgets: TEMPLATE_RINGKASAN.widgets.map((w) => ({ ...w, id: w.id.replace(/^tpl-/, 'tpl-kaca-') })),
 };
 
-export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [TEMPLATE_RINGKASAN, TEMPLATE_ANALITIK, TEMPLATE_TRAFIK, TEMPLATE_KACA];
+// ============================================================================
+// GAYA LAIN DARI TEMPLATE CHART — Default, Tirta, Aurora, Neon, Blok, Bento, Koran
+// ============================================================================
+/**
+ * Setiap gaya di menu Template Chart juga punya template dashboard, supaya kedua
+ * menu sesuai satu sama lain. Susunan & isinya sama dengan Pijar (tiga halaman,
+ * slot angka yang sama), sedangkan seluruh warnanya (latar, kartu, teks, garis,
+ * aksen, palet chart, huruf) diambil dari gaya Template Chart yang sama
+ * (`gayaMode`), lihat `KonteksVarianTemplate`.
+ */
+export const PREFIKS_TEMPLATE_GAYA = 'tpl-gaya-';
+
+/** Varian Template Chart untuk template dashboard bergaya (`tpl-gaya-koran` -> `koran`). */
+export const varianTemplate = (templateId: string): Varian | undefined => {
+  const dasar = templateId.split('#')[0];
+  if (!dasar.startsWith(PREFIKS_TEMPLATE_GAYA)) return undefined;
+  const v = dasar.slice(PREFIKS_TEMPLATE_GAYA.length) as Varian;
+  return VARIAN.includes(v) ? v : undefined;
+};
+
+const GAYA_TEMPLATE_BARU: Array<{ v: Varian; tujuan: string }> = [
+  { v: 'default', tujuan: 'Laporan resmi yang netral dan mudah dicetak.' },
+  { v: 'tirta', tujuan: 'Tampilan biru air yang tenang untuk layanan air minum.' },
+  { v: 'aurora', tujuan: 'Gradasi bercahaya untuk layar besar dan acara.' },
+  { v: 'neon', tujuan: 'Papan pantau gelap berkisi untuk ruang kendali.' },
+  { v: 'blok', tujuan: 'Kartu bertepi tegas yang mencolok dan mudah dipindai.' },
+  { v: 'bento', tujuan: 'Petak-petak bersudut besar yang rapi untuk ringkasan.' },
+  { v: 'koran', tujuan: 'Gaya editorial kertas dan serif untuk laporan naratif.' },
+];
+
+const TEMPLATE_GAYA: DashboardTemplate[] = GAYA_TEMPLATE_BARU.map(({ v, tujuan }) => {
+  const g = GAYA[v];
+  return {
+    ...TEMPLATE_RINGKASAN,
+    id: `${PREFIKS_TEMPLATE_GAYA}${v}`,
+    nama: g.nama,
+    tujuan,
+    caraPenyampaian: `Susunan tiga halaman Pijar (ringkasan keuangan, operasional & pelayanan, kinerja wilayah) dengan gaya ${g.nama} dari menu Template Chart: ${g.sebutan}.`,
+    deskripsi: `Gaya ${g.nama} dari Template Chart: ${g.sebutan}.`,
+    aksen: g.aksen,
+    tema: v,
+    judulDashboard: g.nama,
+    deskripsiDashboard: `Dashboard tiga halaman bergaya ${g.nama}, sama dengan gaya ${g.nama} di menu Template Chart. Seluruh angka ilustrasi.`,
+    widgets: TEMPLATE_RINGKASAN.widgets.map((w) => ({ ...w, id: w.id.replace(/^tpl-/, `tpl-${v}-`) })),
+  };
+});
+
+export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
+  TEMPLATE_RINGKASAN,
+  TEMPLATE_ANALITIK,
+  TEMPLATE_TRAFIK,
+  TEMPLATE_KACA,
+  ...TEMPLATE_GAYA,
+];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {

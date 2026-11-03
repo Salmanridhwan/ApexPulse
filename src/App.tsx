@@ -157,7 +157,7 @@ import {
   WidgetSpec,
   WidgetStyle,
 } from './types';
-import { DashboardTemplate } from './services/templates/dashboardTemplates';
+import { DashboardTemplate, varianTemplate } from './services/templates/dashboardTemplates';
 
 export default function App() {
   // Public Share / Embed Route Handling (No Login Required)
@@ -716,7 +716,11 @@ export default function App() {
   };
 
   const targetPalet = useMemo(() => {
-    if (activeDashboard?.replika) return GRAFIK_TEMPLATE[activeDashboard.replika.templateId] || [];
+    if (activeDashboard?.replika) {
+      const tid = activeDashboard.replika.templateId;
+      // Template bergaya memakai susunan Pijar, jadi grafiknya sama.
+      return GRAFIK_TEMPLATE[tid] || (varianTemplate(tid) ? GRAFIK_TEMPLATE['tpl-ringkasan'] : []);
+    }
     // Kartu di SEMUA halaman, diberi nama halamannya, supaya "ganti beberapa saja" bisa lintas halaman.
     if (!activeDashboard) return [];
     const semua = tulisProyeksi(activeDashboard);

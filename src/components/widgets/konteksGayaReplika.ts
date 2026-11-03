@@ -57,3 +57,32 @@ export function gayaKartuReplika(
   }
   return { varian: desain ?? varian, gaya: hasil };
 }
+
+/**
+ * Varian Template Chart untuk template dashboard bergaya (`tpl-gaya-<varian>`).
+ * Halaman Pijar membaca konteks ini: kosong = warna Pijar asli, terisi = seluruh
+ * warna halaman dan chart diambil dari gaya Template Chart yang sama.
+ */
+export const KonteksVarianTemplate = React.createContext<Varian | undefined>(undefined);
+
+/** Warna halaman template (kunci yang sama dengan `WARNA` halaman Pijar) dari satu gaya varian. */
+export const warnaHalamanDariGaya = (g: GayaVarian) => ({
+  latar: g.latar,
+  latarCss: g.latarCss,
+  kartu: g.kartu,
+  kartu2: g.kartu2,
+  garis: g.tepi?.warna ?? g.garis,
+  teks: g.teks,
+  teks2: g.teks2,
+  teks3: g.teks3,
+  oranye: g.aksen,
+  hijau: g.hijau,
+  merah: g.merah,
+  teal: g.palet[1] ?? g.aksen2,
+  ungu: g.palet[2] ?? g.aksen2,
+  kuning: g.palet[3] ?? g.aksen2,
+  huruf: g.huruf,
+  tepi: g.tepi,
+  sudutKartu: g.sudutKartu,
+  kaca: g.kaca,
+});

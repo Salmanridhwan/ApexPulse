@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { GAYA } from './services/chart/gayaVarian';
 
 export type ThemeMode = 'light' | 'dark';
 

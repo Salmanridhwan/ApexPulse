@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
+import { KonteksVarianTemplate, warnaHalamanDariGaya } from '../widgets/konteksGayaReplika';
+import { gayaMode, type Varian } from '../../services/chart/gayaVarian';
+import { useThemeMode } from '../../theme';
 import { Users, Droplets, Gauge, MessageSquare } from 'lucide-react';
 import { loadEcharts } from '../widgets/echartsSetup';
 import { gayaReplika } from './gayaReplika';
@@ -19,7 +22,7 @@ import { ringkasWilayah, type NilaiWilayah } from '../../services/templates/wila
  * sebaran wilayah.
  */
 
-const WARNA = {
+const WARNA_PIJAR = {
   latar: '#0a0a0b',
   kartu: '#141518',
   kartu2: '#1b1d21',
@@ -35,7 +38,7 @@ const WARNA = {
   kuning: '#f5a524',
 };
 
-const PALET = [WARNA.oranye, WARNA.teal, WARNA.ungu, WARNA.kuning, WARNA.hijau];
+const PALET_PIJAR = [WARNA_PIJAR.oranye, WARNA_PIJAR.teal, WARNA_PIJAR.ungu, WARNA_PIJAR.kuning, WARNA_PIJAR.hijau];
 
 interface Props {
   nilai?: NilaiWilayah;
@@ -56,6 +59,35 @@ export const DashboardWilayah: React.FC<Props> = ({
   contoh = false,
   sumberAktif = false,
 }) => {
+  // Template bergaya (tpl-gaya-<varian>): seluruh warna halaman & chart dari gaya
+  // Template Chart yang sama. Tanpa varian = warna Pijar asli.
+  const varianTpl = useContext(KonteksVarianTemplate);
+  const modeTpl = useThemeMode();
+  const gayaTpl = varianTpl ? gayaMode(varianTpl, modeTpl) : undefined;
+  const WARNA = {
+    ...WARNA_PIJAR,
+    latarCss: undefined as string | undefined,
+    huruf: undefined as string | undefined,
+    ...(gayaTpl ? warnaHalamanDariGaya(gayaTpl) : {}),
+  };
+  const VARIAN_TPL: Varian = varianTpl ?? 'ringkasan';
+  /** Tepi, bayangan, sudut, dan kaca kartu gaya aktif (Blok bertepi tebal, Bento bersudut besar). */
+  const TEPI_KARTU: React.CSSProperties = gayaTpl
+    ? {
+        borderWidth: gayaTpl.tepi?.tebal ?? 1,
+        borderStyle: 'solid',
+        boxShadow: gayaTpl.tepi && gayaTpl.tepi.bayangan !== 'none' ? gayaTpl.tepi.bayangan : undefined,
+        borderRadius: gayaTpl.sudutKartu,
+        backdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+        WebkitBackdropFilter: gayaTpl.kaca ? 'blur(16px)' : undefined,
+      }
+    : {};
+  /** Warna Pijar di data (legenda, progres) diganti warna setara gaya aktif. */
+  const petaWarna = (c: string): string => {
+    const k = (Object.keys(WARNA_PIJAR) as Array<keyof typeof WARNA_PIJAR>).find((x) => WARNA_PIJAR[x] === c);
+    return k ? WARNA[k] : c;
+  };
+  const PALET = PALET_PIJAR.map(petaWarna);
   const n = nilai;
   const [skala, setSkala] = useState(1);
   const [kpiSumber, setKpiSumber] = useState<string | null>(null);
@@ -149,6 +181,7 @@ export const DashboardWilayah: React.FC<Props> = ({
   const bingkaiKartu = {
     backgroundColor: KARTU,
     borderColor: GARIS,
+    ...TEPI_KARTU,
   };
 
   return (
@@ -156,10 +189,10 @@ export const DashboardWilayah: React.FC<Props> = ({
       ref={akarRef}
       className={penuh ? 'h-full w-full p-[0.85em] overflow-hidden flex flex-col gap-[0.8em]' : 'rounded-[1.4em] p-[1.2em]'}
       style={{
-        backgroundColor: WARNA.latar,
+        background: WARNA.latarCss ?? WARNA.latar,
         color: TEKS,
         fontSize: `${(13 * skala * ((gaya?.fontUkuran ?? 13) / 13)).toFixed(2)}px`,
-        fontFamily: gaya?.font ? `'${gaya.font}', 'Inter', system-ui, sans-serif` : undefined,
+        fontFamily: gaya?.font ? `'${gaya.font}', 'Inter', system-ui, sans-serif` : WARNA.huruf,
       }}
     >
       {!baris.length && (
@@ -184,7 +217,8 @@ export const DashboardWilayah: React.FC<Props> = ({
               <WidgetChart
                 key={k.label}
                 chartId="kpi-strip"
-                varian="ringkasan"
+                varian={VARIAN_TPL}
+            gaya={gayaTpl}
                 data={{
                   kategori: [k.label],
                   seri: [{ nama: k.label, data: [Number(String(k.nilai).replace(/\./g, '').replace(',', '.'))] }],
@@ -236,7 +270,8 @@ export const DashboardWilayah: React.FC<Props> = ({
               </div>
               <WidgetChart
                 chartId="bar-tegak"
-                varian="ringkasan"
+                varian={VARIAN_TPL}
+            gaya={gayaTpl}
                 skala={skala}
                 data={{
                   kategori: baris.map((b) => b.wilayah.replace('Jakarta ', '')),
@@ -272,7 +307,8 @@ export const DashboardWilayah: React.FC<Props> = ({
               </div>
               <WidgetChart
                 chartId="bar-tegak-target"
-                varian="ringkasan"
+                varian={VARIAN_TPL}
+            gaya={gayaTpl}
                 skala={skala}
                 data={{
                   kategori: baris.map((b) => b.wilayah.replace('Jakarta ', '')),
@@ -307,7 +343,8 @@ export const DashboardWilayah: React.FC<Props> = ({
               {/* Cincin dan legendanya dirender wajah katalog (donat-tebal). */}
               <WidgetChart
                 chartId="donat-tebal"
-                varian="ringkasan"
+                varian={VARIAN_TPL}
+            gaya={gayaTpl}
                 skala={skala}
                 data={{
                   kategori: baris.map((b) => b.wilayah),
@@ -343,7 +380,8 @@ export const DashboardWilayah: React.FC<Props> = ({
               </div>
               <WidgetChart
                 chartId="bar-mendatar-peringkat"
-                varian="ringkasan"
+                varian={VARIAN_TPL}
+            gaya={gayaTpl}
                 skala={skala}
                 data={{
                   kategori: [...baris]
@@ -372,7 +410,7 @@ export const DashboardWilayah: React.FC<Props> = ({
             className={`${kartuKelas} shrink-0 flex items-start gap-[0.6em]${penuh ? '' : ' mt-[0.8em]'}`}
             kelasIsi="flex items-start gap-[0.6em] w-full"
             tinggiBuka="9em"
-            style={{ backgroundColor: KARTU2, borderColor: GARIS }}
+            style={{ backgroundColor: KARTU2, borderColor: GARIS, ...TEPI_KARTU }}
             warnaTeks={TEKS}
             warnaTeks2={TEKS2}
             warnaTeks3={TEKS3}
