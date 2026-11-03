@@ -17,7 +17,7 @@ import { PratinjauChart } from './PratinjauChart';
  * `src/services/chart/chartDefault.ts`.
  */
 
-const URUTAN_KELOMPOK: KelompokChart[] = ['ringkas', 'banding', 'tren', 'komposisi', 'sebaran'];
+const URUTAN_KELOMPOK: KelompokChart[] = ['ringkas', 'banding', 'tren', 'komposisi', 'sebaran', 'rapat'];
 
 const Kartu: React.FC<{ chartId: ChartId; varian: Varian }> = ({ chartId, varian }) => {
   const entri = CHART_DEFAULT[chartId];

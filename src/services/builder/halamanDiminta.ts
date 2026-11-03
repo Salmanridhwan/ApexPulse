@@ -15,6 +15,7 @@
  */
 
 import type { WidgetSpec } from '../../types';
+import { bagianDariPermintaan, halamanTemplateBagian } from '../templates/templateBagian';
 
 export interface HalamanDiminta {
   judul: string;
@@ -331,6 +332,14 @@ export function dashboardUmum(prompt: string, segmen: HalamanDiminta[] = []): bo
 export function halamanUntukPermintaan(prompt: string, sector: string): { halaman: HalamanDiminta[]; bawaan: boolean } {
   const tertulis = bacaHalamanDiminta(prompt);
   if (tertulis.length > 0) return { halaman: tertulis, bawaan: false };
+  // "Dashboard rapat procurement": susunan halaman deck template bagian, butirnya judul kartu.
+  const bagian = bagianDariPermintaan(prompt);
+  if (bagian) {
+    return {
+      halaman: halamanTemplateBagian(bagian).map((h) => ({ judul: h.judul, butir: h.widgets.map((w) => w.title).slice(0, MAKS_BUTIR) })),
+      bawaan: true,
+    };
+  }
   const segmen = segmenBawaan(sector);
   // Dashboard umum ("buatkan dashboard PDAM") juga memakai segmentasi bawaan:
   // tanpa itu hanya hasil sapuan yang dipakai, dan uji 3 Nov 2026 menghasilkan

@@ -18,6 +18,8 @@ const TIPE_ANGKA = ['kpi', 'bullet-target', 'gauge'];
 function syaratData(e: EntriChart, w: WidgetSpec): boolean {
   const seri = w.chart?.series ?? [];
   const adaTarget = seri.some((s) => /target|rencana|rkap|anggaran/i.test(s.name || ''));
+  if (e.id === 'kpi-target') return w.kpi?.target !== undefined && w.kpi?.target !== null;
+  if (e.id === 'papan-isu' || e.id === 'tabel-status') return (w.table?.columns?.length ?? 0) >= 2;
   if (/(?<!atau )dua seri|seri batang, seri garis/.test(e.butuh)) return seri.length >= 2;
   if (/target/.test(e.butuh) && e.tipe !== 'gauge') return adaTarget || Boolean(w.kpi?.targets?.length);
   if (e.id === 'cincin-progres' || e.id === 'gauge-target') return TIPE_ANGKA.includes(w.type);

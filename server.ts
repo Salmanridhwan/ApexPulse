@@ -73,6 +73,7 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
+import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
   nilaiDariWidgets,
@@ -457,7 +458,9 @@ function hangatkanTemplateTenant(tenant: any): void {
   // menyiapkannya hanya membuang kuota layanan dokumen.
   if (!String(tenant.knowledgeBaseId || '').trim() && !(Number(tenant.documentCount) > 0)) return;
   void (async () => {
-    for (const t of DASHBOARD_TEMPLATES) {
+    // Template rapat bagian disiapkan saat dibuka saja: kartunya banyak dan
+    // topiknya khusus, jadi tidak perlu menghabiskan kuota layanan dokumen.
+    for (const t of DASHBOARD_TEMPLATES.filter((x) => !x.bagian)) {
       try {
         await siapkanTemplateTenant(tenant, t);
       } catch (err) {
@@ -1741,7 +1744,7 @@ const app = express();
 
     const segar = await db.updateTenant(tenant.id, { kbTersinkronPada: new Date().toISOString() });
     if (!segar) return res.status(500).json({ error: 'Gagal menandai pembaruan dokumen.' });
-    for (const tpl of DASHBOARD_TEMPLATES) void siapkanTemplateTenant(segar, tpl);
+    for (const tpl of DASHBOARD_TEMPLATES.filter((x) => !x.bagian)) void siapkanTemplateTenant(segar, tpl);
     return res.json({ ok: true, template: DASHBOARD_TEMPLATES.map((t) => t.id) });
   });
 
@@ -1824,10 +1827,11 @@ const app = express();
         : template.id === 'tpl-trafik'
           ? nilaiTrafikDariWidgets(widgets)
           : nilaiDariWidgets(widgets);
-    const widgets2 = widgetHalaman2(tenant, template, kbId, seed);
+    // Template rapat bagian tidak memakai halaman operasional & wilayah Pijar.
+    const widgets2 = template.bagian ? [] : widgetHalaman2(tenant, template, kbId, seed);
     let wilayah: any = null;
     try {
-      wilayah = await ambilWilayah(tenant);
+      wilayah = template.bagian ? null : await ambilWilayah(tenant);
     } catch {
       wilayah = null;
     }
@@ -1838,7 +1842,15 @@ const app = express();
       satuanAir: wilayah?.satuanAir || 'm³',
       sumber: Array.isArray(wilayah?.sumber) ? wilayah.sumber : [],
     };
-    const halaman = [
+    const halaman = template.bagian
+      ? // Satu halaman dashboard = satu kelompok slide deck, desainnya `DashboardBagian`.
+        halamanTemplateBagian(template, widgets).map((h, i) => ({
+          id: `hlm-${i + 1}`,
+          judul: h.judul,
+          widgets: h.widgets,
+          replika: { templateId: `${template.id}#${i + 1}`, nilai: {} },
+        }))
+      : [
       { id: 'hlm-1', judul: 'Ringkasan', widgets, replika: { templateId: template.id, nilai: nilaiHal1 } },
       {
         id: 'hlm-2',
@@ -1860,11 +1872,12 @@ const app = express();
       sector: tenant.sector,
       // Tema template dibawa ke dashboard nyata: latar, warna kartu, dan aksen
       // harus sama dengan pratinjau yang dilihat pengguna.
-      tema: template.tema,
+      // Template bagian (gaya Korporat) ikut mode terang/gelap aplikasi, tanpa tema kanvas.
+      tema: template.bagian ? undefined : template.tema,
       // Angka dokumen dipetakan ke slot replika template: dipakai kanvas
       // dashboard nyata supaya desainnya identik dengan pratinjau data asli.
       replika: halaman[0].replika,
-      widgets,
+      widgets: halaman[0]?.widgets ?? widgets,
       halaman,
       halamanAktifId: 'hlm-1',
       globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
@@ -3111,7 +3124,8 @@ const app = express();
        * Data dokumen -> chart katalog -> beberapa halaman tanpa data kembar,
        * judul mengikuti isi. Gaya bisa diminta di kalimat ("gaya lensa").
        */
-      const desainDiminta = gayaDariPermintaan(prompt);
+      // Rapat bagian (procurement, outsourcing, ...) tanpa gaya disebut = gaya Korporat seperti deck-nya.
+      const desainDiminta = gayaDariPermintaan(prompt) ?? (bagianDariPermintaan(prompt) ? 'korporat' : undefined);
       const susun = susunDashboardBerhalaman(genResult.dashboard.widgets, {
         instansi: tenantAktif?.name,
         desain: desainDiminta,

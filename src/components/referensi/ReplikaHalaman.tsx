@@ -10,6 +10,9 @@ import { KacaOperasional, KacaRingkasan, KacaWilayah } from './DashboardKaca';
 import { KonteksGayaReplika, KonteksVarianTemplate } from '../widgets/konteksGayaReplika';
 import { varianTemplate } from '../../services/templates/dashboardTemplates';
 import type { SumberDok } from '../../services/templates/nilaiOperasional';
+import type { WidgetSpec } from '../../types';
+import { templateBagianId } from '../../services/templates/templateBagian';
+import { DashboardBagian } from './DashboardBagian';
 
 /**
  * REPLIKA SATU HALAMAN DASHBOARD DARI TEMPLATE.
@@ -44,13 +47,23 @@ export const pecahTemplateId = (templateId: string): { dasar: string; nomor: 1 |
  * di setiap halaman template ikut: desain chart, warna kartu, palet, dan font.
  * Pratinjau contoh di menu Template Dashboard tidak memakai gaya dashboard.
  */
-export const ReplikaHalaman: React.FC<Props> = (props) => (
+export const ReplikaHalaman: React.FC<Props> = (props) =>
+  // Template rapat bagian: halaman berisi kartu Template Chart (`nilai.widgets`).
+  templateBagianId(props.replika.templateId) ? (
+    <DashboardBagian
+      templateId={props.replika.templateId}
+      widgets={(props.replika.nilai as { widgets?: WidgetSpec[] } | undefined)?.widgets}
+      gaya={props.contoh ? undefined : props.gaya}
+      penuh={props.penuh}
+      contoh={props.contoh}
+    />
+  ) : (
   <KonteksVarianTemplate.Provider value={varianTemplate(props.replika.templateId)}>
     <KonteksGayaReplika.Provider value={props.contoh ? undefined : props.gaya}>
       <IsiReplika {...props} />
     </KonteksGayaReplika.Provider>
   </KonteksVarianTemplate.Provider>
-);
+  );
 
 const IsiReplika: React.FC<Props> = ({
   replika,

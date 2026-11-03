@@ -39,7 +39,9 @@ export function gayaKartuReplika(
   const asal: GayaVarian = gantiGaya ?? GAYA[varian];
   let hasil: GayaVarian | undefined = gantiGaya;
   if (desain) {
-    hasil = { ...GAYA[desain] };
+    // Gaya pengganti dari varian yang sama sudah versi mode aktif (mis. Korporat
+    // gelap); GAYA[desain] selalu versi bawaan sehingga paletnya salah mode.
+    hasil = { ...(gantiGaya && varian === desain ? gantiGaya : GAYA[desain]) };
     for (const k of KUNCI_PANEL) (hasil as any)[k] = (asal as any)[k];
   }
   if (warnaKartuValid(gayaHalaman.kartu)) {

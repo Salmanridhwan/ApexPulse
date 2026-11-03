@@ -64,6 +64,7 @@ import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { GlobalStyleModal } from './components/GlobalStyleModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman';
+import { templateBagianId } from './services/templates/templateBagian';
 import { Login } from './pages/Login';
 import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 
@@ -716,7 +717,8 @@ export default function App() {
   };
 
   const targetPalet = useMemo(() => {
-    if (activeDashboard?.replika) {
+    // Template rapat bagian berisi kartu widget biasa: sasarannya daftar kartu.
+    if (activeDashboard?.replika && !templateBagianId(activeDashboard.replika.templateId)) {
       const tid = activeDashboard.replika.templateId;
       // Template bergaya memakai susunan Pijar, jadi grafiknya sama.
       return GRAFIK_TEMPLATE[tid] || (varianTemplate(tid) ? GRAFIK_TEMPLATE['tpl-ringkasan'] : []);
@@ -767,7 +769,10 @@ export default function App() {
       const tid = h.replika?.templateId;
       if (!tid) return { id: h.id, judul: h.judul, widgets: h.widgets || [] };
       // Halaman 2 dan 3 menyimpan angkanya sendiri; halaman 1 dihitung dari widget.
-      const nilai = tid.includes('#')
+      // Template rapat bagian menggambar kartu halaman itu apa adanya.
+      const nilai = templateBagianId(tid)
+        ? { widgets: widgetsH }
+        : tid.includes('#')
         ? h.replika?.nilai
         : tid === 'tpl-analitik'
           ? nilaiAnalitikDariWidgets(widgetsH)
@@ -958,6 +963,7 @@ export default function App() {
   const nilaiReplika = useMemo(() => {
     const tid = activeDashboard?.replika?.templateId;
     if (!tid) return null;
+    if (templateBagianId(tid)) return { widgets: widgetsTampilInternal };
     // Halaman 2 dan 3 template menyimpan angkanya sendiri (bukan turunan widget).
     if (tid.includes('#')) return activeDashboard?.replika?.nilai ?? null;
     if (tid === 'tpl-analitik') return nilaiAnalitikDariWidgets(widgetsTampilInternal);

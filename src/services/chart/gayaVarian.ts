@@ -6,7 +6,8 @@
  * (laut dalam dengan kartu bening gelap, khas BUMD air minum), lalu lima gaya
  * umum dari tren desain: aurora (gradasi bercahaya), neon (kisi gelap, huruf
  * mono), blok (neubrutalism: garis tebal, bayangan keras), bento (pastel,
- * sudut besar), dan koran (editorial Swiss: kertas, serif, satu aksen merah). File ini
+ * sudut besar), koran (editorial Swiss: kertas, serif, satu aksen merah), dan korporat
+ * (laporan rapat manajemen: navy, biru, aksen oranye, kartu putih berikon bulat). File ini
  * HANYA berisi nilai desain. Tidak ada bentuk grafik di sini, jadi menambah wajah baru cukup menambah satu entri.
  *
  * Aturan: warna, gradasi, sudut, dan ketebalan boleh berbeda. Struktur data
@@ -25,9 +26,10 @@ export type Varian =
   | 'neon'
   | 'blok'
   | 'bento'
-  | 'koran';
+  | 'koran'
+  | 'korporat';
 
-export const VARIAN: Varian[] = ['default', 'ringkasan', 'analitik', 'trafik', 'kaca', 'tirta', 'aurora', 'neon', 'blok', 'bento', 'koran'];
+export const VARIAN: Varian[] = ['default', 'ringkasan', 'analitik', 'trafik', 'kaca', 'tirta', 'aurora', 'neon', 'blok', 'bento', 'koran', 'korporat'];
 
 export interface GayaVarian {
   /** Nama template dashboard dan katalog chart. Satu nama untuk keduanya. */
@@ -382,6 +384,34 @@ export const GAYA: Record<Varian, GayaVarian> = {
     sudutKartu: 0,
     huruf: "Georgia, 'Times New Roman', serif",
   },
+  korporat: {
+    nama: 'Korporat',
+    sebutan: 'Rapat manajemen',
+    aksen: '#1e6fd9',
+    aksen2: '#f7a21b',
+    latar: '#eef3f9',
+    kartu: '#ffffff',
+    kartu2: '#f1f5fb',
+    garis: '#dbe4f0',
+    teks: '#0f2b5b',
+    teks2: '#3c5277',
+    teks3: '#6b7c99',
+    palet: ['#1e6fd9', '#f7a21b', '#22a35a', '#0f2b5b', '#17a2c8'],
+    hijau: '#1f9d55',
+    merah: '#e5383b',
+    gradasi: 'y',
+    gradasiUjung: 0.92,
+    sudut: 3,
+    tebalGaris: 2.4,
+    garisTren: false,
+    warnaTren: '#22a35a',
+    labelPil: false,
+    sorotPuncak: false,
+    donatTebal: true,
+    latarCss:
+      'linear-gradient(160deg, rgba(30,111,217,0.07) 0%, transparent 38%), linear-gradient(180deg, #f5f8fc 0%, #e9eff7 100%)',
+    sudutKartu: 12,
+  },
 };
 
 /**
@@ -572,12 +602,31 @@ export const GAYA_GELAP: Partial<Record<Varian, GayaVarian>> = {
     warnaTren: '#f2ede1',
     tepi: { tebal: 1, warna: '#f2ede1', bayangan: 'none' },
   },
+  korporat: {
+    ...GAYA.korporat,
+    aksen: '#4c8dff',
+    aksen2: '#ffb43d',
+    latar: '#0a1a33',
+    kartu: '#10264a',
+    kartu2: '#16305a',
+    garis: 'rgba(140,170,220,0.16)',
+    teks: '#eef4ff',
+    teks2: '#b5c6e3',
+    teks3: '#8aa0c4',
+    palet: ['#4c8dff', '#ffb43d', '#34c27a', '#9cc3ff', '#2cc4e0'],
+    hijau: '#34c27a',
+    merah: '#ff6b6b',
+    gradasiUjung: 0.8,
+    warnaTren: '#34c27a',
+    latarCss:
+      'linear-gradient(160deg, rgba(76,141,255,0.16) 0%, transparent 40%), linear-gradient(180deg, #0b1d3a 0%, #081529 100%)',
+  },
 };
 
 /**
  * Gaya yang dipakai untuk mode tema tertentu: Default gelap di mode gelap;
  * Pijar, Lensa, Nadi, Tirta, Aurora, Neon terang di mode terang; Blok, Bento,
- * Koran gelap di mode gelap. Kaca selalu bening hangat.
+ * Koran, Korporat gelap di mode gelap. Kaca selalu bening hangat.
  */
 export const gayaMode = (v: Varian, mode: 'light' | 'dark'): GayaVarian => {
   if (mode === 'dark') return v === 'default' ? GAYA_DEFAULT_GELAP : GAYA_GELAP[v] ?? GAYA[v];

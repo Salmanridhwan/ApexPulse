@@ -1,5 +1,6 @@
 import { WidgetSpec, WidgetType } from '../../types';
 import { GAYA, VARIAN, type Varian } from '../chart/gayaVarian';
+import { TEMPLATE_BAGIAN, type InfoBagian } from './templateBagian';
 
 /**
  * TEMPLATE DASHBOARD — template UMUM berdasarkan TUJUAN, bukan sektor BUMD.
@@ -47,6 +48,11 @@ export interface DashboardTemplate {
   judulDashboard: string;
   deskripsiDashboard: string;
   widgets: WidgetSpec[];
+  /**
+   * Template rapat manajemen per bagian (lihat `templateBagian.ts`): halaman
+   * deck dan kata kunci asisten. Kosong = template tiga halaman Pijar.
+   */
+  bagian?: InfoBagian;
 }
 
 /** Label bulan netral untuk deret contoh. */
@@ -416,6 +422,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
   TEMPLATE_TRAFIK,
   TEMPLATE_KACA,
   ...TEMPLATE_GAYA,
+  ...TEMPLATE_BAGIAN,
 ];
 
 /** Cari template berdasarkan id (dipakai halaman galeri). */

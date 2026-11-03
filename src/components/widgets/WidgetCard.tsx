@@ -4,26 +4,15 @@ import { CHART_DEFAULT } from '../../services/chart/chartDefault';
 import { chartKatalogCocok, pakaiChartKatalog } from '../../services/chart/katalogCocok';
 import { createPortal } from 'react-dom';
 import {
-  Activity,
   AlertTriangle,
-  Banknote,
-  CircleDollarSign,
-  Coins,
   Copy,
   Database,
   Edit2,
   FileSearch,
-  Gauge,
   MoreVertical,
-  Percent,
-  ShieldAlert,
   Target,
   Trash2,
-  TrendingDown,
-  TrendingUp,
   UserCheck,
-  Users,
-  Wallet,
 } from 'lucide-react';
 import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -32,32 +21,11 @@ import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
 import { grafikKatalog, kartuBerjudulSendiri, pakaiWajahKatalog } from '../../services/chart/dataKatalogWidget';
 import { PanelSumber } from './PanelSumber';
+import { PETA_IKON } from './ikonWidget';
 import { bingkaiKatalog, gayaKatalogWidget } from './bingkaiKatalog';
 
 
-
-/**
- * Peta nama ikon (string di data widget) → komponen lucide.
- *
- * Disimpan sebagai NAMA, bukan komponen, karena widget diserialisasi ke database.
- * Nama tak dikenal jatuh ke `Target` supaya kartu tidak kosong.
- */
-const PETA_IKON: Record<string, React.ComponentType<{ className?: string }>> = {
-  wallet: Wallet,
-  'trending-up': TrendingUp,
-  'trending-down': TrendingDown,
-  coins: Coins,
-  target: Target,
-  gauge: Gauge,
-  users: Users,
-  'shield-alert': ShieldAlert,
-  banknote: Banknote,
-  activity: Activity,
-  percent: Percent,
-  dollar: CircleDollarSign,
-};
-
-/** Render ikon kartu berdasarkan nama di data widget. */
+/** Render ikon kartu berdasarkan nama di data widget. Nama tak dikenal jatuh ke `Target` supaya kartu tidak kosong. */
 function ikonKartu(nama: string) {
   const Ikon = PETA_IKON[nama] ?? Target;
   return <Ikon className="w-3.5 h-3.5" />;

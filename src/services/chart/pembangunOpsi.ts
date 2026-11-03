@@ -1088,7 +1088,8 @@ export const treemapPorsi: Pembangun = (d, g, s) => {
  */
 export interface SpesifikasiHtml {
   mesin: 'html';
-  jenis: 'kpi-kartu' | 'kpi-netral' | 'kpi-pijar' | 'kpi-kaca' | 'kpi-tirta' | 'kpi-strip' | 'kpi-lensa' | 'kpi-nadi' | 'progres-target' | 'tabel-ringkas' | 'narasi-insight' | 'peringkat' | 'strip-os';
+  jenis: 'kpi-kartu' | 'kpi-netral' | 'kpi-pijar' | 'kpi-kaca' | 'kpi-tirta' | 'kpi-strip' | 'kpi-lensa' | 'kpi-nadi' | 'progres-target' | 'tabel-ringkas' | 'narasi-insight' | 'peringkat' | 'strip-os'
+    | 'kpi-korporat' | 'kpi-target' | 'papan-isu' | 'tabel-status' | 'alur-tahap' | 'corong-pipeline' | 'daftar-progres';
   gaya: Pick<
     GayaVarian,
     'aksen' | 'aksen2' | 'kartu' | 'kartu2' | 'garis' | 'teks' | 'teks2' | 'teks3' | 'palet' | 'sudut' | 'hijau' | 'merah' | 'tepi' | 'sudutKartu'
@@ -1129,6 +1130,15 @@ export const progresTarget = htmlBentuk('progres-target');
 export const tabelRingkas = htmlBentuk('tabel-ringkas');
 export const narasiInsight = htmlBentuk('narasi-insight');
 export const peringkat = htmlBentuk('peringkat');
+/** Kartu KPI Korporat: ikon bulat padat, label, angka besar (deck rapat manajemen). */
+export const kpiKorporat = htmlBentuk('kpi-korporat');
+/** Bentuk khas rapat manajemen bagian; semuanya HTML dan ikut warna gaya. */
+export const kpiTarget = htmlBentuk('kpi-target');
+export const papanIsu = htmlBentuk('papan-isu');
+export const tabelStatus = htmlBentuk('tabel-status');
+export const alurTahap = htmlBentuk('alur-tahap');
+export const corongPipeline = htmlBentuk('corong-pipeline');
+export const daftarProgres = htmlBentuk('daftar-progres');
 
 /** Cincin tebal di semua gaya: sudut membulat dan bayangan. */
 export const donatTebal: Pembangun = (d, g, s) => donat(d, { ...g, donatTebal: true }, s);

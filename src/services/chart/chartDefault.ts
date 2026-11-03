@@ -48,7 +48,13 @@ export type ChartId =
   | 'radar-aspek'
   | 'gauge-kesehatan'
   | 'peta-panas'
-  | 'treemap-porsi';
+  | 'treemap-porsi'
+  | 'kpi-target'
+  | 'papan-isu'
+  | 'tabel-status'
+  | 'alur-tahap'
+  | 'corong-pipeline'
+  | 'daftar-progres';
 
 export interface EntriChart {
   id: ChartId;
@@ -66,7 +72,7 @@ export interface EntriChart {
   kelompok: KelompokChart;
 }
 
-export type KelompokChart = 'ringkas' | 'banding' | 'tren' | 'komposisi' | 'sebaran';
+export type KelompokChart = 'ringkas' | 'banding' | 'tren' | 'komposisi' | 'sebaran' | 'rapat';
 
 export const LABEL_KELOMPOK: Record<KelompokChart, string> = {
   ringkas: 'Angka ringkas, tabel, dan teks',
@@ -74,6 +80,7 @@ export const LABEL_KELOMPOK: Record<KelompokChart, string> = {
   tren: 'Perkembangan dari waktu ke waktu',
   komposisi: 'Porsi dan capaian',
   sebaran: 'Sebaran dan hubungan',
+  rapat: 'Rapat manajemen: target, isu, alur, dan tindak lanjut',
 };
 
 export const CHART_DEFAULT: Record<ChartId, EntriChart> = {
@@ -107,6 +114,13 @@ export const CHART_DEFAULT: Record<ChartId, EntriChart> = {
   'radar-aspek': { id: 'radar-aspek', nama: 'Radar aspek kinerja', tipe: 'radar', mesin: 'echarts', butuh: 'aspek dan skor, boleh dua tahun', guna: 'Skor tiap aspek penilaian kinerja dibanding tahun lalu', kelompok: 'sebaran' },
   'gauge-kesehatan': { id: 'gauge-kesehatan', nama: 'Gauge kesehatan BUMD', tipe: 'gauge', mesin: 'echarts', butuh: 'satu skor 0-5', guna: 'Skor kinerja dengan pita Sakit, Kurang Sehat, Sehat', kelompok: 'komposisi' },
   'peta-panas': { id: 'peta-panas', nama: 'Peta panas', tipe: 'heatmap', mesin: 'echarts', butuh: 'baris (mis. wilayah), kolom (mis. bulan), nilai', guna: 'Di mana dan kapan angka menumpuk, mis. pengaduan per wilayah', kelompok: 'sebaran' },
+  // Khas rapat manajemen bagian (deck Executive Summary, Permasalahan & Risiko, Action Plan, Pipeline, KPI 2027).
+  'kpi-target': { id: 'kpi-target', nama: 'Kartu sasaran KPI', tipe: 'kpi', mesin: 'html', butuh: 'satu angka dan sasarannya (≥ atau ≤)', guna: 'Sasaran tahun depan beserta capaian saat ini', kelompok: 'rapat' },
+  'papan-isu': { id: 'papan-isu', nama: 'Papan isu tiga status', tipe: 'table', mesin: 'html', butuh: 'tabel isu dengan kolom status', guna: 'Isu dikelompokkan Critical, Perlu Perhatian, dan Terkendali', kelompok: 'rapat' },
+  'tabel-status': { id: 'tabel-status', nama: 'Tabel tindak lanjut berstatus', tipe: 'table', mesin: 'html', butuh: 'tabel dengan kolom status di ujung', guna: 'Action plan: aksi, PIC, tenggat, dan pil status berwarna', kelompok: 'rapat' },
+  'alur-tahap': { id: 'alur-tahap', nama: 'Alur tahapan proses', tipe: 'funnel', mesin: 'html', butuh: 'urutan tahap dan jumlah per tahap', guna: 'Pipeline dari permintaan sampai pembayaran, jumlah di tiap tahap', kelompok: 'rapat' },
+  'corong-pipeline': { id: 'corong-pipeline', nama: 'Corong pipeline', tipe: 'funnel', mesin: 'html', butuh: 'tahap dan jumlah yang makin mengecil', guna: 'Prospek baru sampai closing: berapa yang tersisa di tiap tahap', kelompok: 'rapat' },
+  'daftar-progres': { id: 'daftar-progres', nama: 'Daftar progres persen', tipe: 'hbar', mesin: 'html', butuh: 'label dan persen', guna: 'Skor atau capaian banyak aspek, mis. kebersihan dan kualitas layanan', kelompok: 'rapat' },
   'treemap-porsi': { id: 'treemap-porsi', nama: 'Petak porsi (treemap)', tipe: 'treemap', mesin: 'echarts', butuh: 'kategori dan nilai', guna: 'Porsi banyak kategori sekaligus, mis. pendapatan per golongan', kelompok: 'komposisi' },
 };
 

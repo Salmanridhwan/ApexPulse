@@ -19,6 +19,7 @@ import {
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
 import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
 import { ReplikaHalaman } from '../components/referensi/ReplikaHalaman';
+import { halamanTemplateBagian } from '../services/templates/templateBagian';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
 import { PresentationMode } from '../components/PresentationMode';
 import { HalamanTabs } from '../components/HalamanTabs';
@@ -153,7 +154,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * sama, isi berbeda. Halaman 2 memakai angka dokumen yang belum dipakai
    * halaman 1 (`/api/templates/pratinjau?halaman=2`).
    */
-  const [halamanAktif, setHalamanAktif] = useState<'1' | '2' | '3'>('1');
+  const [halamanAktif, setHalamanAktif] = useState<string>('1');
   const [asli2, setAsli2] = useState<WidgetSpec[] | null>(null);
   /** Halaman 3: kinerja per wilayah layanan (diurai server dari tabel dokumen). */
   const [asli3, setAsli3] = useState<NilaiWilayah | null>(null);
@@ -192,9 +193,14 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
 
+  /** Template rapat bagian: halaman deck sebanyak definisinya, bukan tiga halaman Pijar. */
+  const bagian = aktif.bagian;
+  const jumlahHalaman = bagian ? bagian.halaman.length : 3;
+
   /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
-  const susunanChip =
-    aktif.id === 'tpl-analitik'
+  const susunanChip = bagian
+    ? `${aktif.widgets.length} kartu · ${jumlahHalaman} halaman · gaya Korporat`
+    : aktif.id === 'tpl-analitik'
       ? '4 angka utama · 7 grafik · 1 tabel · 3 halaman'
       : aktif.id === 'tpl-trafik'
         ? '5 angka utama · 4 grafik · 3 daftar · 3 halaman'
@@ -237,7 +243,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * Galeri, presentasi, dan dashboard tersimpan memakai `ReplikaHalaman` yang
    * sama, jadi tampilannya tidak mungkin berbeda.
    */
-  const replikaTampil = (nomor: 1 | 2 | 3, penuh: boolean) => {
+  const replikaTampil = (nomor: number, penuh: boolean) => {
+    if (bagian) {
+      const isi = halamanTemplateBagian(aktif, asli?.widgets ?? widgetPratinjau)[nomor - 1]?.widgets ?? [];
+      return (
+        <ReplikaHalaman
+          penuh={penuh}
+          replika={{ templateId: `${aktif.id}#${nomor}`, nilai: { widgets: isi } }}
+          contoh={!asli}
+          sumberAktif={Boolean(asli)}
+        />
+      );
+    }
     const nilaiHal1 = !asli
       ? undefined
       : aktif.id === 'tpl-analitik'
@@ -424,8 +441,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
       // Halaman 2 dan 3 diambil ulang saat dibuka berikutnya.
       setAsli2(null);
       setAsli3(null);
-      if (halamanAktif === '2') void bukaHalaman2(true);
-      if (halamanAktif === '3') void bukaHalaman3(true);
+      if (!bagian && halamanAktif === '2') void bukaHalaman2(true);
+      if (!bagian && halamanAktif === '3') void bukaHalaman3(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.status, st?.selesaiPada, asli, aktif.id]);
@@ -769,7 +786,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         {/* Halaman template: desain sama, isi berbeda. Halaman 2 memakai angka
             dokumen yang belum dipakai halaman 1. */}
         <HalamanTabs
-          halaman={[
+          halaman={bagian ? bagian.halaman.map((h, i) => ({ id: String(i + 1), judul: h.judul, widgets: [] as WidgetSpec[] })) : [
             { id: '1', judul: 'Halaman 1', widgets: asli?.widgets ?? widgetPratinjau },
             { id: '2', judul: 'Halaman 2', widgets: asli2 ?? [] },
             // Halaman 3 berlaku untuk SEMUA template: satu lingkup wilayah layanan.
@@ -777,12 +794,17 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           ]}
           aktifId={halamanAktif}
           onPilih={(id) => {
-            if (id === '2') void bukaHalaman2();
+            if (bagian) setHalamanAktif(id);
+            else if (id === '2') void bukaHalaman2();
             else if (id === '3') void bukaHalaman3();
             else setHalamanAktif('1');
           }}
         />
 
+        {bagian ? (
+          // Gaya Korporat mengikuti mode terang/gelap aplikasi, seperti di menu Template Chart.
+          <div className="rounded-card">{replikaTampil(Number(halamanAktif), false)}</div>
+        ) : (
         <div className={`tema-${aktif.tema || 'oranye'} rounded-card p-1.5 -m-1.5`} data-theme="dark">
           <KanvasTemaContext.Provider
             value={
@@ -790,14 +812,15 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             }
           >
             {/* Satu komponen untuk ketiga halaman semua template, sama dengan dashboard tersimpan. */}
-            {replikaTampil(Number(halamanAktif) as 1 | 2 | 3, false)}
+            {replikaTampil(Number(halamanAktif), false)}
           </KanvasTemaContext.Provider>
         </div>
+        )}
 
         <p className="text-[10.5px] text-ink-3 leading-relaxed border-t border-line pt-4 mt-2 flex items-start gap-1.5">
           <BarChart3 className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
-            <strong>Simpan sebagai dashboard</strong> menyimpan ketiga halaman sekaligus, persis seperti pratinjau ini.
+            <strong>Simpan sebagai dashboard</strong> menyimpan {bagian ? `${jumlahHalaman} halaman` : 'ketiga halaman'} sekaligus, persis seperti pratinjau ini.
             Angkanya ikut diperbarui setiap kali dokumen instansi bertambah atau berubah.
           </span>
         </p>
@@ -811,9 +834,9 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           tenantName={currentTenant?.name}
           onExit={() => setPresentasi(false)}
           pratinjau
-          halaman={([1, 2, 3] as const).map((nomor) => ({
+          halaman={Array.from({ length: jumlahHalaman }, (_, i) => i + 1).map((nomor) => ({
             id: String(nomor),
-            judul: `Halaman ${nomor}`,
+            judul: bagian?.halaman[nomor - 1]?.judul ?? `Halaman ${nomor}`,
             konten: replikaTampil(nomor, true),
           }))}
           konten={replikaTampil(1, true)}

@@ -26,7 +26,7 @@ export interface PropsKatalog {
 }
 
 /** Wajah yang menggambar judulnya sendiri di dalam kotak: kepala kartu kanvas disembunyikan. */
-const BERJUDUL_SENDIRI: ChartId[] = ['kpi-kartu', 'kpi-strip', 'narasi-insight'];
+const BERJUDUL_SENDIRI: ChartId[] = ['kpi-kartu', 'kpi-strip', 'narasi-insight', 'kpi-target'];
 
 export const kartuBerjudulSendiri = (w: Pick<WidgetSpec, 'chartId'>): boolean =>
   Boolean(w.chartId && BERJUDUL_SENDIRI.includes(w.chartId as ChartId));
@@ -72,6 +72,40 @@ export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
         },
       };
     }
+    case 'kpi-target': {
+      if (!w.kpi) return null;
+      const nilai = String(w.kpi.value ?? '').trim();
+      const kosong = nilai === '' || nilai === '-';
+      const target = angka(w.kpi.target);
+      return {
+        judul,
+        teksAngka: kosong ? undefined : nilai,
+        data: {
+          kategori: [judul],
+          seri: [{ nama: judul, data: [angka(nilai)] }],
+          satuan: w.kpi.unit,
+          target: target ?? undefined,
+          // "≤ 5 hari", "≤ target": sasaran yang baik bila angkanya turun.
+          arahBaik: /≤|<=|maks|turun|kurang/i.test(w.kpi.targetLabel ?? '') ? 'turun' : 'naik',
+          dariDokumen: true,
+          kosong,
+        },
+      };
+    }
+    case 'papan-isu':
+    case 'tabel-status': {
+      const kolom = w.table?.columns ?? [];
+      const baris = w.table?.rows ?? [];
+      if (kolom.length < 2 || baris.length === 0) return null;
+      return {
+        data: {
+          kategori: [judul],
+          seri: [],
+          dariDokumen: true,
+          tabel: { kepala: kolom.map((c) => c.label), baris: baris.map((r) => kolom.map((c) => r[c.key] ?? '-')) },
+        },
+      };
+    }
     case 'narasi-insight': {
       const teks = w.narasi?.text?.trim();
       if (!teks) return null;
@@ -103,7 +137,7 @@ export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
       };
     }
     default: {
-      // peringkat, strip-os: label + satu deret angka.
+      // peringkat, strip-os, alur-tahap, corong-pipeline, daftar-progres: label + satu deret angka.
       const kategori = w.chart?.xAxis ?? [];
       const seri = w.chart?.series?.[0];
       if (kategori.length === 0 || !seri?.data?.length) return null;

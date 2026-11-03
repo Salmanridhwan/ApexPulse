@@ -297,7 +297,7 @@ export function bagiHalamanDiminta(
   return { halaman, kosong, dilewati };
 }
 
-const NAMA_GAYA: Record<string, Varian> = { pijar: 'ringkasan', lensa: 'analitik', nadi: 'trafik', kaca: 'kaca', glassy: 'kaca', glass: 'kaca', bening: 'kaca', tirta: 'tirta', samudra: 'tirta', aurora: 'aurora', neon: 'neon', blok: 'blok', brutal: 'blok', neubrutalism: 'blok', bento: 'bento', pastel: 'bento', koran: 'koran', editorial: 'koran', default: 'default', netral: 'default' };
+const NAMA_GAYA: Record<string, Varian> = { pijar: 'ringkasan', lensa: 'analitik', nadi: 'trafik', kaca: 'kaca', glassy: 'kaca', glass: 'kaca', bening: 'kaca', tirta: 'tirta', samudra: 'tirta', aurora: 'aurora', neon: 'neon', blok: 'blok', brutal: 'blok', neubrutalism: 'blok', bento: 'bento', pastel: 'bento', koran: 'koran', editorial: 'koran', korporat: 'korporat', korporasi: 'korporat', corporate: 'korporat', default: 'default', netral: 'default' };
 
 /**
  * Apakah pengguna meminta chart dari menu Template Chart? Ya bila menyebut gaya
@@ -314,7 +314,7 @@ export function mintaTemplateChart(prompt: string): boolean {
 
 /** Gaya yang diminta di kalimat pengguna ("pakai gaya lensa"), bila ada. */
 export function gayaDariPermintaan(prompt: string): Varian | undefined {
-  const m = String(prompt).toLowerCase().match(/(?:^|[^a-z])(pijar|lensa|nadi|kaca|glassy|glass|bening|tirta|samudra|aurora|neon|blok|brutal|neubrutalism|bento|pastel|koran|editorial)(?:[^a-z]|$)/);
+  const m = String(prompt).toLowerCase().match(/(?:^|[^a-z])(pijar|lensa|nadi|kaca|glassy|glass|bening|tirta|samudra|aurora|neon|blok|brutal|neubrutalism|bento|pastel|koran|editorial|korporat|korporasi|corporate)(?:[^a-z]|$)/);
   return m ? NAMA_GAYA[m[1]] : undefined;
 }
 

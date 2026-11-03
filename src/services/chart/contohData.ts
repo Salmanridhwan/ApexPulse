@@ -235,6 +235,61 @@ const PETA: Record<ChartId, DataChart> = {
       [7.5, 7.6, 7.7, 7.7, 7.8],
     ],
   },
+  'kpi-target': {
+    kategori: ['On-time delivery'],
+    seri: [{ nama: 'Realisasi', data: [91.4] }],
+    satuan: '%',
+    target: 95,
+    arahBaik: 'naik',
+    desimal: 1,
+  },
+  'papan-isu': {
+    kategori: ['Permasalahan'],
+    seri: [],
+    tabel: {
+      kepala: ['Isu', 'Status'],
+      baris: [
+        ['Lead time panjang', 'Critical'],
+        ['Vendor tidak memenuhi SLA', 'Critical'],
+        ['Harga berubah', 'Perlu perhatian'],
+        ['Approval terlambat', 'Perlu perhatian'],
+        ['Spesifikasi final', 'Terkendali'],
+        ['Dokumen lengkap', 'Terkendali'],
+      ],
+    },
+  },
+  'tabel-status': {
+    kategori: ['Action plan'],
+    seri: [],
+    tabel: {
+      kepala: ['Aksi', 'PIC', 'Tenggat', 'Status'],
+      baris: [
+        ['Negosiasi vendor', 'Procurement', '15 Jan', 'Perlu perhatian'],
+        ['Finalisasi spesifikasi', 'User', '22 Jan', 'Terkendali'],
+        ['Tender paket 3', 'Procurement', '05 Feb', 'Critical'],
+        ['Tindak lanjut delivery', 'User', '12 Feb', 'On progress'],
+      ],
+    },
+  },
+  'alur-tahap': {
+    kategori: ['Request', 'RFQ', 'Evaluasi', 'Negosiasi', 'PO', 'Delivery', 'Payment'],
+    seri: [{ nama: 'Paket', data: [42, 36, 31, 24, 19, 14, 11] }],
+    satuan: 'paket',
+    desimal: 0,
+  },
+  'corong-pipeline': {
+    kategori: ['Prospek baru', 'Dalam negosiasi', 'Proposal', 'Closing'],
+    seri: [{ nama: 'Prospek', data: [120, 45, 28, 12] }],
+    satuan: 'prospek',
+    desimal: 0,
+  },
+  'daftar-progres': {
+    kategori: ['Kebersihan kamar', 'Toilet & kamar mandi', 'Area umum', 'Laundry', 'Pengelolaan sampah'],
+    seri: [{ nama: 'Skor', data: [90, 85, 88, 80, 92] }],
+    satuan: '%',
+    target: 85,
+    desimal: 0,
+  },
 };
 
 export const contohData = (id: ChartId): DataChart => PETA[id] ?? VOLUME;

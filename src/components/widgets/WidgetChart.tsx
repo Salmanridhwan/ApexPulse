@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useRef } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Gauge } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Gauge, Target } from 'lucide-react';
 import { loadEcharts } from './echartsSetup';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
 import { contohKartu } from '../../services/chart/contohData';
@@ -371,6 +371,60 @@ const jalurSpark = (deret: Array<number | null>): { garis: string; area: string 
   });
   const garis = `M${titik.join(' L')}`;
   return { garis, area: `${garis} L100,100 L0,100 Z` };
+};
+
+/** Kuning-oranye status "Perlu Perhatian", sama di semua gaya seperti merah dan hijau. */
+const WARNA_PERHATIAN = '#f08c00';
+
+export type KelasStatus = 'kritis' | 'perhatian' | 'terkendali' | 'proses' | 'netral';
+
+/** Golongkan teks status dokumen (Critical, Perlu perhatian, Terkendali, On progress, ...). */
+export const kelasStatus = (teks: string): KelasStatus => {
+  const t = teks.toLowerCase();
+  if (/critical|kritis|tinggi|high|terlambat|delay|gagal|merah/.test(t)) return 'kritis';
+  if (/perlu|perhatian|medium|sedang|pending|tertunda|kuning|waspada|cukup/.test(t)) return 'perhatian';
+  if (/terkendali|selesai|done|tercapai|on schedule|sesuai|rendah|low|aman|hijau|closed|baik|berfungsi|terkelola|siap/.test(t)) return 'terkendali';
+  if (/progress|proses|berjalan|ongoing/.test(t)) return 'proses';
+  return 'netral';
+};
+
+const warnaStatus = (k: KelasStatus, g: SpesifikasiHtml['gaya']): { latar: string; teks: string } => {
+  if (k === 'kritis') return { latar: g.merah, teks: '#ffffff' };
+  if (k === 'perhatian') return { latar: WARNA_PERHATIAN, teks: '#ffffff' };
+  if (k === 'terkendali') return { latar: g.hijau, teks: '#ffffff' };
+  if (k === 'proses') return { latar: `${g.aksen}26`, teks: g.aksen };
+  return { latar: g.kartu2, teks: g.teks2 };
+};
+
+/**
+ * Baris isu untuk papan tiga status: dari tabel (kolom pertama = isu, kolom
+ * terakhir = status) atau dari kategori + catatan. Status tak dikenal dianggap
+ * perlu perhatian supaya tidak hilang dari papan.
+ */
+const barisStatus = (data: DataChart): Array<{ isu: string; kelas: KelasStatus }> => {
+  const mentah = data.tabel
+    ? data.tabel.baris.map((b) => ({ isu: String(b[0] ?? ''), status: String(b[b.length - 1] ?? '') }))
+    : data.kategori.map((k, i) => ({ isu: k, status: data.catatan?.[i] ?? '' }));
+  return mentah
+    .filter((b) => b.isu.trim())
+    .map((b) => {
+      const k = kelasStatus(b.status);
+      return { isu: b.isu, kelas: k === 'proses' || k === 'netral' ? 'perhatian' : k };
+    });
+};
+
+/** Teks gelap di atas warna terang, putih di atas warna gelap. */
+const tintaDi = (hex: string): string => {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return '#ffffff';
+  const n = parseInt(hex.slice(1), 16);
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 165 ? '#0f1a2e' : '#ffffff';
+};
+
+/** Indeks warna tetap untuk satu label, supaya ikon KPI berganti warna antarkartu. */
+const indeksWarna = (label: string, n: number): number => {
+  let h = 0;
+  for (const c of label) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % n;
 };
 
 interface BentukProps {
@@ -1010,6 +1064,344 @@ const BentukHtml: React.FC<BentukProps> = ({
             )
           )}
         </div>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'kpi-korporat') {
+    // Deck rapat manajemen: ikon putih di lingkaran padat, label, angka besar,
+    // keterangan kecil di bawahnya. Warna lingkaran bergiliran menurut label.
+    const IkonKpi = Ikon ?? Gauge;
+    const label = judul || data.kategori?.[0] || data.seri?.[0]?.nama || contohKartu.judul;
+    const kosong = data.kosong === true;
+    const delta = data.delta;
+    const adaDelta = delta !== undefined && delta !== 0 && !kosong;
+    const naik = (delta ?? 0) > 0;
+    const warnaIkon = data.warnaIkon ?? g.palet[indeksWarna(String(label), 4) % g.palet.length];
+    return (
+      <div className="h-full flex items-start gap-[0.7em] p-[0.85em] min-w-0" style={kotak} onClick={onKlik}>
+        <span
+          className="shrink-0 inline-flex items-center justify-center w-[2.3em] h-[2.3em] rounded-full text-white"
+          style={{ backgroundColor: warnaIkon, boxShadow: `0 0.35em 0.9em ${warnaIkon}40` }}
+        >
+          <IkonKpi className="w-[1.1em] h-[1.1em]" />
+        </span>
+        <div className="min-w-0 flex-1 flex flex-col gap-[0.2em]">
+          <p className="text-[0.74em] font-semibold leading-tight line-clamp-2" style={{ color: g.teks2 }}>
+            {label}
+          </p>
+          <div className="flex items-baseline gap-[0.3em] min-w-0">
+            <span
+              className="text-[1.55em] font-extrabold leading-none tabular-nums tracking-tight truncate"
+              style={{ color: kosong ? g.teks3 : g.teks }}
+            >
+              {kosong ? '—' : teksAngka ?? format(angka, desimal)}
+            </span>
+            {satuan && !kosong && (
+              <span className="text-[0.68em] font-semibold shrink-0" style={{ color: g.teks3 }}>
+                {satuan}
+              </span>
+            )}
+          </div>
+          <p className="text-[0.62em] font-medium truncate" style={{ color: g.teks3 }}>
+            {kosong ? (
+              'belum ada di dokumen'
+            ) : adaDelta ? (
+              <span style={{ color: naik ? g.hijau : g.merah }}>
+                {naik ? '▲' : '▼'} {String(Math.abs(delta!)).replace('.', ',')}%{' '}
+                <span style={{ color: g.teks3 }}>{deltaTeks}</span>
+              </span>
+            ) : (
+              deltaTeks || ' '
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'kpi-target') {
+    // Sasaran tahun depan ("≥ 95%") di atas capaian saat ini.
+    const IkonKpi = Ikon ?? Target;
+    const label = judul || data.kategori?.[0] || data.seri?.[0]?.nama || 'Sasaran';
+    const kosong = data.kosong === true || angka === null;
+    const sasaran = typeof data.target === 'number' ? data.target : null;
+    const turun = data.arahBaik === 'turun';
+    const teksSasaran = (v: number) => `${turun ? '≤' : '≥'} ${format(v, desimal)}${satuan === '%' ? '%' : satuan ? ` ${satuan}` : ''}`;
+    const capai =
+      sasaran !== null && !kosong && sasaran !== 0
+        ? Math.max(0, Math.min(100, turun ? (sasaran / Math.max(angka!, 1e-9)) * 100 : (angka! / sasaran) * 100))
+        : null;
+    const tercapai = capai !== null && capai >= 100;
+    return (
+      <div className="h-full flex flex-col gap-[0.45em] p-[0.85em] min-w-0" style={kotak} onClick={onKlik}>
+        <div className="flex items-center gap-[0.55em] min-w-0">
+          <span
+            className="shrink-0 inline-flex items-center justify-center w-[2em] h-[2em] rounded-full"
+            style={{ backgroundColor: `${g.aksen}1f`, color: g.aksen, boxShadow: `inset 0 0 0 1px ${g.aksen}40` }}
+          >
+            <IkonKpi className="w-[1em] h-[1em]" />
+          </span>
+          <span className="text-[0.76em] font-semibold leading-tight line-clamp-2" style={{ color: g.teks2 }}>
+            {label}
+          </span>
+        </div>
+        <span className="text-[1.55em] font-extrabold leading-none tabular-nums tracking-tight" style={{ color: g.aksen }}>
+          {sasaran !== null ? teksSasaran(sasaran) : kosong ? '—' : teksAngka ?? format(angka, desimal)}
+        </span>
+        <div className="mt-auto">
+          <div className="flex justify-between gap-[0.5em] text-[0.62em] font-semibold mb-[0.3em]" style={{ color: g.teks3 }}>
+            <span className="truncate">
+              {kosong ? 'Realisasi belum ada di dokumen' : `Realisasi ${teksAngka ?? format(angka, desimal)}${satuan === '%' ? '%' : ''}`}
+            </span>
+            {capai !== null && (
+              <span className="tabular-nums shrink-0" style={{ color: tercapai ? g.hijau : g.teks }}>
+                {tercapai ? 'Tercapai' : `${capai.toLocaleString('id-ID', { maximumFractionDigits: 0 })}%`}
+              </span>
+            )}
+          </div>
+          <div className="h-[0.42em] rounded-full overflow-hidden" style={{ backgroundColor: g.kartu2 }}>
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${capai ?? 0}%`, backgroundColor: tercapai ? g.hijau : g.aksen }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'papan-isu') {
+    // Issue board tiga kolom: Critical, Perlu Perhatian, Terkendali.
+    const isu = barisStatus(data);
+    const kolom: Array<{ kelas: KelasStatus; judul: string; warna: string; IkonKolom: React.ComponentType<{ className?: string }> }> = [
+      { kelas: 'kritis', judul: 'Critical', warna: g.merah, IkonKolom: AlertOctagon },
+      { kelas: 'perhatian', judul: 'Perlu Perhatian', warna: WARNA_PERHATIAN, IkonKolom: AlertTriangle },
+      { kelas: 'terkendali', judul: 'Terkendali', warna: g.hijau, IkonKolom: CheckCircle2 },
+    ];
+    return (
+      <div className="h-full grid grid-cols-3 gap-[0.55em] min-h-0" style={{ color: g.teks }} onClick={onKlik}>
+        {kolom.map(({ kelas, judul: jdl, warna, IkonKolom }) => {
+          const isi = isu.filter((b) => b.kelas === kelas);
+          return (
+            <div
+              key={kelas}
+              className="flex flex-col min-h-0 overflow-hidden"
+              style={{ ...kotak, borderColor: `${warna}55`, background: `linear-gradient(180deg, ${warna}12 0%, ${g.kartu} 55%)` }}
+            >
+              <div
+                className="flex items-center gap-[0.4em] px-[0.6em] py-[0.45em] text-white text-[0.68em] font-extrabold uppercase tracking-wide"
+                style={{ backgroundColor: warna }}
+              >
+                <IkonKolom className="w-[1.15em] h-[1.15em] shrink-0" />
+                <span className="truncate">{jdl}</span>
+                <span className="ml-auto tabular-nums opacity-90">{isi.length}</span>
+              </div>
+              <ul className="flex-1 min-h-0 overflow-auto gulir-tema px-[0.7em] py-[0.55em] space-y-[0.35em]">
+                {isi.length === 0 && (
+                  <li className="text-[0.66em]" style={{ color: g.teks3 }}>
+                    Tidak ada
+                  </li>
+                )}
+                {isi.map((b, i) => (
+                  <li key={`${b.isu}-${i}`} className="flex items-start gap-[0.4em] text-[0.7em] leading-snug">
+                    <span className="mt-[0.45em] w-[0.38em] h-[0.38em] rounded-full shrink-0" style={{ backgroundColor: warna }} />
+                    <span className="min-w-0">{b.isu}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'tabel-status') {
+    // Action plan: kepala gelap, kolom terakhir pil status berwarna.
+    const tabel = data.tabel ?? { kepala: ['Keterangan', 'Status'], baris: data.kategori.map((k, i) => [k, data.catatan?.[i] ?? '-']) };
+    const terang = cukupTerang(g.kartu.startsWith('#') ? g.kartu : '#ffffff');
+    const latarKepala = terang ? g.teks : g.kartu2;
+    const akhir = tabel.kepala.length - 1;
+    return (
+      <div className="h-full min-h-0 overflow-auto gulir-tema" style={{ ...kotak, padding: 0 }} onClick={onKlik}>
+        <table className="w-full text-[0.68em] border-collapse">
+          <thead>
+            <tr style={{ backgroundColor: latarKepala, color: terang ? '#ffffff' : g.teks }}>
+              <th className="font-bold py-[0.5em] pl-[0.8em] pr-[0.3em] text-left w-[2.2em]">No</th>
+              {tabel.kepala.map((k, i) => (
+                <th key={k} className={`font-bold py-[0.5em] px-[0.5em] ${i === akhir ? 'text-center' : 'text-left'}`}>
+                  {k}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tabel.baris.map((sel, r) => {
+              const status = String(sel[akhir] ?? '');
+              const warna = warnaStatus(kelasStatus(status), g);
+              return (
+                <tr key={`baris-${r}`} style={{ borderTop: `1px solid ${g.garis}` }}>
+                  <td className="py-[0.45em] pl-[0.8em] pr-[0.3em] tabular-nums" style={{ color: g.teks3 }}>
+                    {r + 1}
+                  </td>
+                  {sel.map((isiSel, i) =>
+                    i === akhir ? (
+                      <td key={`sel-${r}-${i}`} className="py-[0.4em] px-[0.5em] text-center">
+                        <span
+                          className="inline-block min-w-[6.5em] px-[0.6em] py-[0.2em] rounded-[0.4em] text-[0.92em] font-bold uppercase tracking-wide"
+                          style={{ backgroundColor: warna.latar, color: warna.teks }}
+                        >
+                          {status || '—'}
+                        </span>
+                      </td>
+                    ) : (
+                      <td
+                        key={`sel-${r}-${i}`}
+                        className="py-[0.45em] px-[0.5em]"
+                        style={{ color: i === 0 ? g.teks : g.teks2, fontWeight: i === 0 ? 600 : 400 }}
+                      >
+                        {isiSel}
+                      </td>
+                    )
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'alur-tahap') {
+    // Pipeline bertahap: lingkaran bernomor tersambung garis, jumlah di bawah tiap tahap.
+    const nilai = data.seri?.[0]?.data ?? [];
+    const puncak = Math.max(1, ...nilai.map((v) => Number(v ?? 0)));
+    const n = data.kategori.length;
+    return (
+      <div className="h-full flex flex-col justify-center gap-[0.7em] px-[0.8em] py-[0.75em] min-w-0" style={kotak} onClick={onKlik}>
+        <div className="relative grid gap-[0.2em]" style={{ gridTemplateColumns: `repeat(${Math.max(n, 1)}, minmax(0, 1fr))` }}>
+          <span
+            className="absolute top-[1em] h-[0.18em] rounded-full"
+            style={{ left: `${50 / Math.max(n, 1)}%`, right: `${50 / Math.max(n, 1)}%`, backgroundColor: `${g.aksen}40` }}
+          />
+          {data.kategori.map((tahap, i) => {
+            const v = nilai[i];
+            return (
+              <div key={tahap} className="relative flex flex-col items-center gap-[0.3em] min-w-0 text-center">
+                <span
+                  className="w-[2em] h-[2em] rounded-full flex items-center justify-center text-[0.8em] font-extrabold"
+                  style={{ backgroundColor: g.palet[i % 2 === 0 ? 0 : 3] ?? g.aksen, color: tintaDi(g.palet[i % 2 === 0 ? 0 : 3] ?? g.aksen), boxShadow: `0 0 0 0.22em ${g.kartu}` }}
+                >
+                  {i + 1}
+                </span>
+                <span className="text-[0.62em] font-bold uppercase tracking-wide leading-tight line-clamp-2" style={{ color: g.teks2 }}>
+                  {tahap}
+                </span>
+                {typeof v === 'number' && (
+                  <span className="text-[0.86em] font-extrabold tabular-nums leading-none" style={{ color: g.teks }}>
+                    {format(v, desimal)}
+                  </span>
+                )}
+                {typeof v === 'number' && (
+                  <span className="block w-[80%] h-[0.28em] rounded-full overflow-hidden" style={{ backgroundColor: g.kartu2 }}>
+                    <span className="block h-full rounded-full" style={{ width: `${(v / puncak) * 100}%`, backgroundColor: g.aksen2 }} />
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {satuan && (
+          <p className="text-[0.6em] text-right" style={{ color: g.teks3 }}>
+            Jumlah per tahap, satuan {satuan}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'corong-pipeline') {
+    // Corong: batang di tengah, makin sempit tiap tahap, angka di kanan.
+    const nilai = (data.seri?.[0]?.data ?? []).map((v) => Number(v ?? 0));
+    const puncak = Math.max(1, ...nilai);
+    const total = nilai.reduce((a, b) => a + b, 0);
+    return (
+      <div className="h-full flex flex-col gap-[0.35em] px-[0.8em] py-[0.75em] min-h-0" style={kotak} onClick={onKlik}>
+        <div className="flex-1 min-h-0 flex flex-col justify-center gap-[0.3em]">
+          {data.kategori.map((tahap, i) => {
+            const v = nilai[i] ?? 0;
+            const lebar = 38 + (v / puncak) * 62;
+            return (
+              <div key={tahap} className="flex items-center gap-[0.5em]">
+                <div className="flex-1 flex justify-center min-w-0">
+                  <div
+                    className="flex items-center justify-center px-[0.6em] py-[0.42em] text-[0.72em] font-bold truncate"
+                    style={{
+                      width: `${lebar}%`,
+                      backgroundColor: g.palet[i % g.palet.length],
+                      color: tintaDi(g.palet[i % g.palet.length]),
+                      clipPath: 'polygon(0 0, 100% 0, 96% 100%, 4% 100%)',
+                    }}
+                  >
+                    {tahap}
+                  </div>
+                </div>
+                <span className="w-[3.2em] text-right text-[0.86em] font-extrabold tabular-nums shrink-0" style={{ color: g.teks }}>
+                  {format(v, desimal)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between text-[0.7em] font-bold pt-[0.35em]" style={{ borderTop: `1px solid ${g.garis}` }}>
+          <span style={{ color: g.teks2 }}>Total pipeline</span>
+          <span className="tabular-nums" style={{ color: g.teks }}>
+            {format(total, desimal)}
+            {satuan ? ` ${satuan}` : ''}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (spesifikasi.jenis === 'daftar-progres') {
+    // Daftar aspek dengan batang tebal dan persen di kanan; di bawah sasaran = warna kedua.
+    const nilai = data.seri?.[0]?.data ?? [];
+    const sasaran = typeof data.target === 'number' ? data.target : null;
+    const maks = satuan === '%' ? 100 : Math.max(1, ...nilai.map((v) => Number(v ?? 0)));
+    return (
+      <div className="h-full flex flex-col justify-center gap-[0.5em] px-[0.8em] py-[0.75em] min-h-0" style={kotak} onClick={onKlik}>
+        {data.kategori.slice(0, 8).map((label, i) => {
+          const v = Number(nilai[i] ?? 0);
+          const kurang = sasaran !== null && v < sasaran;
+          return (
+            <div key={label} className="text-[0.72em]">
+              <div className="flex items-center justify-between gap-[0.5em]">
+                <span className="truncate font-medium" style={{ color: g.teks2 }}>
+                  {label}
+                </span>
+                <span className="font-extrabold tabular-nums shrink-0" style={{ color: kurang ? g.aksen2 : g.teks }}>
+                  {format(v, desimal)}
+                  {satuan === '%' ? '%' : ''}
+                </span>
+              </div>
+              <span className="block h-[0.5em] rounded-full overflow-hidden mt-[0.25em]" style={{ backgroundColor: g.kartu2 }}>
+                <span
+                  className="block h-full rounded-full"
+                  style={{ width: `${Math.max(0, Math.min(100, (v / maks) * 100))}%`, backgroundColor: kurang ? g.aksen2 : g.aksen }}
+                />
+              </span>
+            </div>
+          );
+        })}
+        {sasaran !== null && (
+          <p className="text-[0.6em]" style={{ color: g.teks3 }}>
+            Sasaran {format(sasaran, desimal)}
+            {satuan === '%' ? '%' : ''}; di bawah sasaran ditandai warna kedua.
+          </p>
+        )}
       </div>
     );
   }

@@ -199,7 +199,7 @@ export interface WidgetStyle {
    * `analitik` (Lensa), atau `trafik` (Nadi). Mengatur bentuk, warna kartu,
    * gradasi, dan label sekaligus. Kosong = ikut tema aplikasi.
    */
-  desain?: 'default' | 'ringkasan' | 'analitik' | 'trafik' | 'kaca' | 'tirta' | 'aurora' | 'neon' | 'blok' | 'bento' | 'koran';
+  desain?: 'default' | 'ringkasan' | 'analitik' | 'trafik' | 'kaca' | 'tirta' | 'aurora' | 'neon' | 'blok' | 'bento' | 'koran' | 'korporat';
   /** Palet siap pakai. Menimpa warna seri bawaan tema. */
   palette?: 'default' | 'brand' | 'hijau' | 'ungu' | 'oranye' | 'monokrom' | 'hangat' | 'sejuk';
   /** Warna kustom per-seri (menimpa palet). Indeks 0 = seri pertama. */

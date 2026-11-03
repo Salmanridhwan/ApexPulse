@@ -42,6 +42,13 @@ import {
   garisTren,
   gaugeTarget,
   kpiKartu,
+  kpiKorporat,
+  kpiTarget,
+  papanIsu,
+  tabelStatus,
+  alurTahap,
+  corongPipeline,
+  daftarProgres,
   kpiKaca,
   kpiNetral,
   kpiPijar,
@@ -72,12 +79,13 @@ const semua = (p: Pembangun, ganti: Partial<Record<Varian, Pembangun>> = {}): Re
   blok: p,
   bento: p,
   koran: p,
+  korporat: p,
   ...ganti,
 });
 
 export const MATRIKS: Record<ChartId, Record<Varian, Pembangun>> = {
   // Kartu, tabel, dan teks
-  'kpi-kartu': semua(kpiNetral, { ringkasan: kpiPijar, analitik: kpiLensa, trafik: kpiNadi, kaca: kpiKaca, tirta: kpiTirta, aurora: kpiPijar, neon: kpiPijar }),
+  'kpi-kartu': semua(kpiNetral, { ringkasan: kpiPijar, analitik: kpiLensa, trafik: kpiNadi, kaca: kpiKaca, tirta: kpiTirta, aurora: kpiPijar, neon: kpiPijar, korporat: kpiKorporat }),
   'kpi-strip': semua(kpiStrip),
   'progres-target': semua(progresTarget),
   'strip-os': semua(stripOs),
@@ -117,6 +125,14 @@ export const MATRIKS: Record<ChartId, Record<Varian, Pembangun>> = {
   'gauge-kesehatan': semua(gaugeKesehatan),
   'peta-panas': semua(petaPanas),
   'treemap-porsi': semua(treemapPorsi),
+
+  // Rapat manajemen bagian
+  'kpi-target': semua(kpiTarget),
+  'papan-isu': semua(papanIsu),
+  'tabel-status': semua(tabelStatus),
+  'alur-tahap': semua(alurTahap),
+  'corong-pipeline': semua(corongPipeline),
+  'daftar-progres': semua(daftarProgres),
 };
 
 /**

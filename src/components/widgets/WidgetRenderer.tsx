@@ -8,6 +8,7 @@ import { NarasiCard } from './NarasiCard';
 import { pasanganUntuk } from './paletPasangan';
 import { WidgetChart } from './WidgetChart';
 import { gayaKatalogWidget } from './bingkaiKatalog';
+import { ikonWidget } from './ikonWidget';
 import { normalizeSeriesData } from './ChartEcharts';
 import { useChartSelection } from './ChartSelection';
 import { adaGaya } from './widgetStyle';
@@ -118,7 +119,7 @@ const KartuKatalogHtml: React.FC<{ widget: WidgetSpec; props: PropsKatalog }> = 
   const { varian, g } = gayaKatalogWidget(widget.style, useThemeMode());
   return (
     <div className="w-full h-full min-h-0 flex flex-col">
-      <WidgetChart chartId={widget.chartId as ChartId} varian={varian} gaya={g} {...props} />
+      <WidgetChart chartId={widget.chartId as ChartId} varian={varian} gaya={g} ikon={ikonWidget(widget.ikon)} {...props} />
     </div>
   );
 };

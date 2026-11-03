@@ -28,6 +28,7 @@ const KETERANGAN: Record<Varian, string> = {
   blok: 'Neubrutalism: tepi hitam tebal, bayangan keras, warna cerah datar. Berani dan mudah dibaca.',
   bento: 'Pastel lembut dengan sudut kartu besar, seperti widget ponsel. Ramah untuk laporan publik.',
   koran: 'Editorial ala koran Swiss: kertas krem, huruf serif, satu aksen merah. Serius dan rapi untuk dicetak.',
+  korporat: 'Laporan rapat manajemen: kartu putih berikon bulat, navy dan biru dengan aksen oranye. Cocok untuk rapat bagian dan RKA.',
 };
 
 export const ChartGalleryPage: React.FC = () => {
