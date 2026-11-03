@@ -165,7 +165,8 @@ export function bacaTabel(buffer: Buffer, sheet?: string): TabelTerbaca {
   // "Kolom 7" hantu dari sel sisa Excel.
   const headerMentah = matriks[idxHeader];
   const barisDataMentah = matriks.slice(idxHeader + 1);
-  const lebarMaks = Math.max(headerMentah.length, ...barisDataMentah.map((r) => r.length), 0);
+  // reduce, bukan spread: Math.max(...150 ribu baris) melampaui batas stack.
+  const lebarMaks = barisDataMentah.reduce((m, r) => Math.max(m, r.length), headerMentah.length);
   const kolomTerpakai: number[] = [];
   for (let c = 0; c < lebarMaks; c++) {
     const adaIsi = !barisKosong([headerMentah[c]]) || barisDataMentah.some((r) => !barisKosong([r[c]]));

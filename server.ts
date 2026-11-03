@@ -701,9 +701,19 @@ const app = express();
    */
   const jsonKecil = express.json({ limit: '2mb' });
   const jsonBesar = express.json({ limit: '70mb' });
+  // Impor Excel/CSV mengirim berkas base64 (maks 25 MB -> ~34 MB). Dulu ikut
+  // batas 2 MB sehingga berkas kecil pun ditolak "request entity too large".
+  const jsonImpor = express.json({ limit: '36mb' });
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path === '/api/berkas/unggah') return jsonBesar(req, res, next);
-    return jsonKecil(req, res, next);
+    const lanjut = (err?: any) => {
+      if (err?.type === 'entity.too.large') {
+        return res.status(413).json({ error: 'Berkas terlalu besar untuk dikirim ke server.' });
+      }
+      next(err);
+    };
+    if (req.path === '/api/berkas/unggah') return jsonBesar(req, res, lanjut);
+    if (req.path.startsWith('/api/impor/')) return jsonImpor(req, res, lanjut);
+    return jsonKecil(req, res, lanjut);
   });
 
   /**
