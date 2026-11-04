@@ -73,6 +73,7 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
+import { namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
 import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
@@ -3165,6 +3166,7 @@ const app = express();
       const desainDiminta = gayaDariPermintaan(prompt) ?? (bagianDariPermintaan(prompt) ? 'korporat' : undefined);
       const susun = susunDashboardBerhalaman(genResult.dashboard.widgets, {
         instansi: tenantAktif?.name,
+        judul: genResult.dokumenTarget ? `Dashboard ${namaTanpaEkstensi(genResult.dokumenTarget)}` : undefined,
         desain: desainDiminta,
         idAwal: `ast-${Date.now()}`,
         halamanDiminta: genResult.halamanDiminta,

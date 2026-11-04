@@ -359,6 +359,8 @@ export function susunDashboardBerhalaman(
      * (perilaku lama): semua grafik dipetakan ke chart katalog.
      */
     chartTemplate?: boolean;
+    /** Judul dashboard yang sudah pasti (mis. "Dashboard Piutang 2026"); kosong = dari isi. */
+    judul?: string;
   } = {}
 ): HasilSusun {
   const dasar = opsi.idAwal ?? `w${Date.now()}`;
@@ -386,7 +388,7 @@ export function susunDashboardBerhalaman(
   const bagian = pakaiPermintaan ? sesuaiPermintaan.halaman : bagiHalaman(terpilih);
   const halaman: HalamanDashboard[] = bagian.map((h, i) => ({ id: `hlm-${i + 1}`, judul: h.judul, widgets: h.widgets }));
   return {
-    title: judulDariIsi(bagian, opsi.instansi),
+    title: opsi.judul || judulDariIsi(bagian, opsi.instansi),
     halaman,
     halamanKosong: pakaiPermintaan ? sesuaiPermintaan.kosong : diminta.map((h) => h.judul),
   };

@@ -5,6 +5,7 @@ import { WIDGET_CATALOG } from './catalog';
 import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { rapikanTataLetak } from './tataLetak';
+import { dokumenDariPermintaan } from './dokumenDiminta';
 import {
   MIN_WIDGET_HALAMAN,
   butirCadangan,
@@ -78,6 +79,8 @@ export interface LaporanButir {
 
 export interface GenerateResult {
   dashboard: Dashboard;
+  /** Dokumen yang disebut pengguna ("dari dokumen Piutang 2026"); kartu hanya dari dokumen ini. */
+  dokumenTarget?: string;
   modeUsed: GenerateMode;
   /** false = dashboard TIDAK boleh disimpan/ditampilkan (tidak ada data sah). */
   ok: boolean;
@@ -121,7 +124,31 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   const permintaanJumlah: PermintaanJumlahWidget | undefined = permintaanJumlahDibaca ?? undefined;
   // Susunan halaman yang ditulis pengguna ("1. Halaman Ringkasan – ... 2. Halaman Keuangan – ...").
   // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
-  const { halaman: halamanDiminta, bawaan: halamanBawaan } = halamanUntukPermintaan(userPrompt, sector);
+  const halamanAwal = halamanUntukPermintaan(userPrompt, sector);
+  let halamanDiminta = halamanAwal.halaman;
+  let halamanBawaan = halamanAwal.bawaan;
+  // Dokumen yang disebut pengguna ("dashboard dari dokumen Piutang 2026"). Tanpa
+  // ini sapuan membaca SEMUA dokumen KB dengan area bertema PDAM, sehingga
+  // dashboardnya berisi laporan PDAM, bukan dokumen yang diminta.
+  let dokumenTarget: string | undefined;
+  if (kbId && typeof options.ragClient?.daftarDokumen === 'function') {
+    try {
+      const daftar = await options.ragClient.daftarDokumen(kbId);
+      const siap = daftar.dokumen.filter((d) => !d.status || /complete|indexed|ready|selesai/i.test(d.status));
+      dokumenTarget = dokumenDariPermintaan(userPrompt, siap.map((d) => d.nama));
+    } catch {
+      // Daftar dokumen gagal: lanjut membaca seluruh KB seperti biasa.
+    }
+  }
+  if (dokumenTarget) {
+    logSummary.push(`[Dokumen] Pengguna meminta dokumen "${dokumenTarget}": hanya kartu bersumber dokumen ini.`);
+    // Segmentasi halaman bawaan sektor (Keuangan, Operasional, ...) tidak cocok
+    // untuk isi satu dokumen; susunan tertulis pengguna tetap dipakai.
+    if (halamanBawaan) {
+      halamanDiminta = [];
+      halamanBawaan = false;
+    }
+  }
   const halamanWidget: Record<string, number> = {};
   const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [], areaSapuanSibuk: 0 };
   if (permintaanJumlah) {
@@ -183,6 +210,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       // Baca SELURUH isi basis dokumen (sapuan per area), bukan 8 potongan teratas.
       // Tanpa ini grafik hanya berisi 3–6 titik dan bagian laporan lain terlewat.
       sapuanPenuh: true,
+      dokumenTarget,
     });
   } catch (err) {
     const pesan =
@@ -218,6 +246,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       jumlahKurang: !!permintaanJumlah,
       halamanDiminta,
       halamanBawaan,
+      dokumenTarget,
       halamanWidget: {},
       laporanButir,
     };
@@ -630,6 +659,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
     jumlahKurang: !!permintaanJumlah && synthesizedWidgets.length < permintaanJumlah.max,
     halamanDiminta,
     halamanBawaan,
+    dokumenTarget,
     halamanWidget,
     laporanButir,
   };

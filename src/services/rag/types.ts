@@ -47,6 +47,13 @@ export interface RagQueryOptions {
    * untuk tanya-jawab biasa (mahal dan lambat).
    */
   sapuanPenuh?: boolean;
+  /**
+   * Nama dokumen yang diminta pengguna ("dashboard dari dokumen Piutang 2026").
+   * Layanan RAG tidak bisa menyaring per dokumen, jadi sapuan memakai area
+   * umum dengan instruksi "HANYA dokumen ini" dan kartu yang sumbernya dokumen
+   * lain dibuang.
+   */
+  dokumenTarget?: string;
 }
 
 export interface RagResult {

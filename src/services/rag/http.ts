@@ -246,6 +246,31 @@ export function hasilWilayahSah(item: any): boolean {
  * Urutannya mengikuti struktur laporan BUMD supaya tidak ada bagian yang
  * terlewat. Tambah area di sini kalau ada bagian laporan baru.
  */
+/**
+ * Area sapuan saat pengguna meminta SATU dokumen. Sengaja umum (tidak memakai
+ * indikator PDAM) karena isi dokumennya bisa apa saja: piutang, anggaran, SDM.
+ */
+export const AREA_DOKUMEN: Array<{ id: string; label: string; instruksi: string }> = [
+  { id: 'dok-ringkasan', label: 'Angka utama', instruksi: 'angka ringkasan terpenting di dokumen ini: total, jumlah, rata-rata, persentase, capaian' },
+  { id: 'dok-periode', label: 'Deret periode', instruksi: 'deret per PERIODE (bulan, triwulan, atau tahun) yang ada di dokumen ini, lengkap semua periodenya' },
+  { id: 'dok-rincian', label: 'Rincian kategori', instruksi: 'rincian per KATEGORI yang ada di dokumen ini (mis. per pelanggan, golongan, unit, wilayah, umur, jenis, status)' },
+  { id: 'dok-perbandingan', label: 'Perbandingan', instruksi: 'perbandingan rencana vs realisasi, target vs capaian, atau tahun ini vs tahun lalu di dokumen ini' },
+  { id: 'dok-tabel', label: 'Tabel rinci', instruksi: 'tabel rinci terpenting di dokumen ini, dengan kolom dan baris seperti di dokumen' },
+];
+
+/** true bila nama dokumen sitasi = dokumen target (tanpa ekstensi, tanpa tanda baca). */
+export function cocokDokumen(namaSitasi: unknown, target: unknown): boolean {
+  const n = (x: unknown) =>
+    String(x || '')
+      .toLowerCase()
+      .replace(/\.[a-z0-9]{2,5}$/, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const a = n(namaSitasi);
+  const b = n(target);
+  return !!a && !!b && (a === b || a.includes(b) || b.includes(a));
+}
+
 export const AREA_SAPUAN: Array<{ id: string; label: string; instruksi: string }> = [
   {
     id: 'kpi',
@@ -1140,7 +1165,10 @@ export class ConfigurableRagClient implements RagClient {
     // jaring: skema utuh tetap diutamakan bila menghasilkan dashboard yang layak.
     const batasUtama = Math.min(Math.max(30, cfg.timeoutMs || 60), 60);
     const [itemUtama, fokus, sapuan] = await Promise.all([
-      this.ambilPayloadExtract(
+      // Satu dokumen diminta: skema utuh tidak bisa dibatasi ke dokumen itu.
+      options.dokumenTarget
+        ? Promise.resolve(null)
+        : this.ambilPayloadExtract(
         base,
         cfg,
         this.instruksiDashboard(options),
@@ -1184,6 +1212,8 @@ export class ConfigurableRagClient implements RagClient {
     const tambahWidget = (w: any) => {
       const k = kunciWidget(w);
       if (!k || k === '|' || sudahAda.has(k)) return;
+      // Dokumen yang diminta pengguna: kartu bersumber dokumen lain dibuang.
+      if (options.dokumenTarget && !(w?.citations || []).some((c: any) => cocokDokumen(c?.docName, options.dokumenTarget))) return;
       sudahAda.add(k);
       gabungSemua.push(w);
     };
@@ -1192,7 +1222,7 @@ export class ConfigurableRagClient implements RagClient {
     // depan), lalu KPI dipotong jadi 6 oleh susunUlangWidget: uji 3 Nov 2026,
     // sapuan 90 widget berakhir jadi 6 kartu KPI tanpa satu grafik pun.
     (sapuan.kelompok || []).forEach((g: any) => {
-      const batasKpi = g.id === 'kpi' ? 5 : 1;
+      const batasKpi = g.id === 'kpi' || g.id === 'dok-ringkasan' ? 5 : 1;
       let kpiArea = 0;
       let lainArea = 0;
       g.widgets.forEach((w: any) => {
@@ -1227,7 +1257,7 @@ export class ConfigurableRagClient implements RagClient {
     }
     if (sapuan.widgets?.length) {
       console.log(
-        `[rag] sapuan menyeluruh dipakai: ${sapuan.widgets.length} widget dari ${AREA_SAPUAN.length} area ` +
+        `[rag] sapuan menyeluruh dipakai: ${sapuan.widgets.length} widget${options.dokumenTarget ? ` (dokumen ${options.dokumenTarget})` : ''} ` +
           `(area kosong: ${sapuan.areaKosong.length ? sapuan.areaKosong.join(', ') : '-'}); ` +
           `skema utuh ${widgetsUtama.length}; fokus ${fokus.widgets.length}; total setelah dedupe ${widgets.length}.`
       );
@@ -1379,7 +1409,9 @@ export class ConfigurableRagClient implements RagClient {
     const kbTerskop = !!options.kbId?.trim();
     return (
       `Ambil data untuk SATU bagian dashboard: ${area.instruksi}. ` +
-      (kbTerskop
+      (options.dokumenTarget
+        ? `Gunakan HANYA dokumen "${options.dokumenTarget}"; abaikan semua dokumen lain di knowledge base. `
+        : kbTerskop
         ? `Semua dokumen di knowledge base ini milik SATU instansi; pakai dokumen yang ada apa adanya. `
         : instansi
           ? `Instansi: "${instansi}". Ambil angka HANYA dari dokumen instansi tersebut. `
@@ -1453,7 +1485,8 @@ export class ConfigurableRagClient implements RagClient {
     const KONKUREN = 1;
 
     // Cache: isi dokumen jarang berubah, jadi sapuan yang sama tidak diulang.
-    const kunciCache = `${options.kbId || cfg.kbId || '-'}|${options.sector}`;
+    const daftarArea = options.dokumenTarget ? AREA_DOKUMEN : AREA_SAPUAN;
+    const kunciCache = `${options.kbId || cfg.kbId || '-'}|${options.sector}${options.dokumenTarget ? `|dok:${options.dokumenTarget}` : ''}`;
     const tersimpan = this.cacheSapuan.get(kunciCache);
     if (tersimpan && Date.now() - tersimpan.waktu < this.statisCacheSapuan) {
       const umurMenit = Math.round((Date.now() - tersimpan.waktu) / 60000);
@@ -1477,19 +1510,19 @@ export class ConfigurableRagClient implements RagClient {
     // terlewati, sisa area dilewati dan dicatat (dashboard tetap terbentuk dari
     // area yang sudah berhasil).
     const tenggat = Date.now() + 600_000;
-    for (let i = 0; i < AREA_SAPUAN.length; i += KONKUREN) {
+    for (let i = 0; i < daftarArea.length; i += KONKUREN) {
       // Bagi sisa waktu secara adil: tiap area mendapat jatahnya sendiri, jadi
       // area terakhir tidak kehabisan waktu hanya karena area awal lambat
       // (dulu area "wilayah" sampai tidak pernah dicoba sama sekali).
-      const sisaArea = AREA_SAPUAN.length - i;
+      const sisaArea = daftarArea.length - i;
       const sisaDetik = Math.max(0, Math.round((tenggat - Date.now()) / 1000));
       const batasArea = Math.max(20, Math.min(batas, Math.floor(sisaDetik / sisaArea)));
       if (Date.now() > tenggat) {
-        for (let j = i; j < AREA_SAPUAN.length; j++) areaKosong.push(`lewat-tenggat(${AREA_SAPUAN[j].id})`);
-        console.warn(`[rag] tenggat sapuan tercapai, ${AREA_SAPUAN.length - i} area dilewati`);
+        for (let j = i; j < daftarArea.length; j++) areaKosong.push(`lewat-tenggat(${daftarArea[j].id})`);
+        console.warn(`[rag] tenggat sapuan tercapai, ${daftarArea.length - i} area dilewati`);
         break;
       }
-      const kelompok = AREA_SAPUAN.slice(i, i + KONKUREN);
+      const kelompok = daftarArea.slice(i, i + KONKUREN);
       const bagian = await Promise.allSettled(
         kelompok.map(async (area) => {
           // Ulangi sekali kalau layanan sedang sibuk (429/502/504/timeout) —
@@ -1564,11 +1597,11 @@ export class ConfigurableRagClient implements RagClient {
         }
       }
       // Jeda kecil antar area supaya layanan tidak dihujani permintaan beruntun.
-      if (i + KONKUREN < AREA_SAPUAN.length) await new Promise((r) => setTimeout(r, 400));
+      if (i + KONKUREN < daftarArea.length) await new Promise((r) => setTimeout(r, 400));
     }
 
     console.log(
-      `[rag] sapuan menyeluruh: ${AREA_SAPUAN.length} area, ${widgets.length} widget, ` +
+      `[rag] sapuan menyeluruh: ${daftarArea.length} area, ${widgets.length} widget, ` +
         `area kosong: ${areaKosong.length ? areaKosong.join(', ') : '-'}`
     );
     if (widgets.length > 0) {
