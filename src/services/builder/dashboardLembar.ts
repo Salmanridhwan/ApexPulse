@@ -361,17 +361,52 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
     const kecil = kategori.find((x) => x.beda <= 6);
     const besar = kategori.find((x) => x !== kecil && x.beda > 3) ?? kategori.find((x) => x !== kecil);
 
+    const kelompok = (k: Kolom, ambilKunci: (v: SelNilai) => string | null) => {
+      const peta = new Map<string, number>();
+      for (const d of a.data) {
+        const kunci = ambilKunci(d.sel[k.indeks]);
+        if (!kunci) continue;
+        peta.set(kunci, (peta.get(kunci) ?? 0) + (keAngka(d.sel[utama.indeks]) ?? 0));
+      }
+      return peta;
+    };
+    const seri = (nilai: number[]) => {
+      if (!rupiah) return { data: nilai.map(bulat), unit: '' };
+      const s = skalaRupiah(nilai);
+      return { data: nilai.map((v) => bulat(v / s.bagi)), unit: s.satuan };
+    };
+
+    // Deret bulanan dipakai grafik tren dan garis kecil di kartu KPI.
+    const kolTanggal = a.kolom.find((k) => k.jenis === 'tanggal');
+    const bulanan = kolTanggal
+      ? [...kelompok(kolTanggal, (v) => {
+          const d = tanggalDari(v);
+          return d ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` : null;
+        }).entries()]
+          .sort((x, y) => x[0].localeCompare(y[0]))
+          .slice(-24)
+      : [];
+    // Jumlah transaksi per bulan untuk garis kecil kartu Jumlah Transaksi.
+    const jumlahBulanan = kolTanggal
+      ? bulanan.map(([b]) => a.data.filter((d) => {
+          const t = tanggalDari(d.sel[kolTanggal.indeks]);
+          return !!t && `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}` === b;
+        }).length)
+      : [];
+    const garisJumlah = jumlahBulanan.length >= 3 ? { sparkline: jumlahBulanan, sparklineAsal: 'dokumen-seri' as const } : {};
+    const garisKecil = bulanan.length >= 3 ? { sparkline: seri(bulanan.map(([, v]) => v)).data, sparklineAsal: 'dokumen-seri' as const } : {};
+
     // 1. Baris KPI (empat kartu): jumlah transaksi, total dokumen, rata-rata, jumlah pihak.
     if (jumlahDiketahui)
       tambah(
-        { title: 'Jumlah Transaksi', subtitle: 'Baris data di dokumen', type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris' } },
+        { title: 'Jumlah Transaksi', subtitle: 'Baris data di dokumen', type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris', ...garisJumlah } },
         `${a.perkiraanBaris} baris data`
       );
     for (const k of urutAngka.filter((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama) && ringkasan(k) !== null && ringkasan(k) !== 0).slice(0, 2)) {
       const v = ringkasan(k)!;
       const r = uang(k) ? ringkasRupiah(v) : { nilai: v.toLocaleString('id-ID', { maximumFractionDigits: 2 }), satuan: '' };
       tambah(
-        { title: `Total ${k.nama}`, subtitle: a.total ? 'Baris Total dokumen' : ketBaris, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan } },
+        { title: `Total ${k.nama}`, subtitle: a.total ? 'Baris Total dokumen' : ketBaris, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan, ...(k === utama ? garisKecil : {}) } },
         `Total ${k.nama} = ${v}`
       );
     }
@@ -397,30 +432,10 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
       );
     }
 
-    const kelompok = (k: Kolom, ambilKunci: (v: SelNilai) => string | null) => {
-      const peta = new Map<string, number>();
-      for (const d of a.data) {
-        const kunci = ambilKunci(d.sel[k.indeks]);
-        if (!kunci) continue;
-        peta.set(kunci, (peta.get(kunci) ?? 0) + (keAngka(d.sel[utama.indeks]) ?? 0));
-      }
-      return peta;
-    };
-    const seri = (nilai: number[]) => {
-      if (!rupiah) return { data: nilai.map(bulat), unit: '' };
-      const s = skalaRupiah(nilai);
-      return { data: nilai.map((v) => bulat(v / s.bagi)), unit: s.satuan };
-    };
-
     // 2. Tren per bulan (garis area: deret waktu dibaca kiri ke kanan).
-    const kolTanggal = a.kolom.find((k) => k.jenis === 'tanggal');
-    if (kolTanggal) {
-      const peta = kelompok(kolTanggal, (v) => {
-        const d = tanggalDari(v);
-        return d ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` : null;
-      });
-      const urut = [...peta.entries()].sort((x, y) => x[0].localeCompare(y[0])).slice(-24);
-      if (urut.length >= 2) {
+    if (kolTanggal && bulanan.length >= 2) {
+      {
+        const urut = bulanan;
         const s = seri(urut.map(([, v]) => v));
         tambah(
           {
@@ -470,41 +485,90 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
       );
     }
 
-    // 4. Tabel ringkas: 8 transaksi terbesar, angka sudah diskalakan.
-    const kolTabel = [besar?.k, kolTanggal, utama].filter((k): k is Kolom => !!k);
-    const teratas = [...a.data].sort((x, y) => (keAngka(y.sel[utama.indeks]) ?? 0) - (keAngka(x.sel[utama.indeks]) ?? 0)).slice(0, 8);
-    const sTabel = seri(teratas.map((d) => keAngka(d.sel[utama.indeks]) ?? 0));
-    tambah(
-      {
-        title: `Transaksi ${utama.nama} Terbesar`,
-        subtitle: `8 teratas · ${ketBaris}`,
-        type: 'table',
-        grid: { x: 0, y: 0, w: 12, h: 5 },
-        table: {
-          columns: kolTabel.map((k, i) => ({
-            key: `k${i}`,
-            label: k === utama && sTabel.unit ? `${k.nama} (${sTabel.unit})` : k.nama,
-            format: 'text' as const,
-          })),
-          rows: teratas.map((d, r) =>
-            Object.fromEntries(
-              kolTabel.map((k, i) => {
-                const v = d.sel[k.indeks];
-                const tgl = k.jenis === 'tanggal' ? tanggalDari(v) : null;
-                const isi =
-                  k === utama
-                    ? sTabel.data[r].toLocaleString('id-ID', { maximumFractionDigits: 2 })
-                    : tgl
-                      ? tgl.toISOString().slice(0, 10)
-                      : pendek(teksSel(v), 40);
-                return [`k${i}`, isi];
-              })
-            )
-          ),
+    // 4. Grafik pengganti tabel: sebaran umur (hari) dan status pelunasan. Tabel
+    // angka hanya dipakai bila dokumennya tidak punya kolom untuk keduanya.
+    let grafikTambahan = 0;
+    const kolUmur = a.kolom.find((k) => k.jenis === 'angka' && /umur|aging|hari|days|lama/i.test(k.nama) && !/^\d+$/.test(k.nama));
+    if (kolUmur) {
+      const RENTANG: Array<[string, number, number]> = [
+        ['0–30 hari', 0, 30],
+        ['31–60 hari', 31, 60],
+        ['61–90 hari', 61, 90],
+        ['91–180 hari', 91, 180],
+        ['> 180 hari', 181, Infinity],
+      ];
+      const hitung = RENTANG.map(([, lo, hi]) => a.data.filter((d) => {
+        const v = keAngka(d.sel[kolUmur.indeks]);
+        return v !== null && v >= lo && v <= hi;
+      }).length);
+      if (hitung.filter((x) => x > 0).length >= 2) {
+        grafikTambahan++;
+        tambah(
+          {
+            title: `Sebaran ${kolUmur.nama}`,
+            subtitle: `Jumlah transaksi per rentang hari · ${ketBaris}`,
+            type: 'bar',
+            grid: { x: 0, y: 0, w: 6, h: 4 },
+            chart: { xAxis: RENTANG.map(([l]) => l), series: [{ name: 'Transaksi', data: hitung }], unit: 'transaksi', showLegend: false },
+          },
+          `${kolUmur.nama} dalam hari`
+        );
+      }
+    }
+    const kolSaldo = angka.find((k) => k !== utama && /saldo|sisa|outstanding|belum/i.test(k.nama));
+    if (kolSaldo) {
+      const lunas = a.data.filter((d) => (keAngka(d.sel[kolSaldo.indeks]) ?? 0) <= 0).length;
+      const belum = a.data.length - lunas;
+      if (lunas > 0 && belum > 0) {
+        grafikTambahan++;
+        tambah(
+          {
+            title: 'Status Pelunasan',
+            subtitle: `${kolSaldo.nama} nol = lunas · ${ketBaris}`,
+            type: 'donut',
+            grid: { x: 0, y: 0, w: 6, h: 4 },
+            chart: { xAxis: ['Lunas', 'Belum lunas'], series: [{ name: 'Transaksi', data: [lunas, belum] }], unit: 'transaksi' },
+          },
+          `${kolSaldo.nama} = 0 dihitung lunas`
+        );
+      }
+    }
+    if (grafikTambahan === 0) {
+      const kolTabel = [besar?.k, kolTanggal, utama].filter((k): k is Kolom => !!k);
+      const teratas = [...a.data].sort((x, y) => (keAngka(y.sel[utama.indeks]) ?? 0) - (keAngka(x.sel[utama.indeks]) ?? 0)).slice(0, 8);
+      const sTabel = seri(teratas.map((d) => keAngka(d.sel[utama.indeks]) ?? 0));
+      tambah(
+        {
+          title: `Transaksi ${utama.nama} Terbesar`,
+          subtitle: `8 teratas · ${ketBaris}`,
+          type: 'table',
+          grid: { x: 0, y: 0, w: 12, h: 5 },
+          table: {
+            columns: kolTabel.map((k, i) => ({
+              key: `k${i}`,
+              label: k === utama && sTabel.unit ? `${k.nama} (${sTabel.unit})` : k.nama,
+              format: 'text' as const,
+            })),
+            rows: teratas.map((d, r) =>
+              Object.fromEntries(
+                kolTabel.map((k, i) => {
+                  const v = d.sel[k.indeks];
+                  const tgl = k.jenis === 'tanggal' ? tanggalDari(v) : null;
+                  const isi =
+                    k === utama
+                      ? sTabel.data[r].toLocaleString('id-ID', { maximumFractionDigits: 2 })
+                      : tgl
+                        ? tgl.toISOString().slice(0, 10)
+                        : pendek(teksSel(v), 40);
+                  return [`k${i}`, isi];
+                })
+              )
+            ),
+          },
         },
-      },
-      `urut menurut ${utama.nama}`
-    );
+        `urut menurut ${utama.nama}`
+      );
+    }
   }
   return { widgets, catatan, lembar, lembarWidget };
 }

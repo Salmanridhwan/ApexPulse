@@ -39,6 +39,12 @@ test('kartu dari potongan: total dari baris Total dokumen, rincian diberi catata
   assert.ok(!hasil.widgets.some((w) => hasil.lembarWidget[w.id] === 1 && w.type === 'kpi' && /^Total/.test(w.title)));
   assert.ok(hasil.catatan.some((c) => /Aging/.test(c) && /Total-nya tidak terbaca/.test(c)));
   assert.ok(hasil.widgets.every((w) => w.citations[0].docName === 'Piutang 2026.xlsx'));
+  // Tabel angka diganti grafik: sebaran umur (hari) dan status pelunasan.
+  const umur = hasil.widgets.find((w) => w.title === 'Sebaran Umur Lunas')!;
+  assert.deepEqual(umur.chart!.series[0].data, [2, 1, 0, 0, 0]);
+  const status = hasil.widgets.find((w) => w.title === 'Status Pelunasan')!;
+  assert.deepEqual(status.chart!.series[0].data, [1, 2]);
+  assert.ok(!hasil.widgets.some((w) => hasil.lembarWidget[w.id] === 0 && w.type === 'table'));
 });
 
 test('berkas asli: semua baris terbaca, total dihitung bila tanpa baris Total', () => {
