@@ -52,7 +52,8 @@ test('dashboard dari satu dokumen dikenali sebagai konteks; kartu baru masuk hal
   const { dokumenKonteksDashboard, denganHalamanAktif } = await import('../src/services/dashboard/halaman');
   const { indikatorKosong } = await import('../src/services/chat/niat');
   const dari = (doc: string) => kartu('k-' + doc + Math.random(), { citations: [{ id: 'c', docName: doc, page: 0, chunkSnippet: '', confidenceScore: 1, date: '' }] });
-  const d: any = { id: 'd', halamanAktifId: 'hlm-1', halaman: [{ id: 'hlm-1', judul: 'A', widgets: [dari('Piutang 2026.xlsx'), dari('Piutang 2026.xlsx')] }], widgets: [] };
+  const d: any = { id: 'd', halamanAktifId: 'hlm-1', halaman: [{ id: 'hlm-1', judul: 'A', widgets: [dari('Piutang 2026.xlsx'), dari('Piutang 2026.xlsx')] }] };
+  d.widgets = d.halaman[0].widgets; // proyeksi halaman aktif
   assert.equal(dokumenKonteksDashboard(d), 'Piutang 2026.xlsx');
   d.halaman[0].widgets.push(dari('pam-jaya.md'));
   assert.equal(dokumenKonteksDashboard(d), undefined, 'campuran dokumen = tanpa konteks tunggal');
