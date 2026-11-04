@@ -47,3 +47,17 @@ test('"1 chart aja" saat dashboard terbuka = ringkas, bukan tambah indikator', a
   assert.equal(niatRingkas('buat 1 chart pendapatan aja'), null);
   assert.equal(niatRingkas('buatkan dashboard'), null);
 });
+
+test('dashboard dari satu dokumen dikenali sebagai konteks; kartu baru masuk halaman aktif', async () => {
+  const { dokumenKonteksDashboard, denganHalamanAktif } = await import('../src/services/dashboard/halaman');
+  const { indikatorKosong } = await import('../src/services/chat/niat');
+  const dari = (doc: string) => kartu('k-' + doc + Math.random(), { citations: [{ id: 'c', docName: doc, page: 0, chunkSnippet: '', confidenceScore: 1, date: '' }] });
+  const d: any = { id: 'd', halamanAktifId: 'hlm-1', halaman: [{ id: 'hlm-1', judul: 'A', widgets: [dari('Piutang 2026.xlsx'), dari('Piutang 2026.xlsx')] }], widgets: [] };
+  assert.equal(dokumenKonteksDashboard(d), 'Piutang 2026.xlsx');
+  d.halaman[0].widgets.push(dari('pam-jaya.md'));
+  assert.equal(dokumenKonteksDashboard(d), undefined, 'campuran dokumen = tanpa konteks tunggal');
+  const baru = denganHalamanAktif(d, [kartu('x')]);
+  assert.equal(baru.halaman![0].widgets.length, 1);
+  assert.equal(indikatorKosong('Tambahkan 1 chart'), true);
+  assert.equal(indikatorKosong('tambahkan chart umur piutang'), false);
+});

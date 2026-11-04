@@ -8,7 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { daftarHalaman, semuaWidget } from './src/services/dashboard/halaman';
+import { daftarHalaman, denganHalamanAktif, dokumenKonteksDashboard, semuaWidget } from './src/services/dashboard/halaman';
+import { normJudul } from './src/services/builder/permintaanWidget';
+import { skorCocok } from './src/services/builder/halamanDiminta';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
 import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
@@ -34,6 +36,7 @@ import {
   niatBuatDashboard,
   niatTambahWidget,
   niatRingkas,
+  indikatorKosong,
   indikatorTambahWidget,
   hanyaKeteranganPeriode,
 } from './src/services/chat/niat';
@@ -75,7 +78,7 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { dokumenDariPermintaan, namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
-import { kumpulkanPotonganLembar, lembarDariBerkas, lembarDariPotongan } from './src/services/builder/dashboardLembar';
+import { kumpulkanPotonganLembar, lembarDariBerkas, lembarDariPotongan, widgetDariSumber, type SumberLembar } from './src/services/builder/dashboardLembar';
 import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
@@ -2384,6 +2387,37 @@ const app = express();
     // supaya jawaban tidak pernah diambil dari dokumen instansi lain.
     const kbChat = kbUntukInstansi(tenantChat, db.systemConfig.ragKnowledgeBaseId);
 
+    /**
+     * Isi tabel dokumen spreadsheet: berkas asli di repositori bila ada (semua
+     * baris), potongan teks basis dokumen bila tidak.
+     */
+    const bacaLembarDokumen = async (namaDokumen: string): Promise<SumberLembar | null> => {
+      // 1. Berkas asli di repositori: semua baris terbaca.
+      try {
+        const { organizationId } = await konteksBerkas(req, session);
+        if (organizationId) {
+          const daftar = await klienKms().daftarBerkas(organizationId);
+          const cocok = daftar.find((b: any) => normalJudul(b?.title || b?.fileName || '') === normalJudul(namaDokumen));
+          if (cocok?.id) {
+            const { isi } = await klienKms().ambilIsiBerkas(String(cocok.id), 'download');
+            return { jenis: 'berkas' as const, lembar: lembarDariBerkas(isi), lengkap: true };
+          }
+        }
+      } catch (err: any) {
+        console.warn('[chat] berkas asli tidak bisa diambil:', err?.message || err);
+      }
+      // 2. Potongan teks basis dokumen.
+      const kb = kbUntukInstansi(tenantChat, db.systemConfig.ragKnowledgeBaseId) || '';
+      if (!kb) return null;
+      const dok = (await ragClient.daftarDokumen(kb).catch(() => null))?.dokumen.find((d) => d.nama === namaDokumen);
+      const potongan = await kumpulkanPotonganLembar(
+        async (q) => (await ragClient.cariPotongan(kb, q, 50)).potongan.map((p) => ({ docName: p.docName, isi: p.isi })),
+        namaDokumen,
+        { targetPotongan: dok?.potongan }
+      );
+      return potongan.length ? { jenis: 'potongan' as const, lembar: lembarDariPotongan(potongan), lengkap: false } : null;
+    };
+
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Prompt wajib disertakan.' });
     }
@@ -2704,7 +2738,50 @@ const app = express();
             indikator = `${pesanUserSebelumnya} ${indikator}`.trim();
           }
         }
-        if (indikator.length < 2) {
+        // Konteks dokumen: dashboard yang kartunya bersumber dari SATU dokumen
+        // ("Dashboard Piutang 2026") menambah chart dari dokumen itu juga, kecuali
+        // kalimatnya menyebut dokumen lain. Dulu "Tambahkan 1 chart" dikirim mentah
+        // ke RAG dan mengambil grafik dari laporan PAM JAYA.
+        const dokKonteks = activeDash ? dokumenKonteksDashboard(activeDash) : undefined;
+        if (activeDash && dokKonteks && /\.(xlsx|xlsm|xls|csv|ods)$/i.test(dokKonteks)) {
+          const sumber = await bacaLembarDokumen(dokKonteks).catch(() => null);
+          const kandidat = sumber
+            ? widgetDariSumber(sumber, dokKonteks, `w-lbr-${Date.now()}`).widgets.filter((w) => !['kpi', 'narasi', 'table'].includes(w.type))
+            : [];
+          const adaJudul = new Set(semuaWidget(activeDash).map((w) => normJudul(w.title)));
+          const kosongIndikator = indikatorKosong(indikator);
+          const cocok =
+            (!kosongIndikator && kandidat.find((w) => skorCocok(indikator, w.title) >= 0.5 && !adaJudul.has(normJudul(w.title)))) ||
+            (kosongIndikator ? kandidat.find((w) => !adaJudul.has(normJudul(w.title))) : undefined);
+          if (cocok || kosongIndikator) {
+            if (!cocok) {
+              const pesan = `Semua grafik yang bisa disusun dari dokumen **"${dokKonteks}"** sudah ada di dashboard ini. Sebutkan indikator lain, atau sebut dokumen lain bila ingin memakai sumber berbeda.`;
+              catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+              sendEvent('result', { actionTaken: 'none', message: pesan });
+              sendEvent('done', { ok: false });
+              return res.end();
+            }
+            const pilih = pilihChart(cocok);
+            const kartu = { ...(pilih.chartId ? pakaiChartKatalog(cocok, pilih.chartId) : cocok), grid: { ...cocok.grid, w: 6, h: 4 } };
+            const isi = denganHalamanAktif(activeDash, [...(activeDash.widgets ?? []), kartu]);
+            const diperbarui = db.updateDashboard(activeDash.id, isi as any, tenantId) || activeDash;
+            db.addAuditLog({
+              tenantId,
+              userId: session.userId,
+              userName: session.name,
+              action: 'Tambah Widget via Chat (Tabel Dokumen)',
+              target: kartu.title,
+              details: `Dokumen konteks: "${dokKonteks}"`,
+            });
+            const pesan = `Grafik **"${kartu.title}"** ditambahkan dari dokumen **${dokKonteks}** (sumber yang sama dengan dashboard ini).`;
+            sendEvent('step', { id: 's0', title: 'Grafik ditambahkan dari dokumen yang sama', status: 'completed' });
+            catatAsisten({ sender: 'system', text: pesan, actionTaken: 'add_widget' } as any);
+            sendEvent('result', { actionTaken: 'add_widget', message: pesan, dashboard: diperbarui });
+            sendEvent('done', { ok: true });
+            return res.end();
+          }
+        }
+        if (indikator.length < 2 || indikatorKosong(indikator)) {
           const pesan =
             'Indikatornya apa yang mau ditambahkan? Sebutkan, misalnya *"tambahkan widget jumlah pelanggan"*. ' +
             'Saya akan meminta datanya ke dokumen instansi Anda.';
@@ -2861,7 +2938,7 @@ const app = express();
               terpakai.add(id);
             }
           }
-          db.updateDashboard(activeDash.id, { widgets: updatedWidgets }, tenantId);
+          db.updateDashboard(activeDash.id, denganHalamanAktif(activeDash, updatedWidgets) as any, tenantId);
           db.addAuditLog({
             tenantId,
             userId: session.userId,
@@ -3220,32 +3297,7 @@ const app = express();
         izinkanSnapshotDemo: db.systemConfig.ragProvider !== 'http',
         onProgress,
         ragClient,
-        ambilLembarDokumen: async (namaDokumen) => {
-          // 1. Berkas asli di repositori: semua baris terbaca.
-          try {
-            const { organizationId } = await konteksBerkas(req, session);
-            if (organizationId) {
-              const daftar = await klienKms().daftarBerkas(organizationId);
-              const cocok = daftar.find((b: any) => normalJudul(b?.title || b?.fileName || '') === normalJudul(namaDokumen));
-              if (cocok?.id) {
-                const { isi } = await klienKms().ambilIsiBerkas(String(cocok.id), 'download');
-                return { jenis: 'berkas' as const, lembar: lembarDariBerkas(isi), lengkap: true };
-              }
-            }
-          } catch (err: any) {
-            console.warn('[chat] berkas asli tidak bisa diambil:', err?.message || err);
-          }
-          // 2. Potongan teks basis dokumen.
-          const kb = kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || '';
-          if (!kb) return null;
-          const dok = (await ragClient.daftarDokumen(kb).catch(() => null))?.dokumen.find((d) => d.nama === namaDokumen);
-          const potongan = await kumpulkanPotonganLembar(
-            async (q) => (await ragClient.cariPotongan(kb, q, 50)).potongan.map((p) => ({ docName: p.docName, isi: p.isi })),
-            namaDokumen,
-            { targetPotongan: dok?.potongan }
-          );
-          return potongan.length ? { jenis: 'potongan' as const, lembar: lembarDariPotongan(potongan), lengkap: false } : null;
-        },
+        ambilLembarDokumen: bacaLembarDokumen,
       });
 
       // Tidak ada angka sah dari dokumen instansi ini: JANGAN simpan/tampilkan

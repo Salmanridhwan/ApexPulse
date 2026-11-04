@@ -104,3 +104,31 @@ export function semuaWidget(d?: Dashboard | null): WidgetSpec[] {
   if (!d) return [];
   return tulisProyeksi(d).flatMap((h) => h.widgets || []);
 }
+
+/**
+ * Ganti kartu halaman aktif: `widgets` (proyeksi) dan halaman aktif di
+ * `halaman[]` ikut sama. Dulu jalur chat hanya menulis `widgets`, sehingga
+ * kartu tambahan hilang dari halaman begitu dashboard dibuka ulang.
+ */
+export function denganHalamanAktif(d: Dashboard, widgets: WidgetSpec[]): Pick<Dashboard, 'widgets' | 'halaman'> {
+  const semua = daftarHalaman(d);
+  if (semua.length === 0) return { widgets, halaman: d.halaman };
+  const aktif = d.halamanAktifId || semua[0].id;
+  return { widgets, halaman: semua.map((h) => (h.id === aktif ? { ...h, widgets } : h)) };
+}
+
+/**
+ * Dokumen sumber dashboard bila hampir semua kartunya (≥ 80%) bersumber dari
+ * SATU dokumen, mis. dashboard dari "Piutang 2026.xlsx". Dipakai chat supaya
+ * "tambahkan 1 chart" tetap di dokumen yang sama.
+ */
+export function dokumenKonteksDashboard(d: Dashboard): string | undefined {
+  const sumber = semuaWidget(d)
+    .map((w) => w.citations?.[0]?.docName)
+    .filter((n): n is string => !!n);
+  if (sumber.length === 0) return undefined;
+  const hitung = new Map<string, number>();
+  for (const n of sumber) hitung.set(n, (hitung.get(n) ?? 0) + 1);
+  const [nama, jumlah] = [...hitung.entries()].sort((a, b) => b[1] - a[1])[0];
+  return jumlah / sumber.length >= 0.8 ? nama : undefined;
+}

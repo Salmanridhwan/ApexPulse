@@ -194,3 +194,18 @@ export function niatRingkas(prompt: unknown): number | null {
     .trim();
   return sisa.length === 0 ? jumlah.max : null;
 }
+
+/**
+ * Indikator hasil `indikatorTambahWidget` yang sebenarnya kosong: hanya kata
+ * perintah, jumlah, dan pengisi ("Tambahkan 1 chart", "buatkan saya grafik lagi").
+ */
+export function indikatorKosong(indikator: unknown): boolean {
+  const sisa = String(indikator || '')
+    .toLowerCase()
+    .replace(/(?:^|[^a-z])(?:tolong|mohon|coba|tambah(?:kan|in)?|buat(?:kan|in)?|bikin(?:kan|in)?|masukkan|pasang|lagi|saja|aja|dong|ya|deh|saya|aku|satu|sebuah|baru|lain|lainnya|yang|ke|di|dashboard(?:nya)?|kanvas|ini)(?=[^a-z]|$)/g, ' ')
+    .replace(/(?:widget|chart|grafik|kartu|panel|diagram)(?:nya)?/g, ' ')
+    .replace(/[0-9.,!?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sisa.length < 2;
+}
