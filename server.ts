@@ -73,7 +73,7 @@ import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
-import { namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
+import { dokumenDariPermintaan, namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
 import { kumpulkanPotonganLembar, lembarDariBerkas, lembarDariPotongan } from './src/services/builder/dashboardLembar';
 import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
@@ -2596,7 +2596,23 @@ const app = express();
       // `\bwidget\b` yang GAGAL pada imbuhan Indonesia — "buatkan widgetnya"
       // tidak dikenali, sehingga pesan jatuh ke jalur chatbot dan dijawab prosa
       // (bahkan kode HTML mentah) alih-alih menambah widget ke kanvas.
-      const mintaTambahWidget = niatTambahWidget(prompt);
+      // Dokumen yang disebut ("1 chart dari dokumen Piutang 2026"): jalur tambah
+      // widget bertanya ke RAG tanpa saringan dokumen dan mengambil dokumen lain.
+      // Kalimat seperti ini diserahkan ke pembuat dashboard, yang membaca dokumen
+      // itu saja (tabelnya langsung untuk spreadsheet) dan menghormati jumlahnya.
+      const niatWidgetAsli = niatTambahWidget(prompt);
+      let dokumenDisebut: string | undefined;
+      if (niatWidgetAsli && kbChat && /(?:^|[^a-z])(?:dokumen|file|berkas|excel|xlsx|pdf)(?:nya)?(?:[^a-z]|$)/i.test(prompt)) {
+        try {
+          const daftar = await ragClient.daftarDokumen(kbChat);
+          const siap = daftar.dokumen.filter((d) => !d.status || /complete|indexed|ready|selesai/i.test(d.status));
+          dokumenDisebut = dokumenDariPermintaan(prompt, siap.map((d) => d.nama));
+        } catch (err: any) {
+          console.warn("[chat] daftar dokumen gagal:", err?.message || err);
+          dokumenDisebut = undefined;
+        }
+      }
+      const mintaTambahWidget = niatWidgetAsli && !dokumenDisebut;
       if (mintaTambahWidget) {
         // Instansi tanpa KB sendiri tidak boleh menembak RAG tanpa scope KB —
         // hasilnya bisa bercampur dengan dokumen instansi lain.
@@ -2971,7 +2987,7 @@ const app = express();
       // regex `\b` DULU gagal pada imbuhan bahasa Indonesia: `\bdashboard\b`
       // tidak cocok "dashboardnya", `\bbuatkan\b` tidak cocok "membuatkan" —
       // sehingga "oke buatkan saya dashboardnya" salah dijawab sebagai obrolan.
-      const isGenerateDash = niatBuatDashboard(prompt);
+      const isGenerateDash = niatBuatDashboard(prompt) || !!dokumenDisebut;
 
       // Deteksi obrolan ringan (sapaan/terima kasih) → persona boleh membalas
       // natural tanpa strict grounding. Pertanyaan data tetap grounded.

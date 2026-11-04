@@ -173,7 +173,15 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       logSummary.push(`[Tabel Dokumen] ${hasilLembar.widgets.length} kartu dari ${asal}.`, ...hasilLembar.catatan.map((c) => `[Tabel Dokumen] ${c}`));
       onProgress?.({ id: 'step-2', title: `Tabel dokumen terbaca dari ${asal}`, status: 'completed' });
       let widgetsLembar = rapikanTataLetak(hasilLembar.widgets);
-      if (permintaanJumlah) widgetsLembar = widgetsLembar.slice(0, permintaanJumlah.max);
+      if (permintaanJumlah) {
+        const mintaGrafik = /(?:^|[^a-z])(?:chart|grafik|diagram)/i.test(userPrompt);
+        const urut = mintaGrafik
+          ? [...widgetsLembar.filter((w) => !['kpi', 'narasi', 'table'].includes(w.type)), ...widgetsLembar.filter((w) => ['kpi', 'narasi', 'table'].includes(w.type))]
+          : widgetsLembar;
+        widgetsLembar = urut.slice(0, permintaanJumlah.max);
+        // Kartu tunggal tidak perlu sesempit kartu dalam deret.
+        if (widgetsLembar.length === 1 && widgetsLembar[0].type !== 'kpi') widgetsLembar = [{ ...widgetsLembar[0], grid: { ...widgetsLembar[0].grid, w: 12, h: 6 } }];
+      }
       const sekarang = new Date().toISOString();
       return {
         dashboard: {
