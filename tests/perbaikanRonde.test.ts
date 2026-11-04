@@ -38,3 +38,12 @@ test('elipsis dibersihkan dari subjudul dan label sumbu sebelum disimpan', () =>
   assert.equal(k.subtitle, 'Per program');
   assert.deepEqual(k.chart!.xAxis, ['Penggantian pipa', 'Ketepatan layanan', 'Digitalisasi meter']);
 });
+
+test('"1 chart aja" saat dashboard terbuka = ringkas, bukan tambah indikator', async () => {
+  const { niatRingkas } = await import('../src/services/chat/niat');
+  assert.equal(niatRingkas('Buatkan saya 1 chart aja'), 1);
+  assert.equal(niatRingkas('cukup 2 grafik saja'), 2);
+  assert.equal(niatRingkas('sisakan 1 chart'), 1);
+  assert.equal(niatRingkas('buat 1 chart pendapatan aja'), null);
+  assert.equal(niatRingkas('buatkan dashboard'), null);
+});

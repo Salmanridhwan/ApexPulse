@@ -33,6 +33,7 @@ import { uraiTabelWilayah, uraiCatatanWilayah, widgetWilayah } from './src/servi
 import {
   niatBuatDashboard,
   niatTambahWidget,
+  niatRingkas,
   indikatorTambahWidget,
   hanyaKeteranganPeriode,
 } from './src/services/chat/niat';
@@ -2600,15 +2601,72 @@ const app = express();
       // widget bertanya ke RAG tanpa saringan dokumen dan mengambil dokumen lain.
       // Kalimat seperti ini diserahkan ke pembuat dashboard, yang membaca dokumen
       // itu saja (tabelnya langsung untuk spreadsheet) dan menghormati jumlahnya.
+      // "Buatkan saya 1 chart aja" saat dashboard terbuka = RINGKAS dashboard ini
+      // menjadi N grafik terpenting, bukan menambah kartu baru dari dokumen lain.
+      const jumlahRingkas = activeDash ? niatRingkas(prompt) : null;
+      if (activeDash && jumlahRingkas) {
+        const halamanAsal: any[] = activeDash.halaman?.length ? activeDash.halaman : [{ id: 'hlm-1', judul: 'Ringkasan', widgets: activeDash.widgets ?? [] }];
+        const semuaKartu: WidgetSpec[] = halamanAsal.flatMap((h: any) => h.widgets ?? []);
+        const bukanGrafik = (w: WidgetSpec) => ['kpi', 'narasi', 'table'].includes(w.type);
+        const urut = [...semuaKartu.filter((w) => !bukanGrafik(w)), ...semuaKartu.filter(bukanGrafik)];
+        const dipilih = urut.slice(0, jumlahRingkas).map((w) => ({
+          ...w,
+          // Satu atau dua grafik mengisi kanvas, bukan kartu sempit di pojok.
+          grid: jumlahRingkas === 1 ? { ...w.grid, w: 12, h: 6 } : jumlahRingkas === 2 ? { ...w.grid, w: 6, h: 6 } : w.grid,
+        }));
+        if (dipilih.length === 0) {
+          const pesan = 'Dashboard ini belum punya kartu untuk diringkas.';
+          catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+          sendEvent('result', { actionTaken: 'none', message: pesan });
+          sendEvent('done', { ok: false });
+          return res.end();
+        }
+        const halamanBaru = [{ ...(halamanAsal[0] ?? {}), id: halamanAsal[0]?.id ?? 'hlm-1', judul: halamanAsal[0]?.judul ?? 'Ringkasan', widgets: dipilih }];
+        const diperbarui =
+          db.updateDashboard(activeDash.id, { widgets: dipilih, halaman: halamanBaru, halamanAktifId: halamanBaru[0].id } as any, tenantId) || activeDash;
+        db.addAuditLog({
+          tenantId,
+          userId: session.userId,
+          userName: session.name,
+          action: 'Ringkas Dashboard via Chat',
+          target: activeDash.title,
+          details: `${semuaKartu.length} kartu menjadi ${dipilih.length}: ${dipilih.map((w) => w.title).join(', ')}`,
+        });
+        const pesan =
+          `Dashboard **"${activeDash.title}"** diringkas menjadi **${dipilih.length} ${dipilih.length === 1 ? 'grafik' : 'kartu'}**: ` +
+          dipilih.map((w) => `**${w.title}**`).join(', ') +
+          `. ${semuaKartu.length - dipilih.length} kartu lain dihapus dari dashboard ini.`;
+        sendEvent('step', { id: 's0', title: 'Dashboard diringkas', status: 'completed' });
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'update_widget' } as any);
+        sendEvent('result', { actionTaken: 'update_widget', message: pesan, dashboard: diperbarui });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
       const niatWidgetAsli = niatTambahWidget(prompt);
       let dokumenDisebut: string | undefined;
-      if (niatWidgetAsli && kbChat && /(?:^|[^a-z])(?:dokumen|file|berkas|excel|xlsx|pdf)(?:nya)?(?:[^a-z]|$)/i.test(prompt)) {
+      const mintaBuatAsli = niatBuatDashboard(prompt);
+      if ((niatWidgetAsli || mintaBuatAsli) && kbChat && /(?:^|[^a-z])(?:dokumen|file|berkas|excel|xlsx|pdf)(?:nya)?(?:[^a-z]|$)/i.test(prompt)) {
         try {
           const daftar = await ragClient.daftarDokumen(kbChat);
-          const siap = daftar.dokumen.filter((d) => !d.status || /complete|indexed|ready|selesai/i.test(d.status));
-          dokumenDisebut = dokumenDariPermintaan(prompt, siap.map((d) => d.nama));
+          // Dicocokkan dengan SEMUA dokumen, termasuk yang gagal diindeks: dulu dokumen
+          // gagal (Sheet1.pdf, 0 potongan) tidak dikenali, lalu asisten diam-diam
+          // memakai dokumen lain.
+          const disebut = dokumenDariPermintaan(prompt, daftar.dokumen.map((d) => d.nama));
+          const dok = daftar.dokumen.find((d) => d.nama === disebut);
+          const siap = !!dok && (!dok.status || /complete|indexed|ready|selesai/i.test(dok.status)) && (dok.potongan ?? 1) > 0;
+          if (dok && !siap) {
+            const pesan =
+              `Dokumen **"${dok.nama}"** belum bisa dibaca: status di basis dokumen ${dok.status ? `**${dok.status}**` : 'belum siap'}` +
+              `${dok.potongan === 0 ? ', tanpa teks yang terbaca (0 potongan)' : ''}. Saya tidak memakai dokumen lain sebagai gantinya. ` +
+              `Biasanya ini PDF hasil pindai/ekspor gambar atau berkas yang terlalu besar; unggah ulang versi aslinya (mis. .xlsx), lalu coba lagi.`;
+            catatAsisten({ sender: 'system', text: pesan, actionTaken: 'no_source' } as any);
+            sendEvent('result', { actionTaken: 'no_source', message: pesan });
+            sendEvent('done', { ok: false });
+            return res.end();
+          }
+          if (niatWidgetAsli) dokumenDisebut = disebut;
         } catch (err: any) {
-          console.warn("[chat] daftar dokumen gagal:", err?.message || err);
+          console.warn('[chat] daftar dokumen gagal:', err?.message || err);
           dokumenDisebut = undefined;
         }
       }

@@ -168,3 +168,29 @@ export function hanyaKeteranganPeriode(teks: unknown): boolean {
     .trim();
   return sisa.length < 3;
 }
+
+/**
+ * Permintaan MERINGKAS dashboard yang terbuka: "buatkan saya 1 chart aja",
+ * "cukup 2 grafik saja", "sisakan 1 chart". Mengembalikan jumlah kartu yang
+ * diminta, atau null bila kalimatnya bukan permintaan meringkas.
+ *
+ * Dulu kalimat ini jatuh ke jalur tambah widget dan SELURUH kalimat dipakai
+ * sebagai indikator, sehingga RAG mengembalikan grafik sembarang dari dokumen
+ * lain dan dashboard malah bertambah satu kartu.
+ */
+export function niatRingkas(prompt: unknown): number | null {
+  const teks = String(prompt || '').toLowerCase();
+  if (!OBJEK_WIDGET.test(teks)) return null;
+  if (!/(?:^|[^a-z])(?:aja|saja|doang|cukup|hanya|sisakan|tinggal|jadikan|jadi)(?:[^a-z]|$)/.test(teks)) return null;
+  const jumlah = parsePermintaanJumlahWidget(teks);
+  if (!jumlah) return null;
+  // Sisa kalimat tanpa kata perintah, jumlah, objek, dan pengisi: harus kosong
+  // (tidak menyebut indikator). "1 chart pendapatan aja" = tambah/ganti indikator, bukan ringkas.
+  const sisa = teks
+    .replace(/(?:^|[^a-z])(?:tolong|mohon|coba|buat(?:kan|in)?|bikin(?:kan|in)?|jadikan|jadi|tampilkan|sisakan|tinggal|cukup|hanya|saja|aja|doang|dong|ya|deh|lagi|saya|aku|kami|kita|dashboard(?:nya)?|kanvas|ini|di|ke|dalam|satu|sebuah|dua|tiga|empat|lima|halaman)(?=[^a-z]|$)/g, ' ')
+    .replace(/(?:widget|chart|grafik|kartu|panel|diagram)(?:nya)?/g, ' ')
+    .replace(/[0-9.,!?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sisa.length === 0 ? jumlah.max : null;
+}
