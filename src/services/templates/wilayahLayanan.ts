@@ -149,3 +149,36 @@ export function ringkasWilayah(nilai: number, satuan: string): string {
   }
   return n.toLocaleString('id-ID', { maximumFractionDigits: 1 });
 }
+
+/**
+ * Kartu halaman "Kinerja per Wilayah" dari baris wilayah dokumen. Desain
+ * halamannya tetap replika template; kartu ini menyimpan angka yang sama dalam
+ * bentuk grafik katalog supaya halaman tidak kosong di tampilan kartu/presentasi.
+ */
+export function widgetWilayah(baris: BarisWilayah[], sumber: SumberWilayah[], idAwal: string): import('../../types').WidgetSpec[] {
+  if (baris.length < 2) return [];
+  const sitasi = sumber.slice(0, 1).map((s, i) => ({
+    id: `cit-${idAwal}-${i}`,
+    docName: s.dokumen,
+    page: s.halaman,
+    chunkSnippet: s.cuplikan,
+    confidenceScore: s.keyakinan,
+    date: '',
+  }));
+  const kartu = (n: number, title: string, data: number[], unit: string) => ({
+    id: `${idAwal}-${n}`,
+    type: 'hbar' as const,
+    chartId: 'bar-mendatar-peringkat',
+    title,
+    subtitle: 'Per wilayah layanan',
+    category: 'Operasional' as const,
+    confidence: 'sumber' as const,
+    grid: { x: 0, y: 0, w: 6, h: 4 },
+    chart: { xAxis: baris.map((b) => b.wilayah), series: [{ name: title, data }], unit, showLegend: false },
+    citations: sitasi,
+    lastUpdated: new Date().toISOString(),
+  });
+  const hasil = [kartu(1, 'Pelanggan per Wilayah', baris.map((b) => b.pelanggan), 'sambungan')];
+  if (baris.some((b) => b.nrw > 0)) hasil.push(kartu(2, 'NRW per Wilayah', baris.map((b) => b.nrw), '%'));
+  return hasil as any;
+}

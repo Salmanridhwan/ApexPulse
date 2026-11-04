@@ -30,7 +30,7 @@ export function terapkanGayaSemua(d: Dashboard, style: WidgetStyle | undefined, 
     fontUkuran: style?.fontUkuran,
     palette: semuaSasaran ? palet : dasar.palette,
     warnaSeri: semuaSasaran ? seri : dasar.warnaSeri,
-    chart: semuaSasaran ? dasar.chart : { ...(dasar.chart || {}), ...Object.fromEntries(sasaran.map((k) => [k, palet || 'default'])) },
+    chart: semuaSasaran || !palet ? dasar.chart : { ...(dasar.chart || {}), ...Object.fromEntries(sasaran.map((k) => [k, palet])) },
   };
 
   const pasang = (w: WidgetSpec): WidgetSpec => {

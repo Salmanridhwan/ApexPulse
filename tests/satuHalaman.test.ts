@@ -103,3 +103,28 @@ test('baris KPI dibatasi tingginya; sisa layar untuk grafik', () => {
   const pendek = tataTinggiKanvas(300, true, 2, 10, 84);
   assert.equal(pendek.kpi, pendek.baris);
 });
+
+test('grid.h menjadi bentang baris; kartu satu deret disamakan tingginya', async () => {
+  const { susunTinggiGrid, spanTinggi } = await import('../src/services/tataLetak/satuHalaman');
+  const k = (w: number, h: number, type = 'bar') => ({ type, grid: { x: 0, y: 0, w, h } });
+  // Deret 1: 6×4 + 6×2 → keduanya 4 satuan. Deret 2: 12×5 → 5 satuan.
+  const hasil = susunTinggiGrid([k(6, 4), k(6, 2), k(12, 5)]);
+  assert.deepEqual(hasil.span, [4, 4, 5]);
+  assert.equal(hasil.satuan, 9);
+  // Kartu h=4 dua kali setinggi h=2 bila di deret berbeda.
+  assert.deepEqual(susunTinggiGrid([k(12, 2), k(12, 4)]).span, [2, 4]);
+  // Tanpa grid.h: bawaan per tipe.
+  assert.equal(spanTinggi({ type: 'line', grid: undefined as any }), 4);
+  assert.equal(spanTinggi({ type: 'narasi', grid: undefined as any }), 2);
+});
+
+test('satuan baris tidak pernah di bawah minimum: layar sempit = gulir, bukan potong', async () => {
+  const { tataSatuan, SATUAN_MIN } = await import('../src/services/tataLetak/satuHalaman');
+  const lega = tataSatuan(900, true, 8, 10);
+  assert.equal(lega.gulir, false);
+  assert.ok(lega.satuan >= SATUAN_MIN);
+  assert.ok(lega.kpi + 10 + 8 * lega.satuan + 7 * 10 <= 900);
+  const sempit = tataSatuan(400, true, 16, 10);
+  assert.equal(sempit.gulir, true);
+  assert.equal(sempit.satuan, SATUAN_MIN);
+});

@@ -177,7 +177,7 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
           className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-semibold transition-colors"
         >
           <Check className="w-3.5 h-3.5" />
-          <span>Selesai</span>
+          <span>Terapkan (belum tersimpan)</span>
         </button>
       </div>
     </div>

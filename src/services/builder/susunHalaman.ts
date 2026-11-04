@@ -375,6 +375,8 @@ export function susunDashboardBerhalaman(
       // Penjaga terakhir sebelum disimpan: elipsis tidak boleh tersimpan di judul
       // atau periode (tahunnya hilang permanen), dan periode memakai bentuk seragam.
       title: tanpaElipsis(w.title),
+      ...(w.subtitle ? { subtitle: tanpaElipsis(w.subtitle) } : {}),
+      ...(w.chart?.xAxis ? { chart: { ...w.chart, xAxis: w.chart.xAxis.map((l) => tanpaElipsis(String(l)) || String(l)) } } : {}),
       periode: periodeWidget(w) ?? tanpaElipsis(w.periode ?? ''),
       id: w.id || `${dasar}-${i + 1}`,
       type: pilih.type,

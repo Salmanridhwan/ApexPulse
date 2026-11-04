@@ -132,6 +132,9 @@ function jadikan(r: Rancangan): DashboardTemplate {
 // RAPAT MANAJEMEN — satu deck umum untuk instansi mana pun
 // ============================================================================
 const rm = pembuat('rapat', 'Manajemen');
+/** Empat kartu KPI satu deret (3 kolom dari 12). */
+const lebar3 = (w: WidgetSpec): WidgetSpec => ({ ...w, grid: { ...w.grid, w: 3 } });
+
 const RAPAT_MANAJEMEN = jadikan({
   kode: 'rapat',
   nama: 'Rapat Manajemen',
@@ -145,12 +148,19 @@ const RAPAT_MANAJEMEN = jadikan({
       judul: 'Executive Summary',
       sub: 'Ringkasan kinerja tahun berjalan',
       kartu: [
-        rm.kpi('Pendapatan', 'Realisasi tahun berjalan', '48,6', 'miliar Rp', 'wallet', 6.1),
-        rm.kpi('Biaya Operasional', 'Realisasi tahun berjalan', '31,2', 'miliar Rp', 'receipt', -2.4),
-        rm.kpi('Laba Bersih', 'Setelah pajak', '9,8', 'miliar Rp', 'trending-up', 18.1),
-        rm.kpi('Realisasi Anggaran', 'Terhadap RKA tahun berjalan', '91,4', '%', 'target'),
-        rm.kpi('Jumlah Pelanggan', 'Pelanggan aktif', '86.420', 'pelanggan', 'users', 3.2),
-        rm.kpi('Jumlah Pegawai', 'Pegawai aktif', '412', 'orang', 'briefcase'),
+        lebar3(rm.kpi('Pendapatan', 'Realisasi tahun berjalan', '48,6', 'miliar Rp', 'wallet', 6.1)),
+        lebar3(rm.kpi('Biaya Operasional', 'Realisasi tahun berjalan', '31,2', 'miliar Rp', 'receipt', -2.4)),
+        lebar3(rm.kpi('Laba Bersih', 'Setelah pajak', '9,8', 'miliar Rp', 'trending-up', 18.1)),
+        lebar3(rm.kpi('Realisasi Anggaran', 'Terhadap RKA tahun berjalan', '91,4', '%', 'target')),
+        rm.grafik('combo', 'combo-batang-garis', 'Pendapatan vs Biaya Operasional', 'Miliar rupiah', 8, 4, TAHUN, [
+          { name: 'Pendapatan', data: [41.2, 45.8, 48.6, 53.4], kind: 'bar' },
+          { name: 'Biaya Operasional', data: [28.9, 30.4, 31.2, 33.1], kind: 'line' },
+        ], 'miliar Rp'),
+        rm.grafik('hbar', 'bar-mendatar-target', 'Capaian vs Target Indikator', 'Persen, tahun berjalan', 4, 4,
+          ['Pendapatan', 'Laba bersih', 'Pelanggan baru', 'Kepuasan'], [
+            { name: 'Capaian', data: [96, 104, 88, 97] },
+            { name: 'Target', data: [100, 100, 100, 100] },
+          ], '%'),
       ],
     },
     {
@@ -174,12 +184,12 @@ const RAPAT_MANAJEMEN = jadikan({
       judul: 'Keuangan & Biaya',
       sub: 'Anggaran, arus kas, dan pengendalian biaya',
       kartu: [
-        rm.grafik('hbar', 'bar-mendatar-target', 'Anggaran vs Realisasi', 'Per pos biaya, juta rupiah', 8, 4,
+        rm.grafik('hbar', 'bar-mendatar-target', 'Anggaran vs Realisasi', 'Per pos biaya, juta rupiah', 7, 4,
           ['Pegawai', 'Operasional', 'Pemeliharaan', 'Administrasi & umum', 'Pemasaran'], [
             { name: 'Realisasi', data: [14600, 9120, 3880, 2400, 960] },
             { name: 'Anggaran', data: [15000, 8900, 4100, 2600, 1100] },
           ], 'juta Rp'),
-        rm.grafik('donut', 'donat-tebal', 'Komposisi Biaya', 'Porsi per pos, persen', 4, 4,
+        rm.grafik('donut', 'donat-tebal', 'Komposisi Biaya', 'Porsi per pos, persen', 5, 4,
           ['Pegawai', 'Operasional', 'Pemeliharaan', 'Administrasi & umum', 'Pemasaran'], [{ name: 'Porsi', data: [47, 29, 12, 8, 4] }], '%'),
         rm.kpi('Kas Masuk', 'Penerimaan kas', '52,1', 'miliar Rp', 'trending-up'),
         rm.kpi('Kas Keluar', 'Pengeluaran kas', '45,7', 'miliar Rp', 'trending-down'),
@@ -190,7 +200,7 @@ const RAPAT_MANAJEMEN = jadikan({
       judul: 'Isu & Action Plan',
       sub: 'Issue board dan tindak lanjut rapat',
       kartu: [
-        rm.tabel('papan-isu', 'Isu Utama', 'Dikelompokkan menurut prioritas', 12, 4, ['Isu', 'Area', 'Prioritas'], [
+        rm.tabel('papan-isu', 'Isu Utama', 'Dikelompokkan menurut prioritas', 8, 4, ['Isu', 'Area', 'Prioritas'], [
           ['Realisasi investasi di bawah rencana', 'Investasi', 'Critical'],
           ['Piutang di atas 90 hari', 'Keuangan', 'Critical'],
           ['Biaya pemeliharaan melampaui anggaran', 'Operasional', 'Perlu perhatian'],
@@ -199,6 +209,9 @@ const RAPAT_MANAJEMEN = jadikan({
           ['Pelaporan keuangan bulanan', 'Keuangan', 'Terkendali'],
           ['Kepatuhan SOP layanan', 'Layanan', 'Terkendali'],
         ]),
+        rm.grafik('hbar', 'daftar-progres', 'Progres Action Plan', 'Persen selesai per aksi', 4, 4,
+          ['Realisasi investasi', 'Penagihan piutang', 'Biaya pemeliharaan', 'Rekrutmen teknis', 'Digitalisasi layanan'],
+          [{ name: 'Progres', data: [55, 40, 65, 25, 80] }], '%'),
         rm.tabel('tabel-status', 'Action Plan', 'Tindak lanjut hasil rapat', 12, 4, ['Aksi', 'PIC', 'Tenggat', 'Status'], [
           ['Percepatan realisasi investasi', 'Perencanaan', 'Mar 2027', 'On progress'],
           ['Penagihan piutang macet', 'Keuangan', 'Feb 2027', 'Perlu perhatian'],
@@ -212,13 +225,16 @@ const RAPAT_MANAJEMEN = jadikan({
       judul: 'Target & KPI 2027',
       sub: 'Sasaran kinerja tahun depan',
       kartu: [
-        rm.sasaran('Pertumbuhan Pendapatan', 6.1, 10, '%', '≥', 'trending-up'),
-        rm.sasaran('Realisasi Anggaran', 91, 95, '%', '≥', 'target'),
-        rm.sasaran('Kepuasan Pelanggan', 82.5, 85, '%', '≥', 'star'),
-        rm.sasaran('Umur Piutang', 47, 40, 'hari', '≤', 'calendar'),
-        rm.sasaran('Rasio Biaya Operasional', 64, 60, '%', '≤', 'percent'),
-        rm.sasaran('Capaian Program Kerja', 80, 90, '%', '≥', 'clipboard'),
-        rm.narasi('Arah 2027', 'Prioritas tahun depan: menjaga pertumbuhan pendapatan, mempercepat penagihan piutang, mengendalikan biaya operasional, dan meningkatkan kualitas layanan.'),
+        lebar3(rm.sasaran('Pertumbuhan Pendapatan', 6.1, 10, '%', '≥', 'trending-up')),
+        lebar3(rm.sasaran('Realisasi Anggaran', 91, 95, '%', '≥', 'target')),
+        lebar3(rm.sasaran('Kepuasan Pelanggan', 82.5, 85, '%', '≥', 'star')),
+        lebar3(rm.sasaran('Umur Piutang', 47, 40, 'hari', '≤', 'calendar')),
+        rm.grafik('hbar', 'bar-mendatar-target', 'Realisasi 2026 vs Sasaran 2027', 'Persen', 8, 4,
+          ['Rasio biaya operasional', 'Capaian program kerja', 'Realisasi investasi', 'Cakupan layanan'], [
+            { name: 'Realisasi 2026', data: [64, 80, 57, 69] },
+            { name: 'Sasaran 2027', data: [60, 90, 85, 75] },
+          ], '%'),
+        rm.narasi('Arah 2027', 'Prioritas tahun depan: menjaga pertumbuhan pendapatan, mempercepat penagihan piutang, mengendalikan biaya operasional, dan meningkatkan kualitas layanan.', 4, 4),
       ],
     },
   ],

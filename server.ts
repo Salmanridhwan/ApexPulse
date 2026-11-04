@@ -29,7 +29,7 @@ import {
 import { kbUntukInstansi } from './src/services/rag/kbDefaults';
 import { ambilHalaman, kumpulkanPotongan } from './src/services/rag/potonganDokumen';
 import { halamanPaket, halamanSyarat } from './src/services/http/halamanPublik';
-import { uraiTabelWilayah, uraiCatatanWilayah } from './src/services/templates/wilayahLayanan';
+import { uraiTabelWilayah, uraiCatatanWilayah, widgetWilayah } from './src/services/templates/wilayahLayanan';
 import {
   niatBuatDashboard,
   niatTambahWidget,
@@ -82,7 +82,8 @@ import {
   nilaiTrafikDariWidgets,
 } from './src/services/templates/nilaiTemplate';
 import { nilaiOperasionalDariWidgets } from './src/services/templates/nilaiOperasional';
-import { gayaDariPermintaan, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
+import { gayaDariPermintaan, pilihChart, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
+import { pakaiChartKatalog } from './src/services/chart/katalogCocok';
 import { MIN_WIDGET_HALAMAN } from './src/services/builder/halamanDiminta';
 import { GAYA } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
@@ -1854,7 +1855,16 @@ const app = express();
       satuanAir: wilayah?.satuanAir || 'm³',
       sumber: Array.isArray(wilayah?.sumber) ? wilayah.sumber : [],
     };
-    const halaman = template.bagian
+    // Kartu template memakai chart katalog (chartId) seperti dashboard asisten;
+    // dulu kartu template lama tersimpan tanpa chartId sama sekali.
+    const denganKatalog = (ws: WidgetSpec[]) =>
+      ws.map((w) => {
+        if (w.chartId) return w;
+        const pilih = pilihChart(w);
+        // Tipe kartu tidak diubah: angka replika (nilaiDariWidgets) dibaca dari kartu yang sama.
+        return pilih.chartId && pilih.type === w.type ? { ...w, chartId: pilih.chartId } : w;
+      });
+    const halamanMentah = template.bagian
       ? // Satu halaman dashboard = satu kelompok slide deck, desainnya `DashboardBagian`.
         halamanTemplateBagian(template, widgets).map((h, i) => ({
           id: `hlm-${i + 1}`,
@@ -1870,8 +1880,15 @@ const app = express();
         widgets: widgets2,
         replika: { templateId: `${template.id}#2`, nilai: nilaiOperasionalDariWidgets(widgets2) },
       },
-      { id: 'hlm-3', judul: 'Kinerja per Wilayah', widgets: [], replika: { templateId: `${template.id}#3`, nilai: nilaiHal3 } },
+      {
+        id: 'hlm-3',
+        judul: 'Kinerja per Wilayah',
+        // Angka wilayah yang sama dengan replika, sebagai grafik: halaman ini dulu tanpa kartu.
+        widgets: widgetWilayah(nilaiHal3.baris, nilaiHal3.sumber, `tpl-${template.id}-${seed}-wil`),
+        replika: { templateId: `${template.id}#3`, nilai: nilaiHal3 },
+      },
     ];
+    const halaman = halamanMentah.map((h) => ({ ...h, widgets: denganKatalog(h.widgets) }));
 
     const newDash: Dashboard = {
       id: `dash-${Date.now()}`,
@@ -2651,7 +2668,7 @@ const app = express();
             return res.end();
           }
           const d = hasil.data as any;
-          const widgetBaru: WidgetSpec = {
+          let widgetBaru: WidgetSpec = {
             id: `w-rag-${Date.now()}`,
             type: d.type || (tipeDiminta === 'bar' ? 'bar' : tipeDiminta),
             title: d.title || hasil.judul || indikator,
@@ -2668,6 +2685,12 @@ const app = express();
             periode: d.periode,
             lastUpdated: new Date().toISOString(),
           } as WidgetSpec;
+          // Kartu dari chat juga memakai chart katalog (chartId), sama dengan pembuat
+          // dashboard — dulu kartu ini tersimpan tanpa chartId.
+          {
+            const pilih = pilihChart(widgetBaru);
+            if (pilih.chartId) widgetBaru = pakaiChartKatalog(widgetBaru, pilih.chartId);
+          }
           // Tolak KEMBARAN: kalau kanvas sudah punya widget dengan isi yang sama
           // (judul + subjudul + periode + tipe), jangan tambah duplikat. Menambah
           // kartu kedua yang menanyakan hal sama membuat jumlah widget menipu.
@@ -2681,7 +2704,11 @@ const app = express();
               description: `Dibuat asisten dari permintaan: "${prompt.slice(0, 120)}"`,
               sector,
               gaya: desainDiminta ? { desain: desainDiminta } : undefined,
-              widgets: [{ ...widgetBaru, grid: { x: 0, y: 0, w: widgetBaru.type === 'kpi' ? 4 : 8, h: widgetBaru.type === 'kpi' ? 2 : 4 } }],
+              // Disimpan sebagai halaman (bukan daftar kartu datar), sama dengan dashboard lain.
+              ...(() => {
+                const kartu = { ...widgetBaru, grid: { x: 0, y: 0, w: widgetBaru.type === 'kpi' ? 4 : 8, h: widgetBaru.type === 'kpi' ? 2 : 4 } };
+                return { widgets: [kartu], halaman: [{ id: 'hlm-1', judul: 'Ringkasan', widgets: [kartu] }], halamanAktifId: 'hlm-1' };
+              })(),
               globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
               createdAt: sekarang,
               updatedAt: sekarang,

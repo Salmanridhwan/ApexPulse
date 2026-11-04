@@ -46,6 +46,71 @@ export function hitungBarisGrid(widgets: Pick<WidgetSpec, 'grid'>[]): number {
 }
 
 /**
+ * Tinggi kartu dalam satuan baris grid (`grid.h`). Dulu `grid.h` tidak pernah
+ * dipakai kanvas: semua kartu satu baris setinggi sama, sehingga grafik 120 px
+ * terpotong di kartu 84 px. Bawaan per tipe bila `grid.h` kosong.
+ */
+export function spanTinggi(w: Pick<WidgetSpec, 'grid'> & { type?: string }): number {
+  const bawaan = w.type === 'kpi' || w.type === 'narasi' ? 2 : 4;
+  const h = Number(w.grid?.h);
+  return Math.max(2, Math.min(8, Number.isFinite(h) && h > 0 ? Math.round(h) : bawaan));
+}
+
+/**
+ * Susunan tinggi grid: kartu dipasang mengikuti lebar (sama dengan CSS grid),
+ * lalu SEMUA kartu dalam satu deret dibentangkan setinggi kartu tertinggi di
+ * deret itu — supaya tidak ada lubang dan tinggi kartu = `span` satuan baris.
+ */
+export function susunTinggiGrid(widgets: Array<Pick<WidgetSpec, 'grid'> & { type?: string }>): { span: number[]; satuan: number } {
+  const span: number[] = [];
+  let mulai = 0;
+  let kolom = 0;
+  let satuan = 0;
+  const tutupDeret = (akhir: number) => {
+    if (akhir <= mulai) return;
+    const tinggi = Math.max(...widgets.slice(mulai, akhir).map(spanTinggi));
+    for (let i = mulai; i < akhir; i++) span[i] = tinggi;
+    satuan += tinggi;
+    mulai = akhir;
+  };
+  widgets.forEach((w, i) => {
+    const c = lebarKolom(w.grid?.w);
+    if (kolom + c > KOLOM_KANVAS) {
+      tutupDeret(i);
+      kolom = 0;
+    }
+    kolom += c;
+  });
+  tutupDeret(widgets.length);
+  return { span, satuan };
+}
+
+/** Tinggi minimum satu satuan baris (px): kartu grafik 4 satuan ≈ 250 px, label sumbu terbaca. */
+export const SATUAN_MIN = 56;
+
+/**
+ * Tinggi baris KPI dan satuan baris kartu lain untuk mode satu halaman.
+ *
+ * Kalau satuan minimum pun tidak muat di layar, kanvas DIGULIR (`gulir`), bukan
+ * diperkecil: memperkecil grid membuat isi grafik yang punya ukuran minimum
+ * terpotong oleh kartunya.
+ */
+export function tataSatuan(
+  tinggiIsi: number,
+  adaKpi: boolean,
+  satuan: number,
+  jarak: number,
+  kpiMaks: number = TINGGI_KPI_MAKS
+): { kpi: number; satuan: number; gulir: boolean } {
+  const kpi = adaKpi ? Math.min(kpiMaks, Math.max(96, Math.round(tinggiIsi * 0.22))) : 0;
+  if (satuan <= 0) return { kpi: adaKpi ? Math.min(kpiMaks, Math.max(0, tinggiIsi)) : 0, satuan: 0, gulir: false };
+  const sisa = tinggiIsi - (adaKpi ? kpi + jarak : 0);
+  const t = Math.floor((sisa - jarak * (satuan - 1)) / satuan);
+  if (t >= SATUAN_MIN) return { kpi, satuan: t, gulir: false };
+  return { kpi, satuan: SATUAN_MIN, gulir: true };
+}
+
+/**
  * Jumlah baris SELURUH kanvas.
  *
  * ATURAN KPI: kartu KPI tidak pernah dibagi ke dua baris — berapa pun jumlahnya

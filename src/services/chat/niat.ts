@@ -10,6 +10,8 @@
  * dijawab prosa (bukan widget). Di sini imbuhan diakomodasi eksplisit.
  */
 
+import { parsePermintaanJumlahWidget } from '../builder/permintaanWidget';
+
 /** Kata perintah membuat/memperbarui, termasuk bentuk berimbuhan (mem-/di-/ter-). */
 const PERINTAH =
   /(?:^|[^a-z])(?:mem(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|di(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan|perbarui|perbaharui)|buat|buatkan|bikin|bikinkan|generate|hasilkan|susun|rancang|ciptakan|sediakan|desain|tampilkan|perbarui|perbaharui|update|refresh|isi|lengkapi|penuhi|tambah(?:kan)?)(?:kan|lah|nya|in)?(?:[^a-z]|$)/i;
@@ -57,6 +59,10 @@ export function niatBuatDashboard(prompt: unknown): boolean {
   if (KONFIRMASI_BUAT.test(teks) || HANYA_PERINTAH.test(teks)) return true;
   // Pertanyaan tentang CARA atau ARTI selalu dijawab, bukan dieksekusi.
   if (TANYA_CARA.test(teks)) return false;
+  // "Buat 3 chart kinerja keuangan": beberapa chart sekaligus = satu dashboard berisi
+  // sejumlah itu (pembuat dashboard memangkas ke jumlahnya).
+  const jumlah = parsePermintaanJumlahWidget(teks);
+  if (jumlah && jumlah.max > 1 && BUAT_TEGAS.test(teks) && OBJEK_WIDGET.test(teks) && !/(?:ke|di)\s+(?:dashboard|halaman|kanvas)\s+ini/.test(teks)) return true;
   // Kata tanya lain tidak membatalkan perintah yang tegas: "bisakah kamu
   // buatkan dashboard dari data apa saja yang ada" jelas meminta dashboard.
   if (TANYA.test(teks)) return BUAT_TEGAS.test(teks) && DASHBOARD.test(teks);
@@ -109,6 +115,11 @@ export function niatTambahWidget(prompt: unknown): boolean {
     /(?:^|[^a-z])(?:buat(?:kan)?|bikin(?:kan)?|susun|rancang|desain|ciptakan|sediakan|generate|hasilkan|mem(?:buat|bikin|rancang|susun|sediakan|desain|hasilkan))(?:kan|lah|nya|in)?(?:[^a-z]|$)/i;
   const objekDashboard = /(?:^|[^a-z])(?:dashboard|kanvas|canvas)(?:nya|ku|mu)?(?:[^a-z]|$)/i;
   if (buatDashboard.test(teks) && objekDashboard.test(teks)) return false;
+  // "Buat 3 chart kinerja keuangan": jumlah lebih dari satu diserahkan ke pembuat
+  // dashboard (yang menghormati jumlah). Dulu jalur ini membuat satu kartu saja.
+  // Kecuali jelas ditujukan ke kanvas yang terbuka ("tambahkan 2 grafik ke dashboard ini").
+  const jumlah = parsePermintaanJumlahWidget(teks);
+  if (jumlah && jumlah.max > 1 && !/(?:ke|di)\s+(?:dashboard|halaman|kanvas)\s+ini/.test(teks)) return false;
   return true;
 }
 

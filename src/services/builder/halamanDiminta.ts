@@ -396,9 +396,22 @@ export function judulUntukButir(butir: string, w: WidgetSpec, judulHalaman = '')
 }
 
 /** Widget ini metrik yang sama dengan salah satu kartu di `daftar` (sinonim ikut dikenali)? */
+/** Satuan waktu yang disebut judul kartu: bulan/triwulan/semester/tahun. */
+function satuanWaktu(judul: string): string | null {
+  const t = String(judul || '').toLowerCase();
+  if (/bulan|bulanan|monthly/.test(t)) return 'bulan';
+  if (/triwulan|kuartal|quarter|\bq[1-4]\b/.test(t)) return 'triwulan';
+  if (/semester/.test(t)) return 'semester';
+  if (/tahun|tahunan|annual|yearly/.test(t)) return 'tahun';
+  return null;
+}
+
 export function widgetKembar(w: WidgetSpec, daftar: WidgetSpec[]): boolean {
+  const waktu = satuanWaktu(w.title);
   return daftar.some(
     (x) =>
+      // KATA_UMUM membuang "bulan"/"tahun" saat mencocokkan, jadi beda satuan waktu dicek di sini.
+      !(waktu && satuanWaktu(x.title) && waktu !== satuanWaktu(x.title)) &&
       angkaTunggal(x.type) === angkaTunggal(w.type) &&
       (skorCocok(w.title, teksWidget(x)) >= 0.75 || skorCocok(x.title, teksWidget(w)) >= 0.75)
   );

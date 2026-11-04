@@ -62,7 +62,9 @@ test('halaman bagian dipotong sesuai urutan kartu', () => {
   assert.equal(hal[0].judul, 'Executive Summary');
   assert.equal(hal[0].widgets[0].title, 'Pendapatan');
   assert.equal(hal.at(-1)!.judul, 'Target & KPI 2027');
-  assert.ok(hal.at(-1)!.widgets.filter((w) => w.type !== 'narasi').every((w) => w.chartId === 'kpi-target'));
+  assert.ok(hal.at(-1)!.widgets.some((w) => w.chartId === 'kpi-target'));
+  // Tiap halaman deck minimal satu grafik (kpi, narasi, tabel tidak dihitung).
+  for (const h of hal) assert.ok(h.widgets.some((w) => !['kpi', 'narasi', 'table'].includes(w.type)), `${h.judul}: tanpa grafik`);
   assert.equal(nomorHalamanBagian('tpl-bagian-rapat#4'), 4);
   assert.equal(nomorHalamanBagian('tpl-bagian-rapat'), 1);
 });

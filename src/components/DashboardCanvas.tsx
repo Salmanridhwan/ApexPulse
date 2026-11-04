@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
-import { hitungBarisGrid, hitungBarisKanvas, tataTinggiKanvas } from '../services/tataLetak/satuHalaman';
+import { hitungBarisKanvas, susunTinggiGrid, tataSatuan } from '../services/tataLetak/satuHalaman';
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -168,8 +168,13 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const widgetsKpi = useMemo(() => widgets.filter((w) => w.type === 'kpi').slice(0, 6), [widgets]);
   const widgetsLain = useMemo(() => widgets.filter((w) => w.type !== 'kpi'), [widgets]);
 
-  /** Baris untuk kartu non-KPI (grafik, tabel, narasi, ...). */
-  const barisLain = useMemo(() => hitungBarisGrid(widgetsLain), [widgetsLain]);
+  /**
+   * Satuan baris kartu non-KPI: tiap kartu membentang `grid.h` satuan, dan kartu
+   * dalam satu deret disamakan tingginya (lihat `susunTinggiGrid`).
+   */
+  const tinggiGrid = useMemo(() => susunTinggiGrid(widgetsLain), [widgetsLain]);
+  const barisLain = tinggiGrid.satuan;
+  const spanKartu = useMemo(() => new Map(widgetsLain.map((w, i) => [w.id, tinggiGrid.span[i]])), [widgetsLain, tinggiGrid]);
 
   /**
    * Jumlah baris SELURUH kanvas: 1 baris KPI (kalau ada KPI) + baris kartu lain.
@@ -192,23 +197,23 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    */
   const JARAK = pasSatuHalamanAwal ? 10 : 16;
   const PADDING = pasSatuHalamanAwal ? 12 : 20;
-  /** Baris lebih pendek dari ini membuat grafik tak terbaca → pakai skala turun. */
-  const BARIS_MIN = 84;
+  /** Tinggi satu satuan baris di luar mode satu halaman (layar kecil, pratinjau). */
+  const SATUAN_BIASA = 60;
 
   const pasSatuHalaman = pasSatuHalamanAwal;
   const tinggiIsi = Math.max(0, tinggiTersedia - PADDING * 2);
   /**
-   * Tinggi baris & skala dihitung murni di `satuHalaman.ts` (ada tesnya): kalau
-   * baris minimum pun tidak cukup, seluruh grid diperkecil dengan `scale`
-   * supaya TETAP muat satu layar tanpa scroll.
+   * Tinggi baris KPI & satuan baris dihitung murni di `satuHalaman.ts` (ada tesnya).
+   * Kalau satuan minimum tidak muat, kanvas digulir — dulu grid diperkecil dengan
+   * `scale`, dan isi grafik yang punya ukuran minimum terpotong oleh kartunya.
    */
   const tata = pasSatuHalaman
-    ? tataTinggiKanvas(tinggiIsi, widgetsKpi.length > 0, barisLain, JARAK, BARIS_MIN, tinggiKpiMaks)
-    : { kpi: 0, baris: 0, skala: 1 };
-  const tinggiBarisFinal = tata.baris;
+    ? tataSatuan(tinggiIsi, widgetsKpi.length > 0, barisLain, JARAK, tinggiKpiMaks)
+    : { kpi: 0, satuan: SATUAN_BIASA, gulir: false };
+  const tinggiBarisFinal = tata.satuan;
   /** Baris KPI dibatasi tingginya supaya kartu angka tidak melar setinggi layar. */
   const tinggiKpi = tata.kpi;
-  const skala = tata.skala;
+  const skala = 1;
   /** Tinggi total kartu non-KPI (dipakai sebagai tinggi grid utamanya). */
   const tinggiGridLain = barisLain * tinggiBarisFinal + JARAK * Math.max(0, barisLain - 1);
 
@@ -282,8 +287,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       colSpan = 'col-span-1 md:col-span-4 lg:col-span-3';
     }
 
-    // Tinggi minimum mengikuti isi: kartu KPI/narasi ringkas, grafik & tabel butuh ruang.
-    const tinggiMin = ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
+    // Kartu grid membentang `span` satuan baris; tinggi minimum lama hanya untuk baris KPI.
+    const span = kpi ? undefined : spanKartu.get(widget.id) ?? 4;
+    const tinggiMin = span ? '' : ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
       'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
       'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
       ? 'min-h-[248px]'
@@ -316,6 +322,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         }}
         className={`${kpi ? '' : colSpan} ${pasSatuHalaman ? 'min-h-0 overflow-hidden' : tinggiMin} rounded-control relative transition-opacity ${dragId === widget.id ? 'opacity-40' : ''
           } ${overId === widget.id && dragId && dragId !== widget.id ? 'ring-2 ring-brand' : ''}`}
+        style={span ? { gridRow: `span ${span}` } : undefined}
       >
         <WidgetCard
           widget={widget}
@@ -377,7 +384,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   return (
     <div
       ref={wadahRef}
-      className={`${polos ? 'relative' : 'canvas-tegas'} ${pasSatuHalaman ? 'overflow-hidden' : 'p-4 sm:p-5'}`}
+      className={`${polos ? 'relative' : 'canvas-tegas'} ${pasSatuHalaman ? (tata.gulir ? 'overflow-y-auto gulir-tema' : 'overflow-hidden') : 'p-4 sm:p-5'}`}
       style={pasSatuHalaman ? { height: tinggiTersedia, padding: PADDING } : undefined}
     >
       <div
@@ -416,7 +423,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                     columnGap: JARAK,
                     paddingBottom: 0,
                   }
-                : { gap: 16 }
+                : { gap: 16, gridAutoRows: `${SATUAN_BIASA}px` }
             }
           >
             {widgetsLain.map((widget, i) => renderKartu(widget, widgetsKpi.length + i, false))}
