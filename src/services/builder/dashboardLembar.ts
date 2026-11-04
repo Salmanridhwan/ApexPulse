@@ -254,12 +254,38 @@ export function ringkasRupiah(n: number): { nilai: string; satuan: string } {
   return { nilai, satuan };
 }
 
+
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/**
+ * Skala satu deret rupiah supaya terbaca: angka mentah "36.926.881.952" di
+ * grafik dan tabel membuat kartu sesak. Satu skala per kartu (dari nilai
+ * terbesar), dua desimal.
+ */
+export function skalaRupiah(nilai: number[]): { bagi: number; satuan: string } {
+  const maks = Math.max(0, ...nilai.map((v) => Math.abs(v)));
+  return maks >= 1e9
+    ? { bagi: 1e9, satuan: 'Rp miliar' }
+    : maks >= 1e6
+      ? { bagi: 1e6, satuan: 'Rp juta' }
+      : maks >= 1e4
+        ? { bagi: 1e3, satuan: 'Rp ribu' }
+        : { bagi: 1, satuan: 'Rp' };
+}
+
+const bulat = (v: number) => Math.round(v * 100) / 100;
+
+/** Label kategori panjang dipendekkan supaya sumbu grafik tidak menumpuk. */
+const pendek = (t: string, maks = 26) => (t.length <= maks ? t : `${t.slice(0, maks - 1).trimEnd()}…`);
 
 export interface HasilLembar {
   widgets: WidgetSpec[];
   /** Catatan jujur untuk pesan asisten (mis. baris yang tidak terbaca). */
   catatan: string[];
+  /** Nama lembar yang dipakai; satu lembar = satu halaman dashboard. */
+  lembar: string[];
+  /** id widget -> indeks lembar di `lembar`. */
+  lembarWidget: Record<string, number>;
 }
 
 export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAwal = `lbr-${Date.now()}`): HasilLembar {
@@ -267,35 +293,39 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
     .map(analisisLembar)
     .filter((a): a is AnalisisLembar => !!a && a.kolom.some((k) => k.jenis === 'angka'))
     .sort((a, b) => b.data.length - a.data.length)
-    .slice(0, 2);
+    .slice(0, 3);
   const widgets: WidgetSpec[] = [];
   const catatan: string[] = [];
+  const lembar: string[] = [];
+  const lembarWidget: Record<string, number> = {};
   let n = 0;
-  const id = () => `${idAwal}-${++n}`;
   const sekarang = new Date().toISOString();
 
   for (const a of analisis) {
-    const awalan = analisis.length > 1 ? `${a.lembar.nama} · ` : '';
+    const indeksLembar = lembar.length;
     const sitasi = (cuplikan: string): Citation[] => [
-      { id: `cit-${idAwal}-${n}`, docName: namaDokumen, page: 0, chunkSnippet: `Lembar "${a.lembar.nama}": ${cuplikan}`.slice(0, 240), confidenceScore: sumber.lengkap ? 1 : 0.9, date: '' },
+      {
+        id: `cit-${idAwal}-${n}`,
+        docName: namaDokumen,
+        page: 0,
+        chunkSnippet: `Lembar "${a.lembar.nama}": ${cuplikan}`.slice(0, 240),
+        confidenceScore: sumber.lengkap ? 1 : 0.9,
+        date: '',
+      },
     ];
-    const dasar = (title: string, subtitle: string, cuplikan: string): Pick<WidgetSpec, 'id' | 'title' | 'subtitle' | 'category' | 'confidence' | 'citations' | 'lastUpdated'> => ({
-      id: id(),
-      title: `${awalan}${title}`,
-      subtitle,
-      category: 'Keuangan',
-      confidence: 'sumber',
-      citations: sitasi(cuplikan),
-      lastUpdated: sekarang,
-    });
+    const tambah = (w: Omit<WidgetSpec, 'id' | 'category' | 'confidence' | 'citations' | 'lastUpdated'>, cuplikan: string) => {
+      const wid = `${idAwal}-${++n}`;
+      lembarWidget[wid] = indeksLembar;
+      widgets.push({ ...w, id: wid, category: 'Keuangan', confidence: 'sumber', citations: sitasi(cuplikan), lastUpdated: sekarang } as WidgetSpec);
+    };
     // Dari potongan, jumlah baris dokumen hanya diketahui bila baris Total-nya terbaca.
     const jumlahDiketahui = sumber.lengkap || !!a.total;
     const lengkap = sumber.lengkap || (!!a.total && a.data.length >= a.perkiraanBaris);
     const ketBaris = lengkap
       ? `${a.data.length.toLocaleString('id-ID')} baris`
       : jumlahDiketahui
-        ? `dari ${a.data.length.toLocaleString('id-ID')} dari ±${a.perkiraanBaris.toLocaleString('id-ID')} baris terbaca`
-        : `dari ${a.data.length.toLocaleString('id-ID')} baris yang terbaca (sebagian)`;
+        ? `${a.data.length.toLocaleString('id-ID')} dari ±${a.perkiraanBaris.toLocaleString('id-ID')} baris terbaca`
+        : `${a.data.length.toLocaleString('id-ID')} baris terbaca (sebagian)`;
     if (!lengkap)
       catatan.push(
         jumlahDiketahui
@@ -305,8 +335,9 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
 
     // Judul kolom berupa angka ("13") = sisa judul bertingkat yang tidak terbaca; maknanya tidak jelas.
     const angka = a.kolom.filter((k) => k.jenis === 'angka' && !KOLOM_KODE.test(k.nama) && !/^\d+([.,]\d+)?$/.test(k.nama));
-    const jumlahKolom = (k: Kolom) => a.data.reduce((s, d) => s + (keAngka(d.sel[k.indeks]) ?? 0), 0);
-    const uang = (k: Kolom) => KOLOM_UANG.test(k.nama) && a.data.some((d) => Math.abs(keAngka(d.sel[k.indeks]) ?? 0) >= 1000);
+    const nilaiKolom = (k: Kolom) => a.data.map((d) => keAngka(d.sel[k.indeks])).filter((v): v is number => v !== null);
+    const jumlahKolom = (k: Kolom) => nilaiKolom(k).reduce((s, v) => s + v, 0);
+    const uang = (k: Kolom) => KOLOM_UANG.test(k.nama) && nilaiKolom(k).some((v) => Math.abs(v) >= 1000);
     // Nilai ringkasan: baris Total milik dokumen, atau jumlah semua baris bila lengkap.
     const ringkasan = (k: Kolom): number | null => {
       const t = a.total ? keAngka(a.total[k.indeks] ?? null) : null;
@@ -316,28 +347,56 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
     const urutAngka = [...angka].sort(
       (x, y) => Number(KOLOM_UTAMA.test(y.nama)) - Number(KOLOM_UTAMA.test(x.nama)) || Math.abs(jumlahKolom(y)) - Math.abs(jumlahKolom(x))
     );
-    const utama = urutAngka.find((k) => uang(k) && !KOLOM_TAK_DIJUMLAH.test(k.nama)) ?? urutAngka.find((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama));
+    const utama =
+      urutAngka.find((k) => uang(k) && !KOLOM_TAK_DIJUMLAH.test(k.nama)) ?? urutAngka.find((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama));
     if (!utama) continue;
+    lembar.push(a.lembar.nama);
+    const rupiah = uang(utama);
 
-    // 1. KPI: jumlah baris + kolom angka terpenting.
-    if (jumlahDiketahui) widgets.push({
-      ...dasar('Jumlah Transaksi', `Baris data di lembar ${a.lembar.nama}`, `${a.perkiraanBaris} baris data`),
-      type: 'kpi',
-      grid: { x: 0, y: 0, w: 3, h: 2 },
-      kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris' },
-    });
-    for (const k of urutAngka.filter((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama) && ringkasan(k) !== null && ringkasan(k) !== 0).slice(0, 3)) {
+    const kategori = a.kolom
+      .filter((k) => k.jenis === 'teks' && !KOLOM_KODE.test(k.nama))
+      .map((k) => ({ k, beda: new Set(a.data.map((d) => teksSel(d.sel[k.indeks])).filter(Boolean)).size }))
+      .filter((x) => x.beda >= 2 && x.beda <= 120)
+      .sort((x, y) => Number(KOLOM_KATEGORI.test(y.k.nama)) - Number(KOLOM_KATEGORI.test(x.k.nama)) || x.beda - y.beda);
+    const kecil = kategori.find((x) => x.beda <= 6);
+    const besar = kategori.find((x) => x !== kecil && x.beda > 3) ?? kategori.find((x) => x !== kecil);
+
+    // 1. Baris KPI (empat kartu): jumlah transaksi, total dokumen, rata-rata, jumlah pihak.
+    if (jumlahDiketahui)
+      tambah(
+        { title: 'Jumlah Transaksi', subtitle: 'Baris data di dokumen', type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris' } },
+        `${a.perkiraanBaris} baris data`
+      );
+    for (const k of urutAngka.filter((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama) && ringkasan(k) !== null && ringkasan(k) !== 0).slice(0, 2)) {
       const v = ringkasan(k)!;
       const r = uang(k) ? ringkasRupiah(v) : { nilai: v.toLocaleString('id-ID', { maximumFractionDigits: 2 }), satuan: '' };
-      widgets.push({
-        ...dasar(`Total ${k.nama}`, a.total ? 'Baris Total dokumen' : ketBaris, `Total ${k.nama} = ${v}`),
-        type: 'kpi',
-        grid: { x: 0, y: 0, w: 3, h: 2 },
-        kpi: { value: r.nilai, unit: r.satuan },
-      });
+      tambah(
+        { title: `Total ${k.nama}`, subtitle: a.total ? 'Baris Total dokumen' : ketBaris, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan } },
+        `Total ${k.nama} = ${v}`
+      );
+    }
+    const nilaiUtama = nilaiKolom(utama).filter((v) => v !== 0);
+    if (nilaiUtama.length > 0) {
+      const rata = nilaiUtama.reduce((s, v) => s + v, 0) / nilaiUtama.length;
+      const r = rupiah ? ringkasRupiah(rata) : { nilai: rata.toLocaleString('id-ID', { maximumFractionDigits: 2 }), satuan: '' };
+      tambah(
+        { title: `Rata-rata ${utama.nama}`, subtitle: `Per transaksi, ${ketBaris}`, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan } },
+        `rata-rata ${utama.nama}`
+      );
+    }
+    if (besar) {
+      tambah(
+        {
+          title: `Jumlah ${besar.k.nama}`,
+          subtitle: lengkap ? 'Nilai berbeda di dokumen' : `Nilai berbeda, ${ketBaris}`,
+          type: 'kpi',
+          grid: { x: 0, y: 0, w: 3, h: 2 },
+          kpi: { value: besar.beda.toLocaleString('id-ID'), unit: 'pihak' },
+        },
+        `${besar.beda} ${besar.k.nama}`
+      );
     }
 
-    const satuanUtama = uang(utama) ? 'Rp' : '';
     const kelompok = (k: Kolom, ambilKunci: (v: SelNilai) => string | null) => {
       const peta = new Map<string, number>();
       for (const d of a.data) {
@@ -347,35 +406,13 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
       }
       return peta;
     };
+    const seri = (nilai: number[]) => {
+      if (!rupiah) return { data: nilai.map(bulat), unit: '' };
+      const s = skalaRupiah(nilai);
+      return { data: nilai.map((v) => bulat(v / s.bagi)), unit: s.satuan };
+    };
 
-    // 2. Per kategori: kolom teks dengan 2–60 nilai berbeda, nama paling bermakna dulu.
-    const kategori = a.kolom
-      .filter((k) => k.jenis === 'teks' && !KOLOM_KODE.test(k.nama))
-      .map((k) => ({ k, beda: new Set(a.data.map((d) => teksSel(d.sel[k.indeks])).filter(Boolean)).size }))
-      .filter((x) => x.beda >= 2 && x.beda <= 60)
-      .sort((x, y) => Number(KOLOM_KATEGORI.test(y.k.nama)) - Number(KOLOM_KATEGORI.test(x.k.nama)) || x.beda - y.beda);
-    const kecil = kategori.find((x) => x.beda <= 8);
-    const besar = kategori.find((x) => x !== kecil && x.beda > 3) ?? kategori.find((x) => x !== kecil);
-    if (besar) {
-      const peta = [...kelompok(besar.k, (v) => teksSel(v) || null).entries()].sort((x, y) => y[1] - x[1]).slice(0, 10);
-      widgets.push({
-        ...dasar(`${utama.nama} per ${besar.k.nama}`, `10 terbesar, ${ketBaris}`, `${besar.k.nama} vs ${utama.nama}`),
-        type: 'hbar',
-        grid: { x: 0, y: 0, w: 6, h: 4 },
-        chart: { xAxis: peta.map(([l]) => l), series: [{ name: utama.nama, data: peta.map(([, v]) => v) }], unit: satuanUtama },
-      });
-    }
-    if (kecil) {
-      const peta = [...kelompok(kecil.k, (v) => teksSel(v) || null).entries()].sort((x, y) => y[1] - x[1]);
-      widgets.push({
-        ...dasar(`Komposisi ${utama.nama} per ${kecil.k.nama}`, ketBaris, `${kecil.k.nama} vs ${utama.nama}`),
-        type: 'donut',
-        grid: { x: 0, y: 0, w: 6, h: 4 },
-        chart: { xAxis: peta.map(([l]) => l), series: [{ name: utama.nama, data: peta.map(([, v]) => v) }], unit: satuanUtama },
-      });
-    }
-
-    // 3. Per bulan dari kolom tanggal.
+    // 2. Tren per bulan (garis area: deret waktu dibaca kiri ke kanan).
     const kolTanggal = a.kolom.find((k) => k.jenis === 'tanggal');
     if (kolTanggal) {
       const peta = kelompok(kolTanggal, (v) => {
@@ -384,39 +421,90 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
       });
       const urut = [...peta.entries()].sort((x, y) => x[0].localeCompare(y[0])).slice(-24);
       if (urut.length >= 2) {
-        widgets.push({
-          ...dasar(`${utama.nama} per Bulan`, `Menurut ${kolTanggal.nama}, ${ketBaris}`, `${kolTanggal.nama} vs ${utama.nama}`),
-          type: 'bar',
-          grid: { x: 0, y: 0, w: 12, h: 4 },
-          chart: {
-            xAxis: urut.map(([k]) => `${BULAN[Number(k.slice(5)) - 1]} ${k.slice(2, 4)}`),
-            series: [{ name: utama.nama, data: urut.map(([, v]) => v) }],
-            unit: satuanUtama,
+        const s = seri(urut.map(([, v]) => v));
+        tambah(
+          {
+            title: `Tren ${utama.nama} per Bulan`,
+            subtitle: `Menurut ${kolTanggal.nama}${s.unit ? `, ${s.unit}` : ''} · ${ketBaris}`,
+            type: 'area',
+            grid: { x: 0, y: 0, w: 12, h: 4 },
+            chart: {
+              xAxis: urut.map(([k]) => `${BULAN[Number(k.slice(5)) - 1]} ${k.slice(2, 4)}`),
+              series: [{ name: utama.nama, data: s.data }],
+              unit: s.unit,
+              showLegend: false,
+            },
           },
-        });
+          `${kolTanggal.nama} vs ${utama.nama}`
+        );
       }
     }
 
-    // 4. Tabel: baris terbesar menurut kolom utama.
+    // 3. Peringkat 8 terbesar per kategori utama + komposisi kategori kecil.
+    if (besar) {
+      const urut = [...kelompok(besar.k, (v) => teksSel(v) || null).entries()].sort((x, y) => y[1] - x[1]).slice(0, 8);
+      const s = seri(urut.map(([, v]) => v));
+      tambah(
+        {
+          title: `${besar.k.nama} dengan ${utama.nama} Terbesar`,
+          subtitle: `8 teratas${s.unit ? `, ${s.unit}` : ''} · ${ketBaris}`,
+          type: 'hbar',
+          grid: { x: 0, y: 0, w: kecil ? 7 : 12, h: 5 },
+          chart: { xAxis: urut.map(([l]) => pendek(l)), series: [{ name: utama.nama, data: s.data }], unit: s.unit, showLegend: false },
+        },
+        `${besar.k.nama} vs ${utama.nama}`
+      );
+    }
+    if (kecil) {
+      const urut = [...kelompok(kecil.k, (v) => teksSel(v) || null).entries()].sort((x, y) => y[1] - x[1]);
+      const s = seri(urut.map(([, v]) => v));
+      tambah(
+        {
+          title: `Komposisi per ${kecil.k.nama}`,
+          subtitle: `${utama.nama}${s.unit ? `, ${s.unit}` : ''} · ${ketBaris}`,
+          type: 'donut',
+          grid: { x: 0, y: 0, w: besar ? 5 : 12, h: 5 },
+          chart: { xAxis: urut.map(([l]) => pendek(l, 20)), series: [{ name: utama.nama, data: s.data }], unit: s.unit },
+        },
+        `${kecil.k.nama} vs ${utama.nama}`
+      );
+    }
+
+    // 4. Tabel ringkas: 8 transaksi terbesar, angka sudah diskalakan.
     const kolTabel = [besar?.k, kolTanggal, utama].filter((k): k is Kolom => !!k);
-    const teratas = [...a.data].sort((x, y) => (keAngka(y.sel[utama.indeks]) ?? 0) - (keAngka(x.sel[utama.indeks]) ?? 0)).slice(0, 10);
-    widgets.push({
-      ...dasar(`${utama.nama} Terbesar`, `10 baris teratas, ${ketBaris}`, `urut menurut ${utama.nama}`),
-      type: 'table',
-      grid: { x: 0, y: 0, w: 12, h: 5 },
-      table: {
-        columns: kolTabel.map((k, i) => ({ key: `k${i}`, label: k.nama, format: k === utama ? (uang(k) ? 'currency' : 'number') : 'text' })),
-        rows: teratas.map((d) =>
-          Object.fromEntries(
-            kolTabel.map((k, i) => {
-              const v = d.sel[k.indeks];
-              const tgl = k.jenis === 'tanggal' ? tanggalDari(v) : null;
-              return [`k${i}`, k === utama ? keAngka(v) : tgl ? tgl.toISOString().slice(0, 10) : teksSel(v)];
-            })
-          )
-        ),
+    const teratas = [...a.data].sort((x, y) => (keAngka(y.sel[utama.indeks]) ?? 0) - (keAngka(x.sel[utama.indeks]) ?? 0)).slice(0, 8);
+    const sTabel = seri(teratas.map((d) => keAngka(d.sel[utama.indeks]) ?? 0));
+    tambah(
+      {
+        title: `Transaksi ${utama.nama} Terbesar`,
+        subtitle: `8 teratas · ${ketBaris}`,
+        type: 'table',
+        grid: { x: 0, y: 0, w: 12, h: 5 },
+        table: {
+          columns: kolTabel.map((k, i) => ({
+            key: `k${i}`,
+            label: k === utama && sTabel.unit ? `${k.nama} (${sTabel.unit})` : k.nama,
+            format: 'text' as const,
+          })),
+          rows: teratas.map((d, r) =>
+            Object.fromEntries(
+              kolTabel.map((k, i) => {
+                const v = d.sel[k.indeks];
+                const tgl = k.jenis === 'tanggal' ? tanggalDari(v) : null;
+                const isi =
+                  k === utama
+                    ? sTabel.data[r].toLocaleString('id-ID', { maximumFractionDigits: 2 })
+                    : tgl
+                      ? tgl.toISOString().slice(0, 10)
+                      : pendek(teksSel(v), 40);
+                return [`k${i}`, isi];
+              })
+            )
+          ),
+        },
       },
-    });
+      `urut menurut ${utama.nama}`
+    );
   }
-  return { widgets, catatan };
+  return { widgets, catatan, lembar, lembarWidget };
 }

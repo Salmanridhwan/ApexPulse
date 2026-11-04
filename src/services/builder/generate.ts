@@ -167,7 +167,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   if (dokumenTarget && /\.(xlsx|xlsm|xls|csv|ods)$/i.test(dokumenTarget) && options.ambilLembarDokumen) {
     onProgress?.({ id: 'step-2', title: `Membaca tabel dokumen "${dokumenTarget}"...`, status: 'in_progress', estimasiDetik: 90 });
     const sumber = await options.ambilLembarDokumen(dokumenTarget).catch(() => null);
-    const hasilLembar = sumber ? widgetDariSumber(sumber, dokumenTarget, `lbr-${Date.now()}`) : { widgets: [], catatan: [] };
+    const hasilLembar = sumber ? widgetDariSumber(sumber, dokumenTarget, `lbr-${Date.now()}`) : { widgets: [], catatan: [], lembar: [] as string[], lembarWidget: {} as Record<string, number> };
     if (hasilLembar.widgets.length > 0) {
       const asal = sumber!.jenis === 'berkas' ? 'berkas asli di repositori' : 'potongan teks basis dokumen';
       logSummary.push(`[Tabel Dokumen] ${hasilLembar.widgets.length} kartu dari ${asal}.`, ...hasilLembar.catatan.map((c) => `[Tabel Dokumen] ${c}`));
@@ -195,11 +195,12 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
         permintaanJumlah,
         jumlahWidget: widgetsLembar.length,
         jumlahKurang: !!permintaanJumlah && widgetsLembar.length < permintaanJumlah.max,
-        halamanDiminta,
-        halamanBawaan,
+        // Satu lembar spreadsheet = satu halaman dashboard.
+        halamanDiminta: hasilLembar.lembar.map((judul) => ({ judul, butir: [] })),
+        halamanBawaan: false,
         dokumenTarget,
         catatanDokumen: hasilLembar.catatan,
-        halamanWidget: {},
+        halamanWidget: hasilLembar.lembarWidget,
         laporanButir,
       };
     }

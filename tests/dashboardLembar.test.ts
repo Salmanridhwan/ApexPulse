@@ -26,12 +26,17 @@ test('kartu dari potongan: total dari baris Total dokumen, rincian diberi catata
   assert.deepEqual(saldo.kpi, { value: '2,5', unit: 'Rp miliar' });
   // Baris 8 tidak terbaca: 3 dari ±4 baris.
   const perPerusahaan = hasil.widgets.find((w) => w.type === 'hbar')!;
-  assert.match(perPerusahaan.subtitle!, /dari 3 dari ±4 baris terbaca/);
+  assert.match(perPerusahaan.subtitle!, /3 dari ±4 baris terbaca/);
   assert.ok(hasil.widgets.some((w) => w.chart?.xAxis.join() === 'PT Alfa,PT Beta'));
+  // Angka grafik diskalakan: 2,5 miliar + 0,5 miliar -> satuan Rp miliar.
+  assert.equal(perPerusahaan.chart!.unit, 'Rp miliar');
+  // Satu lembar = satu halaman.
+  assert.deepEqual(hasil.lembar, ['Saldo Piutang 2026', 'Aging']);
+  assert.ok(hasil.widgets.every((w) => hasil.lembarWidget[w.id] !== undefined));
   // Umur (hari) tidak dijumlahkan menjadi kartu total.
   assert.ok(!hasil.widgets.some((w) => /Umur/.test(w.title) && w.type === 'kpi'));
   // Lembar Aging tanpa baris Total: tidak ada kartu total, ada catatan.
-  assert.ok(!hasil.widgets.some((w) => w.title.startsWith('Aging') && w.type === 'kpi'));
+  assert.ok(!hasil.widgets.some((w) => hasil.lembarWidget[w.id] === 1 && w.type === 'kpi' && /^Total/.test(w.title)));
   assert.ok(hasil.catatan.some((c) => /Aging/.test(c) && /Total-nya tidak terbaca/.test(c)));
   assert.ok(hasil.widgets.every((w) => w.citations[0].docName === 'Piutang 2026.xlsx'));
 });
@@ -51,9 +56,11 @@ test('berkas asli: semua baris terbaca, total dihitung bila tanpa baris Total', 
   const hasil = widgetDariSumber({ jenis: 'berkas', lembar: lembarDariBerkas(buffer), lengkap: true }, 'Piutang.xlsx', 'b');
   assert.deepEqual(hasil.catatan, []);
   assert.deepEqual(hasil.widgets.find((w) => w.title === 'Total Saldo')!.kpi, { value: '10', unit: 'Rp juta' });
-  const bulan = hasil.widgets.find((w) => w.title === 'Saldo per Bulan')!;
+  const bulan = hasil.widgets.find((w) => w.title === 'Tren Saldo per Bulan')!;
   assert.deepEqual(bulan.chart!.xAxis, ['Jan 26', 'Feb 26']);
-  assert.deepEqual(bulan.chart!.series[0].data, [5000000, 5000000]);
+  assert.equal(bulan.type, 'area');
+  assert.equal(bulan.chart!.unit, 'Rp juta');
+  assert.deepEqual(bulan.chart!.series[0].data, [5, 5]);
 });
 
 test('rupiah besar diringkas', () => {

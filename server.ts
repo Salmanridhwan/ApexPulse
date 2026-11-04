@@ -3191,17 +3191,31 @@ const app = express();
        */
       // Rapat bagian (procurement, outsourcing, ...) tanpa gaya disebut = gaya Korporat seperti deck-nya.
       const desainDiminta = gayaDariPermintaan(prompt) ?? (bagianDariPermintaan(prompt) ? 'korporat' : undefined);
-      const susun = susunDashboardBerhalaman(genResult.dashboard.widgets, {
-        instansi: tenantAktif?.name,
-        judul: genResult.dokumenTarget ? `Dashboard ${namaTanpaEkstensi(genResult.dokumenTarget)}` : undefined,
-        desain: desainDiminta,
-        idAwal: `ast-${Date.now()}`,
-        halamanDiminta: genResult.halamanDiminta,
-        halamanWidget: genResult.halamanWidget,
-        // Semua grafik memakai chart dari menu Template Chart (chartId katalog), supaya
-        // kanvas bisa mengganti satu, beberapa, atau semua chart dengan desain katalog.
-        chartTemplate: true,
-      });
+      const judulDokumen = genResult.dokumenTarget ? `Dashboard ${namaTanpaEkstensi(genResult.dokumenTarget)}` : undefined;
+      const susun =
+        genResult.modeUsed === 'Tabel Dokumen'
+          ? // Tabel dokumen: tiap lembar disusun sendiri menjadi halamannya, supaya
+            // kartu lembar berbeda (judul mirip: "Jumlah Transaksi") tidak dianggap kembar.
+            (() => {
+              const idAwal = `ast-${Date.now()}`;
+              const halaman = genResult.halamanDiminta.flatMap((h, i) => {
+                const milik = genResult.dashboard.widgets.filter((w) => genResult.halamanWidget[w.id] === i);
+                const s = susunDashboardBerhalaman(milik, { desain: desainDiminta, idAwal: `${idAwal}-${i}`, chartTemplate: true });
+                return s.halaman.map((p, j) => ({ ...p, id: `${p.id}-${i}`, judul: s.halaman.length > 1 ? `${h.judul} (${j + 1})` : h.judul }));
+              });
+              return { title: judulDokumen!, halaman, halamanKosong: [] as string[] };
+            })()
+          : susunDashboardBerhalaman(genResult.dashboard.widgets, {
+              instansi: tenantAktif?.name,
+              judul: judulDokumen,
+              desain: desainDiminta,
+              idAwal: `ast-${Date.now()}`,
+              halamanDiminta: genResult.halamanDiminta,
+              halamanWidget: genResult.halamanWidget,
+              // Semua grafik memakai chart dari menu Template Chart (chartId katalog), supaya
+              // kanvas bisa mengganti satu, beberapa, atau semua chart dengan desain katalog.
+              chartTemplate: true,
+            });
       const isiBaru = {
         title: susun.title,
         description: genResult.dashboard.description,
