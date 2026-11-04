@@ -30,6 +30,12 @@ interface DashboardCanvasProps {
    * bisa digeser karena kartu selebar layar tidak mungkin dipaksa muat.
    */
   satuHalaman?: boolean;
+  /** Batas tinggi baris KPI (px). Gaya Korporat memakai kartu KPI ringkas. */
+  tinggiKpiMaks?: number;
+  /** Ruang (px) di bawah kanvas yang dipakai bingkai halaman (mis. kaki Korporat). */
+  cadanganBawah?: number;
+  /** true = tanpa latar & garis bingkai kanvas (kanvas berada di dalam bingkai lain). */
+  polos?: boolean;
 }
 
 /**
@@ -59,6 +65,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   readOnly = false,
   preview = false,
   satuHalaman = false,
+  tinggiKpiMaks,
+  cadanganBawah = 0,
+  polos = false,
 }) => {
   // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -128,7 +137,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       }
       // 8px cadangan supaya pembulatan subpiksel tidak memunculkan gulir.
       setTinggiTersedia(
-        Math.max(0, Math.round(Math.min(batasBawah, window.innerHeight) - atas - padBawah - 8))
+        Math.max(0, Math.round(Math.min(batasBawah, window.innerHeight) - atas - padBawah - cadanganBawah - 8))
       );
     };
     ukur();
@@ -146,7 +155,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       window.removeEventListener('resize', ukur);
       pengamat?.disconnect();
     };
-  }, [satuHalaman, widgets.length]);
+  }, [satuHalaman, widgets.length, cadanganBawah]);
 
   /**
    * Pisahkan KPI dari kartu lain: KPI selalu satu baris tersendiri di atas,
@@ -194,7 +203,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    * supaya TETAP muat satu layar tanpa scroll.
    */
   const tata = pasSatuHalaman
-    ? tataTinggiKanvas(tinggiIsi, widgetsKpi.length > 0, barisLain, JARAK, BARIS_MIN)
+    ? tataTinggiKanvas(tinggiIsi, widgetsKpi.length > 0, barisLain, JARAK, BARIS_MIN, tinggiKpiMaks)
     : { kpi: 0, baris: 0, skala: 1 };
   const tinggiBarisFinal = tata.baris;
   /** Baris KPI dibatasi tingginya supaya kartu angka tidak melar setinggi layar. */
@@ -368,7 +377,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   return (
     <div
       ref={wadahRef}
-      className={`canvas-tegas ${pasSatuHalaman ? 'overflow-hidden' : 'p-4 sm:p-5'}`}
+      className={`${polos ? 'relative' : 'canvas-tegas'} ${pasSatuHalaman ? 'overflow-hidden' : 'p-4 sm:p-5'}`}
       style={pasSatuHalaman ? { height: tinggiTersedia, padding: PADDING } : undefined}
     >
       <div

@@ -120,6 +120,8 @@ export function pilihChart(w: WidgetSpec): { type: WidgetType; chartId?: ChartId
       if (nSeri >= 2) return { type: 'bar', chartId: w.chart?.stacked ? 'bar-tumpuk' : 'bar-tegak' };
       // Deret waktu selalu tegak (kiri ke kanan = maju waktu), berapa pun jumlahnya.
       if (deretWaktu(kategori)) return { type: 'bar', chartId: 'bar-tegak' };
+      // Rentang berurutan ("0–30 hari", "> 180 hari"): urutannya bermakna, jadi tegak tanpa sorotan.
+      if (kategori.length >= 3 && kategori.every((k) => /^(\d+\s*[–-]\s*\d+|[<>≥≤]\s*\d+)/.test(String(k).trim()))) return { type: 'bar', chartId: 'bar-tegak' };
       if (labelPanjang || kategori.length > 8) return { type: 'hbar', chartId: 'bar-mendatar-peringkat' };
       return { type: 'bar', chartId: 'bar-tegak-sorot' };
     default:

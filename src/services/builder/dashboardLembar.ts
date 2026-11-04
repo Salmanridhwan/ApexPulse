@@ -399,14 +399,14 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
     // 1. Baris KPI (empat kartu): jumlah transaksi, total dokumen, rata-rata, jumlah pihak.
     if (jumlahDiketahui)
       tambah(
-        { title: 'Jumlah Transaksi', subtitle: 'Baris data di dokumen', type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris', ...garisJumlah } },
+        { title: 'Jumlah Transaksi', subtitle: 'Baris data di dokumen', type: 'kpi', ikon: 'clipboard', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: a.perkiraanBaris.toLocaleString('id-ID'), unit: 'baris', ...garisJumlah } },
         `${a.perkiraanBaris} baris data`
       );
     for (const k of urutAngka.filter((k) => !KOLOM_TAK_DIJUMLAH.test(k.nama) && ringkasan(k) !== null && ringkasan(k) !== 0).slice(0, 2)) {
       const v = ringkasan(k)!;
       const r = uang(k) ? ringkasRupiah(v) : { nilai: v.toLocaleString('id-ID', { maximumFractionDigits: 2 }), satuan: '' };
       tambah(
-        { title: `Total ${k.nama}`, subtitle: a.total ? 'Baris Total dokumen' : ketBaris, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan, ...(k === utama ? garisKecil : {}) } },
+        { title: `Total ${k.nama}`, subtitle: a.total ? 'Baris Total dokumen' : ketBaris, type: 'kpi', ikon: uang(k) ? 'wallet' : 'activity', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan, ...(k === utama ? garisKecil : {}) } },
         `Total ${k.nama} = ${v}`
       );
     }
@@ -415,7 +415,7 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
       const rata = nilaiUtama.reduce((s, v) => s + v, 0) / nilaiUtama.length;
       const r = rupiah ? ringkasRupiah(rata) : { nilai: rata.toLocaleString('id-ID', { maximumFractionDigits: 2 }), satuan: '' };
       tambah(
-        { title: `Rata-rata ${utama.nama}`, subtitle: `Per transaksi, ${ketBaris}`, type: 'kpi', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan } },
+        { title: `Rata-rata ${utama.nama}`, subtitle: `Per transaksi, ${ketBaris}`, type: 'kpi', ikon: rupiah ? 'coins' : 'gauge', grid: { x: 0, y: 0, w: 3, h: 2 }, kpi: { value: r.nilai, unit: r.satuan } },
         `rata-rata ${utama.nama}`
       );
     }
@@ -425,6 +425,7 @@ export function widgetDariSumber(sumber: SumberLembar, namaDokumen: string, idAw
           title: `Jumlah ${besar.k.nama}`,
           subtitle: lengkap ? 'Nilai berbeda di dokumen' : `Nilai berbeda, ${ketBaris}`,
           type: 'kpi',
+          ikon: 'users',
           grid: { x: 0, y: 0, w: 3, h: 2 },
           kpi: { value: besar.beda.toLocaleString('id-ID'), unit: 'pihak' },
         },

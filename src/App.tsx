@@ -64,6 +64,7 @@ import { WidgetEditorModal } from './components/WidgetEditorModal';
 import { GlobalStyleModal } from './components/GlobalStyleModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman';
+import { BingkaiKorporat } from './components/referensi/BingkaiKorporat';
 import { templateBagianId } from './services/templates/templateBagian';
 import { Login } from './pages/Login';
 import { GantiPasswordWajib } from './components/GantiPasswordWajib';
@@ -1599,10 +1600,18 @@ export default function App() {
                   ) : (
                   /* Dashboard Canvas Grid */
                   <ChartSelectionProvider>
+                  {(() => {
+                  // Gaya Semua Korporat: kanvas dibingkai seperti slide template Rapat
+                  // Manajemen (badge nomor, judul halaman, pita, kaki), KPI ringkas.
+                  const korporat = gayaDashboardAktif?.desain === 'korporat';
+                  const kanvas = (
                   <DashboardCanvas
                     widgets={widgetsTampilInternal}
                     readOnly={filterAktif}
                     satuHalaman
+                    tinggiKpiMaks={korporat ? 112 : undefined}
+                    cadanganBawah={korporat ? 40 : 0}
+                    polos={korporat}
                     onEditWidget={handleEditWidget}
                     onManualCorrection={handleManualCorrection}
                     onDeleteWidget={handleDeleteWidget}
@@ -1614,6 +1623,21 @@ export default function App() {
                       setIsChatOpen(true);
                     }}
                   />
+                  );
+                  if (!korporat) return kanvas;
+                  const nomor = Math.max(1, halamanDashboard.findIndex((h) => h.id === halamanSekarang?.id) + 1);
+                  return (
+                    <BingkaiKorporat
+                      nomor={nomor}
+                      judul={halamanSekarang?.judul || activeDashboard?.title || ''}
+                      sub={halamanDashboard.length > 1 ? activeDashboard?.title : undefined}
+                      kaki={`${activeDashboard?.title ?? ''} · ${new Date(activeDashboard?.updatedAt ?? Date.now()).getFullYear()}`}
+                      gaya={gayaDashboardAktif}
+                    >
+                      {kanvas}
+                    </BingkaiKorporat>
+                  );
+                  })()}
                   </ChartSelectionProvider>
                   )}
                   </div>

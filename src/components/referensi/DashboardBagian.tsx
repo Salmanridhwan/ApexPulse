@@ -7,6 +7,7 @@ import { bingkaiKatalog, gayaKatalogWidget } from '../widgets/bingkaiKatalog';
 import { useThemeMode } from '../../theme';
 import { kartuBerjudulSendiri } from '../../services/chart/dataKatalogWidget';
 import { templateBerdasarkanId } from '../../services/templates/dashboardTemplates';
+import { BingkaiKorporat } from './BingkaiKorporat';
 import { halamanTemplateBagian, nomorHalamanBagian } from '../../services/templates/templateBagian';
 
 /**
@@ -39,7 +40,6 @@ const LEBAR_LG: Record<number, string> = {
 const BARIS = 50;
 
 export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, penuh = false, contoh = false }) => {
-  const mode = useThemeMode();
   const dasar = templateId.split('#')[0];
   const nomor = nomorHalamanBagian(templateId);
   const template = templateBerdasarkanId(dasar);
@@ -47,53 +47,25 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
   const isi = widgets ?? halaman?.widgets ?? [];
   // Desain halaman ikut panel Gaya Semua; tanpa pilihan = Korporat.
   const gayaKartu: WidgetStyle = { ...(gaya ?? {}), desain: gaya?.desain ?? 'korporat' };
-  const { g } = gayaKatalogWidget(gayaKartu, mode);
-  const gelapLatar = g.latar.startsWith('#') && parseInt(g.latar.slice(1, 3), 16) < 90;
-  const tintaBadge = gelapLatar ? g.kartu2 : g.teks;
-
   return (
-    <div
-      className={`relative rounded-card overflow-hidden flex flex-col ${penuh ? 'h-full' : ''}`}
-      style={{ background: g.latarCss ?? g.latar, color: g.teks, fontFamily: g.huruf }}
-      data-testid="halaman-bagian"
+    <BingkaiKorporat
+      nomor={nomor}
+      judul={halaman?.judul ?? template?.nama ?? ''}
+      sub={halaman?.sub}
+      kaki={`${template?.bagian?.unit ?? template?.nama} · 2026`}
+      gaya={gayaKartu}
+      penuh={penuh}
     >
-      {/* Hiasan sudut kanan atas: dua pita miring navy dan oranye seperti slide. */}
-      <div className="pointer-events-none absolute -top-6 right-10 w-24 h-28 -skew-x-[28deg] opacity-90" style={{ backgroundColor: tintaBadge }} />
-      <div className="pointer-events-none absolute -top-6 right-2 w-8 h-28 -skew-x-[28deg]" style={{ backgroundColor: g.aksen2 }} />
-
-      <header className="relative flex items-center gap-3 px-4 sm:px-5 pt-4 pb-3 pr-36">
-        <div className="shrink-0 -skew-x-12 px-3.5 py-1.5" style={{ backgroundColor: tintaBadge, borderBottom: `3px solid ${g.aksen2}` }}>
-          <span className="block skew-x-12 text-lg font-extrabold italic text-white tabular-nums">
-            {String(nomor).padStart(2, '0')}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-extrabold leading-tight tracking-tight truncate">{halaman?.judul ?? template?.nama}</h2>
-          {halaman?.sub && (
-            <p className="text-[12px] sm:text-[13px] leading-snug truncate" style={{ color: g.teks2 }}>
-              {halaman.sub}
-            </p>
-          )}
-        </div>
-      </header>
-
       <div
-        className={`relative grid grid-cols-12 gap-3 px-4 sm:px-5 pb-3 ${penuh ? 'flex-1 min-h-0 overflow-auto gulir-tema' : ''}`}
+        data-testid="halaman-bagian"
+        className={`grid grid-cols-12 gap-3 px-4 sm:px-5 pb-3 ${penuh ? 'h-full overflow-auto gulir-tema' : ''}`}
         style={{ gridAutoRows: `${BARIS}px` }}
       >
         {isi.map((w) => (
           <KartuBagian key={w.id} widget={w} gaya={gayaKartu} contoh={contoh} />
         ))}
       </div>
-
-      <footer
-        className="relative mt-auto flex items-center justify-between gap-3 px-4 sm:px-5 py-2 text-[10px] font-semibold uppercase tracking-wider"
-        style={{ color: g.teks3, borderTop: `1px solid ${g.garis}` }}
-      >
-        <span className="truncate">{template?.bagian?.unit ?? template?.nama} · 2026</span>
-        <span className="shrink-0">Confidential · {nomor}</span>
-      </footer>
-    </div>
+    </BingkaiKorporat>
   );
 };
 

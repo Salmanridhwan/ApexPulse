@@ -98,15 +98,16 @@ export function tataTinggiKanvas(
   adaKpi: boolean,
   barisLain: number,
   jarak: number,
-  barisMin: number
+  barisMin: number,
+  kpiMaks: number = TINGGI_KPI_MAKS
 ): { kpi: number; baris: number; skala: number } {
   if (!adaKpi) {
     const t = tinggiBaris(tinggiIsi, barisLain, jarak, barisMin);
     return { kpi: 0, baris: t.tinggi, skala: t.skala };
   }
-  if (barisLain === 0) return { kpi: Math.min(TINGGI_KPI_MAKS, Math.max(0, tinggiIsi)), baris: 0, skala: 1 };
+  if (barisLain === 0) return { kpi: Math.min(kpiMaks, Math.max(0, tinggiIsi)), baris: 0, skala: 1 };
   const rata = tinggiBaris(tinggiIsi, barisLain + 1, jarak, barisMin);
-  if (rata.tinggi <= TINGGI_KPI_MAKS) return { kpi: rata.tinggi, baris: rata.tinggi, skala: rata.skala };
-  const sisa = tinggiBaris(tinggiIsi - TINGGI_KPI_MAKS - jarak, barisLain, jarak, barisMin);
-  return { kpi: TINGGI_KPI_MAKS, baris: sisa.tinggi, skala: sisa.skala };
+  if (rata.tinggi <= kpiMaks) return { kpi: rata.tinggi, baris: rata.tinggi, skala: rata.skala };
+  const sisa = tinggiBaris(tinggiIsi - kpiMaks - jarak, barisLain, jarak, barisMin);
+  return { kpi: kpiMaks, baris: sisa.tinggi, skala: sisa.skala };
 }
