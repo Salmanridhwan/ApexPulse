@@ -74,6 +74,7 @@ import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
 import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
+import { kumpulkanPotonganLembar, lembarDariBerkas, lembarDariPotongan } from './src/services/builder/dashboardLembar';
 import { bagianDariPermintaan, halamanTemplateBagian } from './src/services/templates/templateBagian';
 import {
   nilaiAnalitikDariWidgets,
@@ -3118,6 +3119,32 @@ const app = express();
         izinkanSnapshotDemo: db.systemConfig.ragProvider !== 'http',
         onProgress,
         ragClient,
+        ambilLembarDokumen: async (namaDokumen) => {
+          // 1. Berkas asli di repositori: semua baris terbaca.
+          try {
+            const { organizationId } = await konteksBerkas(req, session);
+            if (organizationId) {
+              const daftar = await klienKms().daftarBerkas(organizationId);
+              const cocok = daftar.find((b: any) => normalJudul(b?.title || b?.fileName || '') === normalJudul(namaDokumen));
+              if (cocok?.id) {
+                const { isi } = await klienKms().ambilIsiBerkas(String(cocok.id), 'download');
+                return { jenis: 'berkas' as const, lembar: lembarDariBerkas(isi), lengkap: true };
+              }
+            }
+          } catch (err: any) {
+            console.warn('[chat] berkas asli tidak bisa diambil:', err?.message || err);
+          }
+          // 2. Potongan teks basis dokumen.
+          const kb = kbUntukInstansi(tenantAktif, db.systemConfig.ragKnowledgeBaseId) || '';
+          if (!kb) return null;
+          const dok = (await ragClient.daftarDokumen(kb).catch(() => null))?.dokumen.find((d) => d.nama === namaDokumen);
+          const potongan = await kumpulkanPotonganLembar(
+            async (q) => (await ragClient.cariPotongan(kb, q, 50)).potongan.map((p) => ({ docName: p.docName, isi: p.isi })),
+            namaDokumen,
+            { targetPotongan: dok?.potongan }
+          );
+          return potongan.length ? { jenis: 'potongan' as const, lembar: lembarDariPotongan(potongan), lengkap: false } : null;
+        },
       });
 
       // Tidak ada angka sah dari dokumen instansi ini: JANGAN simpan/tampilkan
@@ -3227,10 +3254,13 @@ const app = express();
       let replyText = `Dashboard **"${dashboardTersimpan.title}"** sudah ${activeDash && mintaPerbarui ? 'diperbarui' : 'dibuat'} ${
         genResult.modeUsed === 'Fallback (Template Snapshot)'
           ? 'dari TEMPLATE CONTOH (bukan dokumen instansi)'
-          : 'dari dokumen resmi instansi'
+          : genResult.modeUsed === 'Tabel Dokumen'
+            ? `dari tabel dokumen **${genResult.dokumenTarget}**`
+            : 'dari dokumen resmi instansi'
       }, terbagi dalam **${daftarHalaman.length} halaman**:
 ${isiHalaman}
 \n`;
+      for (const c of genResult.catatanDokumen ?? []) replyText += `ℹ️ ${c}\n\n`;
 
       if (genResult.halamanBawaan && susun.halaman.length > 0) {
         replyText += `Halaman disusun per segmen (satu topik per halaman). Untuk susunan sendiri, tulis daftarnya, mis. "1. Halaman Keuangan – pendapatan, laba, arus kas".
@@ -3285,7 +3315,7 @@ ${kpiItems}
 `;
 
       replyText +=
-        genResult.modeUsed === 'Jalur A (LLM JSON)'
+        genResult.modeUsed === 'Jalur A (LLM JSON)' || genResult.modeUsed === 'Tabel Dokumen'
           ? `Angka diambil dari dokumen instansi ini; sumber tiap kartu bisa dilihat di kartunya.\n`
           : `⚠️ **DATA CONTOH:** dashboard ini berasal dari template demo, bukan dari dokumen instansi ini. Jangan dipakai untuk laporan atau presentasi resmi.\n`;
 

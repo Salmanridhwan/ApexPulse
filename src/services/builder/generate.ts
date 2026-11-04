@@ -6,6 +6,7 @@ import { getFallbackDemoDashboard } from './fallback';
 import { buildWidgetsFromJson } from './fromJson';
 import { rapikanTataLetak } from './tataLetak';
 import { dokumenDariPermintaan } from './dokumenDiminta';
+import { widgetDariSumber, type SumberLembar } from './dashboardLembar';
 import {
   MIN_WIDGET_HALAMAN,
   butirCadangan,
@@ -53,11 +54,18 @@ export interface GenerateOptions {
   ragClient?: RagClient;
   /** Jeda sebelum putaran ulang butir yang kena layanan sibuk (bawaan 5 dtk; tes memakai 0). */
   jedaUlangMs?: number;
+  /**
+   * Isi tabel dokumen spreadsheet yang disebut pengguna: berkas asli dari
+   * repositori bila ada, potongan teks basis dokumen bila tidak. Disediakan
+   * server (butuh repositori + RAG); null = tidak bisa dibaca.
+   */
+  ambilLembarDokumen?: (namaDokumen: string) => Promise<SumberLembar | null>;
 }
 
 /** Cara sebuah dashboard diperoleh — dipakai untuk pesan jujur ke pengguna. */
 export type GenerateMode =
   | 'Jalur A (LLM JSON)'
+  | 'Tabel Dokumen'
   | 'Fallback (Template Snapshot)'
   | 'Gagal (Layanan RAG)'
   | 'Gagal (Dokumen Tidak Memadai)';
@@ -81,6 +89,8 @@ export interface GenerateResult {
   dashboard: Dashboard;
   /** Dokumen yang disebut pengguna ("dari dokumen Piutang 2026"); kartu hanya dari dokumen ini. */
   dokumenTarget?: string;
+  /** Catatan jujur pembacaan tabel dokumen (mis. hanya sebagian baris terbaca). */
+  catatanDokumen?: string[];
   modeUsed: GenerateMode;
   /** false = dashboard TIDAK boleh disimpan/ditampilkan (tidak ada data sah). */
   ok: boolean;
@@ -124,6 +134,7 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
   const permintaanJumlah: PermintaanJumlahWidget | undefined = permintaanJumlahDibaca ?? undefined;
   // Susunan halaman yang ditulis pengguna ("1. Halaman Ringkasan – ... 2. Halaman Keuangan – ...").
   // Tanpa daftar tapi meminta "beberapa halaman": segmentasi bawaan sektornya.
+  const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [], areaSapuanSibuk: 0 };
   const halamanAwal = halamanUntukPermintaan(userPrompt, sector);
   let halamanDiminta = halamanAwal.halaman;
   let halamanBawaan = halamanAwal.bawaan;
@@ -149,8 +160,52 @@ export async function generateDashboard(options: GenerateOptions): Promise<Gener
       halamanBawaan = false;
     }
   }
+
+  // Dokumen spreadsheet: tabelnya dibaca langsung dan kartunya dihitung sendiri.
+  // /extract tidak bisa merangkum tabel besar (uji Piutang 2026: 869 baris,
+  // /extract malah mengambil laporan PDF lain dan dashboard gagal).
+  if (dokumenTarget && /\.(xlsx|xlsm|xls|csv|ods)$/i.test(dokumenTarget) && options.ambilLembarDokumen) {
+    onProgress?.({ id: 'step-2', title: `Membaca tabel dokumen "${dokumenTarget}"...`, status: 'in_progress', estimasiDetik: 90 });
+    const sumber = await options.ambilLembarDokumen(dokumenTarget).catch(() => null);
+    const hasilLembar = sumber ? widgetDariSumber(sumber, dokumenTarget, `lbr-${Date.now()}`) : { widgets: [], catatan: [] };
+    if (hasilLembar.widgets.length > 0) {
+      const asal = sumber!.jenis === 'berkas' ? 'berkas asli di repositori' : 'potongan teks basis dokumen';
+      logSummary.push(`[Tabel Dokumen] ${hasilLembar.widgets.length} kartu dari ${asal}.`, ...hasilLembar.catatan.map((c) => `[Tabel Dokumen] ${c}`));
+      onProgress?.({ id: 'step-2', title: `Tabel dokumen terbaca dari ${asal}`, status: 'completed' });
+      let widgetsLembar = rapikanTataLetak(hasilLembar.widgets);
+      if (permintaanJumlah) widgetsLembar = widgetsLembar.slice(0, permintaanJumlah.max);
+      const sekarang = new Date().toISOString();
+      return {
+        dashboard: {
+          id: `dash-${Date.now()}`,
+          tenantId,
+          title: `Dashboard ${dokumenTarget.replace(/\.[a-z0-9]{2,5}$/i, '')}`,
+          description: `Dihitung langsung dari tabel dokumen "${dokumenTarget}" (${asal}).`,
+          sector,
+          widgets: widgetsLembar,
+          globalFilters: { periode: 'Semua', unitKerja: 'Semua', kategori: 'Semua' },
+          createdAt: sekarang,
+          updatedAt: sekarang,
+        },
+        modeUsed: 'Tabel Dokumen',
+        ok: true,
+        latencyMs: Date.now() - start,
+        citationsCount: widgetsLembar.length,
+        logSummary,
+        permintaanJumlah,
+        jumlahWidget: widgetsLembar.length,
+        jumlahKurang: !!permintaanJumlah && widgetsLembar.length < permintaanJumlah.max,
+        halamanDiminta,
+        halamanBawaan,
+        dokumenTarget,
+        catatanDokumen: hasilLembar.catatan,
+        halamanWidget: {},
+        laporanButir,
+      };
+    }
+    logSummary.push(`[Tabel Dokumen] Tabel "${dokumenTarget}" tidak terbaca; lanjut lewat ekstraksi RAG.`);
+  }
   const halamanWidget: Record<string, number> = {};
-  const laporanButir: LaporanButir = { tidakAda: [], ditolak: [], gagalLayanan: [], areaSapuanSibuk: 0 };
   if (permintaanJumlah) {
     logSummary.push(
       `[Permintaan Jumlah] Pengguna meminta ${labelJumlahWidget(permintaanJumlah)} widget.`

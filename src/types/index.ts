@@ -638,7 +638,7 @@ export interface ChatMessage {
    */
   saran?: SaranChart[];
   affectedWidgetId?: string;
-  modeUsed?: 'Jalur A (LLM JSON)' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
+  modeUsed?: 'Jalur A (LLM JSON)' | 'Tabel Dokumen' | 'Chatbot RAG' | 'Fallback (Template Snapshot)' | 'Gagal (Layanan RAG)' | 'Gagal (Dokumen Tidak Memadai)';
   citationsCount?: number;
   progressSteps?: ProgressStep[];
 }
