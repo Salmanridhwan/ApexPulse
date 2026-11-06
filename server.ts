@@ -56,7 +56,18 @@ import {
   setSecretSesi,
   SessionPayload,
 } from './src/services/auth/session';
-import { AlertRule, BumdSector, ChatMessage, Dashboard, NotificationItem, OrganisasiKMS, ProgressStep, StatusLaporan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
+import { AlertRule, BumdSector, ChatMessage, Dashboard, LampiranPermintaan, NotificationItem, OrganisasiKMS, PermintaanData, ProgressStep, StatusLaporan, StatusPermintaan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
+import {
+  SEMUA_STATUS,
+  bolehMelihat,
+  bolehSuntingIsi,
+  bolehUbahStatus,
+  normalisasiBidang,
+  normalisasiPrioritas,
+  normalisasiTanggal,
+  ringkasPermintaan,
+  validasiPermintaanBaru,
+} from './src/services/permintaan/aturan';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
@@ -3856,10 +3867,335 @@ ${kpiItems}
     });
   });
 
+
+  /* ================= PERMINTAAN DATA (User → Admin Instansi) ================= */
+
+  /** Notifikasi alur permintaan — penerimanya selalu jelas, tidak menyebar ke seisi instansi. */
+  const notifPermintaan = (args: {
+    tenantId: string;
+    judul: string;
+    isi: string;
+    permintaanId: string;
+    untukUserId?: string;
+    untukRole?: 'admin';
+  }) => {
+    const notif: NotificationItem = {
+      id: `notif-${Date.now()}-prm-${Math.random().toString(36).slice(2, 7)}`,
+      tenantId: args.tenantId,
+      title: args.judul,
+      message: args.isi,
+      severity: 'info',
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      sentEmail: false,
+      jenis: 'permintaan',
+      permintaanId: args.permintaanId,
+      untukUserId: args.untukUserId,
+      untukRole: args.untukRole,
+    };
+    db.notifications.unshift(notif);
+    db.simpanNotifikasi(notif);
+  };
+
+  /** Lampiran yang dikirim UI: rujukan ke berkas KMS yang sudah diunggah lebih dulu. */
+  const bacaLampiran = (mentah: unknown): LampiranPermintaan[] => {
+    if (!Array.isArray(mentah)) return [];
+    const bersih: LampiranPermintaan[] = [];
+    for (const item of mentah.slice(0, 20)) {
+      const berkasId = String((item as any)?.berkasId || '').trim();
+      if (!berkasId) continue;
+      if (bersih.some((b) => b.berkasId === berkasId)) continue;
+      bersih.push({
+        berkasId,
+        nama: String((item as any)?.nama || 'Dokumen').trim().slice(0, 200),
+        ukuranKb: Number((item as any)?.ukuranKb) || undefined,
+        tipe: String((item as any)?.tipe || '').trim().slice(0, 40) || undefined,
+        diunggahPada: new Date().toISOString(),
+      });
+    }
+    return bersih;
+  };
+
+  app.get('/api/permintaan/ringkasan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const admin = isAdminRole(session.role);
+    const daftar = db.getPermintaanData(tenantId, admin ? undefined : { pemohonId: session.userId });
+    const perStatus: Record<string, number> = {};
+    for (const s of SEMUA_STATUS) perStatus[s] = 0;
+    for (const p of daftar) perStatus[p.status] = (perStatus[p.status] || 0) + 1;
+    res.json({
+      total: daftar.length,
+      perStatus,
+      perluTindakan: daftar.filter((p) => p.status === 'baru' || p.status === 'perlu_data').length,
+    });
+  });
+
+  app.get('/api/permintaan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const admin = isAdminRole(session.role);
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    if (status && !SEMUA_STATUS.includes(status as StatusPermintaan)) {
+      return res.status(400).json({ error: 'Status permintaan tidak dikenal.' });
+    }
+    const daftar = db.getPermintaanData(tenantId, {
+      status,
+      bidang: typeof req.query.bidang === 'string' ? req.query.bidang : undefined,
+      // User hanya melihat permintaannya sendiri; admin melihat seluruh instansi.
+      pemohonId: admin ? undefined : session.userId,
+    });
+    res.json(daftar.map((p) => ({ ...p, ringkasan: ringkasPermintaan(p) })));
+  });
+
+  app.post('/api/permintaan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const hasil = validasiPermintaanBaru(req.body || {});
+    if (hasil.galat || !hasil.nilai) return res.status(400).json({ error: hasil.galat });
+    const baru = db.createPermintaanData({
+      tenantId,
+      pemohonId: session.userId,
+      pemohonNama: session.name,
+      bidang: hasil.nilai.bidang,
+      dataDiminta: hasil.nilai.dataDiminta,
+      arahDashboard: hasil.nilai.arahDashboard,
+      prioritas: hasil.nilai.prioritas,
+      targetSelesai: hasil.nilai.targetSelesai,
+      lampiran: bacaLampiran(req.body?.lampiran),
+    });
+    notifPermintaan({
+      tenantId,
+      judul: `Permintaan data baru: ${baru.bidang}`,
+      isi: `${baru.pemohonNama} meminta data: ${baru.dataDiminta.slice(0, 140)}${baru.dataDiminta.length > 140 ? '…' : ''}`,
+      permintaanId: baru.id,
+      untukRole: 'admin',
+    });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ajukan Permintaan Data',
+      target: `${baru.bidang} — ${baru.dataDiminta.slice(0, 60)}`,
+      details: `Prioritas ${baru.prioritas}, ${baru.lampiran.length} lampiran`,
+    });
+    res.status(201).json(baru);
+  });
+
+  app.get('/api/permintaan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const permintaan = db.getPermintaanDataById(req.params.id, tenantId);
+    if (!permintaan) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    if (!bolehMelihat(permintaan, session.userId, isAdminRole(session.role))) {
+      return res.status(403).json({ error: 'Permintaan ini bukan milik Anda.' });
+    }
+    res.json({ ...permintaan, ringkasan: ringkasPermintaan(permintaan) });
+  });
+
+  app.patch('/api/permintaan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const permintaan = db.getPermintaanDataById(req.params.id, tenantId);
+    if (!permintaan) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    const admin = isAdminRole(session.role);
+
+    if (!admin) {
+      if (permintaan.pemohonId !== session.userId) {
+        return res.status(403).json({ error: 'Permintaan ini bukan milik Anda.' });
+      }
+      // Periksa niat mengubah status lebih dulu: pesannya harus jujur menyebut
+      // sebab yang sebenarnya, bukan "terkunci" yang membuat pemohon bingung.
+      if (req.body?.status) {
+        return res.status(403).json({ error: 'Status permintaan hanya bisa diubah admin instansi.' });
+      }
+      if (!bolehSuntingIsi(permintaan, session.userId)) {
+        return res.status(409).json({
+          error: 'Permintaan sudah dikerjakan admin, isinya tidak bisa diubah lagi. Tambahkan catatan bila ada data susulan.',
+          kode: 'TERKUNCI',
+        });
+      }
+      const ubah: Partial<PermintaanData> = {};
+      if (req.body?.bidang !== undefined) ubah.bidang = normalisasiBidang(req.body.bidang);
+      if (req.body?.dataDiminta !== undefined) {
+        const teks = String(req.body.dataDiminta || '').trim();
+        if (teks.length < 10) return res.status(400).json({ error: 'Uraian data minimal 10 karakter.' });
+        ubah.dataDiminta = teks.slice(0, 2000);
+      }
+      if (req.body?.arahDashboard !== undefined) {
+        ubah.arahDashboard = String(req.body.arahDashboard || '').trim().slice(0, 2000) || undefined;
+      }
+      if (req.body?.prioritas !== undefined) ubah.prioritas = normalisasiPrioritas(req.body.prioritas);
+      if (req.body?.targetSelesai !== undefined) ubah.targetSelesai = normalisasiTanggal(req.body.targetSelesai);
+      if (req.body?.lampiran !== undefined) {
+        // Lampiran digabung, bukan ditimpa: dokumen lama tetap jadi rujukan admin.
+        const tambahan = bacaLampiran(req.body.lampiran).filter(
+          (b) => !permintaan.lampiran.some((l) => l.berkasId === b.berkasId)
+        );
+        ubah.lampiran = [...permintaan.lampiran, ...tambahan];
+      }
+      const diperbarui = db.updatePermintaanData(permintaan.id, tenantId, ubah);
+      return res.json(diperbarui);
+    }
+
+    // Admin instansi: status, penugasan, alasan penolakan, tautan dashboard hasil.
+    const ubah: Partial<PermintaanData> = {};
+    const statusBaru = req.body?.status as StatusPermintaan | undefined;
+    if (statusBaru !== undefined) {
+      if (!SEMUA_STATUS.includes(statusBaru)) {
+        return res.status(400).json({ error: 'Status permintaan tidak dikenal.' });
+      }
+      if (!bolehUbahStatus(permintaan.status, statusBaru)) {
+        return res.status(409).json({
+          error: `Status ${permintaan.status} tidak bisa langsung menjadi ${statusBaru}.`,
+          kode: 'TRANSISI_TIDAK_SAH',
+        });
+      }
+      const alasan = String(req.body?.alasanPenolakan || permintaan.alasanPenolakan || '').trim();
+      if (statusBaru === 'ditolak' && !alasan) {
+        return res.status(400).json({ error: 'Alasan penolakan wajib diisi supaya pemohon tahu sebabnya.' });
+      }
+      ubah.status = statusBaru;
+      if (statusBaru === 'ditolak') ubah.alasanPenolakan = alasan.slice(0, 500);
+      if (statusBaru === 'selesai') ubah.selesaiPada = new Date().toISOString();
+      if (statusBaru === 'diproses') ubah.ditanganiOleh = session.name;
+    }
+    if (req.body?.prioritas !== undefined) ubah.prioritas = normalisasiPrioritas(req.body.prioritas);
+    if (req.body?.ditanganiOleh !== undefined) {
+      ubah.ditanganiOleh = String(req.body.ditanganiOleh || '').trim().slice(0, 120) || session.name;
+    }
+    if (req.body?.dashboardId !== undefined) {
+      ubah.dashboardId = String(req.body.dashboardId || '').trim() || undefined;
+    }
+    const diperbarui = db.updatePermintaanData(permintaan.id, tenantId, ubah);
+    if (statusBaru && statusBaru !== permintaan.status) {
+      notifPermintaan({
+        tenantId,
+        judul: `Permintaan ${permintaan.bidang} kini ${statusBaru.replace('_', ' ')}`,
+        isi:
+          statusBaru === 'ditolak'
+            ? `Ditolak: ${ubah.alasanPenolakan}`
+            : `Ditangani ${session.name}. ${statusBaru === 'perlu_data' ? 'Ada data yang perlu Anda lengkapi.' : ''}`.trim(),
+        permintaanId: permintaan.id,
+        untukUserId: permintaan.pemohonId,
+      });
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Ubah Status Permintaan Data',
+        target: `${permintaan.bidang} — ${permintaan.pemohonNama}`,
+        details: `${permintaan.status} → ${statusBaru}`,
+      });
+    }
+    res.json(diperbarui);
+  });
+
+  app.post('/api/permintaan/:id/catatan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const permintaan = db.getPermintaanDataById(req.params.id, tenantId);
+    if (!permintaan) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    const admin = isAdminRole(session.role);
+    if (!bolehMelihat(permintaan, session.userId, admin)) {
+      return res.status(403).json({ error: 'Permintaan ini bukan milik Anda.' });
+    }
+    const pesan = String(req.body?.pesan || '').trim();
+    if (!pesan) return res.status(400).json({ error: 'Catatan tidak boleh kosong.' });
+    if (pesan.length > 2000) return res.status(400).json({ error: 'Catatan terlalu panjang (maksimal 2000 karakter).' });
+
+    // Bola berpindah: pemohon melengkapi → kembali ke admin; admin menanggapi → dikerjakan.
+    const patch: Partial<PermintaanData> = {};
+    let memindahkan = false;
+    if (!admin && permintaan.status === 'perlu_data') {
+      patch.status = 'diproses';
+      memindahkan = true;
+    } else if (admin && permintaan.status === 'baru') {
+      patch.status = 'diproses';
+      patch.ditanganiOleh = session.name;
+      memindahkan = true;
+    }
+    const lampiranBaru = bacaLampiran(req.body?.lampiran);
+    if (lampiranBaru.length > 0) {
+      patch.lampiran = [
+        ...permintaan.lampiran,
+        ...lampiranBaru.filter((b) => !permintaan.lampiran.some((l) => l.berkasId === b.berkasId)),
+      ];
+    }
+    const diperbarui = db.tambahCatatanPermintaan(
+      permintaan.id,
+      tenantId,
+      {
+        id: `ctt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        olehUserId: session.userId,
+        olehNama: session.name,
+        olehRole: session.role as UserRole,
+        pesan: pesan.slice(0, 2000),
+        pada: new Date().toISOString(),
+        mengubahStatus: memindahkan,
+      },
+      patch
+    );
+    notifPermintaan({
+      tenantId,
+      judul: `Catatan baru: ${permintaan.bidang}`,
+      isi: `${session.name}: ${pesan.slice(0, 140)}${pesan.length > 140 ? '…' : ''}`,
+      permintaanId: permintaan.id,
+      ...(admin ? { untukUserId: permintaan.pemohonId } : { untukRole: 'admin' as const }),
+    });
+    res.status(201).json(diperbarui);
+  });
+
+  app.delete('/api/permintaan/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const permintaan = db.getPermintaanDataById(req.params.id, tenantId);
+    if (!permintaan) return res.status(404).json({ error: 'Permintaan tidak ditemukan.' });
+    const admin = isAdminRole(session.role);
+    if (!admin) {
+      if (permintaan.pemohonId !== session.userId) {
+        return res.status(403).json({ error: 'Permintaan ini bukan milik Anda.' });
+      }
+      // Setelah admin menyentuh permintaan, penghapusan hanya lewat admin agar jejaknya tetap ada.
+      if (permintaan.status !== 'baru') {
+        return res.status(409).json({ error: 'Permintaan yang sudah diproses tidak bisa dihapus sendiri.' });
+      }
+    }
+    db.deletePermintaanData(permintaan.id, tenantId);
+    // Notifikasi yang menunjuk permintaan ini ikut dibuang supaya lonceng tidak
+    // menyisakan tautan mati.
+    for (const n of db.notifications.filter((x) => x.permintaanId === permintaan.id)) {
+      db.hapusNotifikasi(n.id);
+    }
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Permintaan Data',
+      target: `${permintaan.bidang} — ${permintaan.pemohonNama}`,
+      details: `Status terakhir ${permintaan.status}`,
+    });
+    res.json({ success: true });
+  });
+
   app.get('/api/notifications', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    const notifs = db.notifications.filter((n) => n.tenantId === effectiveTenantId(req, session));
+    const notifs = db.notifications.filter((n) => {
+      if (n.tenantId !== effectiveTenantId(req, session)) return false;
+      // Notifikasi lama (alert) tidak punya penerima → berlaku untuk seisi instansi.
+      if (!n.untukUserId && !n.untukRole) return true;
+      if (n.untukUserId && n.untukUserId === session.userId) return true;
+      if (n.untukRole === 'admin' && isAdminRole(session.role)) return true;
+      return false;
+    });
     res.json(notifs);
   });
 

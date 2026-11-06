@@ -596,6 +596,85 @@ export interface NotificationItem {
   metricValue?: number;
   threshold?: number;
   sentEmail?: boolean;
+  /**
+   * Penerima. Bila keduanya kosong, notifikasi berlaku untuk seluruh instansi
+   * (perilaku lama notifikasi alert). Notifikasi alur permintaan data WAJIB
+   * mengisi salah satunya supaya tidak bocor ke semua orang satu instansi.
+   */
+  untukUserId?: string;
+  untukRole?: UserRole;
+  /** Asal notifikasi: 'alert' (bawaan) atau 'permintaan'. */
+  jenis?: 'alert' | 'permintaan';
+  /** Permintaan data yang memicu notifikasi ini, bila ada. */
+  permintaanId?: string;
+}
+
+/* ================= PERMINTAAN DATA (alur User → Admin Instansi) ================= */
+
+/**
+ * Status permintaan data. Alurnya sengaja sempit supaya tiap perpindahan bisa
+ * dipertanggungjawabkan:
+ *
+ * - `baru`      — pemohon mengirim; admin belum menyentuh.
+ * - `diproses`  — admin mengambil alih (atau pemohon melengkapi data yang diminta).
+ * - `perlu_data`— admin menahan karena dokumen/angka kurang; bola di pemohon.
+ * - `selesai`   — halaman dashboard sudah dibuat; status akhir.
+ * - `ditolak`   — tidak dikerjakan, wajib beralasan; status akhir.
+ */
+export type StatusPermintaan = 'baru' | 'diproses' | 'perlu_data' | 'selesai' | 'ditolak';
+
+/** Bidang permintaan. Enam bidang bawaan; instansi boleh menambah sendiri. */
+export type BidangPermintaan = 'Keuangan' | 'Operasional' | 'Pelayanan' | 'SDM' | 'Kinerja' | 'Umum';
+
+/** Berkas yang menempel pada permintaan (rujukan ke KMS, bukan salinan isi). */
+export interface LampiranPermintaan {
+  /** id berkas di KMS — sumber yang sama dengan menu Referensi. */
+  berkasId: string;
+  nama: string;
+  ukuranKb?: number;
+  tipe?: string;
+  diunggahPada: string;
+}
+
+/** Satu tanggapan pada percakapan permintaan (pemohon maupun admin). */
+export interface CatatanPermintaan {
+  id: string;
+  olehUserId: string;
+  olehNama: string;
+  olehRole: UserRole;
+  pesan: string;
+  pada: string;
+  /** true bila catatan ini yang memindahkan status (mis. melengkapi data). */
+  mengubahStatus?: boolean;
+}
+
+export interface PermintaanData {
+  id: string;
+  tenantId: string;
+  /** Pemohon — selalu User, tetapi disimpan apa adanya bila admin mengajukan. */
+  pemohonId: string;
+  pemohonNama: string;
+  /** Salah satu `BidangPermintaan` atau bidang tambahan buatan instansi. */
+  bidang: string;
+  /** Uraian data yang diminta, bahasa pemohon sendiri. */
+  dataDiminta: string;
+  /** Catatan arah dashboard: mau dibentuk ke arah mana. */
+  arahDashboard?: string;
+  prioritas: 'rendah' | 'normal' | 'tinggi';
+  /** Perkiraan tanggal dibutuhkan (YYYY-MM-DD), bila pemohon mengisi. */
+  targetSelesai?: string;
+  status: StatusPermintaan;
+  lampiran: LampiranPermintaan[];
+  catatan: CatatanPermintaan[];
+  /** Alasan penolakan — wajib saat status `ditolak`. */
+  alasanPenolakan?: string;
+  /** Admin instansi yang menangani. */
+  ditanganiOleh?: string;
+  /** Dashboard hasil, bila sudah dibuat dari permintaan ini. */
+  dashboardId?: string;
+  createdAt: string;
+  updatedAt: string;
+  selesaiPada?: string;
 }
 
 export interface ProgressStep {

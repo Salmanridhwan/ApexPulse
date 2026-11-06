@@ -17,6 +17,7 @@ import {
   KewajibanLapor,
   LaporanPeriodik,
   Risiko,
+  PermintaanData,
   AksiMitigasi,
   Aset,
   PerjanjianKinerja,
@@ -149,6 +150,7 @@ interface PersistedState {
   aset?: Aset[];
   perjanjianKinerja?: PerjanjianKinerja[];
   lkjip?: LKjIP[];
+  permintaanData?: PermintaanData[];
 }
 
 export class InMemoryDb {
@@ -373,6 +375,8 @@ export class InMemoryDb {
   public aset: Aset[] = [];
   public perjanjianKinerja: PerjanjianKinerja[] = [];
   public lkjip: LKjIP[] = [];
+  /** Permintaan data dari User ke Admin Instansi (dikelola per-baris di MySQL). */
+  public permintaanData: PermintaanData[] = [];
 
   /**
    * id instansi yang sudah dihapus admin. Dipakai agar user seed (mis.
@@ -421,6 +425,7 @@ export class InMemoryDb {
       aset: this.aset,
       perjanjianKinerja: this.perjanjianKinerja,
       lkjip: this.lkjip,
+      permintaanData: this.permintaanData,
     };
   }
 
@@ -490,6 +495,7 @@ export class InMemoryDb {
         if (Array.isArray(loaded.aset)) this.aset = loaded.aset;
         if (Array.isArray(loaded.perjanjianKinerja)) this.perjanjianKinerja = loaded.perjanjianKinerja;
         if (Array.isArray(loaded.lkjip)) this.lkjip = loaded.lkjip;
+        if (Array.isArray(loaded.permintaanData)) this.permintaanData = loaded.permintaanData;
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
@@ -755,6 +761,14 @@ export class InMemoryDb {
       } else if (lkTable.length > 0) {
         this.lkjip = lkTable;
       }
+      const permintaanTabel = await this.mysql.loadPermintaanData();
+      if (permintaanTabel.length === 0 && this.permintaanData.length > 0) {
+        for (const p of this.permintaanData) {
+          await this.mysql.upsertPermintaanData(p.id, p.tenantId, p);
+        }
+      } else if (permintaanTabel.length > 0) {
+        this.permintaanData = permintaanTabel;
+      }
     } catch (err: any) {
       console.error('[AionesBoard DB] Sinkron pelaporan gagal:', err?.message || err);
     }
@@ -794,6 +808,8 @@ export class InMemoryDb {
       if (pk.length > 0 || this.perjanjianKinerja.length === 0) this.perjanjianKinerja = pk;
       const lk = await this.mysql.loadLKjIP();
       if (lk.length > 0 || this.lkjip.length === 0) this.lkjip = lk;
+      const permintaan = await this.mysql.loadPermintaanData();
+      if (permintaan.length > 0 || this.permintaanData.length === 0) this.permintaanData = permintaan;
     } catch (err: any) {
       console.error('[AionesBoard DB] segarkanMultiInstance gagal:', err?.message || err);
     }
@@ -992,6 +1008,7 @@ export class InMemoryDb {
       if (Array.isArray(parsed.aset)) this.aset = parsed.aset;
       if (Array.isArray(parsed.perjanjianKinerja)) this.perjanjianKinerja = parsed.perjanjianKinerja;
       if (Array.isArray(parsed.lkjip)) this.lkjip = parsed.lkjip;
+      if (Array.isArray(parsed.permintaanData)) this.permintaanData = parsed.permintaanData;
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Peran lama di berkas cadangan (analis/direksi) → pengguna.
       this.normalisasiPeranLama();
@@ -1149,6 +1166,7 @@ export class InMemoryDb {
         aset: this.aset,
         perjanjianKinerja: this.perjanjianKinerja,
         lkjip: this.lkjip,
+        permintaanData: this.permintaanData,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
@@ -1269,6 +1287,12 @@ export class InMemoryDb {
   /** Simpan satu notifikasi milik instansi (dulu ikut snapshot → hilang antar instance). */
   public simpanNotifikasi(n: NotificationItem): void {
     this.trackWrite(this.mysql?.upsertBaris('notifications', n.id, n));
+  }
+
+  /** Hapus satu notifikasi (dipakai saat permintaan data yang memicunya dihapus). */
+  public hapusNotifikasi(id: string): void {
+    this.notifications = this.notifications.filter((n) => n.id !== id);
+    this.trackWrite(this.mysql?.deleteBaris('notifications', id));
   }
 
   /** Simpan/perbarui satu aturan alert. */
@@ -1643,6 +1667,11 @@ export class InMemoryDb {
     const lkHapus = this.lkjip.filter((l) => l.tenantId === id);
     this.lkjip = this.lkjip.filter((l) => l.tenantId !== id);
     for (const l of lkHapus) this.trackWrite(this.mysql?.deleteLKjIPRow(l.id));
+    // 3j) Permintaan data instansi ini. Lampirannya menunjuk berkas KMS milik
+    // instansi yang sama, jadi tidak ada yang perlu dihapus di sisi KMS di sini.
+    const permintaanHapus = this.permintaanData.filter((p) => p.tenantId === id);
+    this.permintaanData = this.permintaanData.filter((p) => p.tenantId !== id);
+    for (const p of permintaanHapus) this.trackWrite(this.mysql?.deletePermintaanDataRow(p.id));
 
     // 4) Instansinya sendiri: dari memori + tabel khusus MySQL.
     this.tenants = this.tenants.filter((t) => t.id !== id);
@@ -1962,6 +1991,118 @@ export class InMemoryDb {
     if (!ada) return false;
     this.temuanAudit = this.temuanAudit.filter((t) => t.id !== id);
     this.trackWrite(this.mysql?.deleteTemuanAuditRow(id));
+    this.persist();
+    return true;
+  }
+
+  /* ================= PERMINTAAN DATA ================= */
+
+  /**
+   * Daftar permintaan data sebuah instansi. `pemohonId` dipakai server untuk
+   * memaksa User hanya melihat miliknya sendiri; admin tidak mengisinya.
+   */
+  getPermintaanData(
+    tenantId: string,
+    filter?: { status?: string; bidang?: string; pemohonId?: string }
+  ): PermintaanData[] {
+    return this.permintaanData
+      .filter(
+        (p) =>
+          p.tenantId === tenantId &&
+          (!filter?.status || p.status === filter.status) &&
+          (!filter?.bidang || p.bidang === filter.bidang) &&
+          (!filter?.pemohonId || p.pemohonId === filter.pemohonId)
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  getPermintaanDataById(id: string, tenantId: string): PermintaanData | undefined {
+    return this.permintaanData.find((p) => p.id === id && p.tenantId === tenantId);
+  }
+
+  createPermintaanData(
+    data: Omit<PermintaanData, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'lampiran' | 'catatan'> & {
+      status?: PermintaanData['status'];
+      lampiran?: PermintaanData['lampiran'];
+      catatan?: PermintaanData['catatan'];
+    }
+  ): PermintaanData {
+    const now = new Date().toISOString();
+    const baru: PermintaanData = {
+      ...data,
+      status: data.status || 'baru',
+      lampiran: Array.isArray(data.lampiran) ? data.lampiran : [],
+      catatan: Array.isArray(data.catatan) ? data.catatan : [],
+      id: `prm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.permintaanData.push(baru);
+    this.trackWrite(this.mysql?.upsertPermintaanData(baru.id, baru.tenantId, baru));
+    this.persist();
+    return baru;
+  }
+
+  /**
+   * Perbarui permintaan. `catatan` sengaja tidak bisa ditimpa lewat sini —
+   * riwayat tanggapan hanya bertambah lewat `tambahCatatanPermintaan` supaya
+   * tidak ada percakapan yang hilang karena satu PATCH.
+   */
+  updatePermintaanData(
+    id: string,
+    tenantId: string,
+    partial: Partial<PermintaanData>
+  ): PermintaanData | undefined {
+    const idx = this.permintaanData.findIndex((p) => p.id === id && p.tenantId === tenantId);
+    if (idx === -1) return undefined;
+    const lama = this.permintaanData[idx];
+    const digabung: PermintaanData = {
+      ...lama,
+      ...partial,
+      id: lama.id,
+      tenantId: lama.tenantId,
+      pemohonId: lama.pemohonId,
+      catatan: lama.catatan,
+      createdAt: lama.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    this.permintaanData[idx] = digabung;
+    this.trackWrite(this.mysql?.upsertPermintaanData(digabung.id, digabung.tenantId, digabung));
+    this.persist();
+    return digabung;
+  }
+
+  /** Tambah satu tanggapan (append-only) dan kembalikan permintaan terbaru. */
+  tambahCatatanPermintaan(
+    id: string,
+    tenantId: string,
+    catatan: PermintaanData['catatan'][number],
+    patch?: Partial<PermintaanData>
+  ): PermintaanData | undefined {
+    const idx = this.permintaanData.findIndex((p) => p.id === id && p.tenantId === tenantId);
+    if (idx === -1) return undefined;
+    const lama = this.permintaanData[idx];
+    const digabung: PermintaanData = {
+      ...lama,
+      ...(patch || {}),
+      id: lama.id,
+      tenantId: lama.tenantId,
+      pemohonId: lama.pemohonId,
+      catatan: [...lama.catatan, catatan],
+      createdAt: lama.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    this.permintaanData[idx] = digabung;
+    this.trackWrite(this.mysql?.upsertPermintaanData(digabung.id, digabung.tenantId, digabung));
+    this.persist();
+    return digabung;
+  }
+
+  deletePermintaanData(id: string, tenantId: string): boolean {
+    const ada = this.permintaanData.some((p) => p.id === id && p.tenantId === tenantId);
+    if (!ada) return false;
+    this.permintaanData = this.permintaanData.filter((p) => p.id !== id);
+    this.trackWrite(this.mysql?.deletePermintaanDataRow(id));
     this.persist();
     return true;
   }

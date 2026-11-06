@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
+import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, PermintaanData, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 /**
@@ -116,6 +116,7 @@ export interface DbSnapshot {
   aset: Aset[];
   perjanjianKinerja: PerjanjianKinerja[];
   lkjip: LKjIP[];
+  permintaanData: PermintaanData[];
 }
 
 export interface LoadedState {
@@ -141,6 +142,7 @@ export interface LoadedState {
   aset?: Aset[];
   perjanjianKinerja?: PerjanjianKinerja[];
   lkjip?: LKjIP[];
+  permintaanData?: PermintaanData[];
 }
 
 export class MysqlStore {
@@ -344,6 +346,24 @@ export class MysqlStore {
         data JSON NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_temuan_tenant (tenant_id)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel PERMINTAAN DATA, per-baris. Ini alur kerja antar-orang: permintaan
+     * User dan tanggapan Admin Instansi tidak boleh hilang karena snapshot
+     * instance backend lain menimpanya.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS permintaan_data (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'baru',
+        pemohon_id VARCHAR(128) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_permintaan_tenant (tenant_id),
+        INDEX idx_permintaan_status (tenant_id, status)
       ) ENGINE=InnoDB
     `);
 
@@ -602,6 +622,28 @@ export class MysqlStore {
   async deleteTemuanAuditRow(id: string): Promise<void> {
     if (!this.pool) return;
     await this.pool.query('DELETE FROM temuan_audit WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU permintaan data (upsert per-baris). */
+  async upsertPermintaanData(id: string, tenantId: string, data: any): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO permintaan_data (id, tenant_id, status, pemohon_id, data) VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), status = VALUES(status),
+       pemohon_id = VALUES(pemohon_id), data = VALUES(data)`,
+      [id, tenantId, String(data?.status || 'baru'), String(data?.pemohonId || ''), JSON.stringify(data)]
+    );
+  }
+
+  async loadPermintaanData(): Promise<PermintaanData[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM permintaan_data');
+    return uraiDaftar<PermintaanData>(rows as Array<{ data: any }>, 'permintaan_data');
+  }
+
+  async deletePermintaanDataRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM permintaan_data WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU risiko (upsert per-baris). */
@@ -945,6 +987,10 @@ export class MysqlStore {
     const temuanKhusus = await this.loadTemuanAudit();
     if (temuanKhusus.length > 0) hasil.temuanAudit = temuanKhusus;
     else if (arrays.temuanAudit) hasil.temuanAudit = arrays.temuanAudit as TemuanAudit[];
+
+    const permintaanKhusus = await this.loadPermintaanData();
+    if (permintaanKhusus.length > 0) hasil.permintaanData = permintaanKhusus;
+    else if (arrays.permintaanData) hasil.permintaanData = arrays.permintaanData as PermintaanData[];
 
     const keuKhusus = await this.loadSnapshotKeuangan();
     if (keuKhusus.length > 0) hasil.snapshotKeuangan = keuKhusus;

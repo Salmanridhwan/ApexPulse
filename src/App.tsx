@@ -96,6 +96,7 @@ const HALAMAN_SAH = [
   'pk',
   'lkjip',
   'berkas',
+  'permintaan',
   'admin',
 ] as const;
 
@@ -121,6 +122,9 @@ const AlertsPage = React.lazy(() =>
 );
 const PelaporanPage = React.lazy(() =>
   import('./pages/PelaporanPage').then((m) => ({ default: m.PelaporanPage }))
+);
+const PermintaanDataPage = React.lazy(() =>
+  import('./pages/PermintaanDataPage').then((m) => ({ default: m.default }))
 );
 const TindakLanjutAuditPage = React.lazy(() =>
   import('./pages/TindakLanjutAuditPage').then((m) => ({ default: m.TindakLanjutAuditPage }))
@@ -1148,6 +1152,10 @@ export default function App() {
                 setViewMode('berkas');
                 setIsMobileNavOpen(false);
               }}
+              onOpenPermintaan={() => {
+                setViewMode('permintaan');
+                setIsMobileNavOpen(false);
+              }}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
@@ -1214,6 +1222,7 @@ export default function App() {
                       : viewMode === 'pelaporan' ? 'Kinerja & Kepatuhan'
                       : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' ? 'Kinerja & Kepatuhan'
                       : viewMode === 'berkas' ? 'Referensi'
+                      : viewMode === 'permintaan' ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk' : 'Permintaan Data')
                       : 'Workspace'}
                   </span>
                 </div>
@@ -1246,7 +1255,9 @@ export default function App() {
                                             ? 'LKjIP'
                                             : viewMode === 'berkas'
                                               ? 'Repositori Dokumen'
-                                              : 'Template Chart'}
+                                              : viewMode === 'permintaan'
+                                                ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk Permintaan' : 'Permintaan Data')
+                                                : 'Template Chart'}
                   </h1>
                 )}
               </div>
@@ -1411,6 +1422,14 @@ export default function App() {
               ) : viewMode === 'pelaporan' ? (
                 <React.Suspense fallback={pageFallback}>
                   <PelaporanPage
+                    tenantId={currentTenant?.id || 'tenant-pdam'}
+                    peran={currentUser?.role}
+                    onBackToWorkspace={() => setViewMode('workspace')}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'permintaan' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <PermintaanDataPage
                     tenantId={currentTenant?.id || 'tenant-pdam'}
                     peran={currentUser?.role}
                     onBackToWorkspace={() => setViewMode('workspace')}
