@@ -22,7 +22,7 @@ import { AkunMenu } from './AkunMenu';
 import { Dashboard, Tenant, User } from '../types';
 import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
 import { ADMIN_TABS, AdminTabId } from './adminTabs';
-import { isAdminRole } from '../services/auth/peran';
+import { bolehPindahInstansi, isAdminRole } from '../services/auth/peran';
 import { tabUntukPeran } from './adminTabs';
 
 export interface SidebarProps {
@@ -146,10 +146,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> Klien / Instansi</span>
               <span className="text-[9px] font-normal lowercase tracking-normal">{currentTenant?.city || 'BUMD'}</span>
             </div>
-            {/* Kunci ketat 1 akun = 1 BUMD: hanya admin yang boleh berpindah
-                instansi. Non-admin melihat instansinya sebagai label statis,
-                bukan dropdown — supaya tidak ada jalan pindah konteks. */}
-            {isAdminRole(currentUser?.role) ? (
+            {/* Kunci ketat 1 akun = 1 BUMD: hanya Admin Aiones yang mengelola
+                lintas instansi dan boleh berpindah. Admin Instansi memegang satu
+                instansi, jadi ia melihat namanya sebagai label statis — bukan
+                dropdown berisi enam instansi seperti sebelumnya. */}
+            {bolehPindahInstansi(currentUser?.role) ? (
               <div className="relative">
                 <select
                   value={currentTenant?.id || ''}

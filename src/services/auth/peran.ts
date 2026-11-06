@@ -97,3 +97,13 @@ export function normalisasiPeranAkun(peran: unknown): UserRole {
   if (peran === 'superadmin') return 'superadmin';
   return normalisasiPeran(peran);
 }
+/**
+ * Apakah peran ini boleh berpindah instansi (melihat data BUMD lain).
+ *
+ * Hanya Admin Aiones yang mengelola lintas instansi. Admin Instansi memegang
+ * SATU instansi — instansinya sendiri — jadi parameter `tenantId` dari klien
+ * tidak boleh menggeser konteksnya.
+ */
+export function bolehPindahInstansi(role: unknown): boolean {
+  return isSuperadmin(role);
+}

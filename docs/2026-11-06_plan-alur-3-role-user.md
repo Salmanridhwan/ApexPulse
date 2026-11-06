@@ -895,3 +895,21 @@ Menghapus kode saja tidak cukup: `CREATE TABLE IF NOT EXISTS` akan membuat ulang
 `tsc` bersih, **529 tes lulus**, build bersih. Setelah boot ulang: 13 tabel, tidak satu pun dari kesembilan tabel itu kembali. Dashboard tetap 22 dan `/api/dashboards`, `/api/permintaan`, `/api/tenants` menjawab 200.
 
 **Belum dikerjakan:** database **produksi** (`192.168.100.185:3310`) masih memuat tabel yang sama. Pembersihannya perlu izin deploy; skrip cadangan + DROP yang sama bisa dijalankan di sana saat rilis.
+## Koreksi 2026-11-06 (keempat): Admin Instansi dikunci ke satu instansi
+
+Temuan saat uji akun `admin@apexpulse.id`: ia masuk sebagai Admin Instansi PAM JAYA, tetapi sidebar menampilkan dropdown berisi **keenam instansi**, panel adminnya memuat 33 akun lintas BUMD, dan `GET /api/dashboards?tenantId=<instansi lain>` mengembalikan dashboard instansi lain. Penyebabnya satu: `isAdminRole` (yang mencakup `admin` **dan** `superadmin`) dipakai sebagai gerbang "boleh lintas instansi".
+
+Perbaikan: aturan baru `bolehPindahInstansi(role)` = hanya `superadmin`, dipakai di semua gerbang lintas instansi:
+
+| Tempat | Sebelum | Sesudah |
+|---|---|---|
+| `GET /api/tenants` | admin melihat 6 instansi | admin melihat 1 |
+| `effectiveTenantId()` | `?tenantId=` diterima dari admin | diabaikan; hanya superadmin boleh |
+| `GET /api/admin/users` | 33 akun semua instansi | akun instansinya saja |
+| `PATCH`/`DELETE /api/admin/users/:id` | akun instansi lain bisa disunting/dihapus | 403; `tenantId` dibuang dari body |
+| `POST /api/admin/users`, approve join | instansi dari body | instansi si admin |
+| `GET /api/admin/join-requests` | semua pending | pending instansinya |
+| `GET /api/admin/stats` | angka platform (6 instansi, 33 akun) | angka instansinya (1, 9) |
+| Sidebar | dropdown untuk semua admin | dropdown hanya Admin Aiones |
+
+Bukti: dengan `admin@apexpulse.id` — `/api/tenants` 1 instansi, `stats` tenantsCount 1/usersCount 9, `/api/admin/users` 9 akun satu tenant, `?tenantId=` instansi lain tetap mengembalikan 19 dashboard miliknya, sidebar hanya "PAM JAYA". Admin Aiones tetap melihat 6 instansi dan switcher-nya. 530 tes lulus.

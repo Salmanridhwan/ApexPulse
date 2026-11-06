@@ -20,7 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bolehMenyusunDashboard, isAdminRole, isSuperadmin, labelPeran } from '../src/services/auth/peran';
+import { bolehMenyusunDashboard, bolehPindahInstansi, isAdminRole, isSuperadmin, labelPeran } from '../src/services/auth/peran';
 import { LABEL_PERAN, normalisasiPeran, normalisasiPeranAkun } from '../src/services/auth/peran';
 import type { UserRole } from '../src/types';
 
@@ -84,4 +84,15 @@ test('tahap alur laporan tidak pernah memakai superadmin', () => {
   // data alur bertahap `superadmin`, tahap itu tidak boleh dianggap sah karena
   // tidak ada peran yang mencocokinya saat pemeriksaan.
   assert.equal(normalisasiPeran('superadmin'), 'pengguna');
+});
+test('hanya Admin Aiones yang boleh berpindah instansi', () => {
+  // Satu akun Admin Instansi memegang SATU instansi. Dulu `isAdminRole` dipakai
+  // untuk gerbang ini, sehingga Admin Instansi ikut menerima keenam instansi dan
+  // bisa membaca dashboard BUMD lain lewat ?tenantId=... .
+  assert.equal(bolehPindahInstansi('superadmin'), true);
+  assert.equal(bolehPindahInstansi('admin'), false);
+  assert.equal(bolehPindahInstansi('pengguna'), false);
+  assert.equal(bolehPindahInstansi('analis'), false);
+  assert.equal(bolehPindahInstansi(null), false);
+  assert.equal(bolehPindahInstansi(undefined), false);
 });

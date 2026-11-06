@@ -74,7 +74,7 @@ import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
 import { BATAS_AUDIT_BAWAAN, saringAudit } from './src/services/admin/audit';
-import { bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
+import { bolehPindahInstansi, bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
 import { isiSlotTemplate, slotKosong, widgetTerisi } from './src/services/analisis/butirKeSlotTemplate';
 import {
@@ -279,8 +279,11 @@ function butuhPenulis(req: Request, res: Response): SessionPayload | null {
  * karena dialah pengelola seluruh instansi pada instalasi ini.
  */
 function effectiveTenantId(req: Request, session: SessionPayload): string {
-  if (!isAdminRole(session.role)) {
-    // Non-admin: kunci ke instansinya sendiri, titik. Abaikan permintaan pindah.
+  if (!bolehPindahInstansi(session.role)) {
+    // Admin Instansi dan User: kunci ke instansinya sendiri, titik. Parameter
+    // `tenantId` dari klien DIABAIKAN, bukan dipercaya — dulu Admin Instansi bisa
+    // membaca dashboard instansi lain hanya dengan menambahkan ?tenantId=...,
+    // padahal satu akun Admin Instansi hanya memegang satu instansi.
     return session.tenantId;
   }
   const requested = (req.query.tenantId as string) || (req.body?.tenantId as string | undefined);
@@ -872,8 +875,11 @@ const app = express();
     // Segarkan dari tabel khusus dulu supaya instance mana pun melihat daftar
     // instansi yang sama (produksi punya >1 instance backend).
     await db.segarkanTenantDariMysql();
-    // Non-admin hanya boleh melihat instansinya sendiri (kunci ketat 1 akun = 1 BUMD).
-    if (!isAdminRole(session.role)) {
+    // Kunci ketat 1 akun = 1 BUMD. Hanya Admin Aiones (superadmin) yang mengelola
+    // lintas instansi; Admin Instansi dan User selalu menerima satu instansi saja,
+    // yaitu miliknya sendiri. Dulu `isAdminRole` dipakai di sini, sehingga Admin
+    // Instansi ikut menerima keenam instansi dan bisa berpindah konteks.
+    if (!isSuperadmin(session.role)) {
       return res.json(db.tenants.filter((t) => t.id === session.tenantId));
     }
     res.json(db.tenants);
@@ -6051,19 +6057,27 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
-    const totalWidgets = db.dashboards.reduce((acc, d) => acc + semuaWidget(d).length, 0);
-    const totalCitations = db.dashboards.reduce(
+    // Angka panel mengikuti cakupan peran: Admin Aiones melihat seluruh platform,
+    // Admin Instansi hanya instansinya sendiri (dulu ia melihat 6 instansi & 33
+    // akun — angka platform yang bukan miliknya).
+    const lintas = bolehPindahInstansi(session.role);
+    const dashboards = lintas ? db.dashboards : db.dashboards.filter((d) => d.tenantId === session.tenantId);
+    const users = lintas ? db.users : db.users.filter((u) => u.tenantId === session.tenantId);
+    const alertRules = lintas ? db.alertRules : db.alertRules.filter((a) => a.tenantId === session.tenantId);
+    const auditLogs = lintas ? db.auditLogs : db.auditLogs.filter((a) => a.tenantId === session.tenantId);
+    const totalWidgets = dashboards.reduce((acc, d) => acc + semuaWidget(d).length, 0);
+    const totalCitations = dashboards.reduce(
       (acc, d) => acc + semuaWidget(d).reduce((wAcc, w) => wAcc + (w.citations?.length || 0), 0),
       0
     );
     res.json({
-      tenantsCount: db.tenants.length,
-      usersCount: db.users.length,
-      dashboardsCount: db.dashboards.length,
+      tenantsCount: lintas ? db.tenants.length : 1,
+      usersCount: users.length,
+      dashboardsCount: dashboards.length,
       totalWidgets,
       totalCitations,
-      alertRulesCount: db.alertRules.length,
-      auditLogsCount: db.auditLogs.length,
+      alertRulesCount: alertRules.length,
+      auditLogsCount: auditLogs.length,
       ragProvider: db.systemConfig.ragProvider,
     });
   });
@@ -6139,6 +6153,11 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Admin Instansi hanya melihat akun instansinya sendiri. Dulu seluruh akun
+    // (termasuk Admin Aiones dan 20+ akun BUMD lain) ikut terkirim ke panelnya.
+    if (!bolehPindahInstansi(session.role)) {
+      return res.json(db.users.filter((u) => u.tenantId === session.tenantId));
+    }
     res.json(db.users);
   });
 
@@ -6150,9 +6169,11 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
-    // Panel admin bersifat lintas instansi: tanpa `?tenantId=` tampilkan SEMUA
-    // permintaan pending supaya admin tidak perlu berpindah konteks satu per satu.
-    const filterTenant = String(req.query.tenantId || '').trim();
+    // Lintas instansi hanya untuk Admin Aiones. Admin Instansi selalu melihat
+    // permintaan pending instansinya sendiri, apa pun `?tenantId=` yang dikirim.
+    const filterTenant = bolehPindahInstansi(session.role)
+      ? String(req.query.tenantId || '').trim()
+      : session.tenantId;
     const daftar = db.users
       .filter((u) => (u.status || 'active') === 'pending' && (!filterTenant || u.tenantId === filterTenant))
       .sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')))
@@ -6184,10 +6205,11 @@ ${navigasi}
     if (roleDiminta !== undefined && !ROLE_SAH.includes(roleDiminta)) {
       return res.status(400).json({ error: `Peran "${roleDiminta}" tidak dikenal.`, roleSah: ROLE_SAH });
     }
-    const tenantTujuan =
-      String(req.body?.tenantId || '').trim() ||
-      user.requestedTenantId ||
-      user.tenantId;
+    // Admin Instansi hanya mengelola instansinya sendiri: `tenantId` dari klien
+    // diabaikan untuknya, supaya ia tidak bisa menyetujui akun ke BUMD lain.
+    const tenantTujuan = bolehPindahInstansi(session.role)
+      ? String(req.body?.tenantId || '').trim() || user.requestedTenantId || user.tenantId
+      : session.tenantId;
     if (!db.tenants.some((t) => t.id === tenantTujuan)) {
       return res.status(400).json({ error: 'Instansi tujuan tidak dikenal.' });
     }
@@ -6248,7 +6270,10 @@ ${navigasi}
       email,
       name: req.body.name || 'Pengguna BUMD',
       role: req.body.role || 'pengguna',
-      tenantId: req.body.tenantId || 'tenant-pdam',
+      // Admin Instansi selalu membuat akun di instansinya sendiri.
+      tenantId: bolehPindahInstansi(session.role)
+        ? req.body.tenantId || 'tenant-pdam'
+        : session.tenantId,
       avatar: req.body.role === 'admin' ? '👨‍💼' : '👩‍💼',
     };
     // Sandi awal = kata sandi sementara acak per akun (bukan sandi bersama yang
@@ -6297,6 +6322,19 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Admin Instansi hanya mengelola akun instansinya sendiri. Tanpa penjagaan
+    // ini, ia bisa memindahkan akun ke BUMD lain (atau menyunting akun instansi
+    // lain) hanya dengan mengirim `tenantId` di body.
+    const targetUser = db.users.find((u) => u.id === req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
+    }
+    if (!bolehPindahInstansi(session.role)) {
+      if (targetUser.tenantId !== session.tenantId) {
+        return res.status(403).json({ error: 'Akun ini milik instansi lain.' });
+      }
+      delete (req.body as any).tenantId;
+    }
     // Penjagaan akun Admin Aiones terakhir: tanpa ini, satu klik bisa membuat
     // platform tidak punya pengelola sama sekali.
     if (req.body?.role !== undefined && req.body.role !== 'superadmin') {
@@ -6328,6 +6366,10 @@ ${navigasi}
     const cekHapus = bolehTurunkanSuperadmin(db.users, req.params.id);
     if (!cekHapus.boleh) return res.status(409).json({ error: cekHapus.alasan, kode: 'SUPERADMIN_TERAKHIR' });
     const target = db.users.find((u) => u.id === req.params.id);
+    if (!target) return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
+    if (!bolehPindahInstansi(session.role) && target.tenantId !== session.tenantId) {
+      return res.status(403).json({ error: 'Akun ini milik instansi lain.' });
+    }
     const success = db.deleteUser(req.params.id);
     if (!success) {
       return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
