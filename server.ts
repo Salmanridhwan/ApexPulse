@@ -68,6 +68,9 @@ import {
   ringkasPermintaan,
   validasiPermintaanBaru,
 } from './src/services/permintaan/aturan';
+import { KUOTA_ANALISIS_BAWAAN, sisaKuota } from './src/services/analisis/antrean';
+import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/services/analisis/jalankan';
+import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
@@ -4181,6 +4184,259 @@ ${kpiItems}
       action: 'Hapus Permintaan Data',
       target: `${permintaan.bidang} — ${permintaan.pemohonNama}`,
       details: `Status terakhir ${permintaan.status}`,
+    });
+    res.json({ success: true });
+  });
+
+  /* ================= ANALISIS DOKUMEN & BUTIR DATA (Fase 2) ================= */
+
+  /** Kuota analisis instansi ini — dipakai UI untuk memberi tahu sisa hari ini. */
+  app.get('/api/analisis/kuota', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const kuota = (db.systemConfig as any).kuotaAnalisisHarian ?? KUOTA_ANALISIS_BAWAAN;
+    const terpakai = pemakaianHariIni(db.getAnalisisDokumen(tenantId));
+    res.json({ kuota, terpakai, sisa: sisaKuota(terpakai, kuota) });
+  });
+
+  app.get('/api/analisis', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const permintaanId = String(req.query.permintaanId || '').trim() || undefined;
+    let daftar = db.getAnalisisDokumen(tenantId, {
+      permintaanId,
+      status: String(req.query.status || '').trim() || undefined,
+    });
+    // User hanya boleh melihat analisis untuk permintaannya sendiri.
+    if (!isAdminRole(session.role)) {
+      const milikSaya = new Set(
+        db.permintaanData.filter((p) => p.tenantId === tenantId && p.pemohonId === session.userId).map((p) => p.id)
+      );
+      daftar = daftar.filter((a) => a.permintaanId && milikSaya.has(a.permintaanId));
+    }
+    res.json(daftar.map((a) => ({ ...a, butir: undefined })));
+  });
+
+  /**
+   * Jalankan analisis satu dokumen. Sinkron: admin menunggu hasilnya, dan satu
+   * dokumen biasanya selesai di bawah satu menit.
+   */
+  app.post('/api/analisis', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menganalisis dokumen.')) return;
+    const tenantId = effectiveTenantId(req, session);
+
+    const berkasId = String(req.body?.berkasId || '').trim();
+    const judulBerkas = String(req.body?.judulBerkas || '').trim();
+    if (!berkasId || !judulBerkas) {
+      return res.status(400).json({ error: 'berkasId dan judulBerkas wajib diisi.' });
+    }
+
+    const permintaanId = String(req.body?.permintaanId || '').trim() || undefined;
+    const permintaan = permintaanId
+      ? db.permintaanData.find((p) => p.id === permintaanId && p.tenantId === tenantId)
+      : undefined;
+    if (permintaanId && !permintaan) {
+      return res.status(404).json({ error: 'Permintaan tidak ditemukan di instansi ini.' });
+    }
+
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const sector = (permintaan ? tenant?.sector : tenant?.sector) || 'pdam';
+
+    const ekstraktor: Ekstraktor = async ({ prompt }) => {
+      const hasil = await ragClient.query({
+        prompt,
+        sector: sector as BumdSector,
+        instansi: tenant?.name,
+        kbId,
+        mode: 'structured',
+        strictGrounding: true,
+        dokumenTarget: judulBerkas,
+        timeoutMs: 120_000,
+      });
+      const mentah = petakanKeluaranRag(hasil.structuredJson, judulBerkas);
+      const ringkasan =
+        (hasil.structuredJson && (hasil.structuredJson as any).description) || hasil.answer || undefined;
+      return { ringkasan, butir: mentah };
+    };
+
+    const konteks = {
+      tenantId,
+      analisisId: '',
+      berkasId,
+      ...(permintaanId ? { permintaanId } : {}),
+      judulBerkas,
+      bidang: permintaan?.bidang,
+      dataDiminta: permintaan?.dataDiminta,
+      arahDashboard: permintaan?.arahDashboard,
+      instansi: tenant?.name,
+    };
+
+    try {
+      const hasil = await jalankanAnalisis({
+        penyimpanan: db as any,
+        ekstraktor,
+        konteks,
+        abaikanKuota: req.body?.abaikanKuota === true,
+      });
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Analisis Dokumen',
+        target: judulBerkas,
+        details: `Status ${hasil.analisis.status}, ${hasil.butir.length} butir, ${hasil.dibuang} dibuang, sisa kuota ${hasil.sisaKuota}`,
+      });
+      const kode = hasil.analisis.status === 'gagal' ? 422 : 201;
+      return res.status(kode).json({
+        analisis: hasil.analisis,
+        butir: hasil.butir,
+        rekomendasi: hasil.rekomendasi,
+        dibuang: hasil.dibuang,
+        sisaKuota: hasil.sisaKuota,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: jelaskanError(err) });
+    }
+  });
+
+  app.get('/api/analisis/:id/butir', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const analisis = db.getAnalisisDokumenById(req.params.id, tenantId);
+    if (!analisis) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
+    if (!isAdminRole(session.role)) {
+      const milik = analisis.permintaanId
+        ? db.permintaanData.find((p) => p.id === analisis.permintaanId && p.tenantId === tenantId)
+        : undefined;
+      if (!milik || milik.pemohonId !== session.userId) {
+        return res.status(403).json({ error: 'Analisis ini bukan milik Anda.' });
+      }
+    }
+    res.json({
+      analisis,
+      butir: db.getButirData(tenantId, { analisisId: analisis.id }),
+    });
+  });
+
+  app.get('/api/analisis/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const analisis = db.getAnalisisDokumenById(req.params.id, effectiveTenantId(req, session));
+    if (!analisis) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
+    res.json(analisis);
+  });
+
+  /** Setujui / tolak / kembalikan butir ke draf. Hanya admin instansi. */
+  app.patch('/api/analisis/butir/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menyetujui butir data.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const status = String(req.body?.status || '');
+    if (!['draf', 'disetujui', 'ditolak'].includes(status)) {
+      return res.status(400).json({ error: 'Status butir harus draf, disetujui, atau ditolak.' });
+    }
+    const butir = db.butirData.find((b) => b.id === req.params.id && b.tenantId === tenantId);
+    if (!butir) return res.status(404).json({ error: 'Butir tidak ditemukan.' });
+    const diperbarui = db.updateButirData(butir.id, tenantId, { status: status as any });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Status Butir Data',
+      target: butir.nama,
+      details: `Menjadi ${status}`,
+    });
+    res.json(diperbarui);
+  });
+
+  /** Ulangi analisis yang gagal atau tertunda kuota. */
+  app.post('/api/analisis/:id/ulang', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh mengulang analisis.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const lama = db.getAnalisisDokumenById(req.params.id, tenantId);
+    if (!lama) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
+    if (lama.status === 'selesai') {
+      return res.status(409).json({ error: 'Analisis ini sudah selesai. Hapus dulu bila ingin menganalisis ulang.' });
+    }
+
+    const permintaan = lama.permintaanId
+      ? db.permintaanData.find((p) => p.id === lama.permintaanId && p.tenantId === tenantId)
+      : undefined;
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const sector = (tenant?.sector || 'pdam') as BumdSector;
+
+    const ekstraktor: Ekstraktor = async ({ prompt }) => {
+      const hasil = await ragClient.query({
+        prompt,
+        sector,
+        instansi: tenant?.name,
+        kbId,
+        mode: 'structured',
+        strictGrounding: true,
+        dokumenTarget: lama.judulBerkas,
+        timeoutMs: 120_000,
+      });
+      return {
+        ringkasan: (hasil.structuredJson && (hasil.structuredJson as any).description) || hasil.answer || undefined,
+        butir: petakanKeluaranRag(hasil.structuredJson, lama.judulBerkas),
+      };
+    };
+
+    try {
+      const hasil = await jalankanAnalisis({
+        penyimpanan: db as any,
+        ekstraktor,
+        konteks: {
+          tenantId,
+          analisisId: '',
+          berkasId: lama.berkasId,
+          ...(lama.permintaanId ? { permintaanId: lama.permintaanId } : {}),
+          judulBerkas: lama.judulBerkas,
+          bidang: permintaan?.bidang,
+          dataDiminta: permintaan?.dataDiminta,
+          arahDashboard: permintaan?.arahDashboard,
+          instansi: tenant?.name,
+        },
+        abaikanKuota: req.body?.abaikanKuota === true,
+      });
+      if (hasil.analisis.status === 'selesai') db.deleteAnalisisDokumen(lama.id, tenantId);
+      return res.status(hasil.analisis.status === 'gagal' ? 422 : 201).json({
+        analisis: hasil.analisis,
+        butir: hasil.butir,
+        rekomendasi: hasil.rekomendasi,
+        dibuang: hasil.dibuang,
+        sisaKuota: hasil.sisaKuota,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: jelaskanError(err) });
+    }
+  });
+
+  app.delete('/api/analisis/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menghapus analisis.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const ada = db.getAnalisisDokumenById(req.params.id, tenantId);
+    if (!ada) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
+    db.deleteAnalisisDokumen(ada.id, tenantId);
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Hapus Analisis Dokumen',
+      target: ada.judulBerkas,
+      details: `${ada.jumlahButir} butir ikut dihapus`,
     });
     res.json({ success: true });
   });

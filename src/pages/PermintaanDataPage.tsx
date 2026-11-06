@@ -15,6 +15,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import IsiDokumenPanel from '../components/IsiDokumenPanel';
 import type { PermintaanData, StatusPermintaan, UserRole } from '../types';
 import { ItemCard } from '../components/ui/ItemCard';
 import { BIDANG_BAWAAN, LABEL_STATUS, SEMUA_STATUS, ringkasPermintaan } from '../services/permintaan/aturan';
@@ -342,6 +343,9 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
             </div>
           </div>
         )}
+
+        {/* Isi dokumen — hasil serapan AI, template, dan butir data */}
+        <IsiDokumenPanel permintaan={terpilih} admin={admin} />
 
         {/* Percakapan */}
         <div>

@@ -348,6 +348,13 @@ export class InMemoryDb {
     smtpFrom: 'AionesBoard Alert System <alert@aionesboard.id>',
     auditRetentionDays: 90,
     /**
+     * Batas analisis dokumen (RAG) per instansi per hari. Analisis memanggil
+     * model dan memakan token, jadi harus ada pagar — 20 dokumen/hari cukup
+     * untuk unggahan rutin, dan habisnya kuota tidak menghilangkan dokumen
+     * (statusnya `tertunda-kuota`, bukan gagal).
+     */
+    kuotaAnalisisHarian: 20,
+    /**
      * KMS (Knowledge Management System) — repositori berkas & media.
      *
      * Layanan TERPISAH dari RAG query (`ragApiUrl`): KMS yang menyimpan berkas,
