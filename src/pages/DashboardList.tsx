@@ -31,6 +31,12 @@ interface DashboardListProps {
   onOpenChatHistory?: (dashboard: Dashboard) => void;
   /** Jumlah pesan riwayat per dashboardId. */
   chatCounts?: Record<string, number>;
+  /**
+   * Boleh menyusun dashboard? `false` untuk role User: tombol buat, duplikat,
+   * bagikan, dan hapus disembunyikan. Server tetap menolak kalau dipaksa,
+   * jadi ini hanya lapisan kenyamanan, bukan pengaman.
+   */
+  bolehMenulis?: boolean;
 }
 
 export const DashboardList: React.FC<DashboardListProps> = ({
@@ -45,6 +51,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   onBackToWorkspace,
   onOpenChatHistory,
   chatCounts,
+  bolehMenulis = true,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [buatOpen, setBuatOpen] = useState(false);
@@ -115,13 +122,15 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             />
           </div>
 
-          <button
-            onClick={() => setBuatOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs shrink-0 w-full sm:w-auto"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Dashboard Baru
-          </button>
+          {bolehMenulis && (
+            <button
+              onClick={() => setBuatOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs shrink-0 w-full sm:w-auto"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Dashboard Baru
+            </button>
+          )}
         </div>
 
         {/* Dashboard Grid */}
@@ -137,12 +146,14 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                 : 'Belum ada dashboard di kategori ini. Anda dapat membuat dashboard baru atau meminta bantuan asisten AI.'}
             </p>
             <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setBuatOpen(true)}
-                className="px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs"
-              >
-                + Dashboard Baru
-              </button>
+              {bolehMenulis && (
+                <button
+                  onClick={() => setBuatOpen(true)}
+                  className="px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs"
+                >
+                  + Dashboard Baru
+                </button>
+              )}
               <button
                 onClick={onOpenChat}
                 className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
@@ -254,6 +265,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1">
+                      {bolehMenulis && (
+                      <>
                       <button
                         onClick={() => onShareDashboard(dash)}
                         className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
@@ -277,6 +290,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      </>
+                      )}
                     </div>
                   </div>
                 </div>

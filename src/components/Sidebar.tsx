@@ -21,6 +21,7 @@ import { AkunMenu } from './AkunMenu';
 import { Dashboard, Tenant, User } from '../types';
 import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
 import { ADMIN_TABS, AdminTabId } from './adminTabs';
+import { isAdminRole } from '../services/auth/peran';
 
 export interface SidebarProps {
   isCollapsed: boolean;
@@ -163,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Kunci ketat 1 akun = 1 BUMD: hanya admin yang boleh berpindah
                 instansi. Non-admin melihat instansinya sebagai label statis,
                 bukan dropdown — supaya tidak ada jalan pindah konteks. */}
-            {currentUser?.role === 'admin' ? (
+            {isAdminRole(currentUser?.role) ? (
               <div className="relative">
                 <select
                   value={currentTenant?.id || ''}
@@ -374,7 +375,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* GRUP 3: Tata Kelola & Sistem — KHUSUS ADMIN.
             Role pengguna tidak boleh melihat Jejak Audit, dan grup yang isinya
             tinggal satu tombol itu tidak boleh tampil kosong. */}
-        {currentUser?.role === 'admin' && (
+        {isAdminRole(currentUser?.role) && (
         <div>
           {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Sistem & Tata Kelola</div>}
           <div className="space-y-0.5">
@@ -383,7 +384,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <History className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'audit' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
               {!isCollapsed && <span className="flex-1 truncate">Jejak Audit</span>}
             </button>
-            {currentUser?.role === 'admin' && (
+            {isAdminRole(currentUser?.role) && (
               <div>
                 {!isCollapsed && (
                   <div className="px-2 pb-1.5 mt-3 flex items-center justify-between text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">

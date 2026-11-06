@@ -262,6 +262,17 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
 }
 
 /**
+ * Peran yang boleh mengelola data (dashboard, impor, tautan bagikan).
+ *
+ * `superadmin` (Admin Aiones) dan `admin` (Admin Instansi) sama-sama boleh.
+ * `pengguna` (User) hanya boleh mengajukan permintaan data dan mengunggah
+ * dokumen, jadi seluruh endpoint tulis harus memakai `butuhPenulis`.
+ */
+function isAdminRole(role: unknown): boolean {
+  return role === 'admin' || role === 'superadmin';
+}
+
+/**
  * Gerbang admin. Mengembalikan `true` bila boleh lanjut; bila tidak, respons 403
  * sudah dikirim sehingga pemanggil cukup `if (!requireAdmin(...)) return;`.
  *
@@ -269,9 +280,32 @@ function requireAuth(req: Request, res: Response): SessionPayload | null {
  * bisa diaudit dengan satu grep, bukan 41 salinan blok if yang gampang terlewat.
  */
 function requireAdmin(session: SessionPayload, res: Response, pesan = 'Hanya administrator yang boleh melakukan tindakan ini.'): boolean {
-  if (session.role === 'admin') return true;
+  if (isAdminRole(session.role)) return true;
   res.status(403).json({ error: pesan });
   return false;
+}
+
+/**
+ * Gerbang tulis untuk data dashboard. Dipakai endpoint yang MENGUBAH data:
+ * buat/ubah/hapus dashboard, halaman, duplikat, presentasi, impor, tautan
+ * bagikan, dan penyegaran template.
+ *
+ * Pesannya menyebut jalan keluar, bukan hanya melarang: pengguna yang mencoba
+ * membuat dashboard diarahkan ke menu Permintaan Data.
+ */
+function butuhPenulis(req: Request, res: Response): SessionPayload | null {
+  const session = requireAuth(req, res);
+  if (!session) return null;
+  if (
+    !requireAdmin(
+      session,
+      res,
+      'Menyusun dashboard hanya bisa dilakukan admin instansi. Ajukan permintaan data lewat menu Permintaan Data.'
+    )
+  ) {
+    return null;
+  }
+  return session;
 }
 
 /**
@@ -285,7 +319,7 @@ function requireAdmin(session: SessionPayload, res: Response, pesan = 'Hanya adm
  * karena dialah pengelola seluruh instansi pada instalasi ini.
  */
 function effectiveTenantId(req: Request, session: SessionPayload): string {
-  if (session.role !== 'admin') {
+  if (!isAdminRole(session.role)) {
     // Non-admin: kunci ke instansinya sendiri, titik. Abaikan permintaan pindah.
     return session.tenantId;
   }
@@ -879,7 +913,7 @@ const app = express();
     // instansi yang sama (produksi punya >1 instance backend).
     await db.segarkanTenantDariMysql();
     // Non-admin hanya boleh melihat instansinya sendiri (kunci ketat 1 akun = 1 BUMD).
-    if (session.role !== 'admin') {
+    if (!isAdminRole(session.role)) {
       return res.json(db.tenants.filter((t) => t.id === session.tenantId));
     }
     res.json(db.tenants);
@@ -1428,7 +1462,7 @@ const app = express();
   });
 
   app.post('/api/dashboards', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const newDash: Dashboard = {
@@ -1462,7 +1496,7 @@ const app = express();
   });
 
   app.patch('/api/dashboards/:id', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const updated = db.updateDashboard(req.params.id, req.body, tenantId);
@@ -1488,7 +1522,7 @@ const app = express();
    * SSE: mengirim progres per widget agar UI menampilkan kemajuan.
    */
   app.post('/api/dashboards/:id/presentasi', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
@@ -1753,7 +1787,7 @@ const app = express();
    * baru, dan pengguna tidak perlu menunggu penanda versi bergeser sendiri.
    */
   app.post('/api/templates/segarkan', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const tenant = db.tenants.find((t) => t.id === tenantId);
@@ -1792,7 +1826,7 @@ const app = express();
   });
 
   app.post('/api/dashboards/dari-template', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
 
     const tenantId = effectiveTenantId(req, session);
@@ -1972,7 +2006,7 @@ const app = express();
    * tahu dengan kalimat biasa (tanpa istilah teknis).
    */
   app.post('/api/dashboards/:id/widget-dari-saran', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
 
     const tenantId = effectiveTenantId(req, session);
@@ -2061,7 +2095,7 @@ const app = express();
   });
 
   app.delete('/api/dashboards/:id', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const success = db.deleteDashboard(req.params.id, tenantId);
@@ -2090,7 +2124,7 @@ const app = express();
    * ini, hanya isinya yang berbeda.
    */
   app.post('/api/dashboards/:id/halaman', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
 
     const tenantId = effectiveTenantId(req, session);
@@ -2157,7 +2191,7 @@ const app = express();
   });
 
   app.post('/api/dashboards/:id/duplicate', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const dup = db.duplicateDashboard(req.params.id, effectiveTenantId(req, session));
     if (!dup) {
@@ -2503,6 +2537,21 @@ const app = express();
         catatPesanUser();
         pesanBaru(msg);
       };
+
+      // Role User tidak menyusun dashboard. Kalau niatnya membuat atau menambah
+      // widget, jawab dengan ARAHAN (bukan 403): user perlu tahu jalan keluarnya,
+      // yaitu mengajukan permintaan data dan membiarkan admin instansi menyusun
+      // halamannya. Pertanyaan biasa tetap dilayani seperti sekarang.
+      if (!isAdminRole(session.role) && (niatBuatDashboard(prompt) || niatTambahWidget(prompt))) {
+        const pesan =
+          'Penyusunan dashboard dilakukan admin instansi. Ajukan permintaan data lewat menu Permintaan Data: ' +
+          'sebutkan bidang, data yang Anda minta, dan arah dashboard yang diinginkan. Dokumen pendukung bisa ' +
+          'Anda unggah pada permintaan itu, lalu admin instansi yang menyusun halamannya.';
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'arahan_permintaan', modeUsed: 'Chatbot RAG' });
+        sendEvent('result', { actionTaken: 'arahan_permintaan', message: pesan, modeUsed: 'Chatbot RAG' });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
 
       // Case 0a-0: pengguna menanyakan ISI REPOSITORI ("ada berapa dokumen?",
       // "dokumen apa saja?"). Model bahasa hanya melihat potongan teks yang
@@ -5123,7 +5172,7 @@ ${kpiItems}
     const session = requireAuth(req, res);
     if (!session) return;
     const { tenant, organizationId, otomatis, projectKms } = await konteksBerkas(req, session);
-    const cakupanAll = session.role === 'admin' && String(req.query.cakupan || '') === 'all';
+    const cakupanAll = isAdminRole(session.role) && String(req.query.cakupan || '') === 'all';
     const org = cakupanAll ? 'all' : organizationId;
 
     if (!org) {
@@ -5529,7 +5578,7 @@ ${navigasi}
   app.post('/api/admin/tenants/:id/kms-hubungkan', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (session.role !== 'admin') {
+    if (!isAdminRole(session.role)) {
       return res.status(403).json({ error: 'Hanya administrator yang boleh menghubungkan instansi ke KMS.' });
     }
     const tenant = db.tenants.find((t) => t.id === req.params.id);
@@ -5762,7 +5811,7 @@ ${navigasi}
    * Angka yang tidak bisa dibaca dengan pasti TIDAK ditebak (lihat `keAngka`).
    */
   app.post('/api/impor/pratinjau', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const isiB64 = typeof req.body?.isi === 'string' ? req.body.isi : '';
     if (!isiB64) return res.status(400).json({ error: 'Berkas belum dikirim.' });
@@ -5795,7 +5844,7 @@ ${navigasi}
    * tidak menambah jalur tulis baru.
    */
   app.post('/api/impor/widget', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const isiB64 = typeof req.body?.isi === 'string' ? req.body.isi : '';
     if (!isiB64) return res.status(400).json({ error: 'Berkas belum dikirim.' });
@@ -5933,7 +5982,7 @@ ${navigasi}
   };
 
   app.post('/api/dashboards/:id/share', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const dash = db.getDashboardById(req.params.id, effectiveTenantId(req, session));
     if (!dash) {
@@ -6004,7 +6053,7 @@ ${navigasi}
 
   /** Cabut tautan bagikan: tautan langsung tidak bisa dipakai lagi (410). */
   app.delete('/api/share/:token', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const token = req.params.token;
     const meta: any = db.shareTokens[token];
@@ -6206,7 +6255,7 @@ ${navigasi}
     if (!session) return;
     // Jejak audit memuat tindakan seluruh pengguna instansi. Menyembunyikan
     // menunya saja tidak cukup: role pengguna juga tidak boleh membaca datanya.
-    if (session.role !== 'admin') {
+    if (!isAdminRole(session.role)) {
       return res.status(403).json({ error: 'Jejak audit hanya untuk administrator.' });
     }
     const logs = db.auditLogs.filter((l) => l.tenantId === effectiveTenantId(req, session));

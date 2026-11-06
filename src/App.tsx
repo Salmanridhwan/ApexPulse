@@ -37,6 +37,7 @@ import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
+import { isAdminRole } from './services/auth/peran';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
 import { MENU_KINERJA, menuTampil } from './components/menuKinerja';
 import {
@@ -392,7 +393,7 @@ export default function App() {
       setCurrentTenant(assigned);
     }
     // Role admin langsung masuk panel admin, tidak lewat workspace.
-    if (user.role === 'admin') {
+    if (isAdminRole(user.role)) {
       setViewMode('admin');
     }
   };
@@ -1330,7 +1331,7 @@ export default function App() {
         <div className={`flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto transition-[padding] duration-200 ${
           isChatOpen || isGlobalStyleOpen ? 'lg:pr-[440px]' : ''
         }`}>
-          {viewMode === 'admin' && currentUser?.role === 'admin' ? (
+          {viewMode === 'admin' && isAdminRole(currentUser?.role) ? (
             <React.Suspense fallback={pageFallback}>
               <Admin
                 currentUser={currentUser}
@@ -1379,9 +1380,10 @@ export default function App() {
                       setIsChatOpen(true);
                     }}
                     onBackToWorkspace={() => setViewMode('workspace')}
+                    bolehMenulis={isAdminRole(currentUser?.role)}
                   />
                 </React.Suspense>
-              ) : viewMode === 'audit' && currentUser?.role === 'admin' ? (
+              ) : viewMode === 'audit' && isAdminRole(currentUser?.role) ? (
                 <React.Suspense fallback={pageFallback}>
                   <AuditLogPage
                     tenantId={currentTenant?.id || 'tenant-pdam'}

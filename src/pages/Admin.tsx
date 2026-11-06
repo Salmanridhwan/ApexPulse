@@ -1,3 +1,4 @@
+import { isAdminRole, labelPeran } from '../services/auth/peran';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -1475,12 +1476,12 @@ export const Admin: React.FC<AdminProps> = ({
                           <td className="p-3 text-ink-2">{u.email}</td>
                           <td className="p-3">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'admin'
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${isAdminRole(u.role)
                                   ? 'bg-brand/15 text-brand-ink border border-brand/30'
                                   : 'bg-surface-2 text-ink'
                                 }`}
                             >
-                              {u.role === 'admin' ? 'Administrator' : 'Pengguna'}
+                              {labelPeran(u.role)}
                             </span>
                           </td>
                           <td className="p-3">

@@ -33,8 +33,9 @@ export const ALUR_BAWAAN: TahapAlur[] = [
 
 /** Label manusiawi peran. */
 export const LABEL_PERAN: Record<UserRole, string> = {
-  admin: 'Admin',
-  pengguna: 'Pengguna',
+  superadmin: 'Admin Aiones',
+  admin: 'Admin Instansi',
+  pengguna: 'User',
 };
 
 /**
@@ -46,6 +47,20 @@ export const LABEL_PERAN: Record<UserRole, string> = {
  */
 export function normalisasiPeran(peran: unknown): UserRole {
   return peran === 'admin' ? 'admin' : 'pengguna';
+}
+
+/**
+ * Normalisasi peran AKUN (bukan tahap alur).
+ *
+ * Berbeda dari `normalisasiPeran` yang hanya mengenal `admin`/`pengguna`:
+ * `superadmin` harus dipertahankan, sebab kalau tidak, akun Admin Aiones akan
+ * turun jadi `pengguna` setiap kali state dimuat ulang dari MySQL atau
+ * `data/db.json`. Tahap alur verifikasi tetap memakai `normalisasiPeran` karena
+ * alur laporan tidak punya tahap khusus superadmin.
+ */
+export function normalisasiPeranAkun(peran: unknown): UserRole {
+  if (peran === 'superadmin') return 'superadmin';
+  return normalisasiPeran(peran);
 }
 
 /**

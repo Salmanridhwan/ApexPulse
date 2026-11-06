@@ -4,6 +4,7 @@ import { BookOpen, Building2, ChevronsUpDown, KeyRound, LogOut, Mail, Moon, Sun,
 import type { Tenant, User } from '../types';
 import { AvatarTile } from './BrandMark';
 import { GantiPasswordWajib } from './GantiPasswordWajib';
+import { labelPeran } from '../services/auth/peran';
 import { applyTheme, EVENT_TEMA, getInitialTheme, type ThemeMode } from '../theme';
 
 /**
@@ -51,7 +52,7 @@ export const AkunMenu: React.FC<Props> = ({ user, tenant, ciut, onLogout }) => {
   const tombolRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const peran = user?.role === 'admin' ? 'Admin' : 'Pengguna';
+  const peran = labelPeran(user?.role);
   const sub = tenant?.name ? `${peran} · ${tenant.name}` : peran;
   const akunGoogle = Boolean(user?.viaGoogle || user?.googleSub);
 

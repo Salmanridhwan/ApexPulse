@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { randomBytes } from 'crypto';
 import { DbSnapshot, MysqlStore } from './mysqlStore';
 import { daftarBerubah, gabungKonfig, kunciKonfigBerubah } from './sinkronKonfig';
 import path from 'path';
@@ -31,7 +32,7 @@ import {
 import { hashPassword, verifyPassword } from '../auth/session';
 import { SANDI_ADMIN_BAWAAN } from '../auth/password';
 import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
-import { normalisasiPeran } from '../laporan/alur';
+import { normalisasiPeran, normalisasiPeranAkun } from '../laporan/alur';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
@@ -94,6 +95,24 @@ const SEED_USERS: SafeUser[] = [
     avatar: '',
   },
 ];
+
+/**
+ * Akun demo Admin Aiones (pihak kita).
+ *
+ * SENGAJA tidak dimasukkan ke `SEED_USERS`: `ensureSeedUsers` menyetel ulang
+ * sandi semua akun seed ke sandi demo yang diketahui dan menghapus tanda
+ * `mustChangePassword`. Untuk akun pemilik platform, sandi harus acak, hanya
+ * dicetak sekali saat dibuat, dan wajib diganti saat login pertama. Karena itu
+ * akun ini punya jalur sendiri: `ensureSuperadminDemo`.
+ */
+const SUPERADMIN_DEMO: SafeUser = {
+  id: 'user-superadmin',
+  email: 'admin.aiones@aionesboard.id',
+  name: 'Admin Aiones (Demo)',
+  role: 'superadmin',
+  tenantId: 'tenant-pdam',
+  avatar: '',
+};
 
 /** Password seed khusus per userId (selain default DEMO_PASSWORD). */
 const SEED_PASSWORDS: Record<string, string> = {
@@ -812,7 +831,9 @@ export class InMemoryDb {
   private normalisasiPeranLama(): void {
     let berubah = false;
     for (const u of this.users) {
-      const peran = normalisasiPeran(u.role);
+      // `normalisasiPeranAkun`, bukan `normalisasiPeran`: peran `superadmin`
+      // harus bertahan saat state dimuat ulang (lihat catatan di alur.ts).
+      const peran = normalisasiPeranAkun(u.role);
       if (u.role !== peran) {
         u.role = peran;
         berubah = true;
@@ -861,15 +882,59 @@ export class InMemoryDb {
         berubah = true;
       }
     }
-    // Kewajiban ganti sandi sudah dihapus: bersihkan tanda lama agar layar
-    // "wajib ganti sandi" tidak muncul lagi pada akun yang dibuat sebelumnya.
+    // Tanda "wajib ganti sandi" hanya dibersihkan untuk akun seed lama.
+    // Akun Admin Aiones justru WAJIB mengganti sandi saat login pertama, jadi
+    // tandanya tidak boleh ikut dibersihkan di sini.
+    const idSeed = new Set(SEED_USERS.map((u) => u.id));
     for (const u of this.users) {
-      if (u.mustChangePassword) {
+      if (u.mustChangePassword && idSeed.has(u.id)) {
         u.mustChangePassword = false;
         berubah = true;
       }
     }
+    if (this.ensureSuperadminDemo()) berubah = true;
     if (berubah) this.persist();
+  }
+
+  /**
+   * Pastikan akun demo Admin Aiones ada.
+   *
+   * Dibuat SEKALI: sandi acak 20 karakter, hash scrypt, dicetak sekali ke log
+   * server, dan `mustChangePassword` menyala. Kalau akun sudah ada, sandi tidak
+   * pernah disetel ulang — supaya sandi yang sudah diganti pemilik tidak
+   * kembali menjadi nilai acak setiap restart.
+   *
+   * @returns true bila state berubah sehingga perlu disimpan.
+   */
+  private ensureSuperadminDemo(): boolean {
+    if (this.deletedTenantIds.includes(SUPERADMIN_DEMO.tenantId)) return false;
+    const ada = this.users.find((u) => u.id === SUPERADMIN_DEMO.id);
+    if (ada) {
+      // Jaga peran tetap superadmin walau ada data lama yang menurunkannya.
+      if (ada.role !== 'superadmin') {
+        ada.role = 'superadmin';
+        return true;
+      }
+      return false;
+    }
+    const sandi = randomBytes(15).toString('base64url');
+    this.users.push({ ...SUPERADMIN_DEMO, mustChangePassword: true });
+    this.credentials[SUPERADMIN_DEMO.id] = hashPassword(sandi);
+    console.log(
+      [
+        '',
+        '='.repeat(64),
+        'AKUN DEMO ADMIN AIONES DIBUAT (ditampilkan sekali saja)',
+        `  email : ${SUPERADMIN_DEMO.email}`,
+        `  sandi : ${sandi}`,
+        '  Wajib diganti saat login pertama.',
+        '  Sandi ini tidak disimpan di repo, dokumen, atau percakapan.',
+        '  Kalau hilang, pakai menu lupa sandi.',
+        '='.repeat(64),
+        '',
+      ].join('\n')
+    );
+    return true;
   }
 
   /**

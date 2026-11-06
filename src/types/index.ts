@@ -3,12 +3,18 @@ export type BumdSector = 'pdam' | 'pasar' | 'bank' | 'rsud' | 'transportasi' | '
 /**
  * Peran pengguna aplikasi.
  *
- * Hanya dua peran: `admin` (pengelola instalasi — akses penuh tata kelola) dan
- * `pengguna` (gabungan hak analis + direksi lama: pekerjaan operasional,
- * verifikasi laporan, dan persetujuan). Peran `analis`/`direksi` sudah
- * dihapus; data lama dinormalkan ke `pengguna` oleh `normalisasiPeran`.
+ * Tiga peran:
+ * - `superadmin` — Admin Aiones (pihak pengelola platform): lintas instansi,
+ *   konfigurasi RAG/KMS, akun admin instansi, audit lintas instansi.
+ * - `admin` — Admin Instansi (pihak konsumen): mengelola dashboard instansinya,
+ *   menerima permintaan data dari `pengguna`, menyusun halaman.
+ * - `pengguna` — User: mengajukan permintaan data, mengunggah dokumen, menulis
+ *   catatan arah. TIDAK boleh membuat atau menghapus dashboard.
+ *
+ * Peran `analis`/`direksi` sudah dihapus; data lama dinormalkan ke `pengguna`
+ * oleh `normalisasiPeran`.
  */
-export type UserRole = 'admin' | 'pengguna';
+export type UserRole = 'superadmin' | 'admin' | 'pengguna';
 
 export interface Tenant {
   id: string;
@@ -630,7 +636,7 @@ export interface ChatMessage {
   sender: 'user' | 'system';
   text: string;
   timestamp: string;
-  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error' | 'saran_chart' | 'daftar_dokumen';
+  actionTaken?: 'create_dashboard' | 'update_widget' | 'remove_widget' | 'add_widget' | 'filter' | 'none' | 'qa_answer' | 'no_source' | 'no_kb' | 'rag_error' | 'saran_chart' | 'daftar_dokumen' | 'arahan_permintaan';
   /**
    * Pilihan tampilan chart yang ditawarkan asisten. Pengguna melihat pratinjau
    * bentuknya, lalu menekan Oke untuk menambahkannya ke kanvas (angkanya baru
