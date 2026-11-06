@@ -669,6 +669,21 @@ Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKe
 | `butirKeSlotTemplate.ts` | belum — menunggu UI pemilihan template |
 | UI pemilihan butir ("Katalog Data") | belum — endpoint sudah siap, layarnya belum ada |
 
+
+**Koreksi 2026-11-06 (setelah uji coba di browser):** tombol "Sempurnakan halaman" DIHAPUS.
+
+Tombol itu membuat dua pintu ke asisten yang sama, dan admin harus ingat sedang di pintu mana.
+Yang benar: asisten selalu membaca konteks halaman (judul, daftar kartu, butir disetujui), lalu
+membedakan sendiri kalimat pertanyaan dari permintaan mengubah halaman.
+
+- `niatUbahHalaman(pesan)` — deteksi deterministik tanpa model (`src/services/analisis/niatUbahHalaman.ts`).
+  Kata tanya di awal kalimat menang atas kata kerja ("berapa kartu yang perlu ditambah?" = pertanyaan),
+  kecuali kalimatnya menyuruh ("tolong tambahkan grafik, berapa lama?" = perintah).
+  "buat dashboard baru" dan "tambahan data" dikecualikan.
+- Permintaan perubahan → `POST /api/usulan/dari-chat` → kartu usulan + Terapkan.
+- Pertanyaan → `POST /api/chat` seperti biasa.
+- Pagar "usulan dulu, baru Terapkan" TETAP: yang dibuang tombol modenya, bukan pengamannya.
+
 **Status Fase 4 (commit):**
 
 | Bagian | Keadaan |

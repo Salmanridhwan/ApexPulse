@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import type { UsulanHalaman } from '../types';
+import { niatUbahHalaman } from '../services/analisis/niatUbahHalaman';
 import { BumdSector, ChatMessage, Dashboard, ProgressStep, SaranChart } from '../types';
 import { PratinjauSaranChart } from './PratinjauSaranChart';
 
@@ -100,8 +101,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onDashboardUpdated,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  /** Mode menyempurnakan halaman: pesan berikutnya jadi usulan, bukan jawaban biasa. */
-  const [modeUsulan, setModeUsulan] = useState(false);
   const [usulanAktif, setUsulanAktif] = useState<UsulanHalaman | null>(null);
   const [sibukUsulan, setSibukUsulan] = useState(false);
   const [galatUsulan, setGalatUsulan] = useState('');
@@ -229,10 +228,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     setMessages((prev) => [...prev, userMsg]);
 
-    // ---- MODE SEMPURNAKAN HALAMAN ----
-    // Percakapan di sini menghasilkan USULAN, bukan perubahan langsung. Halaman
-    // baru berubah setelah admin menekan Terapkan.
-    if (modeUsulan && dashboardId && halamanId) {
+    // ---- PERMINTAAN MENGUBAH HALAMAN ----
+    // Tidak ada tombol mode: asisten sendiri yang membaca kalimatnya. Kalau
+    // admin minta perubahan, hasilnya USULAN — halaman baru berubah setelah
+    // admin menekan Terapkan. Pertanyaan biasa tetap dijawab seperti biasa.
+    if (dashboardId && halamanId && niatUbahHalaman(prompt)) {
       setIsStreaming(true);
       setGalatUsulan('');
       try {
@@ -770,22 +770,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         ))}
       </div>
 
-      {/* Tombol mode penyempurnaan halaman */}
+      {/* Konteks halaman — keterangan, bukan tombol: admin tidak perlu
+          mengaktifkan apa pun. Minta perubahan lewat kalimat biasa. */}
       {dashboardId && halamanId && (
-        <div className="px-3 pt-2 border-t border-line bg-surface flex items-center gap-2">
-          <button
-            onClick={() => setModeUsulan((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
-              modeUsulan
-                ? 'bg-brand text-on-brand border-brand'
-                : 'bg-surface-2 text-ink-2 border-line hover:border-brand/40'
-            }`}
-            data-testid="tombol-mode-usulan"
-          >
-            <Wand2 className="w-3 h-3" />
-            {modeUsulan ? 'Mode sempurnakan halaman: aktif' : `Sempurnakan halaman${halamanJudul ? ` "${halamanJudul}"` : ''}`}
-          </button>
-          {modeUsulan && <span className="text-[10px] text-ink-3">Perubahan tampil sebagai usulan dulu</span>}
+        <div
+          className="px-3 pt-2 border-t border-line bg-surface flex items-center gap-1.5 text-[10px] text-ink-3"
+          data-testid="konteks-halaman-asisten"
+        >
+          <Wand2 className="w-3 h-3 shrink-0 text-brand" />
+          <span>
+            Halaman{halamanJudul ? ` "${halamanJudul}"` : ''} ikut terbaca. Minta perubahan seperti biasa —
+            hasilnya tampil sebagai usulan dulu, halaman baru berubah setelah Anda menekan Terapkan.
+          </span>
         </div>
       )}
 
