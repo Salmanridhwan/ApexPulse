@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, PermintaanData, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
+import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, PermintaanData, AnalisisDokumen, ButirData, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 /**
@@ -117,6 +117,8 @@ export interface DbSnapshot {
   perjanjianKinerja: PerjanjianKinerja[];
   lkjip: LKjIP[];
   permintaanData: PermintaanData[];
+  analisisDokumen: AnalisisDokumen[];
+  butirData: ButirData[];
 }
 
 export interface LoadedState {
@@ -143,6 +145,8 @@ export interface LoadedState {
   perjanjianKinerja?: PerjanjianKinerja[];
   lkjip?: LKjIP[];
   permintaanData?: PermintaanData[];
+  analisisDokumen?: AnalisisDokumen[];
+  butirData?: ButirData[];
 }
 
 export class MysqlStore {
@@ -364,6 +368,39 @@ export class MysqlStore {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_permintaan_tenant (tenant_id),
         INDEX idx_permintaan_status (tenant_id, status)
+      ) ENGINE=InnoDB
+    `);
+
+    /**
+     * Tabel ANALISIS DOKUMEN & BUTIR DATA, per-baris. Antrean dianalisis oleh
+     * dua instance PM2 sekaligus; status dan klaim (`lease_sampai`) harus
+     * terlihat lintas instance, jadi tidak boleh ikut snapshot.
+     */
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS analisis_dokumen (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        berkas_id VARCHAR(128) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'antri',
+        lease_sampai BIGINT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_analisis_tenant (tenant_id),
+        INDEX idx_analisis_status (tenant_id, status),
+        INDEX idx_analisis_berkas (berkas_id)
+      ) ENGINE=InnoDB
+    `);
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS butir_data (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        analisis_id VARCHAR(128) NOT NULL,
+        kategori VARCHAR(64) NOT NULL DEFAULT 'Umum',
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_butir_tenant (tenant_id),
+        INDEX idx_butir_analisis (analisis_id),
+        INDEX idx_butir_kategori (tenant_id, kategori)
       ) ENGINE=InnoDB
     `);
 
@@ -644,6 +681,57 @@ export class MysqlStore {
   async deletePermintaanDataRow(id: string): Promise<void> {
     if (!this.pool) return;
     await this.pool.query('DELETE FROM permintaan_data WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU baris analisis dokumen. */
+  async upsertAnalisisDokumen(id: string, tenantId: string, data: any): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO analisis_dokumen (id, tenant_id, berkas_id, status, lease_sampai, data) VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), berkas_id = VALUES(berkas_id),
+       status = VALUES(status), lease_sampai = VALUES(lease_sampai), data = VALUES(data)`,
+      [
+        id,
+        tenantId,
+        String(data?.berkasId || ''),
+        String(data?.status || 'antri'),
+        typeof data?.leaseSampai === 'number' ? data.leaseSampai : null,
+        JSON.stringify(data),
+      ]
+    );
+  }
+
+  async loadAnalisisDokumen(): Promise<AnalisisDokumen[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM analisis_dokumen');
+    return uraiDaftar<AnalisisDokumen>(rows as Array<{ data: any }>, 'analisis_dokumen');
+  }
+
+  async deleteAnalisisDokumenRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM analisis_dokumen WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU butir data. */
+  async upsertButirData(id: string, tenantId: string, data: any): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO butir_data (id, tenant_id, analisis_id, kategori, data) VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), analisis_id = VALUES(analisis_id),
+       kategori = VALUES(kategori), data = VALUES(data)`,
+      [id, tenantId, String(data?.analisisId || ''), String(data?.kategori || 'Umum'), JSON.stringify(data)]
+    );
+  }
+
+  async loadButirData(): Promise<ButirData[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM butir_data');
+    return uraiDaftar<ButirData>(rows as Array<{ data: any }>, 'butir_data');
+  }
+
+  async deleteButirDataRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM butir_data WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU risiko (upsert per-baris). */
@@ -991,6 +1079,14 @@ export class MysqlStore {
     const permintaanKhusus = await this.loadPermintaanData();
     if (permintaanKhusus.length > 0) hasil.permintaanData = permintaanKhusus;
     else if (arrays.permintaanData) hasil.permintaanData = arrays.permintaanData as PermintaanData[];
+
+    const analisisKhusus = await this.loadAnalisisDokumen();
+    if (analisisKhusus.length > 0) hasil.analisisDokumen = analisisKhusus;
+    else if (arrays.analisisDokumen) hasil.analisisDokumen = arrays.analisisDokumen as AnalisisDokumen[];
+
+    const butirKhusus = await this.loadButirData();
+    if (butirKhusus.length > 0) hasil.butirData = butirKhusus;
+    else if (arrays.butirData) hasil.butirData = arrays.butirData as ButirData[];
 
     const keuKhusus = await this.loadSnapshotKeuangan();
     if (keuKhusus.length > 0) hasil.snapshotKeuangan = keuKhusus;

@@ -677,6 +677,85 @@ export interface PermintaanData {
   selesaiPada?: string;
 }
 
+
+/* ================= ANALISIS DOKUMEN & BUTIR DATA (Fase 2) ================= */
+
+/** Saran template halaman — hasil hitungan deterministik, bukan tebakan model. */
+export interface SaranTemplate {
+  templateId: string;
+  nama: string;
+  /** 0..1 — makin tinggi makin cocok dengan butir yang ada. */
+  skor: number;
+  /** Alasan dalam bahasa manusia, menyebut fokus template yang cocok. */
+  alasan: string;
+}
+
+export type StatusAnalisis = 'antri' | 'proses' | 'selesai' | 'gagal' | 'tertunda-kuota';
+
+export interface AnalisisDokumen {
+  id: string;
+  tenantId: string;
+  permintaanId?: string;
+  /** id dokumen di KMS (atau id basis dokumen lokal untuk impor tabel). */
+  berkasId: string;
+  judulBerkas: string;
+  jenisBerkas?: string;
+  status: StatusAnalisis;
+  /** `tabel-lokal` = impor Excel/CSV tanpa LLM; `rag-extract` = ekstraksi dokumen. */
+  metode: 'tabel-lokal' | 'rag-extract';
+  ringkasan?: string;
+  /** Kategori yang benar-benar muncul pada butir, urut dari yang terbanyak. */
+  kategoriTerdeteksi: string[];
+  rekomendasiTemplate?: SaranTemplate[];
+  jumlahButir: number;
+  galat?: string;
+  percobaan: number;
+  /** Pengunci antar-instance PM2: instance lain tidak boleh mengklaim baris ini. */
+  leaseSampai?: number;
+  dibuatPada: string;
+  selesaiPada?: string;
+}
+
+export type KeyakinanButir = 'tinggi' | 'sedang' | 'rendah';
+
+export interface SeriButir {
+  nama: string;
+  data: number[];
+  kategori?: string[];
+}
+
+export interface TabelButir {
+  kolom: string[];
+  baris: Array<Array<string | number>>;
+}
+
+/**
+ * Satu butir data yang sudah bisa dipakai menyusun widget. Angka di sini harus
+ * berasal dari dokumen — `sitasi` adalah buktinya, dan butir tanpa sitasi tidak
+ * pernah dianggap disetujui.
+ */
+export interface ButirData {
+  id: string;
+  tenantId: string;
+  analisisId: string;
+  berkasId: string;
+  permintaanId?: string;
+  nama: string;
+  /** Diisi `kategoriWidget()` deterministik, bukan tebakan model. */
+  kategori: string;
+  periode?: string;
+  satuan?: string;
+  nilai?: number | null;
+  seri?: SeriButir[];
+  tabel?: TabelButir;
+  bentukDisarankan: WidgetType;
+  chartIdDisarankan?: string;
+  sitasi: { dokumen: string; halaman?: number; kutipan?: string };
+  keyakinan: KeyakinanButir;
+  status: 'draf' | 'disetujui' | 'ditolak';
+  dibuatPada: string;
+}
+
 export interface ProgressStep {
   id: string;
   title: string;

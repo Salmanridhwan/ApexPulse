@@ -18,6 +18,8 @@ import {
   LaporanPeriodik,
   Risiko,
   PermintaanData,
+  AnalisisDokumen,
+  ButirData,
   AksiMitigasi,
   Aset,
   PerjanjianKinerja,
@@ -151,6 +153,8 @@ interface PersistedState {
   perjanjianKinerja?: PerjanjianKinerja[];
   lkjip?: LKjIP[];
   permintaanData?: PermintaanData[];
+  analisisDokumen?: AnalisisDokumen[];
+  butirData?: ButirData[];
 }
 
 export class InMemoryDb {
@@ -377,6 +381,10 @@ export class InMemoryDb {
   public lkjip: LKjIP[] = [];
   /** Permintaan data dari User ke Admin Instansi (dikelola per-baris di MySQL). */
   public permintaanData: PermintaanData[] = [];
+  /** Hasil analisis dokumen (Fase 2) — satu baris per berkas, per-baris di MySQL. */
+  public analisisDokumen: AnalisisDokumen[] = [];
+  /** Butir data hasil analisis — bahan menyusun widget. */
+  public butirData: ButirData[] = [];
 
   /**
    * id instansi yang sudah dihapus admin. Dipakai agar user seed (mis.
@@ -426,6 +434,8 @@ export class InMemoryDb {
       perjanjianKinerja: this.perjanjianKinerja,
       lkjip: this.lkjip,
       permintaanData: this.permintaanData,
+      analisisDokumen: this.analisisDokumen,
+      butirData: this.butirData,
     };
   }
 
@@ -496,6 +506,8 @@ export class InMemoryDb {
         if (Array.isArray(loaded.perjanjianKinerja)) this.perjanjianKinerja = loaded.perjanjianKinerja;
         if (Array.isArray(loaded.lkjip)) this.lkjip = loaded.lkjip;
         if (Array.isArray(loaded.permintaanData)) this.permintaanData = loaded.permintaanData;
+        if (Array.isArray(loaded.analisisDokumen)) this.analisisDokumen = loaded.analisisDokumen;
+        if (Array.isArray(loaded.butirData)) this.butirData = loaded.butirData;
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
@@ -769,6 +781,22 @@ export class InMemoryDb {
       } else if (permintaanTabel.length > 0) {
         this.permintaanData = permintaanTabel;
       }
+      const analisisTabel = await this.mysql.loadAnalisisDokumen();
+      if (analisisTabel.length === 0 && this.analisisDokumen.length > 0) {
+        for (const a of this.analisisDokumen) {
+          await this.mysql.upsertAnalisisDokumen(a.id, a.tenantId, a);
+        }
+      } else if (analisisTabel.length > 0) {
+        this.analisisDokumen = analisisTabel;
+      }
+      const butirTabel = await this.mysql.loadButirData();
+      if (butirTabel.length === 0 && this.butirData.length > 0) {
+        for (const b of this.butirData) {
+          await this.mysql.upsertButirData(b.id, b.tenantId, b);
+        }
+      } else if (butirTabel.length > 0) {
+        this.butirData = butirTabel;
+      }
     } catch (err: any) {
       console.error('[AionesBoard DB] Sinkron pelaporan gagal:', err?.message || err);
     }
@@ -810,6 +838,10 @@ export class InMemoryDb {
       if (lk.length > 0 || this.lkjip.length === 0) this.lkjip = lk;
       const permintaan = await this.mysql.loadPermintaanData();
       if (permintaan.length > 0 || this.permintaanData.length === 0) this.permintaanData = permintaan;
+      const analisis = await this.mysql.loadAnalisisDokumen();
+      if (analisis.length > 0 || this.analisisDokumen.length === 0) this.analisisDokumen = analisis;
+      const butir = await this.mysql.loadButirData();
+      if (butir.length > 0 || this.butirData.length === 0) this.butirData = butir;
     } catch (err: any) {
       console.error('[AionesBoard DB] segarkanMultiInstance gagal:', err?.message || err);
     }
@@ -1009,6 +1041,8 @@ export class InMemoryDb {
       if (Array.isArray(parsed.perjanjianKinerja)) this.perjanjianKinerja = parsed.perjanjianKinerja;
       if (Array.isArray(parsed.lkjip)) this.lkjip = parsed.lkjip;
       if (Array.isArray(parsed.permintaanData)) this.permintaanData = parsed.permintaanData;
+      if (Array.isArray(parsed.analisisDokumen)) this.analisisDokumen = parsed.analisisDokumen;
+      if (Array.isArray(parsed.butirData)) this.butirData = parsed.butirData;
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Peran lama di berkas cadangan (analis/direksi) → pengguna.
       this.normalisasiPeranLama();
@@ -1167,6 +1201,8 @@ export class InMemoryDb {
         perjanjianKinerja: this.perjanjianKinerja,
         lkjip: this.lkjip,
         permintaanData: this.permintaanData,
+        analisisDokumen: this.analisisDokumen,
+        butirData: this.butirData,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
@@ -1672,6 +1708,13 @@ export class InMemoryDb {
     const permintaanHapus = this.permintaanData.filter((p) => p.tenantId === id);
     this.permintaanData = this.permintaanData.filter((p) => p.tenantId !== id);
     for (const p of permintaanHapus) this.trackWrite(this.mysql?.deletePermintaanDataRow(p.id));
+    // 3k) Analisis dokumen & butir data instansi ini.
+    const analisisHapus = this.analisisDokumen.filter((a) => a.tenantId === id);
+    this.analisisDokumen = this.analisisDokumen.filter((a) => a.tenantId !== id);
+    for (const a of analisisHapus) this.trackWrite(this.mysql?.deleteAnalisisDokumenRow(a.id));
+    const butirHapus = this.butirData.filter((b) => b.tenantId === id);
+    this.butirData = this.butirData.filter((b) => b.tenantId !== id);
+    for (const b of butirHapus) this.trackWrite(this.mysql?.deleteButirDataRow(b.id));
 
     // 4) Instansinya sendiri: dari memori + tabel khusus MySQL.
     this.tenants = this.tenants.filter((t) => t.id !== id);
@@ -2103,6 +2146,136 @@ export class InMemoryDb {
     if (!ada) return false;
     this.permintaanData = this.permintaanData.filter((p) => p.id !== id);
     this.trackWrite(this.mysql?.deletePermintaanDataRow(id));
+    this.persist();
+    return true;
+  }
+
+  /* ================= ANALISIS DOKUMEN & BUTIR DATA ================= */
+
+  getAnalisisDokumen(
+    tenantId: string,
+    filter?: { permintaanId?: string; status?: string; berkasId?: string }
+  ): AnalisisDokumen[] {
+    return this.analisisDokumen
+      .filter(
+        (a) =>
+          a.tenantId === tenantId &&
+          (!filter?.permintaanId || a.permintaanId === filter.permintaanId) &&
+          (!filter?.status || a.status === filter.status) &&
+          (!filter?.berkasId || a.berkasId === filter.berkasId)
+      )
+      .sort((a, b) => b.dibuatPada.localeCompare(a.dibuatPada));
+  }
+
+  getAnalisisDokumenById(id: string, tenantId: string): AnalisisDokumen | undefined {
+    return this.analisisDokumen.find((a) => a.id === id && a.tenantId === tenantId);
+  }
+
+  createAnalisisDokumen(
+    data: Omit<AnalisisDokumen, 'id' | 'dibuatPada' | 'jumlahButir' | 'kategoriTerdeteksi'> & {
+      jumlahButir?: number;
+      kategoriTerdeteksi?: string[];
+    }
+  ): AnalisisDokumen {
+    const baru: AnalisisDokumen = {
+      ...data,
+      jumlahButir: data.jumlahButir ?? 0,
+      kategoriTerdeteksi: data.kategoriTerdeteksi ?? [],
+      id: `anl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      dibuatPada: new Date().toISOString(),
+    };
+    this.analisisDokumen.push(baru);
+    this.trackWrite(this.mysql?.upsertAnalisisDokumen(baru.id, baru.tenantId, baru));
+    this.persist();
+    return baru;
+  }
+
+  updateAnalisisDokumen(
+    id: string,
+    tenantId: string,
+    partial: Partial<AnalisisDokumen>
+  ): AnalisisDokumen | undefined {
+    const idx = this.analisisDokumen.findIndex((a) => a.id === id && a.tenantId === tenantId);
+    if (idx === -1) return undefined;
+    const lama = this.analisisDokumen[idx];
+    const digabung: AnalisisDokumen = {
+      ...lama,
+      ...partial,
+      id: lama.id,
+      tenantId: lama.tenantId,
+      dibuatPada: lama.dibuatPada,
+    };
+    this.analisisDokumen[idx] = digabung;
+    this.trackWrite(this.mysql?.upsertAnalisisDokumen(digabung.id, digabung.tenantId, digabung));
+    this.persist();
+    return digabung;
+  }
+
+  getButirData(
+    tenantId: string,
+    filter?: { analisisId?: string; permintaanId?: string; status?: string; kategori?: string }
+  ): ButirData[] {
+    return this.butirData.filter(
+      (b) =>
+        b.tenantId === tenantId &&
+        (!filter?.analisisId || b.analisisId === filter.analisisId) &&
+        (!filter?.permintaanId || b.permintaanId === filter.permintaanId) &&
+        (!filter?.status || b.status === filter.status) &&
+        (!filter?.kategori || b.kategori === filter.kategori)
+    );
+  }
+
+  /** Simpan sekumpulan butir sekaligus (hasil satu analisis). */
+  simpanButirData(daftar: ButirData[]): ButirData[] {
+    for (const b of daftar) {
+      const idx = this.butirData.findIndex((x) => x.id === b.id);
+      if (idx === -1) this.butirData.push(b);
+      else this.butirData[idx] = b;
+      this.trackWrite(this.mysql?.upsertButirData(b.id, b.tenantId, b));
+    }
+    this.persist();
+    return daftar;
+  }
+
+  updateButirData(
+    id: string,
+    tenantId: string,
+    partial: Partial<ButirData>
+  ): ButirData | undefined {
+    const idx = this.butirData.findIndex((b) => b.id === id && b.tenantId === tenantId);
+    if (idx === -1) return undefined;
+    const lama = this.butirData[idx];
+    const digabung: ButirData = {
+      ...lama,
+      ...partial,
+      id: lama.id,
+      tenantId: lama.tenantId,
+      analisisId: lama.analisisId,
+      berkasId: lama.berkasId,
+      dibuatPada: lama.dibuatPada,
+    };
+    this.butirData[idx] = digabung;
+    this.trackWrite(this.mysql?.upsertButirData(digabung.id, digabung.tenantId, digabung));
+    this.persist();
+    return digabung;
+  }
+
+  /** Hapus semua butir satu analisis (dipakai saat analisis diulang). */
+  hapusButirAnalisis(analisisId: string, tenantId: string): number {
+    const hapus = this.butirData.filter((b) => b.analisisId === analisisId && b.tenantId === tenantId);
+    if (hapus.length === 0) return 0;
+    this.butirData = this.butirData.filter((b) => !(b.analisisId === analisisId && b.tenantId === tenantId));
+    for (const b of hapus) this.trackWrite(this.mysql?.deleteButirDataRow(b.id));
+    this.persist();
+    return hapus.length;
+  }
+
+  deleteAnalisisDokumen(id: string, tenantId: string): boolean {
+    const ada = this.analisisDokumen.some((a) => a.id === id && a.tenantId === tenantId);
+    if (!ada) return false;
+    this.analisisDokumen = this.analisisDokumen.filter((a) => !(a.id === id && a.tenantId === tenantId));
+    this.trackWrite(this.mysql?.deleteAnalisisDokumenRow(id));
+    this.hapusButirAnalisis(id, tenantId);
     this.persist();
     return true;
   }
