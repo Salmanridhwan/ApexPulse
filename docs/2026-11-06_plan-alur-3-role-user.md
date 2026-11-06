@@ -126,12 +126,35 @@ Rincian teknis di bagian 7.3.
 4. Pilihannya: buat dashboard baru, atau tambahkan sebagai halaman baru ke dashboard yang sudah ada. Ini yang dimaksud "membuatnya menjadi 1 halaman".
 5. Angka di widget berasal dari butir, bukan dari LLM saat menyusun, jadi tidak bisa berubah atau dikarang.
 
-#### 3.2.6 Menyempurnakan lewat chat
+#### 3.2.6 Menyempurnakan lewat asisten chat
 
-1. Halaman hasil susunan dibuka di kanvas. Tombol **Sempurnakan halaman ini** mengirim konteks: `dashboardId`, halaman aktif, daftar widget, dan catatan arah dari user.
-2. Admin menulis permintaan bebas, misalnya "gabungkan dua grafik ini" atau "buat angka utama lebih menonjol".
-3. Chat mengubah halaman yang sama, bukan membuat dashboard baru.
-4. Setiap perubahan dari chat tercatat di audit dengan asal "chat", supaya bisa dibandingkan dengan susunan awal.
+Penyempurnaan **bukan** tombol sekali-jalan yang menyusun ulang halaman sendiri. Yang
+dipakai adalah asisten chat yang sudah ada: halaman aktif dibawa sebagai konteks, lalu
+admin menulis apa yang masih kurang — tambah grafik, ganti tipe, ubah judul, hapus
+kartu, susun ulang urutan — dan chat menyiapkan perubahannya.
+
+1. Saat halaman dibuka di kanvas, asisten chat otomatis tahu konteksnya: `dashboardId`,
+   `halamanAktifId`, daftar widget di halaman itu, butir data yang sudah disetujui, dan
+   catatan arah dari pemohon.
+2. Pintu masuknya percakapan, bukan mesin terpisah. Yang boleh ada di kanvas hanyalah
+   pemintas kecil berlabel jelas ("tanya asisten tentang halaman ini") yang membuka chat
+   dengan konteks halaman terpasang — bukan tombol yang diam-diam mengubah halaman.
+3. Permintaan bebas: "tambahkan tren pendapatan dari dokumen yang tadi saya setujui",
+   "gabungkan dua grafik ini", "angka utama dibuat lebih menonjol", "hapus kartu ini".
+4. Chat mengubah **halaman yang sedang dibuka**, bukan halaman lain dan bukan dashboard
+   baru. Bila perintahnya ambigu soal halaman, chat bertanya dulu — tidak menebak.
+5. **Semua** perubahan ditampilkan sebagai usulan lebih dulu: pratinjau berisi daftar
+   perubahan (tambah / ubah / hapus / urutkan), lalu admin menekan **Terapkan**. Tidak ada
+   perubahan halaman yang terjadi hanya karena chat menjawab. Keputusan ini diambil sadar:
+   chat bisa salah menafsirkan "hapus kartu ini", dan halaman yang sudah rapi tidak boleh
+   rusak oleh satu kalimat yang ambigu.
+6. Siapa yang boleh: hanya **Admin Instansi** dan **Admin Aiones**. Role `pengguna` tetap
+   hanya mengajukan permintaan dan tidak menyusun halaman — termasuk lewat chat, karena
+   menyunting halaman adalah menyusun. Server menolak usulan dari `pengguna` (403).
+7. Angka tetap hanya boleh berasal dari butir yang disetujui. Chat boleh mengubah
+   tampilan dan susunan; chat **tidak** boleh mengarang angka baru di luar butir.
+8. Setiap usulan yang diterapkan tercatat di audit dengan asal "chat", supaya bisa
+   dibandingkan dengan susunan awal.
 
 #### 3.2.7 Menutup permintaan
 
@@ -540,7 +563,7 @@ Dengan ini, kalimat "di setiap template di kategorinya ada rekomendasi AI" punya
 - `src/pages/DashboardList.tsx` dan `App.tsx`: tombol buat, impor, gaya, bagikan, hapus disembunyikan untuk `pengguna`, dan server tetap menolak kalau dipaksa.
 - `src/components/adminTabs.ts` + `src/pages/Admin.tsx`: tab diberi penanda `peran: 'admin' | 'superadmin'`. Tab instansi, KB/KMS, RAG, audit, kuota hanya muncul untuk superadmin.
 - `src/pages/ManajemenBerkasPage.tsx`: form unggah menerima `permintaanId`, dan setelah unggah menampilkan status "sedang dianalisis".
-- `src/components/ChatPanel.tsx`: untuk `pengguna`, kolom kirim tetap ada tetapi perintah pembuatan dashboard dijawab dengan arahan ke admin. Untuk admin, tombol "Sempurnakan halaman ini" membawa `dashboardId` dan `catatanArah`.
+- `src/components/ChatPanel.tsx`: untuk `pengguna`, kolom kirim tetap ada tetapi perintah pembuatan dashboard dijawab dengan arahan ke admin. Untuk admin, chat membawa `dashboardId` **dan** `halamanAktifId` beserta daftar widget halaman itu, sehingga "sempurnakan halaman ini" berarti halaman yang sedang dibuka — bukan halaman mana pun yang dipilih model.
 
 ### 8.3 Preferensi tampilan yang sudah ada wajib dipertahankan
 
@@ -593,14 +616,14 @@ Berkas: `src/services/data/*` baru, `src/services/rag/http.ts`, `src/services/st
 
 ### Fase 3: Susun halaman dan penyempurnaan chat
 
-1. `src/services/data/butirKeWidget.ts` murni: butir → `WidgetSpec` lengkap dengan `chartId`, kategori, periode, sitasi.
-2. `src/services/data/butirKeSlotTemplate.ts`: isi slot template yang disarankan dari butir, slot kosong diberi label jujur (bagian 7.5).
+1. `src/services/analisis/butirKeWidget.ts` murni: butir → `WidgetSpec` lengkap dengan `chartId`, kategori, periode, sitasi. (Bukan `src/services/data/` — `.gitignore` memuat pola `data/` yang menelan folder bernama data di kedalaman mana pun.)
+2. `src/services/analisis/butirKeSlotTemplate.ts`: isi slot template yang disarankan dari butir, slot kosong diberi label jujur (bagian 7.5).
 3. Endpoint `POST /api/dashboards/dari-butir`, termasuk batas 9 widget per halaman dan pemecahan halaman otomatis.
 4. UI: bilah pilihan butir, modal "Buat Halaman", pilih template yang disarankan, tautkan ke permintaan, notifikasi selesai.
-5. Chat: konteks `dashboardId` + `catatanArah`, tombol "Sempurnakan halaman ini".
+5. Chat sebagai penyunting halaman: kirim `dashboardId` + `halamanAktifId` + daftar widget halaman + butir yang disetujui. Tanpa `halamanAktifId`, chat saat ini hanya tahu dashboard dan bisa mengubah halaman yang salah — itu yang harus diperbaiki lebih dulu. Perintah yang harus dikenali: tambah widget, ubah tipe/judul, hapus widget, susun ulang urutan. Yang merusak data (hapus/timpa) ditawarkan sebagai usulan yang bisa dibatalkan.
 6. Uji: `tests/butirKeWidget.test.ts` (validasi `WidgetSpecSchema`, sitasi, pengelompokan halaman), `tests/butirKeSlotTemplate.test.ts` (slot terisi sesuai jenis, slot kosong tidak diisi angka contoh, batas 9 widget), e2e satu permintaan penuh dari user sampai selesai.
 
-Berkas: `src/services/data/butirKeWidget.ts`, `src/services/data/butirKeSlotTemplate.ts`, `server.ts`, `KatalogDataPage.tsx`, `App.tsx`, `ChatPanel.tsx`.
+Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKeSlotTemplate.ts`, `server.ts`, `KatalogDataPage.tsx`, `App.tsx`, `ChatPanel.tsx`.
 
 ### Fase 4: Panel Admin Aiones
 
