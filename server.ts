@@ -56,7 +56,7 @@ import {
   setSecretSesi,
   SessionPayload,
 } from './src/services/auth/session';
-import { AlertRule, BumdSector, ChatMessage, Dashboard, LampiranPermintaan, NotificationItem, OrganisasiKMS, PermintaanData, ProgressStep, StatusLaporan, StatusPermintaan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
+import { AlertRule, BumdSector, ChatMessage, Dashboard, LampiranPermintaan, NotificationItem, OrganisasiKMS, PermintaanData, ProgressStep, StatusPermintaan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
 import {
   SEMUA_STATUS,
   bolehMelihat,

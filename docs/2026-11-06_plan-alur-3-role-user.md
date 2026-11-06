@@ -879,3 +879,19 @@ Yang **tidak** dihapus: data lama di MySQL (tabel `kewajiban_lapor`, `laporan_pe
 Helper peran `normalisasiPeran`, `normalisasiPeranAkun`, `LABEL_PERAN` dipindah dari `services/laporan/alur.ts` ke `services/auth/peran.ts` — masih dipakai `inMemoryDb` dan `tests/rbac.test.ts`.
 
 Bukti: `tsc` bersih; **529 tes lulus**; build bersih; sidebar tanpa grup Kinerja; hash lama `#/v/pelaporan` jatuh ke Workspace; `/api/pelaporan/kewajiban` & `/api/keuangan/ringkasan` → 404.
+### Pembersihan database (2026-11-06, setelah kode dihapus)
+
+Menghapus kode saja tidak cukup: `CREATE TABLE IF NOT EXISTS` akan membuat ulang sembilan tabel itu setiap boot. Jadi pembersihan dikerjakan di dua sisi.
+
+| Sisi | Tindakan |
+|---|---|
+| MySQL lokal | `DROP` 9 tabel: `kewajiban_lapor`, `laporan_periodik`, `alur_verifikasi`, `temuan_audit`, `snapshot_keuangan`, `risiko`, `aset`, `perjanjian_kinerja`, `lkjip`. Semuanya kosong (0 baris); dicadangkan dulu ke `data/cadangan-kinerja-2026-11-06.sql` |
+| `baris` & `collections` | Diperiksa — tidak ada baris dengan nama koleksi tersebut |
+| `mysqlStore.ts` | 9 blok `CREATE TABLE`, 18 field state, semua metode upsert/load/delete per koleksi, blok pemuatan state (-386 baris) |
+| `inMemoryDb.ts` | 9 array, snapshot(), persist(), muat dari file, sinkron MySQL, segarkanMultiInstance, pembersihan tenant (-905 baris) |
+| `types/index.ts` | 7 bagian tipe + tipe pendukung (-686 baris) |
+| `data/db.json` | 9 kunci koleksi dibuang |
+
+`tsc` bersih, **529 tes lulus**, build bersih. Setelah boot ulang: 13 tabel, tidak satu pun dari kesembilan tabel itu kembali. Dashboard tetap 22 dan `/api/dashboards`, `/api/permintaan`, `/api/tenants` menjawab 200.
+
+**Belum dikerjakan:** database **produksi** (`192.168.100.185:3310`) masih memuat tabel yang sama. Pembersihannya perlu izin deploy; skrip cadangan + DROP yang sama bisa dijalankan di sana saat rilis.

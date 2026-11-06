@@ -5,31 +5,18 @@ import { daftarBerubah, gabungKonfig, kunciKonfigBerubah } from './sinkronKonfig
 import path from 'path';
 import {
   AlertRule,
-  AlurVerifikasi,
-  AksiVerifikasi,
-  AksiTindakLanjut,
   AuditLog,
   BumdSector,
   Chat,
   ChatMessage,
   Dashboard,
   KetersediaanPreset,
-  KewajibanLapor,
-  LaporanPeriodik,
-  Risiko,
   PermintaanData,
   AnalisisDokumen,
   ButirData,
   UsulanHalaman,
-  AksiMitigasi,
-  Aset,
-  PerjanjianKinerja,
-  LKjIP,
-  SnapshotKeuangan,
-  StatusLaporan,
   NotificationItem,
   Tenant,
-  TemuanAudit,
   User,
   WidgetSpec,
 } from '../../types';
@@ -144,15 +131,6 @@ interface PersistedState {
   credentials?: Record<string, string>;
   ketersediaanPreset?: KetersediaanPreset[];
   deletedTenantIds?: string[];
-  kewajibanLapor?: KewajibanLapor[];
-  laporanPeriodik?: LaporanPeriodik[];
-  alurVerifikasi?: AlurVerifikasi[];
-  temuanAudit?: TemuanAudit[];
-  snapshotKeuangan?: SnapshotKeuangan[];
-  risiko?: Risiko[];
-  aset?: Aset[];
-  perjanjianKinerja?: PerjanjianKinerja[];
-  lkjip?: LKjIP[];
   permintaanData?: PermintaanData[];
   analisisDokumen?: AnalisisDokumen[];
   butirData?: ButirData[];
@@ -373,21 +351,6 @@ export class InMemoryDb {
   /** token -> hash PIN (scrypt) untuk mode edit pada tautan publik. */
   public sharePins: Record<string, string> = {};
 
-  /**
-   * Pelaporan periodik BUMD (fitur "Kepatuhan Pelaporan").
-   * - `kewajibanLapor`: jenis laporan yang WAJIB disampaikan instansi.
-   * - `laporanPeriodik`: realisasi per periode (hanya ada bila benar-benar dibuat).
-   * Keduanya dikelola per-baris di MySQL (bukan snapshot) — lihat mysqlStore.
-   */
-  public kewajibanLapor: KewajibanLapor[] = [];
-  public laporanPeriodik: LaporanPeriodik[] = [];
-  public alurVerifikasi: AlurVerifikasi[] = [];
-  public temuanAudit: TemuanAudit[] = [];
-  public snapshotKeuangan: SnapshotKeuangan[] = [];
-  public risiko: Risiko[] = [];
-  public aset: Aset[] = [];
-  public perjanjianKinerja: PerjanjianKinerja[] = [];
-  public lkjip: LKjIP[] = [];
   /** Permintaan data dari User ke Admin Instansi (dikelola per-baris di MySQL). */
   public permintaanData: PermintaanData[] = [];
   /** Hasil analisis dokumen (Fase 2) — satu baris per berkas, per-baris di MySQL. */
@@ -435,15 +398,6 @@ export class InMemoryDb {
       dashboards: this.dashboards,
       chats: this.chats,
       ketersediaanPreset: this.ketersediaanPreset,
-      kewajibanLapor: this.kewajibanLapor,
-      laporanPeriodik: this.laporanPeriodik,
-      alurVerifikasi: this.alurVerifikasi,
-      temuanAudit: this.temuanAudit,
-      snapshotKeuangan: this.snapshotKeuangan,
-      risiko: this.risiko,
-      aset: this.aset,
-      perjanjianKinerja: this.perjanjianKinerja,
-      lkjip: this.lkjip,
       permintaanData: this.permintaanData,
       analisisDokumen: this.analisisDokumen,
       butirData: this.butirData,
@@ -508,15 +462,6 @@ export class InMemoryDb {
             new Set([...this.deletedTenantIds, ...loaded.deletedTenantIds])
           );
         }
-        if (Array.isArray(loaded.kewajibanLapor)) this.kewajibanLapor = loaded.kewajibanLapor;
-        if (Array.isArray(loaded.laporanPeriodik)) this.laporanPeriodik = loaded.laporanPeriodik;
-        if (Array.isArray(loaded.alurVerifikasi)) this.alurVerifikasi = loaded.alurVerifikasi;
-        if (Array.isArray(loaded.temuanAudit)) this.temuanAudit = loaded.temuanAudit;
-        if (Array.isArray(loaded.snapshotKeuangan)) this.snapshotKeuangan = loaded.snapshotKeuangan;
-        if (Array.isArray(loaded.risiko)) this.risiko = loaded.risiko;
-        if (Array.isArray(loaded.aset)) this.aset = loaded.aset;
-        if (Array.isArray(loaded.perjanjianKinerja)) this.perjanjianKinerja = loaded.perjanjianKinerja;
-        if (Array.isArray(loaded.lkjip)) this.lkjip = loaded.lkjip;
         if (Array.isArray(loaded.permintaanData)) this.permintaanData = loaded.permintaanData;
         if (Array.isArray(loaded.analisisDokumen)) this.analisisDokumen = loaded.analisisDokumen;
         if (Array.isArray(loaded.butirData)) this.butirData = loaded.butirData;
@@ -545,7 +490,7 @@ export class InMemoryDb {
       // Migrasi/ambil dashboard & chat dari tabel khusus (per-baris).
       await this.sinkronDashboardChatKeMysql();
       // Migrasi kewajiban & laporan pelaporan ke tabel khusus (per-baris).
-      await this.sinkronPelaporanKeMysql();
+      await this.sinkronPermintaanKeMysql();
       // Kunci API lama masih tersimpan polos — enkripsi sekali di sini supaya
       // deployment yang sudah berjalan ikut terlindungi tanpa langkah manual.
       const kunciPolos: Record<string, unknown> = {};
@@ -708,84 +653,13 @@ export class InMemoryDb {
   }
 
   /**
-   * Selaraskan kewajiban & laporan pelaporan ke tabel khusus (migrasi + multi-instance).
-   * Tabel kosong = migrasi dari memori; tabel berisi = SUMBER KEBENARAN.
+   * Selaraskan permintaan data, analisis dokumen, dan butir data ke tabel khusus
+   * (migrasi + multi-instance). Tabel kosong = migrasi dari memori; tabel berisi
+   * = SUMBER KEBENARAN.
    */
-  private async sinkronPelaporanKeMysql(): Promise<void> {
+  private async sinkronPermintaanKeMysql(): Promise<void> {
     if (!this.mysql) return;
     try {
-      const kewTabel = await this.mysql.loadKewajiban();
-      if (kewTabel.length === 0 && this.kewajibanLapor.length > 0) {
-        for (const k of this.kewajibanLapor) {
-          await this.mysql.upsertKewajiban(k.id, k.tenantId, k);
-        }
-      } else if (kewTabel.length > 0) {
-        this.kewajibanLapor = kewTabel;
-      }
-      const lapTabel = await this.mysql.loadLaporan();
-      if (lapTabel.length === 0 && this.laporanPeriodik.length > 0) {
-        for (const l of this.laporanPeriodik) {
-          await this.mysql.upsertLaporan(l.id, l.tenantId, l.kewajibanId, l);
-        }
-      } else if (lapTabel.length > 0) {
-        this.laporanPeriodik = lapTabel;
-      }
-      const alurTabel = await this.mysql.loadAlurVerifikasi();
-      if (alurTabel.length === 0 && this.alurVerifikasi.length > 0) {
-        for (const a of this.alurVerifikasi) {
-          await this.mysql.upsertAlurVerifikasi(a.id, a.tenantId, a);
-        }
-      } else if (alurTabel.length > 0) {
-        this.alurVerifikasi = alurTabel;
-      }
-      const temuanTabel = await this.mysql.loadTemuanAudit();
-      if (temuanTabel.length === 0 && this.temuanAudit.length > 0) {
-        for (const t of this.temuanAudit) {
-          await this.mysql.upsertTemuanAudit(t.id, t.tenantId, t);
-        }
-      } else if (temuanTabel.length > 0) {
-        this.temuanAudit = temuanTabel;
-      }
-      const keuTabel = await this.mysql.loadSnapshotKeuangan();
-      if (keuTabel.length === 0 && this.snapshotKeuangan.length > 0) {
-        for (const k of this.snapshotKeuangan) {
-          await this.mysql.upsertSnapshotKeuangan(k.id, k.tenantId, k);
-        }
-      } else if (keuTabel.length > 0) {
-        this.snapshotKeuangan = keuTabel;
-      }
-      const risikoTabel = await this.mysql.loadRisiko();
-      if (risikoTabel.length === 0 && this.risiko.length > 0) {
-        for (const r of this.risiko) {
-          await this.mysql.upsertRisiko(r.id, r.tenantId, r);
-        }
-      } else if (risikoTabel.length > 0) {
-        this.risiko = risikoTabel;
-      }
-      const asetTabel = await this.mysql.loadAset();
-      if (asetTabel.length === 0 && this.aset.length > 0) {
-        for (const a of this.aset) {
-          await this.mysql.upsertAset(a.id, a.tenantId, a);
-        }
-      } else if (asetTabel.length > 0) {
-        this.aset = asetTabel;
-      }
-      const pkTabel = await this.mysql.loadPerjanjianKinerja();
-      if (pkTabel.length === 0 && this.perjanjianKinerja.length > 0) {
-        for (const p of this.perjanjianKinerja) {
-          await this.mysql.upsertPerjanjianKinerja(p.id, p.tenantId, p);
-        }
-      } else if (pkTabel.length > 0) {
-        this.perjanjianKinerja = pkTabel;
-      }
-      const lkTable = await this.mysql.loadLKjIP();
-      if (lkTable.length === 0 && this.lkjip.length > 0) {
-        for (const l of this.lkjip) {
-          await this.mysql.upsertLKjIP(l.id, l.tenantId, l);
-        }
-      } else if (lkTable.length > 0) {
-        this.lkjip = lkTable;
-      }
       const permintaanTabel = await this.mysql.loadPermintaanData();
       if (permintaanTabel.length === 0 && this.permintaanData.length > 0) {
         for (const p of this.permintaanData) {
@@ -811,7 +685,7 @@ export class InMemoryDb {
         this.butirData = butirTabel;
       }
     } catch (err: any) {
-      console.error('[AionesBoard DB] Sinkron pelaporan gagal:', err?.message || err);
+      console.error('[AionesBoard DB] Sinkron permintaan gagal:', err?.message || err);
     }
   }
 
@@ -830,25 +704,6 @@ export class InMemoryDb {
       if (dash.length > 0) this.dashboards = dash;
       const chat = await this.mysql.loadChats();
       if (chat.length > 0 || this.chats.length === 0) this.chats = chat;
-      // Pelaporan: ikut disegarkan supaya status kepatuhan tidak "berkedip".
-      const kew = await this.mysql.loadKewajiban();
-      if (kew.length > 0 || this.kewajibanLapor.length === 0) this.kewajibanLapor = kew;
-      const lap = await this.mysql.loadLaporan();
-      if (lap.length > 0 || this.laporanPeriodik.length === 0) this.laporanPeriodik = lap;
-      const alur = await this.mysql.loadAlurVerifikasi();
-      if (alur.length > 0 || this.alurVerifikasi.length === 0) this.alurVerifikasi = alur;
-      const temuan = await this.mysql.loadTemuanAudit();
-      if (temuan.length > 0 || this.temuanAudit.length === 0) this.temuanAudit = temuan;
-      const keu = await this.mysql.loadSnapshotKeuangan();
-      if (keu.length > 0 || this.snapshotKeuangan.length === 0) this.snapshotKeuangan = keu;
-      const rsk = await this.mysql.loadRisiko();
-      if (rsk.length > 0 || this.risiko.length === 0) this.risiko = rsk;
-      const ast = await this.mysql.loadAset();
-      if (ast.length > 0 || this.aset.length === 0) this.aset = ast;
-      const pk = await this.mysql.loadPerjanjianKinerja();
-      if (pk.length > 0 || this.perjanjianKinerja.length === 0) this.perjanjianKinerja = pk;
-      const lk = await this.mysql.loadLKjIP();
-      if (lk.length > 0 || this.lkjip.length === 0) this.lkjip = lk;
       const permintaan = await this.mysql.loadPermintaanData();
       if (permintaan.length > 0 || this.permintaanData.length === 0) this.permintaanData = permintaan;
       const analisis = await this.mysql.loadAnalisisDokumen();
@@ -895,20 +750,11 @@ export class InMemoryDb {
     let berubah = false;
     for (const u of this.users) {
       // `normalisasiPeranAkun`, bukan `normalisasiPeran`: peran `superadmin`
-      // harus bertahan saat state dimuat ulang (lihat catatan di alur.ts).
+      // harus bertahan saat state dimuat ulang (lihat catatan di auth/peran.ts).
       const peran = normalisasiPeranAkun(u.role);
       if (u.role !== peran) {
         u.role = peran;
         berubah = true;
-      }
-    }
-    for (const alur of this.alurVerifikasi) {
-      for (const tahap of alur.tahap || []) {
-        const peran = normalisasiPeran(tahap.peran);
-        if (tahap.peran !== peran) {
-          tahap.peran = peran;
-          berubah = true;
-        }
       }
     }
     if (berubah) this.persist();
@@ -1046,15 +892,6 @@ export class InMemoryDb {
       if (Array.isArray(parsed.deletedTenantIds)) {
         this.deletedTenantIds = parsed.deletedTenantIds;
       }
-      if (Array.isArray(parsed.kewajibanLapor)) this.kewajibanLapor = parsed.kewajibanLapor;
-      if (Array.isArray(parsed.laporanPeriodik)) this.laporanPeriodik = parsed.laporanPeriodik;
-      if (Array.isArray(parsed.alurVerifikasi)) this.alurVerifikasi = parsed.alurVerifikasi;
-      if (Array.isArray(parsed.temuanAudit)) this.temuanAudit = parsed.temuanAudit;
-      if (Array.isArray(parsed.snapshotKeuangan)) this.snapshotKeuangan = parsed.snapshotKeuangan;
-      if (Array.isArray(parsed.risiko)) this.risiko = parsed.risiko;
-      if (Array.isArray(parsed.aset)) this.aset = parsed.aset;
-      if (Array.isArray(parsed.perjanjianKinerja)) this.perjanjianKinerja = parsed.perjanjianKinerja;
-      if (Array.isArray(parsed.lkjip)) this.lkjip = parsed.lkjip;
       if (Array.isArray(parsed.permintaanData)) this.permintaanData = parsed.permintaanData;
       if (Array.isArray(parsed.analisisDokumen)) this.analisisDokumen = parsed.analisisDokumen;
       if (Array.isArray(parsed.butirData)) this.butirData = parsed.butirData;
@@ -1207,15 +1044,6 @@ export class InMemoryDb {
         tenants: this.tenants,
         credentials: this.credentials,
         deletedTenantIds: this.deletedTenantIds,
-        kewajibanLapor: this.kewajibanLapor,
-        laporanPeriodik: this.laporanPeriodik,
-        alurVerifikasi: this.alurVerifikasi,
-        temuanAudit: this.temuanAudit,
-        snapshotKeuangan: this.snapshotKeuangan,
-        risiko: this.risiko,
-        aset: this.aset,
-        perjanjianKinerja: this.perjanjianKinerja,
-        lkjip: this.lkjip,
         permintaanData: this.permintaanData,
         analisisDokumen: this.analisisDokumen,
         butirData: this.butirData,
@@ -1685,41 +1513,6 @@ export class InMemoryDb {
     this.auditLogs = this.auditLogs.filter((a) => a.tenantId !== id);
     this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => k.tenantId !== id);
 
-    // 3b) Pelaporan periodik instansi ini (kewajiban + laporan) beserta baris tabelnya.
-    const kewHapus = this.kewajibanLapor.filter((k) => k.tenantId === id);
-    this.kewajibanLapor = this.kewajibanLapor.filter((k) => k.tenantId !== id);
-    const lapHapus = this.laporanPeriodik.filter((l) => l.tenantId === id);
-    this.laporanPeriodik = this.laporanPeriodik.filter((l) => l.tenantId !== id);
-    for (const k of kewHapus) this.trackWrite(this.mysql?.deleteKewajibanRow(k.id));
-    for (const l of lapHapus) this.trackWrite(this.mysql?.deleteLaporanRow(l.id));
-    // 3c) Alur verifikasi instansi ini beserta baris tabelnya.
-    const alurHapus = this.alurVerifikasi.filter((a) => a.tenantId === id);
-    this.alurVerifikasi = this.alurVerifikasi.filter((a) => a.tenantId !== id);
-    for (const a of alurHapus) this.trackWrite(this.mysql?.deleteAlurVerifikasiRow(a.id));
-    // 3d) Temuan audit instansi ini beserta baris tabelnya.
-    const temuanHapus = this.temuanAudit.filter((t) => t.tenantId === id);
-    this.temuanAudit = this.temuanAudit.filter((t) => t.tenantId !== id);
-    for (const t of temuanHapus) this.trackWrite(this.mysql?.deleteTemuanAuditRow(t.id));
-    // 3e) Snapshot kesehatan keuangan instansi ini beserta baris tabelnya.
-    const keuHapus = this.snapshotKeuangan.filter((k) => k.tenantId === id);
-    this.snapshotKeuangan = this.snapshotKeuangan.filter((k) => k.tenantId !== id);
-    for (const k of keuHapus) this.trackWrite(this.mysql?.deleteSnapshotKeuanganRow(k.id));
-    // 3f) Register risiko instansi ini beserta baris tabelnya.
-    const risikoHapus = this.risiko.filter((r) => r.tenantId === id);
-    this.risiko = this.risiko.filter((r) => r.tenantId !== id);
-    for (const r of risikoHapus) this.trackWrite(this.mysql?.deleteRisikoRow(r.id));
-    // 3g) Daftar aset instansi ini beserta baris tabelnya.
-    const asetHapus = this.aset.filter((a) => a.tenantId === id);
-    this.aset = this.aset.filter((a) => a.tenantId !== id);
-    for (const a of asetHapus) this.trackWrite(this.mysql?.deleteAsetRow(a.id));
-    // 3h) Perjanjian Kinerja instansi ini beserta baris tabelnya.
-    const pkHapus = this.perjanjianKinerja.filter((p) => p.tenantId === id);
-    this.perjanjianKinerja = this.perjanjianKinerja.filter((p) => p.tenantId !== id);
-    for (const p of pkHapus) this.trackWrite(this.mysql?.deletePerjanjianKinerjaRow(p.id));
-    // 3i) LKjIP instansi ini beserta baris tabelnya.
-    const lkHapus = this.lkjip.filter((l) => l.tenantId === id);
-    this.lkjip = this.lkjip.filter((l) => l.tenantId !== id);
-    for (const l of lkHapus) this.trackWrite(this.mysql?.deleteLKjIPRow(l.id));
     // 3j) Permintaan data instansi ini. Lampirannya menunjuk berkas KMS milik
     // instansi yang sama, jadi tidak ada yang perlu dihapus di sisi KMS di sini.
     const permintaanHapus = this.permintaanData.filter((p) => p.tenantId === id);
@@ -1747,314 +1540,6 @@ export class InMemoryDb {
       }
     }
 
-    this.persist();
-    return true;
-  }
-
-  /* ================= PELAPORAN PERIODIK & KEPATUHAN ================= */
-
-  /** Daftar kewajiban lapor sebuah instansi (opsional hanya yang aktif). */
-  getKewajiban(tenantId: string, hanyaAktif = false): KewajibanLapor[] {
-    return this.kewajibanLapor.filter(
-      (k) => k.tenantId === tenantId && (!hanyaAktif || k.isActive)
-    );
-  }
-
-  createKewajiban(data: Omit<KewajibanLapor, 'id' | 'createdAt'>): KewajibanLapor {
-    const baru: KewajibanLapor = {
-      ...data,
-      id: `kew-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: new Date().toISOString(),
-    };
-    this.kewajibanLapor.push(baru);
-    this.trackWrite(this.mysql?.upsertKewajiban(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  updateKewajiban(
-    id: string,
-    tenantId: string,
-    partial: Partial<KewajibanLapor>
-  ): KewajibanLapor | undefined {
-    const idx = this.kewajibanLapor.findIndex((k) => k.id === id && k.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const digabung: KewajibanLapor = {
-      ...this.kewajibanLapor[idx],
-      ...partial,
-      // id & tenantId tidak boleh diubah lewat partial.
-      id: this.kewajibanLapor[idx].id,
-      tenantId: this.kewajibanLapor[idx].tenantId,
-    };
-    this.kewajibanLapor[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertKewajiban(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  /** Hapus kewajiban + SEMUA laporan yang menunjuk padanya (cascade). */
-  deleteKewajiban(id: string, tenantId: string): boolean {
-    const ada = this.kewajibanLapor.some((k) => k.id === id && k.tenantId === tenantId);
-    if (!ada) return false;
-    this.kewajibanLapor = this.kewajibanLapor.filter((k) => k.id !== id);
-    const lapHapus = this.laporanPeriodik.filter((l) => l.kewajibanId === id);
-    this.laporanPeriodik = this.laporanPeriodik.filter((l) => l.kewajibanId !== id);
-    this.trackWrite(this.mysql?.deleteKewajibanRow(id));
-    for (const l of lapHapus) this.trackWrite(this.mysql?.deleteLaporanRow(l.id));
-    this.persist();
-    return true;
-  }
-
-  /** Laporan periodik sebuah instansi, opsional disaring satu periode. */
-  getLaporan(tenantId: string, periode?: string): LaporanPeriodik[] {
-    return this.laporanPeriodik.filter(
-      (l) => l.tenantId === tenantId && (!periode || l.periode === periode)
-    );
-  }
-
-  /**
-   * Catat/perbarui realisasi laporan untuk (kewajiban, periode).
-   *
-   * Kalau sudah ada entri untuk pasangan itu, entri itulah yang diperbarui —
-   * bukan dibuat duplikat. Ini yang membuat alur "isi laporan" idempoten.
-   */
-  catatLaporan(
-    data: Omit<LaporanPeriodik, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
-  ): LaporanPeriodik {
-    const now = new Date().toISOString();
-    const idx = this.laporanPeriodik.findIndex(
-      (l) =>
-        l.tenantId === data.tenantId &&
-        l.kewajibanId === data.kewajibanId &&
-        l.periode === data.periode
-    );
-    if (idx !== -1) {
-      const lama = this.laporanPeriodik[idx];
-      const diperbarui: LaporanPeriodik = {
-        ...lama,
-        ...data,
-        id: lama.id,
-        createdAt: lama.createdAt,
-        updatedAt: now,
-      };
-      this.laporanPeriodik[idx] = diperbarui;
-      this.trackWrite(
-        this.mysql?.upsertLaporan(diperbarui.id, diperbarui.tenantId, diperbarui.kewajibanId, diperbarui)
-      );
-      this.persist();
-      return diperbarui;
-    }
-    const baru: LaporanPeriodik = {
-      ...data,
-      id: data.id || `lap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.laporanPeriodik.push(baru);
-    this.trackWrite(this.mysql?.upsertLaporan(baru.id, baru.tenantId, baru.kewajibanId, baru));
-    this.persist();
-    return baru;
-  }
-
-  deleteLaporan(id: string, tenantId: string): boolean {
-    const ada = this.laporanPeriodik.some((l) => l.id === id && l.tenantId === tenantId);
-    if (!ada) return false;
-    this.laporanPeriodik = this.laporanPeriodik.filter((l) => l.id !== id);
-    this.trackWrite(this.mysql?.deleteLaporanRow(id));
-    this.persist();
-    return true;
-  }
-
-  /**
-   * Ubah HANYA status sebuah laporan (dipakai alur verifikasi bertingkat).
-   * Menjaga field lain apa adanya — tidak menyentuh tenggat, lampiran, atau riwayat.
-   */
-  updateLaporanStatus(
-    id: string,
-    tenantId: string,
-    status: StatusLaporan
-  ): LaporanPeriodik | undefined {
-    const idx = this.laporanPeriodik.findIndex((l) => l.id === id && l.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const diperbarui: LaporanPeriodik = {
-      ...this.laporanPeriodik[idx],
-      status,
-      updatedAt: new Date().toISOString(),
-    };
-    this.laporanPeriodik[idx] = diperbarui;
-    this.trackWrite(
-      this.mysql?.upsertLaporan(diperbarui.id, diperbarui.tenantId, diperbarui.kewajibanId, diperbarui)
-    );
-    this.persist();
-    return diperbarui;
-  }
-
-  // ===== Alur verifikasi bertingkat =====
-
-  /** Alur verifikasi sebuah instansi. */
-  getAlurVerifikasi(tenantId: string): AlurVerifikasi[] {
-    return this.alurVerifikasi.filter((a) => a.tenantId === tenantId);
-  }
-
-  /** Alur default instansi (yang dipakai laporan tanpa `alurId`), bila ada. */
-  getAlurDefault(tenantId: string): AlurVerifikasi | undefined {
-    return this.alurVerifikasi.find((a) => a.tenantId === tenantId && a.isDefault);
-  }
-
-  /**
-   * Simpan alur (buat baru atau perbarui). Bila `isDefault` true, alur lain
-   * milik instansi yang sama diturunkan — supaya hanya ada SATU default.
-   */
-  simpanAlurVerifikasi(
-    data: Omit<AlurVerifikasi, 'id' | 'createdAt'> & { id?: string }
-  ): AlurVerifikasi {
-    if (data.isDefault) {
-      for (const a of this.alurVerifikasi) {
-        if (a.tenantId === data.tenantId && a.isDefault && a.id !== data.id) {
-          a.isDefault = false;
-          this.trackWrite(this.mysql?.upsertAlurVerifikasi(a.id, a.tenantId, a));
-        }
-      }
-    }
-    if (data.id) {
-      const idx = this.alurVerifikasi.findIndex(
-        (a) => a.id === data.id && a.tenantId === data.tenantId
-      );
-      if (idx !== -1) {
-        const diperbarui: AlurVerifikasi = {
-          ...this.alurVerifikasi[idx],
-          ...data,
-          id: this.alurVerifikasi[idx].id,
-          tenantId: this.alurVerifikasi[idx].tenantId,
-        };
-        this.alurVerifikasi[idx] = diperbarui;
-        this.trackWrite(
-          this.mysql?.upsertAlurVerifikasi(diperbarui.id, diperbarui.tenantId, diperbarui)
-        );
-        this.persist();
-        return diperbarui;
-      }
-    }
-    const baru: AlurVerifikasi = {
-      ...data,
-      id: data.id || `alur-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: new Date().toISOString(),
-    };
-    this.alurVerifikasi.push(baru);
-    this.trackWrite(this.mysql?.upsertAlurVerifikasi(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  deleteAlurVerifikasi(id: string, tenantId: string): boolean {
-    const ada = this.alurVerifikasi.some((a) => a.id === id && a.tenantId === tenantId);
-    if (!ada) return false;
-    this.alurVerifikasi = this.alurVerifikasi.filter((a) => a.id !== id);
-    // Laporan yang memakai alur ini kembali ke alur bawaan — JANGAN hapus
-    // laporannya, cukup lepaskan rujukannya supaya riwayatnya tidak hilang.
-    for (const l of this.laporanPeriodik) {
-      if (l.alurId === id) {
-        delete l.alurId;
-        this.trackWrite(this.mysql?.upsertLaporan(l.id, l.tenantId, l.kewajibanId, l));
-      }
-    }
-    this.trackWrite(this.mysql?.deleteAlurVerifikasiRow(id));
-    this.persist();
-    return true;
-  }
-
-  /**
-   * Tambahkan satu aksi verifikasi ke riwayat laporan (append-only).
-   * Dipakai untuk `kirim`, `setujui`, dan `revisi`. Mengembalikan laporan
-   * terbaru, atau `undefined` bila laporan tidak ada di instansi itu.
-   */
-  tambahAksiVerifikasi(
-    laporanId: string,
-    tenantId: string,
-    aksi: AksiVerifikasi
-  ): LaporanPeriodik | undefined {
-    const idx = this.laporanPeriodik.findIndex(
-      (l) => l.id === laporanId && l.tenantId === tenantId
-    );
-    if (idx === -1) return undefined;
-    const lama = this.laporanPeriodik[idx];
-    const riwayat = Array.isArray(lama.riwayatVerifikasi) ? lama.riwayatVerifikasi : [];
-    const diperbarui: LaporanPeriodik = {
-      ...lama,
-      riwayatVerifikasi: [...riwayat, aksi],
-      updatedAt: new Date().toISOString(),
-    };
-    this.laporanPeriodik[idx] = diperbarui;
-    this.trackWrite(
-      this.mysql?.upsertLaporan(diperbarui.id, diperbarui.tenantId, diperbarui.kewajibanId, diperbarui)
-    );
-    this.persist();
-    return diperbarui;
-  }
-
-  /* ================= TINDAK LANJUT AUDIT ================= */
-
-  /** Daftar temuan audit sebuah instansi (opsional disaring sumber/status). */
-  getTemuanAudit(tenantId: string, filter?: { sumber?: string; status?: string }): TemuanAudit[] {
-    return this.temuanAudit.filter(
-      (t) =>
-        t.tenantId === tenantId &&
-        (!filter?.sumber || t.sumber === filter.sumber) &&
-        (!filter?.status || t.status === filter.status)
-    );
-  }
-
-  /** Satu temuan audit milik instansi ini, atau `undefined`. */
-  getTemuanAuditById(id: string, tenantId: string): TemuanAudit | undefined {
-    return this.temuanAudit.find((t) => t.id === id && t.tenantId === tenantId);
-  }
-
-  createTemuanAudit(
-    data: Omit<TemuanAudit, 'id' | 'createdAt' | 'updatedAt'>
-  ): TemuanAudit {
-    const now = new Date().toISOString();
-    const baru: TemuanAudit = {
-      ...data,
-      aksiTindakLanjut: Array.isArray(data.aksiTindakLanjut) ? data.aksiTindakLanjut : [],
-      id: `tem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.temuanAudit.push(baru);
-    this.trackWrite(this.mysql?.upsertTemuanAudit(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  updateTemuanAudit(
-    id: string,
-    tenantId: string,
-    partial: Partial<TemuanAudit>
-  ): TemuanAudit | undefined {
-    const idx = this.temuanAudit.findIndex((t) => t.id === id && t.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.temuanAudit[idx];
-    const digabung: TemuanAudit = {
-      ...lama,
-      ...partial,
-      // id & tenantId & riwayat tidak boleh diubah lewat partial.
-      id: lama.id,
-      tenantId: lama.tenantId,
-      aksiTindakLanjut: lama.aksiTindakLanjut,
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.temuanAudit[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertTemuanAudit(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  deleteTemuanAudit(id: string, tenantId: string): boolean {
-    const ada = this.temuanAudit.some((t) => t.id === id && t.tenantId === tenantId);
-    if (!ada) return false;
-    this.temuanAudit = this.temuanAudit.filter((t) => t.id !== id);
-    this.trackWrite(this.mysql?.deleteTemuanAuditRow(id));
     this.persist();
     return true;
   }
@@ -2351,382 +1836,6 @@ export class InMemoryDb {
     this.analisisDokumen = this.analisisDokumen.filter((a) => !(a.id === id && a.tenantId === tenantId));
     this.trackWrite(this.mysql?.deleteAnalisisDokumenRow(id));
     this.hapusButirAnalisis(id, tenantId);
-    this.persist();
-    return true;
-  }
-
-  /**
-   * Tambahkan satu aksi tindak lanjut ke riwayat temuan (append-only) DAN
-   * perbarui status temuan mengikuti `statusSesudah`. Mengembalikan temuan
-   * terbaru, atau `undefined` bila temuan tidak ada di instansi itu.
-   */
-  tambahAksiTindakLanjut(
-    temuanId: string,
-    tenantId: string,
-    aksi: AksiTindakLanjut,
-    patchTemuan?: Partial<TemuanAudit>
-  ): TemuanAudit | undefined {
-    const idx = this.temuanAudit.findIndex((t) => t.id === temuanId && t.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.temuanAudit[idx];
-    const diperbarui: TemuanAudit = {
-      ...lama,
-      ...(patchTemuan || {}),
-      id: lama.id,
-      tenantId: lama.tenantId,
-      status: aksi.statusSesudah,
-      aksiTindakLanjut: [...lama.aksiTindakLanjut, aksi],
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.temuanAudit[idx] = diperbarui;
-    this.trackWrite(this.mysql?.upsertTemuanAudit(diperbarui.id, diperbarui.tenantId, diperbarui));
-    this.persist();
-    return diperbarui;
-  }
-
-  /* ================= MANAJEMEN RISIKO ================= */
-
-  /** Daftar risiko sebuah instansi (opsional disaring kategori/level/status). */
-  getRisiko(
-    tenantId: string,
-    filter?: { kategori?: string; level?: string; status?: string }
-  ): Risiko[] {
-    return this.risiko.filter(
-      (r) =>
-        r.tenantId === tenantId &&
-        (!filter?.kategori || r.kategori === filter.kategori) &&
-        (!filter?.level || r.level === filter.level) &&
-        (!filter?.status || r.status === filter.status)
-    );
-  }
-
-  getRisikoById(id: string, tenantId: string): Risiko | undefined {
-    return this.risiko.find((r) => r.id === id && r.tenantId === tenantId);
-  }
-
-  createRisiko(data: Omit<Risiko, 'id' | 'createdAt' | 'updatedAt'>): Risiko {
-    const now = new Date().toISOString();
-    const baru: Risiko = {
-      ...data,
-      aksiMitigasi: Array.isArray(data.aksiMitigasi) ? data.aksiMitigasi : [],
-      id: `rsk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.risiko.push(baru);
-    this.trackWrite(this.mysql?.upsertRisiko(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  /**
-   * Ubah risiko. `id`/`tenantId`/`createdAt`/riwayat mitigasi tidak boleh
-   * berubah lewat `partial` — sama seperti `updateTemuanAudit`.
-   */
-  updateRisiko(id: string, tenantId: string, partial: Partial<Risiko>): Risiko | undefined {
-    const idx = this.risiko.findIndex((r) => r.id === id && r.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.risiko[idx];
-    const digabung: Risiko = {
-      ...lama,
-      ...partial,
-      id: lama.id,
-      tenantId: lama.tenantId,
-      aksiMitigasi: lama.aksiMitigasi,
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.risiko[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertRisiko(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  deleteRisiko(id: string, tenantId: string): boolean {
-    const ada = this.risiko.some((r) => r.id === id && r.tenantId === tenantId);
-    if (!ada) return false;
-    this.risiko = this.risiko.filter((r) => r.id !== id);
-    this.trackWrite(this.mysql?.deleteRisikoRow(id));
-    this.persist();
-    return true;
-  }
-
-  /**
-   * Tambahkan satu aksi mitigasi ke riwayat risiko (append-only) DAN perbarui
-   * status risiko mengikuti `statusSesudah`. Mengembalikan risiko terbaru, atau
-   * `undefined` bila risiko tidak ada di instansi itu.
-   */
-  tambahAksiMitigasi(
-    risikoId: string,
-    tenantId: string,
-    aksi: AksiMitigasi,
-    patchRisiko?: Partial<Risiko>
-  ): Risiko | undefined {
-    const idx = this.risiko.findIndex((r) => r.id === risikoId && r.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.risiko[idx];
-    const diperbarui: Risiko = {
-      ...lama,
-      ...(patchRisiko || {}),
-      id: lama.id,
-      tenantId: lama.tenantId,
-      status: aksi.statusSesudah,
-      levelResidual: aksi.levelResidual ?? lama.levelResidual,
-      aksiMitigasi: [...lama.aksiMitigasi, aksi],
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.risiko[idx] = diperbarui;
-    this.trackWrite(this.mysql?.upsertRisiko(diperbarui.id, diperbarui.tenantId, diperbarui));
-    this.persist();
-    return diperbarui;
-  }
-
-  /* ================= MANAJEMEN ASET ================= */
-
-  /** Daftar aset sebuah instansi (opsional disaring kategori/kondisi/pemanfaatan). */
-  getAset(
-    tenantId: string,
-    filter?: { kategori?: string; kondisi?: string; pemanfaatan?: string }
-  ): Aset[] {
-    return this.aset.filter(
-      (a) =>
-        a.tenantId === tenantId &&
-        (!filter?.kategori || a.kategori === filter.kategori) &&
-        (!filter?.kondisi || a.kondisi === filter.kondisi) &&
-        (!filter?.pemanfaatan || a.pemanfaatan === filter.pemanfaatan)
-    );
-  }
-
-  getAsetById(id: string, tenantId: string): Aset | undefined {
-    return this.aset.find((a) => a.id === id && a.tenantId === tenantId);
-  }
-
-  createAset(data: Omit<Aset, 'id' | 'createdAt' | 'updatedAt'>): Aset {
-    const now = new Date().toISOString();
-    const baru: Aset = {
-      ...data,
-      id: `ast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.aset.push(baru);
-    this.trackWrite(this.mysql?.upsertAset(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  /**
-   * Ubah aset. `id`/`tenantId`/`createdAt` tidak boleh diubah klien.
-   * Nilai buku/penyusutan dihitung ulang di lapisan API dari field mentah.
-   */
-  updateAset(id: string, tenantId: string, partial: Partial<Aset>): Aset | undefined {
-    const idx = this.aset.findIndex((a) => a.id === id && a.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.aset[idx];
-    const digabung: Aset = {
-      ...lama,
-      ...partial,
-      id: lama.id,
-      tenantId: lama.tenantId,
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.aset[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertAset(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  deleteAset(id: string, tenantId: string): boolean {
-    const ada = this.aset.some((a) => a.id === id && a.tenantId === tenantId);
-    if (!ada) return false;
-    this.aset = this.aset.filter((a) => a.id !== id);
-    this.trackWrite(this.mysql?.deleteAsetRow(id));
-    this.persist();
-    return true;
-  }
-
-  /* ================= PERJANJIAN KINERJA ================= */
-
-  /** Daftar Perjanjian Kinerja sebuah instansi (opsional disaring periode/status). */
-  getPerjanjianKinerja(tenantId: string, filter?: { periode?: string; status?: string }): PerjanjianKinerja[] {
-    return this.perjanjianKinerja.filter(
-      (p) =>
-        p.tenantId === tenantId &&
-        (!filter?.periode || p.periode === filter.periode) &&
-        (!filter?.status || p.status === filter.status)
-    );
-  }
-
-  getPerjanjianKinerjaById(id: string, tenantId: string): PerjanjianKinerja | undefined {
-    return this.perjanjianKinerja.find((p) => p.id === id && p.tenantId === tenantId);
-  }
-
-  createPerjanjianKinerja(data: Omit<PerjanjianKinerja, 'id' | 'createdAt' | 'updatedAt'>): PerjanjianKinerja {
-    const now = new Date().toISOString();
-    const baru: PerjanjianKinerja = {
-      ...data,
-      id: `pk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.perjanjianKinerja.push(baru);
-    this.trackWrite(this.mysql?.upsertPerjanjianKinerja(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  /** Ubah dokumen PK. `id`/`tenantId`/`createdAt` tidak boleh diubah klien. */
-  updatePerjanjianKinerja(
-    id: string,
-    tenantId: string,
-    partial: Partial<PerjanjianKinerja>
-  ): PerjanjianKinerja | undefined {
-    const idx = this.perjanjianKinerja.findIndex((p) => p.id === id && p.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.perjanjianKinerja[idx];
-    const digabung: PerjanjianKinerja = {
-      ...lama,
-      ...partial,
-      id: lama.id,
-      tenantId: lama.tenantId,
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.perjanjianKinerja[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertPerjanjianKinerja(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  deletePerjanjianKinerja(id: string, tenantId: string): boolean {
-    const ada = this.perjanjianKinerja.some((p) => p.id === id && p.tenantId === tenantId);
-    if (!ada) return false;
-    this.perjanjianKinerja = this.perjanjianKinerja.filter((p) => p.id !== id);
-    this.trackWrite(this.mysql?.deletePerjanjianKinerjaRow(id));
-    this.persist();
-    return true;
-  }
-
-  /* ================= LKjIP ================= */
-
-  /** Daftar LKjIP sebuah instansi (opsional disaring periode/status). */
-  getLKjIP(tenantId: string, filter?: { periode?: string; status?: string }): LKjIP[] {
-    return this.lkjip.filter(
-      (l) =>
-        l.tenantId === tenantId &&
-        (!filter?.periode || l.periode === filter.periode) &&
-        (!filter?.status || l.status === filter.status)
-    );
-  }
-
-  getLKjIPById(id: string, tenantId: string): LKjIP | undefined {
-    return this.lkjip.find((l) => l.id === id && l.tenantId === tenantId);
-  }
-
-  createLKjIP(data: Omit<LKjIP, 'id' | 'createdAt' | 'updatedAt'>): LKjIP {
-    const now = new Date().toISOString();
-    const baru: LKjIP = {
-      ...data,
-      id: `lkjip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.lkjip.push(baru);
-    this.trackWrite(this.mysql?.upsertLKjIP(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  /** Ubah LKjIP. `id`/`tenantId`/`createdAt` tidak boleh diubah klien. */
-  updateLKjIP(id: string, tenantId: string, partial: Partial<LKjIP>): LKjIP | undefined {
-    const idx = this.lkjip.findIndex((l) => l.id === id && l.tenantId === tenantId);
-    if (idx === -1) return undefined;
-    const lama = this.lkjip[idx];
-    const digabung: LKjIP = {
-      ...lama,
-      ...partial,
-      id: lama.id,
-      tenantId: lama.tenantId,
-      createdAt: lama.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.lkjip[idx] = digabung;
-    this.trackWrite(this.mysql?.upsertLKjIP(digabung.id, digabung.tenantId, digabung));
-    this.persist();
-    return digabung;
-  }
-
-  deleteLKjIP(id: string, tenantId: string): boolean {
-    const ada = this.lkjip.some((l) => l.id === id && l.tenantId === tenantId);
-    if (!ada) return false;
-    this.lkjip = this.lkjip.filter((l) => l.id !== id);
-    this.trackWrite(this.mysql?.deleteLKjIPRow(id));
-    this.persist();
-    return true;
-  }
-
-  /* ================= KESEHATAN KEUANGAN & RASIO ================= */
-
-  /** Snapshot kesehatan keuangan sebuah instansi (opsional satu periode). */
-  getSnapshotKeuangan(tenantId: string, periode?: string): SnapshotKeuangan[] {
-    return this.snapshotKeuangan.filter(
-      (s) => s.tenantId === tenantId && (!periode || s.periode === periode)
-    );
-  }
-
-  getSnapshotKeuanganById(id: string, tenantId: string): SnapshotKeuangan | undefined {
-    return this.snapshotKeuangan.find((s) => s.id === id && s.tenantId === tenantId);
-  }
-
-  /**
-   * Catat/perbarui snapshot untuk (instansi, periode).
-   *
-   * Idempoten seperti `catatLaporan`: periode yang sama diperbarui, bukan
-   * digandakan. Rasio dihitung ulang oleh pemanggil (server) sebelum dikirim.
-   */
-  catatSnapshotKeuangan(
-    data: Omit<SnapshotKeuangan, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
-  ): SnapshotKeuangan {
-    const now = new Date().toISOString();
-    const idx = this.snapshotKeuangan.findIndex(
-      (s) => s.tenantId === data.tenantId && s.periode === data.periode
-    );
-    if (idx !== -1) {
-      const lama = this.snapshotKeuangan[idx];
-      const diperbarui: SnapshotKeuangan = {
-        ...lama,
-        ...data,
-        id: lama.id,
-        createdAt: lama.createdAt,
-        updatedAt: now,
-      };
-      this.snapshotKeuangan[idx] = diperbarui;
-      this.trackWrite(
-        this.mysql?.upsertSnapshotKeuangan(diperbarui.id, diperbarui.tenantId, diperbarui)
-      );
-      this.persist();
-      return diperbarui;
-    }
-    const baru: SnapshotKeuangan = {
-      ...data,
-      id: data.id || `keu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.snapshotKeuangan.push(baru);
-    this.trackWrite(this.mysql?.upsertSnapshotKeuangan(baru.id, baru.tenantId, baru));
-    this.persist();
-    return baru;
-  }
-
-  deleteSnapshotKeuangan(id: string, tenantId: string): boolean {
-    const ada = this.snapshotKeuangan.some((s) => s.id === id && s.tenantId === tenantId);
-    if (!ada) return false;
-    this.snapshotKeuangan = this.snapshotKeuangan.filter((s) => s.id !== id);
-    this.trackWrite(this.mysql?.deleteSnapshotKeuanganRow(id));
     this.persist();
     return true;
   }
