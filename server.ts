@@ -72,6 +72,8 @@ import { KUOTA_ANALISIS_BAWAAN, sisaKuota } from './src/services/analisis/antrea
 import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/services/analisis/jalankan';
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
+import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
+import { bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
 import {
   butirSiapPakai,
@@ -7356,6 +7358,73 @@ ${navigasi}
     });
   });
 
+  /* ================= PANEL ADMIN AIONES (Fase 4) ================= */
+
+  /** Ringkasan lintas instansi — hanya Admin Aiones. */
+  app.get('/api/admin/platform', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!isSuperadmin(session.role)) {
+      return res.status(403).json({ error: 'Ringkasan platform hanya untuk Admin Aiones.' });
+    }
+    const ringkasan = ringkasPlatform({
+      tenants: db.tenants,
+      users: db.users,
+      dashboards: db.dashboards,
+      permintaan: db.permintaanData,
+      analisis: db.analisisDokumen,
+      butir: db.butirData,
+      kuota: (db.systemConfig as any).kuotaAnalisisHarian ?? undefined,
+    });
+    res.json(ringkasan);
+  });
+
+  /** Pemakaian kuota AI per instansi hari ini. */
+  app.get('/api/admin/kuota', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!isSuperadmin(session.role)) {
+      return res.status(403).json({ error: 'Kuota AI lintas instansi hanya untuk Admin Aiones.' });
+    }
+    const kuota = (db.systemConfig as any).kuotaAnalisisHarian ?? undefined;
+    res.json({
+      kuota: kuota ?? 20,
+      perInstansi: kuotaPerInstansi({
+        tenants: db.tenants,
+        users: db.users,
+        dashboards: db.dashboards,
+        permintaan: db.permintaanData,
+        analisis: db.analisisDokumen,
+        butir: db.butirData,
+        kuota,
+      }),
+    });
+  });
+
+  /** Ubah kuota analisis harian per instansi. */
+  app.patch('/api/admin/kuota', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!isSuperadmin(session.role)) {
+      return res.status(403).json({ error: 'Kuota AI hanya bisa diatur Admin Aiones.' });
+    }
+    const nilai = Number(req.body?.kuotaAnalisisHarian);
+    if (!Number.isFinite(nilai) || nilai < 0 || nilai > 1000) {
+      return res.status(400).json({ error: 'Kuota harus angka 0 sampai 1000 per instansi per hari.' });
+    }
+    db.updateSystemConfig({ kuotaAnalisisHarian: Math.floor(nilai) });
+    const disimpan = db.systemConfig;
+    db.addAuditLog({
+      tenantId: effectiveTenantId(req, session),
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Kuota Analisis AI',
+      target: 'systemConfig.kuotaAnalisisHarian',
+      details: `Menjadi ${Math.floor(nilai)} dokumen/instansi/hari`,
+    });
+    res.json({ kuotaAnalisisHarian: (disimpan as any).kuotaAnalisisHarian });
+  });
+
   app.get('/api/admin/users', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
@@ -7518,6 +7587,12 @@ ${navigasi}
     const session = requireAuth(req, res);
     if (!session) return;
     if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Penjagaan akun Admin Aiones terakhir: tanpa ini, satu klik bisa membuat
+    // platform tidak punya pengelola sama sekali.
+    if (req.body?.role !== undefined && req.body.role !== 'superadmin') {
+      const cek = bolehTurunkanSuperadmin(db.users, req.params.id);
+      if (!cek.boleh) return res.status(409).json({ error: cek.alasan, kode: 'SUPERADMIN_TERAKHIR' });
+    }
     const updated = db.updateUser(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
@@ -7540,6 +7615,8 @@ ${navigasi}
     if (req.params.id === session.userId) {
       return res.status(400).json({ error: 'Tidak bisa menghapus akun sendiri.' });
     }
+    const cekHapus = bolehTurunkanSuperadmin(db.users, req.params.id);
+    if (!cekHapus.boleh) return res.status(409).json({ error: cekHapus.alasan, kode: 'SUPERADMIN_TERAKHIR' });
     const target = db.users.find((u) => u.id === req.params.id);
     const success = db.deleteUser(req.params.id);
     if (!success) {

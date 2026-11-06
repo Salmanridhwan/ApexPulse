@@ -23,6 +23,7 @@ import { Dashboard, Tenant, User } from '../types';
 import { TIPE_VISUALISASI } from '../services/spec/widgetTypes';
 import { ADMIN_TABS, AdminTabId } from './adminTabs';
 import { isAdminRole } from '../services/auth/peran';
+import { tabUntukPeran } from './adminTabs';
 
 export interface SidebarProps {
   isCollapsed: boolean;
@@ -425,7 +426,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  {ADMIN_TABS.map((tab) => {
+                  {tabUntukPeran(currentUser?.role).map((tab) => {
                     const Icon = tab.icon;
                     const aktif = currentView === 'admin' && adminTab === tab.id;
                     return (

@@ -669,6 +669,18 @@ Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKe
 | `butirKeSlotTemplate.ts` | belum — menunggu UI pemilihan template |
 | UI pemilihan butir ("Katalog Data") | belum — endpoint sudah siap, layarnya belum ada |
 
+**Status Fase 4 (commit):**
+
+| Bagian | Keadaan |
+|---|---|
+| Pembagian tab per peran | selesai — `AdminTab.peran`; Admin Instansi hanya melihat Ringkasan, Pengguna, Tampilan Menu, Ambang Batas |
+| Tab Kuota AI | selesai — tabel pemakaian per instansi + ubah batas harian (0–1000) |
+| `GET /api/admin/platform` | selesai — ringkasan lintas instansi (akun per peran, permintaan, analisis, butir, kuota) |
+| Penjagaan Admin Aiones terakhir | selesai — turunkan/hapus akun superadmin terakhir ditolak 409 `SUPERADMIN_TERAKHIR` |
+| Ringkasan platform di layar | belum — endpoint siap, kartu ringkasan di tab Ringkasan masih versi lama (`/api/admin/stats`) |
+| Jejak audit lintas instansi berfilter | belum — `/api/audit-logs` sudah ada, filter per instansi belum |
+
+
 
 ### Fase 4: Panel Admin Aiones
 

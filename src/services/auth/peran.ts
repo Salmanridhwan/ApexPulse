@@ -33,3 +33,33 @@ export function labelPeran(role: unknown): string {
 export function bolehMenyusunDashboard(role: UserRole | string | undefined): boolean {
   return isAdminRole(role);
 }
+
+/** Akun yang perannya `superadmin`. */
+export function daftarSuperadmin<T extends { id: string; role?: string }>(semua: T[]): T[] {
+  return semua.filter((u) => u.role === 'superadmin');
+}
+
+/**
+ * Boleh tidaknya seorang superadmin diturunkan perannya atau dihapus.
+ *
+ * Admin Aiones adalah satu-satunya pihak yang bisa mengelola platform. Kalau
+ * akun superadmin terakhir diturunkan atau dihapus, tidak ada lagi yang bisa
+ * mengembalikannya lewat aplikasi — pemulihannya harus lewat database. Karena
+ * itu aksi itu ditolak, bukan diberi peringatan yang bisa dilewati.
+ */
+export function bolehTurunkanSuperadmin(
+  semua: Array<{ id: string; role?: string }>,
+  targetId: string
+): { boleh: boolean; alasan?: string } {
+  const target = semua.find((u) => u.id === targetId);
+  if (!target || target.role !== 'superadmin') return { boleh: true };
+  const jumlah = daftarSuperadmin(semua).length;
+  if (jumlah <= 1) {
+    return {
+      boleh: false,
+      alasan:
+        'Ini akun Admin Aiones terakhir. Angkat akun lain menjadi Admin Aiones dulu sebelum menurunkan atau menghapus akun ini.',
+    };
+  }
+  return { boleh: true };
+}

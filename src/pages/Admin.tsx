@@ -158,6 +158,54 @@ export const Admin: React.FC<AdminProps> = ({
   const [tampilKunci, setTampilKunci] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+  /** Tab Kuota AI (khusus Admin Aiones). */
+  const [kuotaAi, setKuotaAi] = useState<number>(20);
+  const [kuotaPer, setKuotaPer] = useState<Array<{ tenantId: string; nama: string; terpakai: number; kuota: number; sisa: number }>>([]);
+  const [menyimpanKuota, setMenyimpanKuota] = useState(false);
+  const [pesanKuota, setPesanKuota] = useState<{ ok: boolean; teks: string } | null>(null);
+
+  /**
+   * Muat pemakaian kuota AI per instansi.
+   *
+   * Hanya dipanggil saat tab Kuota dibuka: endpoint-nya menolak Admin Instansi,
+   * jadi memanggilnya di awal untuk semua orang hanya menghasilkan 403.
+   */
+  const muatKuota = async () => {
+    try {
+      const res = await fetch('/api/admin/kuota');
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setKuotaAi(Number(data.kuota ?? 20));
+      setKuotaPer(Array.isArray(data.perInstansi) ? data.perInstansi : []);
+    } catch {
+      setPesanKuota({ ok: false, teks: 'Gagal memuat kuota. Coba muat ulang.' });
+    }
+  };
+
+  const simpanKuotaAi = async () => {
+    setMenyimpanKuota(true);
+    setPesanKuota(null);
+    try {
+      const res = await fetch('/api/admin/kuota', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kuotaAnalisisHarian: kuotaAi }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Gagal menyimpan (${res.status})`);
+      setPesanKuota({ ok: true, teks: 'Kuota tersimpan. Berlaku untuk analisis berikutnya.' });
+      await muatKuota();
+    } catch (e: any) {
+      setPesanKuota({ ok: false, teks: e?.message || 'Gagal menyimpan kuota.' });
+    } finally {
+      setMenyimpanKuota(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'kuota') void muatKuota();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
   /** Pendaftar yang menunggu persetujuan admin instansi (manual maupun Google). */
   const [permintaanGabung, setPermintaanGabung] = useState<
     { id: string; name: string; email: string; tenantId: string; tenantName: string | null; viaGoogle: boolean; emailVerified: boolean; requestedAt: string | null }[]
@@ -2333,6 +2381,80 @@ export const Admin: React.FC<AdminProps> = ({
           })()}
 
           {/* ================= TAB 5: ALERTS ================= */}
+          {activeTab === 'kuota' && (
+            <div className="space-y-4">
+              <div className="card p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink-1">Kuota analisis AI</h3>
+                    <p className="text-xs text-ink-2 mt-1 max-w-xl">
+                      Batas berapa dokumen yang boleh dianalisis AI per instansi setiap hari. Kuota
+                      dihitung per instansi, jadi satu instansi yang boros tidak menghabiskan jatah
+                      instansi lain.
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div>
+                      <label className="text-[11px] font-semibold text-ink-2 block mb-1">Dokumen / instansi / hari</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        value={kuotaAi}
+                        onChange={(e) => setKuotaAi(Number(e.target.value))}
+                        className="input w-28 text-sm"
+                        data-testid="input-kuota-ai"
+                      />
+                    </div>
+                    <button
+                      onClick={simpanKuotaAi}
+                      disabled={menyimpanKuota}
+                      className="btn-primary text-xs px-3 py-2"
+                      data-testid="simpan-kuota-ai"
+                    >
+                      {menyimpanKuota ? 'Menyimpan…' : 'Simpan'}
+                    </button>
+                  </div>
+                </div>
+                {pesanKuota && (
+                  <p className={`text-xs mt-3 ${pesanKuota.ok ? 'text-emerald-600' : 'text-red-600'}`}>{pesanKuota.teks}</p>
+                )}
+              </div>
+
+              <div className="card overflow-hidden">
+                <div className="px-5 py-3 border-b border-line-1 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-ink-1">Pemakaian hari ini</h3>
+                  <button onClick={muatKuota} className="text-xs text-brand-600 hover:underline">Muat ulang</button>
+                </div>
+                <table className="w-full text-xs">
+                  <thead className="bg-surface-2 text-ink-2">
+                    <tr>
+                      <th className="text-left px-5 py-2 font-semibold">Instansi</th>
+                      <th className="text-right px-5 py-2 font-semibold">Terpakai</th>
+                      <th className="text-right px-5 py-2 font-semibold">Kuota</th>
+                      <th className="text-right px-5 py-2 font-semibold">Sisa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kuotaPer.length === 0 && (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-ink-2">Belum ada data kuota.</td></tr>
+                    )}
+                    {kuotaPer.map((k) => (
+                      <tr key={k.tenantId} className="border-t border-line-1">
+                        <td className="px-5 py-2 text-ink-1 font-medium">{k.nama}</td>
+                        <td className="px-5 py-2 text-right tabular-nums">{k.terpakai}</td>
+                        <td className="px-5 py-2 text-right tabular-nums text-ink-2">{k.kuota}</td>
+                        <td className={`px-5 py-2 text-right tabular-nums font-semibold ${k.sisa === 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {k.sisa}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'alerts' && (
             <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
               <div>
