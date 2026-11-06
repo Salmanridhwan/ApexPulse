@@ -61,14 +61,6 @@ export interface Tenant {
    * tujuan unggah memakai `kmsOrganizationId`.
    */
   kmsKnowledgeBase?: string;
-  /**
-   * Menu grup "Kinerja & Kepatuhan" yang DISEMBUNYIKAN admin untuk instansi ini.
-   *
-   * Isinya key menu (lihat `src/components/menuKinerja.ts`), mis. ['risiko','aset'].
-   * Kosong/tidak ada = semua menu tampil. Opt-out, bukan opt-in, supaya instansi
-   * lama otomatis tetap lengkap tanpa migrasi data.
-   */
-  menuSembunyi?: string[];
 }
 
 export interface User {

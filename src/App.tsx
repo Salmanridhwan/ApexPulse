@@ -39,7 +39,6 @@ import { ShareModal } from './components/ShareModal';
 import { Sidebar } from './components/Sidebar';
 import { isAdminRole } from './services/auth/peran';
 import { ADMIN_TABS, AdminTabId } from './components/adminTabs';
-import { MENU_KINERJA, menuTampil } from './components/menuKinerja';
 import {
   nilaiDariWidgets,
   nilaiAnalitikDariWidgets,
@@ -215,17 +214,6 @@ export default function App() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
 
-  /**
-   * Menu grup "Kinerja & Kepatuhan" boleh disembunyikan admin per instansi.
-   * Dipakai untuk dua hal: menentukan callback sidebar dan menjaga viewMode.
-   */
-  const tampilMenu = (key: string) => menuTampil(currentTenant?.menuSembunyi, key);
-
-  useEffect(() => {
-    if (MENU_KINERJA.some((m) => m.key === viewMode) && !menuTampil(currentTenant?.menuSembunyi, viewMode)) {
-      setViewMode('workspace');
-    }
-  }, [viewMode, currentTenant?.menuSembunyi]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
 
@@ -1120,34 +1108,34 @@ export default function App() {
                 setViewMode('templates');
                 setIsMobileNavOpen(false);
               }}
-              onOpenPelaporan={tampilMenu('pelaporan') ? () => {
+              onOpenPelaporan={() => {
                 setViewMode('pelaporan');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenTindakLanjutAudit={tampilMenu('auditTl') ? () => {
+              }}
+              onOpenTindakLanjutAudit={() => {
                 setViewMode('auditTl');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenKesehatanKeuangan={tampilMenu('keuangan') ? () => {
+              }}
+              onOpenKesehatanKeuangan={() => {
                 setViewMode('keuangan');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenManajemenRisiko={tampilMenu('risiko') ? () => {
+              }}
+              onOpenManajemenRisiko={() => {
                 setViewMode('risiko');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenManajemenAset={tampilMenu('aset') ? () => {
+              }}
+              onOpenManajemenAset={() => {
                 setViewMode('aset');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenPerjanjianKinerja={tampilMenu('pk') ? () => {
+              }}
+              onOpenPerjanjianKinerja={() => {
                 setViewMode('pk');
                 setIsMobileNavOpen(false);
-              } : undefined}
-              onOpenLKjIP={tampilMenu('lkjip') ? () => {
+              }}
+              onOpenLKjIP={() => {
                 setViewMode('lkjip');
                 setIsMobileNavOpen(false);
-              } : undefined}
+              }}
               onOpenManajemenBerkas={() => {
                 setViewMode('berkas');
                 setIsMobileNavOpen(false);

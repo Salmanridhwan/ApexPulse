@@ -700,7 +700,7 @@ membedakan sendiri kalimat pertanyaan dari permintaan mengubah halaman.
 
 | Bagian | Keadaan |
 |---|---|
-| Pembagian tab per peran | selesai — `AdminTab.peran`; Admin Instansi hanya melihat Ringkasan, Pengguna, Tampilan Menu, Ambang Batas |
+| Pembagian tab per peran | selesai — `AdminTab.peran`; Admin Instansi hanya melihat Ringkasan, Pengguna, Ambang Batas (tab Tampilan Menu dihapus 2026-11-06 atas permintaan pemilik) |
 | Tab Kuota AI | selesai — tabel pemakaian per instansi + ubah batas harian (0–1000) |
 | `GET /api/admin/platform` | selesai — ringkasan lintas instansi (akun per peran, permintaan, analisis, butir, kuota) |
 | Penjagaan Admin Aiones terakhir | selesai — turunkan/hapus akun superadmin terakhir ditolak 409 `SUPERADMIN_TERAKHIR` |

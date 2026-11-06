@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Bell, Building2, Database, Gauge, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Bell, Building2, Database, Gauge, ShieldCheck, Users } from 'lucide-react';
 
 /**
  * Daftar menu Panel Admin — SATU sumber untuk sidebar utama dan halaman Admin.
@@ -10,7 +10,7 @@ import { Activity, Bell, Building2, Database, Gauge, LayoutGrid, ShieldCheck, Us
  * utama (grup "Sistem & Tata Kelola"), dan halaman Admin hanya menampilkan isi
  * tab yang dipilih — tidak ada lagi sidebar kedua.
  */
-export type AdminTabId = 'overview' | 'users' | 'tenants' | 'menu' | 'rag' | 'kuota' | 'alerts' | 'audit';
+export type AdminTabId = 'overview' | 'users' | 'tenants' | 'rag' | 'kuota' | 'alerts' | 'audit';
 
 export interface AdminTab {
   id: AdminTabId;
@@ -34,7 +34,6 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'overview', label: 'Ringkasan', judul: 'Ringkasan Sistem', icon: Activity, peran: 'admin' },
   { id: 'users', label: 'Pengguna & RBAC', judul: 'Pengguna & RBAC', icon: Users, peran: 'admin' },
   { id: 'tenants', label: 'Instansi & KB', judul: 'Instansi & Knowledge Base', icon: Building2, peran: 'superadmin' },
-  { id: 'menu', label: 'Tampilan Menu', judul: 'Tampilan Menu Instansi', icon: LayoutGrid, peran: 'admin' },
   { id: 'rag', label: 'Konfigurasi RAG', judul: 'Konfigurasi RAG', icon: Database, peran: 'superadmin' },
   { id: 'kuota', label: 'Kuota AI', judul: 'Kuota Analisis AI per Instansi', icon: Gauge, peran: 'superadmin' },
   { id: 'alerts', label: 'Ambang Batas', judul: 'Ambang Batas & Alert', icon: Bell, peran: 'admin' },

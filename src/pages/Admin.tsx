@@ -30,7 +30,6 @@ import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
 import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
-import { MENU_KINERJA } from '../components/menuKinerja';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
 
 /** Label sektor untuk ditampilkan (sektor tetap dipetakan dari dokumen KB). */
@@ -974,51 +973,6 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
-  const [menyimpanMenu, setMenyimpanMenu] = useState<string | null>(null);
-
-  /**
-   * Simpan daftar menu yang disembunyikan untuk satu instansi.
-   *
-   * Disimpan per instansi (Tenant.menuSembunyi) karena satu deployment melayani
-   * banyak BUMD dengan kebutuhan modul berbeda. Server menyaring key yang tidak
-   * dikenal, jadi payload di sini boleh apa adanya.
-   */
-  const simpanMenuInstansi = async (tenant: Tenant, sembunyi: string[]) => {
-    setMenyimpanMenu(tenant.id);
-    setGalatAksi(null);
-    try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menuSembunyi: sembunyi }),
-      });
-      const hasil = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setGalatAksi(hasil?.error || 'Tampilan menu instansi gagal disimpan.');
-        return;
-      }
-      setTenants((prev) =>
-        prev.map((t) => (t.id === tenant.id ? { ...t, menuSembunyi: hasil.menuSembunyi || [] } : t))
-      );
-      onTenantsRefreshed?.();
-    } finally {
-      setMenyimpanMenu(null);
-    }
-  };
-
-  /** Nyalakan/matikan satu menu. */
-  const ubahMenuInstansi = async (tenant: Tenant, key: string, tampil: boolean) => {
-    const sembunyi = new Set(tenant.menuSembunyi || []);
-    if (tampil) sembunyi.delete(key);
-    else sembunyi.add(key);
-    await simpanMenuInstansi(tenant, [...sembunyi]);
-  };
-
-  /** Sakelar borongan: matikan semua menu sekaligus, atau hidupkan semuanya. */
-  const ubahSemuaMenu = async (tenant: Tenant, aktif: boolean) => {
-    await simpanMenuInstansi(tenant, aktif ? [] : MENU_KINERJA.map((m) => m.key));
-  };
-
   /**
    * Perbarui SEMUA instansi berurutan (sengaja tidak paralel supaya layanan RAG
    * tidak dihujani permintaan sekaligus), lalu rangkum hasilnya.
@@ -1817,109 +1771,7 @@ export const Admin: React.FC<AdminProps> = ({
             </div>
           )}
 
-          {/* ================= TAB 4: RAG CONFIG ================= */}
-          {activeTab === 'menu' && (
-            <div className="space-y-4" data-testid="tab-tampilan-menu">
-              <div className="bg-surface p-5 rounded-card border border-line shadow-2xs">
-                <h3 className="text-sm font-bold text-ink">Tampilan Menu Instansi</h3>
-                <p className="text-xs text-ink-2 mt-1">
-                  Pilih menu grup <span className="font-semibold">Kinerja &amp; Kepatuhan</span> yang tampil
-                  untuk setiap instansi. Menu yang dimatikan hilang dari sidebar dan halamannya tidak bisa
-                  dibuka lagi. Perubahan tersimpan begitu switch ditekan.{' '}
-                  <span className="font-semibold">Instansi baru otomatis masuk dengan semua menu mati</span> —
-                  nyalakan satu per satu setelah instansi itu siap dipakai.
-                </p>
-              </div>
-
-              {tenants.length === 0 && (
-                <div className="bg-surface p-5 rounded-card border border-line text-xs text-ink-2">
-                  Belum ada instansi terdaftar.
-                </div>
-              )}
-
-              {tenants.map((t) => {
-                const sembunyi = t.menuSembunyi || [];
-                const jumlahTampil = MENU_KINERJA.length - MENU_KINERJA.filter((m) => sembunyi.includes(m.key)).length;
-                const sedangSimpan = menyimpanMenu === t.id;
-                return (
-                  <div
-                    key={t.id}
-                    className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3"
-                    data-testid={`menu-tenant-${t.id}`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-ink">{t.name}</h4>
-                        <p className="text-xs text-ink-2">
-                          {t.code} · {t.sector.toUpperCase()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <span className="text-[11px] px-2 py-0.5 rounded-chip border border-line text-ink-2">
-                          {jumlahTampil}/{MENU_KINERJA.length} menu tampil
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => void ubahSemuaMenu(t, jumlahTampil === 0)}
-                          disabled={sedangSimpan}
-                          className={`px-3 py-1.5 rounded-control text-[11px] font-semibold border transition-colors disabled:opacity-60 ${
-                            jumlahTampil === 0
-                              ? 'border-brand/40 text-brand hover:bg-brand/10'
-                              : 'border-line text-ink-2 hover:bg-surface-2'
-                          }`}
-                          title={
-                            jumlahTampil === 0
-                              ? 'Tampilkan lagi seluruh menu Kinerja & Kepatuhan'
-                              : 'Sembunyikan seluruh menu Kinerja & Kepatuhan untuk instansi ini'
-                          }
-                        >
-                          {jumlahTampil === 0 ? 'Aktifkan semua' : 'Nonaktifkan semua'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {MENU_KINERJA.map((m) => {
-                        const tampil = !sembunyi.includes(m.key);
-                        return (
-                          <button
-                            key={m.key}
-                            type="button"
-                            role="switch"
-                            aria-checked={tampil}
-                            aria-label={`${tampil ? 'Sembunyikan' : 'Tampilkan'} ${m.label}`}
-                            disabled={sedangSimpan}
-                            onClick={() => void ubahMenuInstansi(t, m.key, !tampil)}
-                            className={`flex items-start gap-3 p-3 rounded-control border text-left transition-colors disabled:opacity-60 ${
-                              tampil ? 'border-line bg-surface hover:bg-surface-2' : 'border-line bg-surface-2 hover:bg-surface'
-                            }`}
-                          >
-                            <span
-                              className={`w-9 h-5 rounded-full shrink-0 relative mt-0.5 transition-colors ${
-                                tampil ? 'bg-brand' : 'bg-line'
-                              }`}
-                            >
-                              <span
-                                className="absolute top-0.5 w-4 h-4 rounded-full bg-surface transition-all"
-                                style={{ left: tampil ? 18 : 2 }}
-                              />
-                            </span>
-                            <span className="min-w-0">
-                              <span className={`block text-xs font-semibold ${tampil ? 'text-ink' : 'text-ink-3'}`}>
-                                {m.label}
-                              </span>
-                              <span className="block text-[11px] text-ink-2 leading-snug">{m.ket}</span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
+          {/* ================= TAB RAG CONFIG ================= */}
           {activeTab === 'rag' && systemConfig && (() => {
             const modeHttp = systemConfig.ragProvider === 'http';
             const berubah = jejakCfg(systemConfig) !== cfgTersimpan;
