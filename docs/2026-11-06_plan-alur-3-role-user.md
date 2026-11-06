@@ -859,3 +859,23 @@ Kedua keputusan yang tadinya menggantung sudah dijawab pemilik pada 2026-11-06:
 2. Bidang: memakai 6 kategori yang sama, bisa ditambah menyusul (5.7).
 
 Plan tidak punya pertanyaan terbuka lagi. Langkah berikutnya Fase 0.
+## Koreksi 2026-11-06 (ketiga): grup Kinerja & Kepatuhan dihapus seluruhnya
+
+Pemilik meminta grup menu **Kinerja & Kepatuhan** dihapus sepenuhnya — bukan hanya sakelar per instansi seperti koreksi sebelumnya. Alasan yang masuk akal: tujuh halaman itu dibangun sebelum alur 3 peran, tidak punya data nyata, dan menyisakan jalan buntu (instansi 0/7 menu). Dashboard builder + permintaan data sudah cukup untuk demo.
+
+Yang dihapus:
+
+| Bagian | Rincian |
+|---|---|
+| Sidebar | Blok `GRUP 2.5`, 7 tombol, 7 prop callback (`onOpenPelaporan` … `onOpenLKjIP`) |
+| `App.tsx` | 7 nilai `HALAMAN_SAH`, 7 lazy import, 7 cabang render, 7 callback, cabang judul & remah halaman |
+| Halaman | `PelaporanPage`, `TindakLanjutAuditPage`, `KesehatanKeuanganPage`, `ManajemenRisikoPage`, `ManajemenAsetPage`, `PerjanjianKinerjaPage`, `LKjIPPage` |
+| `server.ts` | Blok PELAPORAN + TINDAK LANJUT AUDIT + RISIKO + ASET + PERJANJIAN KINERJA + LKjIP (1.138 baris) dan blok KESEHATAN KEUANGAN & RASIO (131 baris) |
+| Service | Folder `laporan`, `audit`, `risiko`, `aset`, `kinerja`, `keuangan` |
+| Pemasaran | Fitur di `halamanPublik.ts` yang menjanjikan LKjIP/risiko/aset diganti fitur yang benar-benar ada |
+
+Yang **tidak** dihapus: data lama di MySQL (tabel `kewajiban_lapor`, `laporan_periodik`, `temuan_audit`, `risiko`, `aset`, `perjanjian_kinerja`, `lkjip`, `snapshot_keuangan`) dan tipe datanya. Menghapus tabel berarti kehilangan data permanen tanpa manfaat; kode tidak lagi membacanya.
+
+Helper peran `normalisasiPeran`, `normalisasiPeranAkun`, `LABEL_PERAN` dipindah dari `services/laporan/alur.ts` ke `services/auth/peran.ts` — masih dipakai `inMemoryDb` dan `tests/rbac.test.ts`.
+
+Bukti: `tsc` bersih; **529 tes lulus**; build bersih; sidebar tanpa grup Kinerja; hash lama `#/v/pelaporan` jatuh ke Workspace; `/api/pelaporan/kewajiban` & `/api/keuangan/ringkasan` → 404.

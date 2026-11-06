@@ -63,3 +63,37 @@ export function bolehTurunkanSuperadmin(
   }
   return { boleh: true };
 }
+/** Label peran dalam bentuk tabel (dipakai tes & UI yang butuh pemetaan). */
+export const LABEL_PERAN: Record<UserRole, string> = {
+  superadmin: 'Admin Aiones',
+  admin: 'Admin Instansi',
+  pengguna: 'User',
+};
+
+/**
+ * Normalisasi peran dari sesi/data lama (bertipe `string`) menjadi `UserRole`.
+ *
+ * Peran lama `analis` dan `direksi` digabung menjadi `pengguna` (gabungan hak
+ * keduanya). Nilai tak dikenal juga diperlakukan sebagai `pengguna` — peran
+ * paling terbatas, supaya kesalahan data tidak pernah menaikkan hak akses.
+ *
+ * Fungsi ini dulu tinggal di `services/laporan/alur.ts` bersama alur verifikasi
+ * pelaporan. Setelah fitur Kinerja & Kepatuhan dihapus, bagian yang masih
+ * dipakai (normalisasi peran) dipindah ke sini supaya tidak ada modul yatim.
+ */
+export function normalisasiPeran(peran: unknown): UserRole {
+  return peran === 'admin' ? 'admin' : 'pengguna';
+}
+
+/**
+ * Normalisasi peran AKUN (bukan tahap alur).
+ *
+ * Berbeda dari `normalisasiPeran` yang hanya mengenal `admin`/`pengguna`:
+ * `superadmin` harus dipertahankan, sebab kalau tidak, akun Admin Aiones akan
+ * turun jadi `pengguna` setiap kali state dimuat ulang dari MySQL atau
+ * `data/db.json`.
+ */
+export function normalisasiPeranAkun(peran: unknown): UserRole {
+  if (peran === 'superadmin') return 'superadmin';
+  return normalisasiPeran(peran);
+}

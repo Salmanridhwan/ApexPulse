@@ -116,12 +116,12 @@ const PAKET = [
   },
   {
     nama: 'Profesional',
-    untuk: 'Instansi dengan kebutuhan pelaporan & kepatuhan',
+    untuk: 'Instansi dengan banyak pengguna dan alur permintaan data',
     unggul: true,
     fitur: [
       'Semua isi paket Dasar',
-      'Perjanjian kinerja, LKjIP, dan pelaporan periodik',
-      'Manajemen risiko, aset, dan tindak lanjut audit',
+      'Permintaan data: pengguna mengajukan, admin menyusun halaman',
+      'Katalog data dari dokumen resmi, langsung jadi kartu dashboard',
       'Peringatan otomatis & jejak audit lengkap',
       'Ekspor CSV/PDF dan mode presentasi',
     ],
@@ -153,7 +153,7 @@ export function halamanPaket(kontak: Kontak = konfigKontak()): string {
 
   const isi = `
 <h1>Pilih paket sesuai kebutuhan instansi</h1>
-<p class="pembuka">Aiones Boards menyatukan dashboard kinerja, asisten AI dari dokumen resmi, pelaporan, dan kepatuhan dalam satu tempat. Harga ditentukan setelah kami tahu jumlah instansi, pengguna, dan modul yang dipakai — supaya Anda tidak membayar fitur yang tidak terpakai.</p>
+<p class="pembuka">Aiones Boards menyatukan dashboard kinerja, asisten AI dari dokumen resmi, permintaan data, dan tata kelola akses dalam satu tempat. Harga ditentukan setelah kami tahu jumlah instansi, pengguna, dan modul yang dipakai — supaya Anda tidak membayar fitur yang tidak terpakai.</p>
 <div class="kisi">${kartu}</div>
 
 <section>

@@ -21,7 +21,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bolehMenyusunDashboard, isAdminRole, isSuperadmin, labelPeran } from '../src/services/auth/peran';
-import { LABEL_PERAN, normalisasiPeran, normalisasiPeranAkun } from '../src/services/laporan/alur';
+import { LABEL_PERAN, normalisasiPeran, normalisasiPeranAkun } from '../src/services/auth/peran';
 import type { UserRole } from '../src/types';
 
 const SEMUA_PERAN: UserRole[] = ['superadmin', 'admin', 'pengguna'];

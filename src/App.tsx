@@ -87,13 +87,6 @@ const HALAMAN_SAH = [
   'alerts',
   'charts',
   'templates',
-  'pelaporan',
-  'auditTl',
-  'keuangan',
-  'risiko',
-  'aset',
-  'pk',
-  'lkjip',
   'berkas',
   'permintaan',
   'admin',
@@ -119,28 +112,9 @@ const AuditLogPage = React.lazy(() =>
 const AlertsPage = React.lazy(() =>
   import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage }))
 );
-const PelaporanPage = React.lazy(() =>
-  import('./pages/PelaporanPage').then((m) => ({ default: m.PelaporanPage }))
-);
 const PermintaanDataPage = React.lazy(() =>
   import('./pages/PermintaanDataPage').then((m) => ({ default: m.default }))
 );
-const TindakLanjutAuditPage = React.lazy(() =>
-  import('./pages/TindakLanjutAuditPage').then((m) => ({ default: m.TindakLanjutAuditPage }))
-);
-const KesehatanKeuanganPage = React.lazy(() =>
-  import('./pages/KesehatanKeuanganPage').then((m) => ({ default: m.KesehatanKeuanganPage }))
-);
-const ManajemenRisikoPage = React.lazy(() =>
-  import('./pages/ManajemenRisikoPage').then((m) => ({ default: m.ManajemenRisikoPage }))
-);
-const ManajemenAsetPage = React.lazy(() =>
-  import('./pages/ManajemenAsetPage').then((m) => ({ default: m.ManajemenAsetPage }))
-);
-const PerjanjianKinerjaPage = React.lazy(() =>
-  import('./pages/PerjanjianKinerjaPage').then((m) => ({ default: m.PerjanjianKinerjaPage }))
-);
-const LKjIPPage = React.lazy(() => import('./pages/LKjIPPage').then((m) => ({ default: m.LKjIPPage })));
 const ManajemenBerkasPage = React.lazy(() =>
   import('./pages/ManajemenBerkasPage').then((m) => ({ default: m.ManajemenBerkasPage }))
 );
@@ -1108,34 +1082,6 @@ export default function App() {
                 setViewMode('templates');
                 setIsMobileNavOpen(false);
               }}
-              onOpenPelaporan={() => {
-                setViewMode('pelaporan');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenTindakLanjutAudit={() => {
-                setViewMode('auditTl');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenKesehatanKeuangan={() => {
-                setViewMode('keuangan');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenManajemenRisiko={() => {
-                setViewMode('risiko');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenManajemenAset={() => {
-                setViewMode('aset');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenPerjanjianKinerja={() => {
-                setViewMode('pk');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenLKjIP={() => {
-                setViewMode('lkjip');
-                setIsMobileNavOpen(false);
-              }}
               onOpenManajemenBerkas={() => {
                 setViewMode('berkas');
                 setIsMobileNavOpen(false);
@@ -1207,8 +1153,6 @@ export default function App() {
                       : viewMode === 'alerts' ? 'Alert'
                       : viewMode === 'charts' ? 'Chart'
                       : viewMode === 'templates' ? 'Template Dashboard'
-                      : viewMode === 'pelaporan' ? 'Kinerja & Kepatuhan'
-                      : viewMode === 'auditTl' || viewMode === 'keuangan' || viewMode === 'risiko' || viewMode === 'aset' || viewMode === 'pk' || viewMode === 'lkjip' ? 'Kinerja & Kepatuhan'
                       : viewMode === 'berkas' ? 'Referensi'
                       : viewMode === 'permintaan' ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk' : 'Permintaan Data')
                       : 'Workspace'}
@@ -1227,25 +1171,11 @@ export default function App() {
                           ? 'Ambang Batas & Alert'
                           : viewMode === 'templates'
                             ? 'Template Dashboard'
-                            : viewMode === 'pelaporan'
-                              ? 'Pelaporan Periodik & Kepatuhan'
-                              : viewMode === 'auditTl'
-                                ? 'Tindak Lanjut Audit'
-                                : viewMode === 'keuangan'
-                                    ? 'Kesehatan Keuangan'
-                                    : viewMode === 'risiko'
-                                      ? 'Manajemen Risiko'
-                                      : viewMode === 'aset'
-                                        ? 'Manajemen Aset'
-                                        : viewMode === 'pk'
-                                          ? 'Perjanjian Kinerja'
-                                          : viewMode === 'lkjip'
-                                            ? 'LKjIP'
-                                            : viewMode === 'berkas'
-                                              ? 'Repositori Dokumen'
-                                              : viewMode === 'permintaan'
-                                                ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk Permintaan' : 'Permintaan Data')
-                                                : 'Template Chart'}
+                            : viewMode === 'berkas'
+                              ? 'Repositori Dokumen'
+                              : viewMode === 'permintaan'
+                                ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk Permintaan' : 'Permintaan Data')
+                                : 'Template Chart'}
                   </h1>
                 )}
               </div>
@@ -1407,65 +1337,9 @@ export default function App() {
                     onUseTemplate={handleUseTemplate}
                   />
                 </React.Suspense>
-              ) : viewMode === 'pelaporan' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <PelaporanPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
               ) : viewMode === 'permintaan' ? (
                 <React.Suspense fallback={pageFallback}>
                   <PermintaanDataPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'auditTl' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <TindakLanjutAuditPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'keuangan' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <KesehatanKeuanganPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'risiko' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <ManajemenRisikoPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'aset' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <ManajemenAsetPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'pk' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <PerjanjianKinerjaPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    peran={currentUser?.role}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
-              ) : viewMode === 'lkjip' ? (
-                <React.Suspense fallback={pageFallback}>
-                  <LKjIPPage
                     tenantId={currentTenant?.id || 'tenant-pdam'}
                     peran={currentUser?.role}
                     onBackToWorkspace={() => setViewMode('workspace')}

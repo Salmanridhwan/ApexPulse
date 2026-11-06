@@ -36,7 +36,7 @@ import {
 import { hashPassword, verifyPassword } from '../auth/session';
 import { SANDI_ADMIN_BAWAAN } from '../auth/password';
 import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
-import { normalisasiPeran, normalisasiPeranAkun } from '../laporan/alur';
+import { normalisasiPeran, normalisasiPeranAkun } from '../auth/peran';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
 
