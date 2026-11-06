@@ -74,6 +74,11 @@ export function pemakaianHariIni(
     if (a.metode !== 'rag-extract') return false;
     // Analisis yang tertunda kuota tidak dihitung: ia belum memanggil model.
     if (a.status === 'tertunda-kuota') return false;
+    // Analisis yang gagal juga tidak dihitung. Kalau layanan RAG sedang mati
+    // (502), seluruh kuota instansi bisa habis tanpa satu pun butir dihasilkan —
+    // instansi dihukum untuk gangguan di sisi kita. Percobaan ulang tetap dibatasi
+    // oleh `percobaan` di antrean, jadi ini bukan jalan gratis tanpa batas.
+    if (a.status === 'gagal') return false;
     const t = new Date(a.dibuatPada).getTime();
     return Number.isFinite(t) && t >= mulai;
   }).length;

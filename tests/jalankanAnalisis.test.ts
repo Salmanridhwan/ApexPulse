@@ -105,6 +105,21 @@ test('pemakaian hari ini hanya menghitung analisis RAG hari ini', () => {
   assert.equal(jumlah, 1, 'yang tertunda kuota, kemarin, dan tabel lokal tidak dihitung');
 });
 
+test('analisis yang gagal tidak menghabiskan kuota instansi', () => {
+  const sekarang = new Date('2026-11-06T10:00:00').getTime();
+  const hariIni = new Date('2026-11-06T01:00:00').toISOString();
+  const jumlah = pemakaianHariIni(
+    [
+      { metode: 'rag-extract', dibuatPada: hariIni, status: 'gagal' },
+      { metode: 'rag-extract', dibuatPada: hariIni, status: 'gagal' },
+      { metode: 'rag-extract', dibuatPada: hariIni, status: 'selesai' },
+      { metode: 'rag-extract', dibuatPada: hariIni, status: 'proses' },
+    ],
+    sekarang
+  );
+  assert.equal(jumlah, 2, 'hanya yang selesai dan yang sedang berjalan dihitung');
+});
+
 test('keluaran RAG dipetakan dari kpi/grafik/tabel, bukan hanya butir', () => {
   const hasil = petakanKeluaranRag(
     {

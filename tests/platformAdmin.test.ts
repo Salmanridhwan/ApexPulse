@@ -148,11 +148,11 @@ test('ringkasan menghitung analisis per status dan butir per persetujuan', () =>
   assert.equal(r.butir.disetujui, 1);
 });
 
-test('kuota harian hanya menghitung analisis RAG hari ini, bukan tabel lokal', () => {
+test('kuota harian hanya menghitung analisis RAG yang berhasil atau berjalan', () => {
   const r = ringkasPlatform(bahan);
-  // t1: satu rag-extract selesai hari ini (yang gagal tetap dihitung pemakaian).
-  // t2: tertunda-kuota tidak dihitung, tabel-lokal tidak dihitung.
-  assert.equal(r.kuotaHariIni.terpakai, 2);
+  // t1: satu rag-extract selesai; yang gagal TIDAK dihitung (gangguan layanan
+  // bukan kesalahan instansi). t2: tertunda-kuota & tabel-lokal tidak dihitung.
+  assert.equal(r.kuotaHariIni.terpakai, 1);
   assert.equal(r.kuotaHariIni.kapasitas, 40);
 });
 
@@ -160,9 +160,9 @@ test('kuotaPerInstansi memisahkan pemakaian antar instansi', () => {
   const per = kuotaPerInstansi(bahan);
   const t1 = per.find((x) => x.tenantId === 't1')!;
   const t2 = per.find((x) => x.tenantId === 't2')!;
-  assert.equal(t1.terpakai, 2);
+  assert.equal(t1.terpakai, 1, 'analisis gagal tidak memakai kuota');
   assert.equal(t2.terpakai, 0, 'instansi dengan analisis tertunda kuota tidak memakai kuota');
-  assert.equal(t1.sisa, 18);
+  assert.equal(t1.sisa, 19);
 });
 
 test('instansi tanpa analisis tetap muncul dengan sisa penuh', () => {

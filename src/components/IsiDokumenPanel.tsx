@@ -188,6 +188,13 @@ const KartuAnalisis: React.FC<{
         {analisis.status === 'selesai' && (
           <span className="text-[10px] text-ink-3">{analisis.jumlahButir} butir</span>
         )}
+        {/* Alasan gagal tampil di kepala kartu: kalau harus dibuka dulu, admin
+            hanya melihat kata "Gagal" dan tidak tahu harus berbuat apa. */}
+        {analisis.status === 'gagal' && analisis.galat && (
+          <span className="text-[10px] text-neg max-w-[45%] truncate" title={analisis.galat}>
+            {analisis.galat}
+          </span>
+        )}
       </button>
 
       {terbuka && (
@@ -405,7 +412,7 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
         <span className="text-[10px] font-semibold text-ink-3 uppercase tracking-wide">Isi dokumen</span>
         {kuota && (
           <span className={`text-[10px] ${kuota.sisa === 0 ? 'text-coral font-semibold' : 'text-ink-3'}`}>
-            Kuota analisis hari ini: {kuota.sisa}/{kuota.kuota}
+            Sisa kuota hari ini: {kuota.sisa}/{kuota.kuota}
           </span>
         )}
       </div>
