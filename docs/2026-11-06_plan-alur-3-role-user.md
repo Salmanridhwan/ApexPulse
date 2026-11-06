@@ -670,6 +670,17 @@ Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKe
 | UI pemilihan butir ("Katalog Data") | belum — endpoint sudah siap, layarnya belum ada |
 
 
+
+**Status Fase 5 (2026-11-06):**
+
+| Bagian | Keadaan |
+|---|---|
+| Uji tiga role di browser | selesai — tapi memakai instansi yang sudah ada (Tirta Moedal/PAM JAYA), bukan instansi uji khusus seperti di rencana |
+| Uji beban kecil (5 dokumen) | selesai lewat simulasi antrean, 7 kasus (`tests/antreanBersamaan.test.ts`). Unggah 5 berkas sungguhan belum bisa diuji karena KMS |
+| `npm test` / `tsc` / `build` | lulus — 518 tes, tsc bersih, build bersih |
+| Redeploy ke panel | BELUM — menunggu izin pemilik. Produksi masih `e583358` |
+| Vault | selesai — `Alur 3 Role.md`, `Laporan Verifikasi 2026-11-06.md`, `Aiones Boards.md` diperbarui |
+
 **Koreksi 2026-11-06 (setelah uji coba di browser):** tombol "Sempurnakan halaman" DIHAPUS.
 
 Tombol itu membuat dua pintu ke asisten yang sama, dan admin harus ingat sedang di pintu mana.
