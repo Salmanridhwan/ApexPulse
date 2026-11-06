@@ -73,6 +73,7 @@ import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/se
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
+import { BATAS_AUDIT_BAWAAN, saringAudit } from './src/services/admin/audit';
 import { bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
 import {
@@ -7293,17 +7294,36 @@ ${navigasi}
     if (!isAdminRole(session.role)) {
       return res.status(403).json({ error: 'Jejak audit hanya untuk administrator.' });
     }
-    const logs = db.auditLogs.filter((l) => l.tenantId === effectiveTenantId(req, session));
+    // Admin Aiones boleh menanyakan instansi mana pun (atau 'semua'). Admin
+    // Instansi TIDAK: parameter `tenantId` dari mereka diabaikan dan diganti
+    // instansinya sendiri, supaya tidak bisa menarik log instansi lain hanya
+    // dengan mengubah URL.
+    const mintaTenant = String(req.query.tenantId || '').trim();
+    const lingkup =
+      isSuperadmin(session.role) && mintaTenant
+        ? mintaTenant
+        : effectiveTenantId(req, session);
+
+    const logs = saringAudit(db.auditLogs, {
+      tenantId: lingkup,
+      aksi: req.query.aksi ? String(req.query.aksi) : undefined,
+      pengguna: req.query.pengguna ? String(req.query.pengguna) : undefined,
+      dari: req.query.dari ? String(req.query.dari) : undefined,
+      sampai: req.query.sampai ? String(req.query.sampai) : undefined,
+      // Saat klien meminta halaman (limit/offset), jangan potong lebih dulu —
+      // total dihitung dari seluruh hasil saringan.
+      batas: req.query.limit !== undefined ? 100000 : BATAS_AUDIT_BAWAAN,
+    });
 
     // Ekspor CSV untuk kebutuhan audit eksternal (dibuka di Excel).
     if (String(req.query.format || '').toLowerCase() === 'csv') {
-      const terbaruDulu = [...logs].reverse();
-      const csv = keCsv(terbaruDulu, [
+      const csv = keCsv(logs, [
         { kunci: 'timestamp', judul: 'Waktu' },
         { kunci: 'action', judul: 'Aksi' },
         { kunci: 'target', judul: 'Target' },
         { kunci: 'userName', judul: 'Pengguna' },
         { kunci: 'details', judul: 'Detail' },
+        ...(isSuperadmin(session.role) ? [{ kunci: 'tenantId' as const, judul: 'Instansi' }] : []),
       ]);
       const tanggal = new Date().toISOString().slice(0, 10);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

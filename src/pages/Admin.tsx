@@ -163,6 +163,47 @@ export const Admin: React.FC<AdminProps> = ({
   const [kuotaPer, setKuotaPer] = useState<Array<{ tenantId: string; nama: string; terpakai: number; kuota: number; sisa: number }>>([]);
   const [menyimpanKuota, setMenyimpanKuota] = useState(false);
   const [pesanKuota, setPesanKuota] = useState<{ ok: boolean; teks: string } | null>(null);
+  /** Ringkasan lintas instansi (Admin Aiones). Null untuk Admin Instansi. */
+  const [platform, setPlatform] = useState<any>(null);
+  /** Penyaring jejak audit. Admin Instansi tidak bisa mengubah instansinya. */
+  const [filterAudit, setFilterAudit] = useState<{ tenantId: string; aksi: string }>({ tenantId: 'semua', aksi: '' });
+  const [memuatAudit, setMemuatAudit] = useState(false);
+  const superadmin = currentUser?.role === 'superadmin';
+
+  /**
+   * Muat ringkasan platform.
+   *
+   * Hanya dipanggil untuk Admin Aiones: endpoint-nya menolak peran lain, jadi
+   * memanggilnya untuk Admin Instansi hanya menghasilkan 403 di konsol.
+   */
+  const muatPlatform = async () => {
+    if (!superadmin) return;
+    try {
+      const res = await fetch('/api/admin/platform');
+      if (!res.ok) return;
+      setPlatform(await res.json());
+    } catch {
+      /* ringkasan gagal dimuat: kartu tidak ditampilkan, tab lain tetap jalan */
+    }
+  };
+
+  /** Muat jejak audit sesuai penyaring aktif. */
+  const muatAudit = async (saring = filterAudit) => {
+    setMemuatAudit(true);
+    try {
+      const q = new URLSearchParams();
+      if (superadmin && saring.tenantId) q.set('tenantId', saring.tenantId);
+      if (saring.aksi.trim()) q.set('aksi', saring.aksi.trim());
+      const res = await fetch(`/api/audit-logs${q.toString() ? `?${q}` : ''}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setAuditLogs(Array.isArray(data) ? data : Array.isArray(data?.logs) ? data.logs : []);
+    } catch {
+      /* biarkan data lama tampil */
+    } finally {
+      setMemuatAudit(false);
+    }
+  };
 
   /**
    * Muat pemakaian kuota AI per instansi.
@@ -203,6 +244,8 @@ export const Admin: React.FC<AdminProps> = ({
   };
 
   useEffect(() => {
+    if (activeTab === 'overview') void muatPlatform();
+    if (activeTab === 'audit') void muatAudit();
     if (activeTab === 'kuota') void muatKuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -1275,6 +1318,40 @@ export const Admin: React.FC<AdminProps> = ({
           {/* ================= TAB 1: OVERVIEW ================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* Ringkasan lintas instansi — hanya Admin Aiones. */}
+              {superadmin && platform && (
+                <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <div>
+                      <h3 className="text-sm font-bold text-ink">Ringkasan Platform</h3>
+                      <p className="text-xs text-ink-2">Angka lintas seluruh instansi, dihitung saat halaman dibuka.</p>
+                    </div>
+                    <button onClick={() => void muatPlatform()} className="text-xs text-brand hover:underline">
+                      Muat ulang
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {[
+                      { label: 'Instansi', nilai: platform.jumlahInstansi, sub: `${platform.akun.total} akun` },
+                      { label: 'Admin Aiones', nilai: platform.akun.superadmin, sub: `${platform.akun.admin} admin instansi` },
+                      { label: 'Pengguna', nilai: platform.akun.pengguna, sub: 'akun pemohon' },
+                      { label: 'Perlu Tindakan', nilai: platform.permintaan.perluTindakan, sub: `dari ${platform.permintaan.total} permintaan` },
+                      { label: 'Analisis AI', nilai: platform.analisis.selesai, sub: `${platform.analisis.gagal} gagal · ${platform.analisis.tertundaKuota} tertunda` },
+                      { label: 'Kuota Hari Ini', nilai: `${platform.kuotaHariIni.terpakai}/${platform.kuotaHariIni.kapasitas}`, sub: `${platform.kuotaHariIni.instansiHabis} instansi habis` },
+                    ].map((k, i) => (
+                      <div key={i} className="p-3 rounded-card border border-line bg-surface-2">
+                        <span className="text-[10px] uppercase font-bold text-ink-3">{k.label}</span>
+                        <p className="text-xl font-bold text-ink mt-0.5 tabular-nums">{k.nilai}</p>
+                        <span className="text-[10px] text-ink-2">{k.sub}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-ink-2">
+                    Butir data: {platform.butir.disetujui} disetujui · {platform.butir.draf} draf · {platform.butir.ditolak} ditolak
+                  </p>
+                </div>
+              )}
+
               {/* Top Stat Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 {[
@@ -2558,6 +2635,49 @@ export const Admin: React.FC<AdminProps> = ({
                 <p className="text-xs text-ink-2">
                   Seluruh pembuatan, perubahan widget, dan koreksi manual tercatat secara permanen
                 </p>
+              </div>
+
+              <div className="flex items-end gap-2 flex-wrap">
+                <div>
+                  <label className="text-[11px] font-semibold text-ink-2 block mb-1">Instansi</label>
+                  <select
+                    value={filterAudit.tenantId}
+                    onChange={(e) => {
+                      const baru = { ...filterAudit, tenantId: e.target.value };
+                      setFilterAudit(baru);
+                      void muatAudit(baru);
+                    }}
+                    disabled={!superadmin}
+                    className="input text-xs py-1.5 min-w-[160px]"
+                    data-testid="filter-audit-instansi"
+                  >
+                    {superadmin
+                      ? [{ id: 'semua', name: 'Semua instansi' }, ...tenants.map((t) => ({ id: t.id, name: t.name }))].map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))
+                      : <option value={filterAudit.tenantId}>{tenants.find((t) => t.id === filterAudit.tenantId)?.name || 'Instansi saya'}</option>}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-ink-2 block mb-1">Cari aksi</label>
+                  <input
+                    value={filterAudit.aksi}
+                    onChange={(e) => setFilterAudit({ ...filterAudit, aksi: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void muatAudit(); }}
+                    placeholder="mis. dashboard"
+                    className="input text-xs py-1.5 w-40"
+                    data-testid="filter-audit-aksi"
+                  />
+                </div>
+                <button
+                  onClick={() => void muatAudit()}
+                  disabled={memuatAudit}
+                  className="btn-primary text-xs px-3 py-1.5"
+                  data-testid="muat-audit"
+                >
+                  {memuatAudit ? 'Memuat…' : 'Terapkan'}
+                </button>
+                <span className="text-[11px] text-ink-2 ml-auto">{auditLogs.length} baris</span>
               </div>
 
               <div className="overflow-x-auto border border-line rounded-card">

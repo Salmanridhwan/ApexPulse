@@ -677,8 +677,8 @@ Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKe
 | Tab Kuota AI | selesai — tabel pemakaian per instansi + ubah batas harian (0–1000) |
 | `GET /api/admin/platform` | selesai — ringkasan lintas instansi (akun per peran, permintaan, analisis, butir, kuota) |
 | Penjagaan Admin Aiones terakhir | selesai — turunkan/hapus akun superadmin terakhir ditolak 409 `SUPERADMIN_TERAKHIR` |
-| Ringkasan platform di layar | belum — endpoint siap, kartu ringkasan di tab Ringkasan masih versi lama (`/api/admin/stats`) |
-| Jejak audit lintas instansi berfilter | belum — `/api/audit-logs` sudah ada, filter per instansi belum |
+| Ringkasan platform di layar | selesai — enam kartu lintas instansi di tab Ringkasan (hanya Admin Aiones), dihitung ulang saat tab dibuka |
+| Jejak audit lintas instansi berfilter | selesai — `tenantId` + `aksi` + `pengguna` + rentang waktu; Admin Instansi dipaksa ke instansinya sendiri; CSV lintas instansi menyertakan kolom Instansi |
 
 
 
