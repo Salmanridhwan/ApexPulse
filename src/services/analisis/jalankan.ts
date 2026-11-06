@@ -144,6 +144,12 @@ export interface OpsiJalankan {
   sekarang?: number;
   /** Paksa lewati pemeriksaan kuota (dipakai saat mengulang analisis yang tertunda). */
   abaikanKuota?: boolean;
+  /**
+   * Sidik dokumen & basis saat analisis dijalankan. Disimpan bersama hasilnya
+   * supaya pemanggilan berikutnya tahu apakah cache masih sah — tanpa ini,
+   * setiap kunjungan halaman akan memicu pembacaan RAG lagi.
+   */
+  sidik?: { dokumen?: string; kb?: string };
 }
 
 /**
@@ -172,6 +178,8 @@ export async function jalankanAnalisis(opsi: OpsiJalankan): Promise<HasilAnalisi
       ringkasan: pesanKuotaHabis(kuota),
       galat: pesanKuotaHabis(kuota),
       percobaan: 0,
+      sidikDokumen: opsi.sidik?.dokumen,
+      sidikKb: opsi.sidik?.kb,
     });
     return { analisis: tertunda, butir: [], rekomendasi: [], dibuang: 0, sisaKuota: 0 };
   }
@@ -191,6 +199,8 @@ export async function jalankanAnalisis(opsi: OpsiJalankan): Promise<HasilAnalisi
     metode: 'rag-extract',
     percobaan: 1,
     leaseSampai: leaseBaru(sekarang),
+    sidikDokumen: opsi.sidik?.dokumen,
+    sidikKb: opsi.sidik?.kb,
   });
 
   let mentah: any;

@@ -136,11 +136,12 @@ const KartuAnalisis: React.FC<{
   admin: boolean;
   onUlang: (id: string) => void;
   onHapus: (id: string) => void;
+  onSegarkan: (berkasId: string, nama: string) => void;
   onUbahButir: (id: string, status: 'disetujui' | 'ditolak' | 'draf') => void;
   sibuk: boolean;
   /** Dinaikkan setiap ada perubahan, supaya butir yang sedang terbuka ikut segar. */
   versi: number;
-}> = ({ analisis, admin, onUlang, onHapus, onUbahButir, sibuk, versi }) => {
+}> = ({ analisis, admin, onUlang, onHapus, onSegarkan, onUbahButir, sibuk, versi }) => {
   const [terbuka, setTerbuka] = useState(false);
   const [butir, setButir] = useState<ButirData[] | null>(null);
   const [memuat, setMemuat] = useState(false);
@@ -250,6 +251,16 @@ const KartuAnalisis: React.FC<{
 
           {admin && (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {analisis.status === 'selesai' && (
+                <button
+                  disabled={sibuk}
+                  onClick={() => onSegarkan(analisis.berkasId, analisis.judulBerkas)}
+                  title="Baca ulang dari RAG — pakai bila dokumennya berubah atau ada dokumen baru"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-ink-2 bg-surface-2 hover:bg-surface-3 border border-line rounded-control disabled:opacity-50"
+                >
+                  <RefreshCw className="w-3 h-3" /> Baca ulang dari RAG
+                </button>
+              )}
               {analisis.status !== 'selesai' && (
                 <button
                   disabled={sibuk}
@@ -279,16 +290,22 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
   const [kuota, setKuota] = useState<{ kuota: number; terpakai: number; sisa: number } | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState('');
+  const [info, setInfo] = useState('');
+  const [kesegaran, setKesegaran] = useState<{ perluDibacaUlang: Array<{ id: string; judulBerkas: string }>; catatan: string } | null>(
+    null
+  );
   const [versi, setVersi] = useState(0);
 
   const muat = useCallback(async () => {
     try {
-      const [resA, resK] = await Promise.all([
+      const [resA, resK, resS] = await Promise.all([
         fetch(`/api/analisis?permintaanId=${encodeURIComponent(permintaan.id)}`, { credentials: 'include' }),
         fetch('/api/analisis/kuota', { credentials: 'include' }),
+        admin ? fetch('/api/analisis/kesegaran', { credentials: 'include' }) : Promise.resolve(null),
       ]);
       if (resA.ok) setDaftar(await resA.json());
       if (resK.ok) setKuota(await resK.json());
+      if (resS && resS.ok) setKesegaran(await resS.json());
     } catch {
       /* biarkan kosong — panel tetap bisa dipakai */
     }
@@ -300,9 +317,10 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
 
   const analisisUntuk = (berkasId: string) => daftar.filter((a) => a.berkasId === berkasId);
 
-  const jalankan = async (lampiran: { berkasId: string; nama: string }) => {
+  const jalankan = async (lampiran: { berkasId: string; nama: string }, segarkan = false) => {
     setSibuk(true);
     setGalat('');
+    setInfo('');
     try {
       const res = await fetch('/api/analisis', {
         method: 'POST',
@@ -312,11 +330,16 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
           berkasId: lampiran.berkasId,
           judulBerkas: lampiran.nama,
           permintaanId: permintaan.id,
+          ...(segarkan ? { segarkan: true } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok && res.status !== 422) {
         setGalat(data?.error || 'Analisis gagal dijalankan.');
+      } else if (data?.dariCache) {
+        setInfo(data.catatanCache || 'Memakai hasil analisis yang tersimpan.');
+      } else if (data?.catatanCache) {
+        setInfo(data.catatanCache);
       }
       await muat();
     } finally {
@@ -391,6 +414,23 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
         <div className="p-2 rounded-control bg-neg/5 border border-neg/25 text-neg text-[11px]">{galat}</div>
       )}
 
+      {info && (
+        <div className="p-2 rounded-control bg-brand/5 border border-brand/20 text-ink-2 text-[11px]">{info}</div>
+      )}
+
+      {kesegaran && kesegaran.perluDibacaUlang.length > 0 && (
+        <div className="p-2 rounded-control bg-coral/10 border border-coral/30 text-[11px] flex gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-coral" />
+          <div>
+            <div className="font-semibold text-ink">Ada dokumen baru di basis instansi</div>
+            <div className="text-ink-2">{kesegaran.catatan}</div>
+            <div className="text-ink-3 mt-0.5">
+              {kesegaran.perluDibacaUlang.map((k) => k.judulBerkas).join(', ')}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {permintaan.lampiran.map((l) => {
           const hasil = analisisUntuk(l.berkasId);
@@ -415,6 +455,7 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
                   admin={admin}
                   onUlang={(id) => void ulang(id)}
                   onHapus={(id) => void hapus(id)}
+                  onSegarkan={(berkasId, nama) => void jalankan({ berkasId, nama }, true)}
                   onUbahButir={(id, s) => void ubahButir(id, s)}
                   sibuk={sibuk}
                   versi={versi}

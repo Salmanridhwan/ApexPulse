@@ -373,6 +373,39 @@ Konsekuensi yang perlu diterima: kalau sebuah permintaan berbidang Keuangan meng
 
 ---
 
+### 5.8 Cache hasil RAG — dokumen dibaca sekali saja
+
+Membaca dokumen lewat RAG memakan token dan waktu. Karena itu hasil analisis **disimpan**
+dan dipakai ulang; RAG hanya dipanggil lagi kalau memang ada yang berubah.
+
+1. Setiap analisis menyimpan **sidik dokumen** (`sidikDokumen`) dan **sidik basis**
+   (`sidikKb`).
+   - `sidikDokumen` = id berkas + ukuran + tipe + waktu unggah. Berubah bila berkasnya
+     diganti.
+   - `sidikKb` = daftar id dokumen + waktu ubah, disortir. Berubah bila **ada dokumen
+     baru** masuk ke basis instansi.
+2. Saat admin menekan analisis pada dokumen yang sudah pernah dianalisis:
+   - sidik sama dan umur masih di bawah 30 hari → **pakai hasil tersimpan**, RAG tidak
+     dipanggil, kuota tidak terpakai.
+   - dokumen berubah → dibaca ulang dengan isi terbaru.
+   - ada dokumen baru di basis → dibaca ulang supaya indikator baru ikut tertangkap.
+   - cache lebih tua dari 30 hari → dibaca ulang walau sidik sama, supaya kesalahan lama
+     tidak hidup selamanya.
+3. Admin selalu bisa memaksa: tombol **Baca ulang dari RAG** (`segarkan: true`). Ini satu-
+   satunya jalan yang menghabiskan kuota tanpa ada perubahan dokumen.
+4. Pemberitahuan, bukan tindakan diam-diam: `GET /api/analisis/kesegaran` memberi tahu
+   analisis mana yang dibuat sebelum ada dokumen baru. Analisis ulang **tidak** dijalankan
+   otomatis, karena memakan kuota dan bisa mengubah angka yang sudah disetujui admin.
+5. Analisis ulang mengganti butir lama, bukan menumpuknya. Persetujuan butir karena itu
+   ikut direset — angka yang berubah tidak boleh tetap berstatus "disetujui" dari
+   persetujuan atas angka yang berbeda.
+6. Sidik bersifat lunak: bila `sidikKb` tidak bisa diambil (KMS belum dipetakan), cache
+   tetap dipakai dan tidak memaksa analisis ulang. Ketiadaan data sidik bukan alasan
+   membuang token.
+7. Cache di memori (`cacheSapuan`, `cacheIndikator` di `rag/http.ts`, 6 jam) tetap ada
+   untuk pertanyaan berulang dalam satu instance. Cache di database adalah yang bertahan
+   lintas restart dan lintas instance PM2 — keduanya tidak saling menggantikan.
+
 ## 6. Endpoint baru
 
 ### 6.1 Permintaan

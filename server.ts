@@ -71,6 +71,7 @@ import {
 import { KUOTA_ANALISIS_BAWAAN, sisaKuota } from './src/services/analisis/antrean';
 import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/services/analisis/jalankan';
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
+import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
@@ -4190,6 +4191,23 @@ ${kpiItems}
 
   /* ================= ANALISIS DOKUMEN & BUTIR DATA (Fase 2) ================= */
 
+  /**
+   * Sidik basis dokumen instansi (untuk mendeteksi dokumen BARU). Satu panggilan
+   * daftar berkas — bukan panggilan RAG, jadi tidak memakan token. Gagal
+   * mengambil daftar bukan alasan menggagalkan analisis: sidiknya saja yang
+   * tidak dipakai.
+   */
+  const sidikKbInstansi = async (req: Request, session: SessionPayload): Promise<string | undefined> => {
+    try {
+      const { organizationId } = await konteksBerkas(req, session);
+      if (!organizationId) return undefined;
+      const daftar = await klienKms().daftarBerkas(organizationId);
+      return sidikKb(Array.isArray(daftar) ? daftar : []);
+    } catch {
+      return undefined;
+    }
+  };
+
   /** Kuota analisis instansi ini — dipakai UI untuk memberi tahu sisa hari ini. */
   app.get('/api/analisis/kuota', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -4198,6 +4216,39 @@ ${kpiItems}
     const kuota = (db.systemConfig as any).kuotaAnalisisHarian ?? KUOTA_ANALISIS_BAWAAN;
     const terpakai = pemakaianHariIni(db.getAnalisisDokumen(tenantId));
     res.json({ kuota, terpakai, sisa: sisaKuota(terpakai, kuota) });
+  });
+
+  /**
+   * Analisis mana yang perlu dibaca ulang karena ada dokumen baru di basis
+   * instansi. Ditampilkan sebagai pemberitahuan — tidak disegarkan diam-diam,
+   * karena analisis ulang memakan kuota.
+   */
+  app.get('/api/analisis/kesegaran', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh memeriksa kesegaran analisis.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const sidikSekarang = await sidikKbInstansi(req, session);
+    if (!sidikSekarang) {
+      return res.json({
+        sidikKb: '',
+        jumlahDokumen: 0,
+        perluDibacaUlang: [],
+        catatan:
+          'Instansi ini belum dipetakan ke repositori berkas, jadi dokumen baru belum bisa dipantau otomatis.',
+      });
+    }
+    const analisis = db.getAnalisisDokumen(tenantId).filter((a) => a.status === 'selesai');
+    const perlu = perluSegarKarenaKb(analisis, sidikSekarang);
+    res.json({
+      sidikKb: sidikSekarang,
+      jumlahDokumen: analisis.length,
+      perluDibacaUlang: perlu.map((a) => ({ id: a.id, judulBerkas: a.judulBerkas, berkasId: a.berkasId })),
+      catatan:
+        perlu.length === 0
+          ? 'Semua hasil analisis masih sesuai dengan dokumen yang ada.'
+          : `${perlu.length} analisis dibuat sebelum ada dokumen baru. Baca ulang bila indikator barunya dibutuhkan.`,
+    });
   });
 
   app.get('/api/analisis', (req: Request, res: Response) => {
@@ -4247,6 +4298,43 @@ ${kpiItems}
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
     const sector = (permintaan ? tenant?.sector : tenant?.sector) || 'pdam';
 
+    // ---- CACHE ----
+    // Dokumen yang isinya belum berubah tidak dibaca ulang ke RAG. Yang membuat
+    // cache batal hanya: berkasnya diganti, ada dokumen baru di basis instansi,
+    // cache terlalu tua, atau admin minta segarkan.
+    const lampiran = permintaan?.lampiran.find((l) => l.berkasId === berkasId);
+    const sidikSekarang = sidikDokumen({
+      berkasId,
+      ukuranKb: lampiran?.ukuranKb ?? (typeof req.body?.ukuranKb === 'number' ? req.body.ukuranKb : undefined),
+      tipe: lampiran?.tipe ?? (req.body?.tipe ? String(req.body.tipe) : undefined),
+      diunggahPada: lampiran?.diunggahPada,
+    });
+    const sidikKbSekarang = await sidikKbInstansi(req, session);
+    const paksa = req.body?.segarkan === true;
+    const putusan = putusanCache(db.getAnalisisDokumen(tenantId, { berkasId }), {
+      berkasId,
+      sidikDokumen: sidikSekarang,
+      sidikKb: sidikKbSekarang,
+      paksa,
+    });
+
+    if (putusan.pakai) {
+      const tersimpan = db.getAnalisisDokumenById(putusan.analisisId, tenantId);
+      if (tersimpan) {
+        const kuotaKini = (db.systemConfig as any).kuotaAnalisisHarian ?? KUOTA_ANALISIS_BAWAAN;
+        const terpakai = pemakaianHariIni(db.getAnalisisDokumen(tenantId));
+        return res.json({
+          analisis: tersimpan,
+          butir: db.getButirData(tenantId, { analisisId: tersimpan.id }),
+          rekomendasi: tersimpan.rekomendasiTemplate || [],
+          dibuang: 0,
+          sisaKuota: sisaKuota(terpakai, kuotaKini),
+          dariCache: true,
+          catatanCache: putusan.alasan,
+        });
+      }
+    }
+
     const ekstraktor: Ekstraktor = async ({ prompt }) => {
       const hasil = await ragClient.query({
         prompt,
@@ -4282,6 +4370,7 @@ ${kpiItems}
         ekstraktor,
         konteks,
         abaikanKuota: req.body?.abaikanKuota === true,
+        sidik: { dokumen: sidikSekarang, kb: sidikKbSekarang },
       });
       db.addAuditLog({
         tenantId,
@@ -4298,6 +4387,8 @@ ${kpiItems}
         rekomendasi: hasil.rekomendasi,
         dibuang: hasil.dibuang,
         sisaKuota: hasil.sisaKuota,
+        dariCache: false,
+        catatanCache: putusan.alasan,
       });
     } catch (err) {
       return res.status(500).json({ error: jelaskanError(err) });
@@ -4396,6 +4487,17 @@ ${kpiItems}
       const hasil = await jalankanAnalisis({
         penyimpanan: db as any,
         ekstraktor,
+        sidik: {
+          dokumen:
+            lama.sidikDokumen ||
+            sidikDokumen({
+              berkasId: lama.berkasId,
+              ukuranKb: permintaan?.lampiran.find((l) => l.berkasId === lama.berkasId)?.ukuranKb,
+              tipe: permintaan?.lampiran.find((l) => l.berkasId === lama.berkasId)?.tipe,
+              diunggahPada: permintaan?.lampiran.find((l) => l.berkasId === lama.berkasId)?.diunggahPada,
+            }),
+          kb: await sidikKbInstansi(req, session),
+        },
         konteks: {
           tenantId,
           analisisId: '',

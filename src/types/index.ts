@@ -710,6 +710,13 @@ export interface AnalisisDokumen {
   jumlahButir: number;
   galat?: string;
   percobaan: number;
+  /**
+   * Sidik isi dokumen saat dianalisis (id + ukuran + tipe + waktu unggah).
+   * Selama sidik ini sama, hasil analisis dipakai ulang tanpa memanggil RAG.
+   */
+  sidikDokumen?: string;
+  /** Sidik basis dokumen instansi — berubah bila ada dokumen baru masuk. */
+  sidikKb?: string;
   /** Pengunci antar-instance PM2: instance lain tidak boleh mengklaim baris ini. */
   leaseSampai?: number;
   dibuatPada: string;
