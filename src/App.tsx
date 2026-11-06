@@ -1685,6 +1685,10 @@ export default function App() {
         tenantName={currentTenant?.name}
         tenantKbId={currentTenant?.knowledgeBaseId}
         dashboardId={activeDashboard?.id}
+        halamanId={activeDashboard?.halamanAktifId || halamanDashboard[0]?.id}
+        halamanJudul={
+          halamanDashboard.find((h) => h.id === activeDashboard?.halamanAktifId)?.judul || halamanDashboard[0]?.judul
+        }
         onDashboardUpdated={(newDash) => {
           setActiveDashboard(newDash);
           // Dashboard dari asisten langsung dibuka di kanvas, dari menu mana pun.

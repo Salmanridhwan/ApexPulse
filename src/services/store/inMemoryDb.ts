@@ -20,6 +20,7 @@ import {
   PermintaanData,
   AnalisisDokumen,
   ButirData,
+  UsulanHalaman,
   AksiMitigasi,
   Aset,
   PerjanjianKinerja,
@@ -155,6 +156,7 @@ interface PersistedState {
   permintaanData?: PermintaanData[];
   analisisDokumen?: AnalisisDokumen[];
   butirData?: ButirData[];
+  usulanHalaman?: UsulanHalaman[];
 }
 
 export class InMemoryDb {
@@ -392,6 +394,8 @@ export class InMemoryDb {
   public analisisDokumen: AnalisisDokumen[] = [];
   /** Butir data hasil analisis — bahan menyusun widget. */
   public butirData: ButirData[] = [];
+  /** Usulan perubahan halaman dari asisten — belum menyentuh dashboard sampai diterapkan. */
+  public usulanHalaman: UsulanHalaman[] = [];
 
   /**
    * id instansi yang sudah dihapus admin. Dipakai agar user seed (mis.
@@ -443,6 +447,7 @@ export class InMemoryDb {
       permintaanData: this.permintaanData,
       analisisDokumen: this.analisisDokumen,
       butirData: this.butirData,
+      usulanHalaman: this.usulanHalaman,
     };
   }
 
@@ -515,6 +520,7 @@ export class InMemoryDb {
         if (Array.isArray(loaded.permintaanData)) this.permintaanData = loaded.permintaanData;
         if (Array.isArray(loaded.analisisDokumen)) this.analisisDokumen = loaded.analisisDokumen;
         if (Array.isArray(loaded.butirData)) this.butirData = loaded.butirData;
+        if (Array.isArray(loaded.usulanHalaman)) this.usulanHalaman = loaded.usulanHalaman;
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
@@ -849,6 +855,8 @@ export class InMemoryDb {
       if (analisis.length > 0 || this.analisisDokumen.length === 0) this.analisisDokumen = analisis;
       const butir = await this.mysql.loadButirData();
       if (butir.length > 0 || this.butirData.length === 0) this.butirData = butir;
+      const usulan = await this.mysql.loadUsulanHalaman();
+      if (usulan.length > 0 || this.usulanHalaman.length === 0) this.usulanHalaman = usulan;
     } catch (err: any) {
       console.error('[AionesBoard DB] segarkanMultiInstance gagal:', err?.message || err);
     }
@@ -1050,6 +1058,7 @@ export class InMemoryDb {
       if (Array.isArray(parsed.permintaanData)) this.permintaanData = parsed.permintaanData;
       if (Array.isArray(parsed.analisisDokumen)) this.analisisDokumen = parsed.analisisDokumen;
       if (Array.isArray(parsed.butirData)) this.butirData = parsed.butirData;
+      if (Array.isArray(parsed.usulanHalaman)) this.usulanHalaman = parsed.usulanHalaman;
       if (parsed.credentials) this.credentials = parsed.credentials;
       // Peran lama di berkas cadangan (analis/direksi) → pengguna.
       this.normalisasiPeranLama();
@@ -1210,6 +1219,7 @@ export class InMemoryDb {
         permintaanData: this.permintaanData,
         analisisDokumen: this.analisisDokumen,
         butirData: this.butirData,
+        usulanHalaman: this.usulanHalaman,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
@@ -1722,6 +1732,10 @@ export class InMemoryDb {
     const butirHapus = this.butirData.filter((b) => b.tenantId === id);
     this.butirData = this.butirData.filter((b) => b.tenantId !== id);
     for (const b of butirHapus) this.trackWrite(this.mysql?.deleteButirDataRow(b.id));
+    // 3l) Usulan perubahan halaman instansi ini.
+    const usulanHapus = this.usulanHalaman.filter((u) => u.tenantId === id);
+    this.usulanHalaman = this.usulanHalaman.filter((u) => u.tenantId !== id);
+    for (const u of usulanHapus) this.trackWrite(this.mysql?.deleteUsulanHalamanRow(u.id));
 
     // 4) Instansinya sendiri: dari memori + tabel khusus MySQL.
     this.tenants = this.tenants.filter((t) => t.id !== id);
@@ -2275,6 +2289,60 @@ export class InMemoryDb {
     for (const b of hapus) this.trackWrite(this.mysql?.deleteButirDataRow(b.id));
     this.persist();
     return hapus.length;
+  }
+
+
+  /* ================= USULAN PERUBAHAN HALAMAN ================= */
+
+  getUsulanHalaman(
+    tenantId: string,
+    filter?: { dashboardId?: string; halamanId?: string; status?: string }
+  ): UsulanHalaman[] {
+    return this.usulanHalaman
+      .filter(
+        (u) =>
+          u.tenantId === tenantId &&
+          (!filter?.dashboardId || u.dashboardId === filter.dashboardId) &&
+          (!filter?.halamanId || u.halamanId === filter.halamanId) &&
+          (!filter?.status || u.status === filter.status)
+      )
+      .sort((a, b) => b.dibuatPada.localeCompare(a.dibuatPada));
+  }
+
+  getUsulanHalamanById(id: string, tenantId: string): UsulanHalaman | undefined {
+    return this.usulanHalaman.find((u) => u.id === id && u.tenantId === tenantId);
+  }
+
+  createUsulanHalaman(
+    data: Omit<UsulanHalaman, 'id' | 'dibuatPada' | 'status'> & { status?: UsulanHalaman['status'] }
+  ): UsulanHalaman {
+    const baru: UsulanHalaman = {
+      ...data,
+      status: data.status ?? 'menunggu',
+      id: `usl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      dibuatPada: new Date().toISOString(),
+    };
+    this.usulanHalaman.unshift(baru);
+    this.trackWrite(this.mysql?.upsertUsulanHalaman(baru.id, baru.tenantId, baru));
+    this.persist();
+    return baru;
+  }
+
+  updateUsulanHalaman(id: string, tenantId: string, partial: Partial<UsulanHalaman>): UsulanHalaman | undefined {
+    const idx = this.usulanHalaman.findIndex((u) => u.id === id && u.tenantId === tenantId);
+    if (idx === -1) return undefined;
+    const lama = this.usulanHalaman[idx];
+    const digabung: UsulanHalaman = {
+      ...lama,
+      ...partial,
+      id: lama.id,
+      tenantId: lama.tenantId,
+      dibuatPada: lama.dibuatPada,
+    };
+    this.usulanHalaman[idx] = digabung;
+    this.trackWrite(this.mysql?.upsertUsulanHalaman(digabung.id, digabung.tenantId, digabung));
+    this.persist();
+    return digabung;
   }
 
   deleteAnalisisDokumen(id: string, tenantId: string): boolean {

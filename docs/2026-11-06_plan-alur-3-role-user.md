@@ -658,6 +658,18 @@ Berkas: `src/services/data/*` baru, `src/services/rag/http.ts`, `src/services/st
 
 Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKeSlotTemplate.ts`, `server.ts`, `KatalogDataPage.tsx`, `App.tsx`, `ChatPanel.tsx`.
 
+**Status 2026-11-06 (commit Fase 3):**
+
+| Bagian | Keadaan |
+|---|---|
+| `butirKeWidget.ts` | selesai — angka dari butir apa adanya, butir tanpa angka tidak dibuatkan kartu, sitasi ikut, batas 9 per halaman |
+| `POST /api/dashboards/dari-butir` | selesai — buat dashboard baru atau tambah halaman, tautkan ke permintaan, audit |
+| `usulan.ts` + `/api/usulan/*` | selesai — validasi (wajib sitasi), pratinjau, Terapkan/Batalkan, transaksi batal utuh bila gagal |
+| Chat mode "sempurnakan halaman" | selesai — `halamanId` + daftar kartu + butir disetujui jadi konteks; hasilnya usulan, bukan perubahan langsung |
+| `butirKeSlotTemplate.ts` | belum — menunggu UI pemilihan template |
+| UI pemilihan butir ("Katalog Data") | belum — endpoint sudah siap, layarnya belum ada |
+
+
 ### Fase 4: Panel Admin Aiones
 
 Tidak lagi ditunda: pemilik memutuskan akun demo baru dibuat (12.1).

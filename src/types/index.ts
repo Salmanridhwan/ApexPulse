@@ -763,6 +763,49 @@ export interface ButirData {
   dibuatPada: string;
 }
 
+/* ================= USULAN PERUBAHAN HALAMAN (Fase 3) ================= */
+
+/**
+ * Satu perubahan yang diusulkan asisten terhadap sebuah halaman.
+ *
+ * Usulan TIDAK langsung mengubah dashboard. Admin melihat pratinjaunya lalu
+ * menekan Terapkan. Ini disengaja: satu kalimat ambigu ("hapus kartu ini") tidak
+ * boleh merusak halaman yang sudah rapi.
+ */
+export interface PerubahanHalaman {
+  aksi: 'tambah' | 'ubah' | 'hapus' | 'urutkan';
+  /** Untuk `ubah` dan `hapus`. */
+  widgetId?: string;
+  /** Untuk `tambah` dan `ubah`. */
+  widget?: WidgetSpec;
+  /** Untuk `urutkan` — urutan id widget yang baru. */
+  urutan?: string[];
+  /** Alasan singkat yang dibaca admin, bukan istilah mesin. */
+  alasan?: string;
+}
+
+export type StatusUsulan = 'menunggu' | 'diterapkan' | 'dibatalkan';
+
+export interface UsulanHalaman {
+  id: string;
+  tenantId: string;
+  dashboardId: string;
+  halamanId: string;
+  /** Judul halaman saat usulan dibuat — supaya pratinjau tetap terbaca walau halaman diubah. */
+  judulHalaman: string;
+  ringkasan: string;
+  perubahan: PerubahanHalaman[];
+  status: StatusUsulan;
+  /** `chat` bila berasal dari percakapan, `manual` bila disusun lewat panel. */
+  asal: 'chat' | 'manual';
+  dibuatOleh: string;
+  dibuatOlehNama: string;
+  dibuatPada: string;
+  diterapkanPada?: string;
+  /** Catatan penolakan/penyebab usulan tidak bisa diterapkan. */
+  catatan?: string;
+}
+
 export interface ProgressStep {
   id: string;
   title: string;

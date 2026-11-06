@@ -72,6 +72,14 @@ import { KUOTA_ANALISIS_BAWAAN, sisaKuota } from './src/services/analisis/antrea
 import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/services/analisis/jalankan';
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
+import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
+import {
+  butirSiapPakai,
+  halamanDari,
+  ringkasUsulan,
+  terapkanPerubahan,
+  validasiPerubahan,
+} from './src/services/analisis/usulan';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
@@ -4541,6 +4549,337 @@ ${kpiItems}
       details: `${ada.jumlahButir} butir ikut dihapus`,
     });
     res.json({ success: true });
+  });
+
+  /**
+   * Susun halaman dari butir data yang disetujui admin.
+   *
+   * Angka diambil dari butir — bukan dari model — sehingga tidak ada satu pun
+   * nilai di halaman ini yang bisa berubah karena halusinasi. Butir yang ditolak
+   * atau tidak punya angka dilewati, dan jumlahnya dilaporkan apa adanya.
+   */
+  app.post('/api/dashboards/dari-butir', (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+
+    const ids: string[] = Array.isArray(req.body?.butirIds) ? req.body.butirIds.map((x: unknown) => String(x)) : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'Pilih minimal satu butir data.' });
+    }
+
+    const dipilih = db.getButirData(tenantId).filter((b) => ids.includes(b.id));
+    if (dipilih.length === 0) {
+      return res.status(404).json({ error: 'Butir yang dipilih tidak ditemukan di instansi ini.' });
+    }
+
+    const permintaanId = String(req.body?.permintaanId || '').trim() || undefined;
+    const permintaan = permintaanId
+      ? db.permintaanData.find((p) => p.id === permintaanId && p.tenantId === tenantId)
+      : undefined;
+    if (permintaanId && !permintaan) {
+      return res.status(404).json({ error: 'Permintaan tidak ditemukan di instansi ini.' });
+    }
+
+    const judul =
+      String(req.body?.judul || '').trim() ||
+      (permintaan ? `Data ${permintaan.bidang}` : 'Halaman dari dokumen');
+    const halamanBaru = butirKeHalaman(dipilih, { judul });
+    if (halamanBaru.every((h) => h.widgets.length === 0)) {
+      return res.status(422).json({
+        error:
+          'Butir terpilih tidak punya angka yang bisa ditampilkan. Setujui butir yang berisi nilai, deret, atau tabel lebih dulu.',
+      });
+    }
+
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const dashId = String(req.body?.dashboardId || '').trim();
+
+    if (dashId) {
+      const lama = db.dashboards.find((d) => d.id === dashId && d.tenantId === tenantId);
+      if (!lama) return res.status(404).json({ error: 'Dashboard tujuan tidak ditemukan.' });
+      const halamanLama =
+        lama.halaman && lama.halaman.length > 0
+          ? lama.halaman
+          : [{ id: 'hlm-1', judul: 'Ringkasan', widgets: lama.widgets }];
+      const tambahan = halamanBaru.map((h, i) => ({
+        id: `hlm-${Date.now()}-${i + 1}`,
+        judul: h.judul,
+        widgets: h.widgets,
+      }));
+      const diperbarui = db.updateDashboard(
+        lama.id,
+        {
+          halaman: [...halamanLama, ...tambahan],
+          halamanAktifId: tambahan[0].id,
+          widgets: tambahan[0].widgets,
+        },
+        tenantId
+      );
+      db.addAuditLog({
+        tenantId,
+        userId: session.userId,
+        userName: session.name,
+        action: 'Tambah Halaman dari Butir',
+        target: lama.title,
+        details: `${tambahan.length} halaman, ${ringkasHalaman(dipilih, halamanBaru)}`,
+      });
+      return res.status(201).json({
+        dashboard: diperbarui,
+        jumlahHalaman: tambahan.length,
+        ringkasan: ringkasHalaman(dipilih, halamanBaru),
+      });
+    }
+
+    const halaman = halamanBaru.map((h, i) => ({
+      id: `hlm-${i + 1}`,
+      judul: h.judul,
+      widgets: h.widgets,
+    }));
+    const baru: Dashboard = {
+      id: `dash-${Date.now()}`,
+      tenantId,
+      title: judul,
+      description: `Disusun dari ${dipilih.length} butir data dokumen.`,
+      sector: (tenant?.sector || 'pdam') as BumdSector,
+      widgets: halaman[0].widgets,
+      globalFilters: { periode: '2026-Q1', unitKerja: 'Semua', kategori: 'Semua' },
+      halaman,
+      halamanAktifId: halaman[0].id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const dibuat = db.createDashboard(baru);
+
+    if (permintaan) db.updatePermintaanData(permintaan.id, tenantId, { dashboardId: dibuat.id });
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Buat Dashboard dari Butir',
+      target: judul,
+      details: `${halaman.length} halaman, ${ringkasHalaman(dipilih, halamanBaru)}`,
+    });
+
+    return res.status(201).json({
+      dashboard: dibuat,
+      jumlahHalaman: halaman.length,
+      ringkasan: ringkasHalaman(dipilih, halamanBaru),
+    });
+  });
+
+  /* ================= USULAN PERUBAHAN HALAMAN (Fase 3) ================= */
+
+  /**
+   * Asisten menyiapkan usulan perubahan untuk SATU halaman.
+   *
+   * Yang dikirim ke model: halaman mana yang sedang dibuka, kartu apa saja yang
+   * ada di sana, dan butir mana yang sudah disetujui admin. Model hanya boleh
+   * memakai angka dari butir itu — hasilnya divalidasi, dan usulan yang
+   * menyelipkan angka tanpa sumber ditolak sebelum tersimpan.
+   *
+   * Usulan TIDAK mengubah halaman. Admin menekan Terapkan dulu.
+   */
+  app.post('/api/usulan/dari-chat', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Menyempurnakan halaman hanya bisa dilakukan admin instansi.')) return;
+    const tenantId = effectiveTenantId(req, session);
+
+    const dashboardId = String(req.body?.dashboardId || '').trim();
+    const halamanId = String(req.body?.halamanId || '').trim();
+    const perintah = String(req.body?.prompt || '').trim();
+    if (!dashboardId || !halamanId) {
+      return res.status(400).json({ error: 'dashboardId dan halamanId wajib diisi supaya asisten tahu halaman mana yang disunting.' });
+    }
+    if (!perintah) return res.status(400).json({ error: 'Tulis dulu apa yang ingin diubah.' });
+
+    const dash = db.dashboards.find((d) => d.id === dashboardId && d.tenantId === tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan di instansi ini.' });
+    const halaman = halamanDari(dash, halamanId);
+    if (!halaman) return res.status(404).json({ error: 'Halaman tidak ditemukan di dashboard ini.' });
+
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const butir = butirSiapPakai(db.getButirData(tenantId)).slice(0, 40);
+    const daftarKartu = halaman.widgets.map((w) => `- id=${w.id} | "${w.title}" | tipe ${w.type}`).join('\n');
+    const daftarButir = butir
+      .map(
+        (b) =>
+          `- id=${b.id} | "${b.nama}" | ${b.kategori} | ${
+            b.nilai !== undefined && b.nilai !== null ? `nilai ${b.nilai}${b.satuan ? ' ' + b.satuan : ''}` : b.seri ? `deret ${b.seri[0]?.data.join(',')}` : 'tabel'
+          } | sumber: ${b.sitasi.dokumen}${b.sitasi.halaman ? ' hlm ' + b.sitasi.halaman : ''}`
+      )
+      .join('\n');
+
+    const prompt = [
+      `Halaman yang sedang dibuka: "${halaman.judul}" (id ${halaman.id}) pada dashboard "${dash.title}".`,
+      'Kartu yang ada di halaman ini:',
+      daftarKartu || '(belum ada kartu)',
+      '',
+      'Butir data yang SUDAH DISETUJUI admin (satu-satunya sumber angka yang boleh dipakai):',
+      daftarButir || '(belum ada butir yang disetujui)',
+      '',
+      `Permintaan admin: ${perintah}`,
+      '',
+      'Balas HANYA dengan JSON tanpa penjelasan lain, bentuk:',
+      '{"ringkasan":"satu kalimat tentang usulan ini","perubahan":[',
+      '{"aksi":"tambah","widget":{"id":"w-baru-1","type":"kpi","title":"...","confidence":"sumber","grid":{"x":0,"y":0,"w":3,"h":2},"kpi":{"value":123,"unit":"..."},"citations":[{"id":"c1","docName":"...","page":1,"chunkSnippet":"...","confidenceScore":0.9,"date":"..."}]},"alasan":"..."},',
+      '{"aksi":"hapus","widgetId":"w-1","alasan":"..."},',
+      '{"aksi":"ubah","widgetId":"w-2","widget":{...},"alasan":"..."},',
+      '{"aksi":"urutkan","urutan":["w-3","w-1"],"alasan":"..."}]}',
+      '',
+      'Aturan wajib: JANGAN mengarang angka. Semua nilai harus berasal dari butir di atas, dan setiap kartu baru WAJIB menyertakan citations dengan docName dari butir. Jangan menyentuh halaman lain.',
+    ].join('\n');
+
+    let teksJawaban = '';
+    try {
+      const hasil = await ragClient.query({
+        prompt,
+        sector: (dash.sector || tenant?.sector || 'pdam') as BumdSector,
+        instansi: tenant?.name,
+        kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '',
+        mode: 'prose',
+        strictGrounding: true,
+        timeoutMs: 90_000,
+      });
+      teksJawaban = String(hasil.answer || '').trim();
+    } catch (err) {
+      return res.status(502).json({ error: `Asisten tidak bisa dihubungi: ${jelaskanError(err)}` });
+    }
+
+    // Model kadang membungkus JSON dengan ```json — dibersihkan, bukan ditolak.
+    const bersih = teksJawaban.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const mulai = bersih.indexOf('{');
+    const akhir = bersih.lastIndexOf('}');
+    if (mulai === -1 || akhir <= mulai) {
+      return res.status(422).json({
+        error: 'Asisten tidak membalas dalam bentuk yang bisa dibaca. Coba tulis permintaan lebih spesifik, misalnya "hapus kartu X".',
+        jawabanAsisten: teksJawaban.slice(0, 400),
+      });
+    }
+
+    let mentah: any;
+    try {
+      mentah = JSON.parse(bersih.slice(mulai, akhir + 1));
+    } catch {
+      return res.status(422).json({
+        error: 'Jawaban asisten bukan JSON yang sah, jadi tidak ada yang bisa diterapkan.',
+        jawabanAsisten: bersih.slice(0, 400),
+      });
+    }
+
+    const validasi = validasiPerubahan(mentah?.perubahan, halaman);
+    if (!validasi.sah) {
+      return res.status(422).json({ error: validasi.galat || 'Usulan tidak bisa dipakai.' });
+    }
+
+    // Pratinjau dihitung sekarang, supaya admin melihat hasilnya sebelum menyetujui.
+    const pratinjau = terapkanPerubahan(halaman.widgets, validasi.perubahan);
+    if (!pratinjau.berhasil) {
+      return res.status(409).json({ error: pratinjau.galat || 'Usulan tidak bisa diterapkan pada halaman ini.' });
+    }
+
+    const usulan = db.createUsulanHalaman({
+      tenantId,
+      dashboardId,
+      halamanId: halaman.id,
+      judulHalaman: halaman.judul,
+      ringkasan: String(mentah?.ringkasan || ringkasUsulan(validasi.perubahan)).slice(0, 300),
+      perubahan: validasi.perubahan,
+      asal: 'chat',
+      dibuatOleh: session.userId,
+      dibuatOlehNama: session.name,
+    });
+
+    res.status(201).json({
+      usulan,
+      ringkasanPerubahan: ringkasUsulan(validasi.perubahan),
+      jumlahKartuSetelah: pratinjau.jumlahAkhir,
+      pratinjauWidgets: pratinjau.widgets,
+    });
+  });
+
+  app.get('/api/usulan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!isAdminRole(session.role)) {
+      return res.status(403).json({ error: 'Usulan halaman hanya untuk admin instansi.' });
+    }
+    const tenantId = effectiveTenantId(req, session);
+    res.json(
+      db.getUsulanHalaman(tenantId, {
+        dashboardId: String(req.query.dashboardId || '').trim() || undefined,
+        halamanId: String(req.query.halamanId || '').trim() || undefined,
+        status: String(req.query.status || '').trim() || undefined,
+      })
+    );
+  });
+
+  /** Terapkan usulan — di sinilah halaman benar-benar berubah. */
+  app.post('/api/usulan/:id/terapkan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menerapkan usulan.')) return;
+    const tenantId = effectiveTenantId(req, session);
+
+    const usulan = db.getUsulanHalamanById(req.params.id, tenantId);
+    if (!usulan) return res.status(404).json({ error: 'Usulan tidak ditemukan.' });
+    if (usulan.status !== 'menunggu') {
+      return res.status(409).json({ error: `Usulan ini sudah ${usulan.status}.` });
+    }
+
+    const dash = db.dashboards.find((d) => d.id === usulan.dashboardId && d.tenantId === tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard-nya sudah tidak ada.' });
+    const halaman = halamanDari(dash, usulan.halamanId);
+    if (!halaman) return res.status(404).json({ error: 'Halamannya sudah tidak ada.' });
+
+    const hasil = terapkanPerubahan(halaman.widgets, usulan.perubahan);
+    if (!hasil.berhasil) {
+      db.updateUsulanHalaman(usulan.id, tenantId, { catatan: hasil.galat });
+      return res.status(409).json({ error: hasil.galat || 'Usulan tidak bisa diterapkan.' });
+    }
+
+    const daftarHalaman =
+      dash.halaman && dash.halaman.length > 0
+        ? dash.halaman
+        : [{ id: halaman.id, judul: halaman.judul, widgets: halaman.widgets }];
+    const halamanBaru = daftarHalaman.map((h) => (h.id === halaman.id ? { ...h, widgets: hasil.widgets } : h));
+    const aktif = dash.halamanAktifId || halaman.id;
+    const halamanAktif = halamanBaru.find((h) => h.id === aktif) || halamanBaru[0];
+
+    const diperbarui = db.updateDashboard(
+      dash.id,
+      { halaman: halamanBaru, halamanAktifId: halamanAktif.id, widgets: halamanAktif.widgets },
+      tenantId
+    );
+    const usulanSelesai = db.updateUsulanHalaman(usulan.id, tenantId, {
+      status: 'diterapkan',
+      diterapkanPada: new Date().toISOString(),
+    });
+
+    db.addAuditLog({
+      tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Terapkan Usulan Halaman',
+      target: `${dash.title} — ${halaman.judul}`,
+      details: `${ringkasUsulan(usulan.perubahan)} (asal ${usulan.asal})`,
+    });
+
+    res.json({ usulan: usulanSelesai, dashboard: diperbarui, jumlahKartu: hasil.jumlahAkhir });
+  });
+
+  app.post('/api/usulan/:id/batalkan', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh membatalkan usulan.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const usulan = db.getUsulanHalamanById(req.params.id, tenantId);
+    if (!usulan) return res.status(404).json({ error: 'Usulan tidak ditemukan.' });
+    if (usulan.status !== 'menunggu') {
+      return res.status(409).json({ error: `Usulan ini sudah ${usulan.status}.` });
+    }
+    res.json(db.updateUsulanHalaman(usulan.id, tenantId, { status: 'dibatalkan' }));
   });
 
   app.get('/api/notifications', (req: Request, res: Response) => {

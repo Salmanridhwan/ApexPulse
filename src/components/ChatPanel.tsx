@@ -17,8 +17,10 @@ import {
   Table2,
   Timer,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react';
+import type { UsulanHalaman } from '../types';
 import { BumdSector, ChatMessage, Dashboard, ProgressStep, SaranChart } from '../types';
 import { PratinjauSaranChart } from './PratinjauSaranChart';
 
@@ -54,6 +56,12 @@ interface ChatPanelProps {
   tenantKbId?: string;
   /** Dashboard pemilik percakapan ini — sumber riwayatnya. */
   dashboardId?: string;
+  /**
+   * Halaman yang sedang dibuka. WAJIB untuk mode "sempurnakan halaman": tanpa
+   * ini asisten hanya tahu dashboard-nya dan bisa menyunting halaman yang salah.
+   */
+  halamanId?: string;
+  halamanJudul?: string;
   onDashboardUpdated: (dashboard: Dashboard) => void;
 }
 
@@ -87,9 +95,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   tenantName,
   tenantKbId,
   dashboardId,
+  halamanId,
+  halamanJudul,
   onDashboardUpdated,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  /** Mode menyempurnakan halaman: pesan berikutnya jadi usulan, bukan jawaban biasa. */
+  const [modeUsulan, setModeUsulan] = useState(false);
+  const [usulanAktif, setUsulanAktif] = useState<UsulanHalaman | null>(null);
+  const [sibukUsulan, setSibukUsulan] = useState(false);
+  const [galatUsulan, setGalatUsulan] = useState('');
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [inputPrompt, setInputPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -213,6 +228,51 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     setMessages((prev) => [...prev, userMsg]);
+
+    // ---- MODE SEMPURNAKAN HALAMAN ----
+    // Percakapan di sini menghasilkan USULAN, bukan perubahan langsung. Halaman
+    // baru berubah setelah admin menekan Terapkan.
+    if (modeUsulan && dashboardId && halamanId) {
+      setIsStreaming(true);
+      setGalatUsulan('');
+      try {
+        const res = await fetch('/api/usulan/dari-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dashboardId, halamanId, prompt }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setGalatUsulan(data?.error || 'Asisten tidak bisa menyusun usulan.');
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg-${Date.now()}-err`,
+              sender: 'system',
+              text: data?.error || 'Asisten tidak bisa menyusun usulan untuk halaman ini.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+        } else {
+          setUsulanAktif(data.usulan);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg-${Date.now()}-usulan`,
+              sender: 'system',
+              text: `${data.usulan?.ringkasan || 'Usulan siap ditinjau.'} (${data.ringkasanPerubahan}) — tinjau dulu, halaman belum berubah.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+        }
+      } catch {
+        setGalatUsulan('Gagal menghubungi server.');
+      } finally {
+        setIsStreaming(false);
+      }
+      return;
+    }
+
     setIsStreaming(true);
     setCurrentSteps([
       { id: 'step-0', title: 'Menghubungkan ke asisten...', status: 'in_progress' },
@@ -709,6 +769,102 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </button>
         ))}
       </div>
+
+      {/* Tombol mode penyempurnaan halaman */}
+      {dashboardId && halamanId && (
+        <div className="px-3 pt-2 border-t border-line bg-surface flex items-center gap-2">
+          <button
+            onClick={() => setModeUsulan((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
+              modeUsulan
+                ? 'bg-brand text-on-brand border-brand'
+                : 'bg-surface-2 text-ink-2 border-line hover:border-brand/40'
+            }`}
+            data-testid="tombol-mode-usulan"
+          >
+            <Wand2 className="w-3 h-3" />
+            {modeUsulan ? 'Mode sempurnakan halaman: aktif' : `Sempurnakan halaman${halamanJudul ? ` "${halamanJudul}"` : ''}`}
+          </button>
+          {modeUsulan && <span className="text-[10px] text-ink-3">Perubahan tampil sebagai usulan dulu</span>}
+        </div>
+      )}
+
+      {/* Kartu pratinjau usulan */}
+      {usulanAktif && (
+        <div className="m-3 p-2.5 rounded-card border border-brand/30 bg-brand/5 space-y-2" data-testid="kartu-usulan">
+          <div className="text-[11px] font-semibold text-ink">
+            Usulan untuk halaman "{usulanAktif.judulHalaman}"
+          </div>
+          <p className="text-[11px] text-ink-2">{usulanAktif.ringkasan}</p>
+          <ul className="text-[10px] text-ink-3 space-y-0.5">
+            {usulanAktif.perubahan.map((p, i) => (
+              <li key={i}>
+                • {p.aksi === 'tambah' ? 'Tambah' : p.aksi === 'ubah' ? 'Ubah' : p.aksi === 'hapus' ? 'Hapus' : 'Susun ulang'}{' '}
+                {p.widget?.title || p.widgetId || ''} {p.alasan ? `— ${p.alasan}` : ''}
+              </li>
+            ))}
+          </ul>
+          {galatUsulan && <div className="text-[10px] text-neg">{galatUsulan}</div>}
+          <div className="flex gap-1.5">
+            <button
+              disabled={sibukUsulan}
+              onClick={async () => {
+                setSibukUsulan(true);
+                setGalatUsulan('');
+                try {
+                  const res = await fetch(`/api/usulan/${usulanAktif.id}/terapkan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    setGalatUsulan(data?.error || 'Usulan tidak bisa diterapkan.');
+                  } else {
+                    if (data.dashboard) onDashboardUpdated(data.dashboard);
+                    setUsulanAktif(null);
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `msg-${Date.now()}-ok`,
+                        sender: 'system',
+                        text: `Diterapkan. Halaman sekarang berisi ${data.jumlahKartu ?? '-'} kartu.`,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      },
+                    ]);
+                  }
+                } finally {
+                  setSibukUsulan(false);
+                }
+              }}
+              className="px-2.5 py-1 text-[11px] font-semibold text-on-brand bg-brand rounded-control disabled:opacity-50"
+              data-testid="terapkan-usulan"
+            >
+              {sibukUsulan ? 'Menerapkan…' : 'Terapkan'}
+            </button>
+            <button
+              disabled={sibukUsulan}
+              onClick={async () => {
+                setSibukUsulan(true);
+                try {
+                  await fetch(`/api/usulan/${usulanAktif.id}/batalkan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                  });
+                } finally {
+                  setUsulanAktif(null);
+                  setSibukUsulan(false);
+                }
+              }}
+              className="px-2.5 py-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line rounded-control disabled:opacity-50"
+              data-testid="batalkan-usulan"
+            >
+              Batalkan
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input Form */}
       <div className="p-3 border-t border-line bg-surface">

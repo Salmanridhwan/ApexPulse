@@ -8,7 +8,7 @@
  * Urutan elemen dipertahankan lewat kolom `idx` (dashboard/audit perlu urutan).
  */
 import mysql from 'mysql2/promise';
-import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, PermintaanData, AnalisisDokumen, ButirData, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
+import { AlertRule, AlurVerifikasi, Aset, AuditLog, Chat, Dashboard, KetersediaanPreset, KewajibanLapor, LaporanPeriodik, LKjIP, NotificationItem, PerjanjianKinerja, PermintaanData, AnalisisDokumen, ButirData, UsulanHalaman, Risiko, SnapshotKeuangan, Tenant, TemuanAudit } from '../../types';
 import { SafeUser } from './inMemoryDb';
 
 /**
@@ -119,6 +119,7 @@ export interface DbSnapshot {
   permintaanData: PermintaanData[];
   analisisDokumen: AnalisisDokumen[];
   butirData: ButirData[];
+  usulanHalaman: UsulanHalaman[];
 }
 
 export interface LoadedState {
@@ -147,6 +148,7 @@ export interface LoadedState {
   permintaanData?: PermintaanData[];
   analisisDokumen?: AnalisisDokumen[];
   butirData?: ButirData[];
+  usulanHalaman?: UsulanHalaman[];
 }
 
 export class MysqlStore {
@@ -388,6 +390,20 @@ export class MysqlStore {
         INDEX idx_analisis_tenant (tenant_id),
         INDEX idx_analisis_status (tenant_id, status),
         INDEX idx_analisis_berkas (berkas_id)
+      ) ENGINE=InnoDB
+    `);
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS usulan_halaman (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        dashboard_id VARCHAR(128) NOT NULL,
+        halaman_id VARCHAR(128) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'menunggu',
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_usulan_tenant (tenant_id),
+        INDEX idx_usulan_halaman (dashboard_id, halaman_id),
+        INDEX idx_usulan_status (tenant_id, status)
       ) ENGINE=InnoDB
     `);
     await this.pool.query(`
@@ -732,6 +748,35 @@ export class MysqlStore {
   async deleteButirDataRow(id: string): Promise<void> {
     if (!this.pool) return;
     await this.pool.query('DELETE FROM butir_data WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU usulan perubahan halaman. */
+  async upsertUsulanHalaman(id: string, tenantId: string, data: any): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO usulan_halaman (id, tenant_id, dashboard_id, halaman_id, status, data) VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), dashboard_id = VALUES(dashboard_id),
+       halaman_id = VALUES(halaman_id), status = VALUES(status), data = VALUES(data)`,
+      [
+        id,
+        tenantId,
+        String(data?.dashboardId || ''),
+        String(data?.halamanId || ''),
+        String(data?.status || 'menunggu'),
+        JSON.stringify(data),
+      ]
+    );
+  }
+
+  async loadUsulanHalaman(): Promise<UsulanHalaman[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM usulan_halaman');
+    return uraiDaftar<UsulanHalaman>(rows as Array<{ data: any }>, 'usulan_halaman');
+  }
+
+  async deleteUsulanHalamanRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM usulan_halaman WHERE id = ?', [id]);
   }
 
   /** Tambah/perbarui SATU risiko (upsert per-baris). */
@@ -1087,6 +1132,10 @@ export class MysqlStore {
     const butirKhusus = await this.loadButirData();
     if (butirKhusus.length > 0) hasil.butirData = butirKhusus;
     else if (arrays.butirData) hasil.butirData = arrays.butirData as ButirData[];
+
+    const usulanKhusus = await this.loadUsulanHalaman();
+    if (usulanKhusus.length > 0) hasil.usulanHalaman = usulanKhusus;
+    else if (arrays.usulanHalaman) hasil.usulanHalaman = arrays.usulanHalaman as UsulanHalaman[];
 
     const keuKhusus = await this.loadSnapshotKeuangan();
     if (keuKhusus.length > 0) hasil.snapshotKeuangan = keuKhusus;
