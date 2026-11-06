@@ -730,6 +730,32 @@ Berkas: `src/pages/Admin.tsx`, `src/components/adminTabs.ts`, `server.ts`.
 
 ---
 
+
+### Fase 6: Rilis terkendali dan verifikasi dengan AI sungguhan
+
+Fase 0–5 mengubah kode. Fase 6 memindahkan kode itu ke tangan pengguna, dan menguji satu hal yang tidak bisa diuji di mesin pengembangan: **apakah jalur AI benar-benar bekerja**. Semua uji sampai Fase 5 memakai data tanam karena RAG membalas 502 di lingkungan lokal.
+
+Urutannya tidak boleh ditukar:
+
+1. **Cadangan dulu.** Backup situs + database produksi, berlabel commit yang sedang berjalan (`e583358`). Tanpa ini, rollback hanya mengandalkan release lama yang tidak menyertakan data.
+2. **Deploy.** Produksi sekarang `e583358`, tertinggal 19 commit. Rilis membawa perubahan perilaku: 21 akun `pengguna` kehilangan hak menyusun dashboard.
+3. **Asap uji (5 menit), dalam urutan ini:**
+   - Halaman masuk terbuka, tidak ada galat konsol.
+   - Login Admin Instansi → Panel Admin hanya 4 tab.
+   - Login Admin Aiones → 8 tab, kartu Ringkasan Platform berisi angka.
+   - Login `pengguna` → tidak ada tombol dashboard, menu "Permintaan Data" ada.
+   - `POST /api/chat` sebagai `pengguna` → 403 dengan pesan yang benar.
+4. **Uji AI sungguhan dengan satu dokumen kecil** di satu instansi, bukan seluruh instansi sekaligus:
+   - Unggah satu PDF → analisis berjalan → butir muncul dengan sitasi.
+   - Setujui satu butir → Katalog Data → Buat halaman → angka di kartu cocok dengan dokumen.
+   - Buka asisten, minta satu perubahan → usulan muncul → Terapkan.
+   Kalau langkah ini gagal, yang salah adalah konfigurasi RAG/API key produksi, bukan kode — dan itu bisa diperbaiki tanpa rollback.
+5. **Kriteria rollback.** Rollback bila: halaman masuk tidak terbuka, login gagal, atau data instansi tidak terbaca. Jangan rollback hanya karena analisis AI gagal — itu jalur eksternal, dan status `gagal` sudah tidak memakai kuota.
+
+Yang masih belum bisa diverifikasi dari sini dan tetap menjadi risiko: unggah berkas lewat KMS, dan perilaku RAG di bawah beban nyata.
+
+**Status 2026-11-06:** belum dijalankan. Panel Kroombox membalas "temporarily unavailable" saat backup hendak dibuat, jadi langkah 1 pun belum bisa dimulai.
+
 ## 10. Risiko dan jebakan
 
 | Risiko | Dampak | Penanganan |
