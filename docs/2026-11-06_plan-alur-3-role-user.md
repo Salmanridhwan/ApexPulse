@@ -666,8 +666,9 @@ Berkas: `src/services/analisis/butirKeWidget.ts`, `src/services/analisis/butirKe
 | `POST /api/dashboards/dari-butir` | selesai — buat dashboard baru atau tambah halaman, tautkan ke permintaan, audit |
 | `usulan.ts` + `/api/usulan/*` | selesai — validasi (wajib sitasi), pratinjau, Terapkan/Batalkan, transaksi batal utuh bila gagal |
 | Chat mode "sempurnakan halaman" | selesai — `halamanId` + daftar kartu + butir disetujui jadi konteks; hasilnya usulan, bukan perubahan langsung |
-| `butirKeSlotTemplate.ts` | belum — menunggu UI pemilihan template |
-| UI pemilihan butir ("Katalog Data") | belum — endpoint sudah siap, layarnya belum ada |
+| `butirKeSlotTemplate.ts` | selesai — slot template diisi butir; slot tanpa butir dibiarkan KOSONG dengan alasan (tidak diisi angka contoh); batas 9 kartu; 15 tes |
+| UI pemilihan butir ("Katalog Data") | selesai — `KatalogDataPanel` di detail permintaan: centang butir disetujui, pilih template yang disarankan, pratinjau jujur (terisi vs kosong) sebelum halaman dibuat |
+| Endpoint menerima `templateId` | selesai — `POST /api/dashboards/dari-butir` memakai susunan template bila `templateId` dikirim, dan mengembalikan `ringkasan` + `slotKosong` |
 
 
 

@@ -76,6 +76,7 @@ import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform
 import { BATAS_AUDIT_BAWAAN, saringAudit } from './src/services/admin/audit';
 import { bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
+import { isiSlotTemplate, slotKosong, widgetTerisi } from './src/services/analisis/butirKeSlotTemplate';
 import {
   butirSiapPakai,
   halamanDari,
@@ -4587,7 +4588,30 @@ ${kpiItems}
     const judul =
       String(req.body?.judul || '').trim() ||
       (permintaan ? `Data ${permintaan.bidang}` : 'Halaman dari dokumen');
-    const halamanBaru = butirKeHalaman(dipilih, { judul });
+    // Dua cara menyusun: memakai susunan template (kalau admin memilih satu),
+    // atau pengelompokan otomatis per kategori. Template dipakai bila ada, karena
+    // admin sudah memilih bentuk halaman yang ia inginkan.
+    const templateId = String(req.body?.templateId || '').trim();
+    let catatanTemplate = '';
+    let slotKosongTemplate: Array<{ judulSlot: string; alasan: string }> = [];
+    let halamanBaru: Array<{ judul: string; widgets: any[] }>;
+
+    if (templateId) {
+      const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+      if (!template) return res.status(404).json({ error: 'Template tidak ditemukan.' });
+      const hasilSlot = isiSlotTemplate(template, dipilih);
+      const widgetsSlot = widgetTerisi(hasilSlot);
+      catatanTemplate = hasilSlot.catatan;
+      slotKosongTemplate = slotKosong(hasilSlot);
+      if (widgetsSlot.length === 0) {
+        return res.status(422).json({
+          error: `Template "${template.nama}" tidak bisa diisi dari butir yang dipilih — ${hasilSlot.catatan}.`,
+        });
+      }
+      halamanBaru = [{ judul, widgets: widgetsSlot }];
+    } else {
+      halamanBaru = butirKeHalaman(dipilih, { judul });
+    }
     if (halamanBaru.every((h) => h.widgets.length === 0)) {
       return res.status(422).json({
         error:
@@ -4630,7 +4654,8 @@ ${kpiItems}
       return res.status(201).json({
         dashboard: diperbarui,
         jumlahHalaman: tambahan.length,
-        ringkasan: ringkasHalaman(dipilih, halamanBaru),
+        ringkasan: catatanTemplate || ringkasHalaman(dipilih, halamanBaru),
+        ...(slotKosongTemplate.length > 0 ? { slotKosong: slotKosongTemplate } : {}),
       });
     }
 
@@ -4667,7 +4692,8 @@ ${kpiItems}
     return res.status(201).json({
       dashboard: dibuat,
       jumlahHalaman: halaman.length,
-      ringkasan: ringkasHalaman(dipilih, halamanBaru),
+      ringkasan: catatanTemplate || ringkasHalaman(dipilih, halamanBaru),
+      ...(slotKosongTemplate.length > 0 ? { slotKosong: slotKosongTemplate } : {}),
     });
   });
 
