@@ -10,6 +10,7 @@ import { chartIdDariTipe } from '../../services/chart/petaTipe';
 import { terapkanRancangan } from '../../services/chart/rancanganRag';
 import { GAYA } from '../../services/chart/gayaVarian';
 import { terapkanGaya } from './widgetStyle';
+import { pastikanPetaTerdaftar as pastikanPetaIndonesia, NAMA_PETA } from './petaTerdaftar';
 import { WidgetType, type RancanganChart, type WidgetStyle } from '../../types';
 
 // echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
@@ -21,23 +22,12 @@ const loadEcharts = () => (echartsPromise ??= import('./echartsSetup'));
  *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
 export const preloadEcharts = (): Promise<unknown> => loadEcharts();
 
-/** Cache peta Indonesia: diunduh & didaftarkan sekali untuk semua widget peta. */
-let petaIndonesiaPromise: Promise<void> | null = null;
-const NAMA_MAP = 'indonesia';
-
-function pastikanPetaTerdaftar(echarts: any): Promise<void> {
-  return (petaIndonesiaPromise ??= (async () => {
-    if (echarts.getMap?.(NAMA_MAP)) return;
-    const res = await fetch('/geo/indonesia.geojson');
-    if (!res.ok) throw new Error('GeoJSON peta gagal dimuat');
-    const geo = await res.json();
-    echarts.registerMap(NAMA_MAP, geo);
-  })().catch((err) => {
-    // Reset agar percobaan berikutnya bisa mengulang (mis. jaringan pulih).
-    petaIndonesiaPromise = null;
-    throw err;
-  }));
-}
+/**
+ * Peta Indonesia didaftarkan oleh satu modul bersama (`petaTerdaftar.ts`),
+ * dipakai juga oleh wajah `peta-wilayah` di Template Chart. Dulu logikanya ada
+ * di sini, sehingga chart katalog tidak bisa memakainya.
+ */
+const pastikanPetaTerdaftar = (_echarts?: any): Promise<void> => pastikanPetaIndonesia();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIT NORMALIZATION

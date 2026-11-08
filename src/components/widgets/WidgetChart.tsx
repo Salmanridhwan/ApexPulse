@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useRef } from 'react';
 import { AlertOctagon, AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Gauge, Target } from 'lucide-react';
 import { loadEcharts } from './echartsSetup';
+import { pastikanPetaTerdaftar } from './petaTerdaftar';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
 import { contohKartu } from '../../services/chart/contohData';
 import { ringkasWilayah } from '../../services/templates/wilayahLayanan';
@@ -150,7 +151,13 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
     let batal = false;
     let instans: any = null;
     let pengamat: ResizeObserver | null = null;
-    void loadEcharts().then((ec) => {
+    void loadEcharts().then(async (ec) => {
+      // Peta geografis butuh GeoJSON terdaftar SEBELUM setOption; kalau tidak,
+      // ECharts menggambar bidang kosong.
+      if (chartId === 'peta-wilayah') {
+        await pastikanPetaTerdaftar().catch(() => undefined);
+        if (batal || !wadah.current) return;
+      }
       if (batal || !wadah.current) return;
       instans = ec.init(wadah.current);
       instans.setOption(hasil.opsi as any, true);

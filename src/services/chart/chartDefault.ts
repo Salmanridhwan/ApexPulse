@@ -54,7 +54,10 @@ export type ChartId =
   | 'tabel-status'
   | 'alur-tahap'
   | 'corong-pipeline'
-  | 'daftar-progres';
+  | 'daftar-progres'
+  | 'peta-wilayah'
+  | 'jadwal-gantt'
+  | 'kotak-sebaran';
 
 export interface EntriChart {
   id: ChartId;
@@ -122,6 +125,11 @@ export const CHART_DEFAULT: Record<ChartId, EntriChart> = {
   'corong-pipeline': { id: 'corong-pipeline', nama: 'Corong pipeline', tipe: 'funnel', mesin: 'html', butuh: 'tahap dan jumlah yang makin mengecil', guna: 'Prospek baru sampai closing: berapa yang tersisa di tiap tahap', kelompok: 'rapat' },
   'daftar-progres': { id: 'daftar-progres', nama: 'Daftar progres persen', tipe: 'hbar', mesin: 'html', butuh: 'label dan persen', guna: 'Skor atau capaian banyak aspek, mis. kebersihan dan kualitas layanan', kelompok: 'rapat' },
   'treemap-porsi': { id: 'treemap-porsi', nama: 'Petak porsi (treemap)', tipe: 'treemap', mesin: 'echarts', butuh: 'kategori dan nilai', guna: 'Porsi banyak kategori sekaligus, mis. pendapatan per golongan', kelompok: 'komposisi' },
+  // Tiga wajah yang sebelumnya tidak ada di katalog (widget bertipe peta, gantt,
+  // dan boxplot dulu dibuatkan entri sementara). Sekarang punya wajah sendiri.
+  'peta-wilayah': { id: 'peta-wilayah', nama: 'Peta wilayah', tipe: 'map', mesin: 'echarts', butuh: 'nama wilayah/provinsi dan nilainya', guna: 'Sebaran angka per wilayah di peta Indonesia, mis. pelanggan atau kehilangan air', kelompok: 'sebaran' },
+  'jadwal-gantt': { id: 'jadwal-gantt', nama: 'Jadwal kegiatan (gantt)', tipe: 'gantt', mesin: 'echarts', butuh: 'nama kegiatan, tanggal mulai dan selesai, progres', guna: 'Jadwal proyek atau program berjalan beserta progres tiap kegiatan', kelompok: 'rapat' },
+  'kotak-sebaran': { id: 'kotak-sebaran', nama: 'Kotak sebaran (boxplot)', tipe: 'boxplot', mesin: 'echarts', butuh: 'nilai minimum, kuartil 1, median, kuartil 3, maksimum', guna: 'Sebaran nilai per unit: mana yang menyimpang dan seberapa lebar sebarannya', kelompok: 'sebaran' },
 };
 
 export const DAFTAR_CHART: ChartId[] = Object.keys(CHART_DEFAULT) as ChartId[];

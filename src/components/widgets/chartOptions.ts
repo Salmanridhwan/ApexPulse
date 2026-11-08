@@ -231,7 +231,7 @@ function hitungHistogram(mentah: number[], jumlahBin = 8): { labels: string[]; c
 }
 
 // ── Boxplot: hitung statistik lima angka dari data mentah ────────────────────
-function statistikBox(mentah: number[]): number[] {
+export function statistikBox(mentah: number[]): number[] {
   const s = [...mentah].sort((a, b) => a - b);
   const n = s.length;
   if (!n) return [0, 0, 0, 0, 0];

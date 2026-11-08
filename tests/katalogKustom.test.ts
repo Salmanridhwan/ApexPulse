@@ -41,8 +41,8 @@ test('chart bawaan yang sah dibiarkan apa adanya', () => {
 });
 
 test('bentuk data tanpa padanan bawaan → entri Template Chart baru', () => {
-  // Peta tanpa geo: tidak ada chart bawaan bertipe peta yang bisa menggambar.
-  const w = widget({ id: 'w2', type: 'map' });
+  // Tipe yang belum punya wajah di katalog (mis. tipe baru di masa depan).
+  const w = widget({ id: 'w2', type: 'donut-3d' as any });
   const hasil = pastikanChartKatalog([w], { ada: [], sekarang: '2026-11-08T00:00:00.000Z' });
   assert.equal(hasil.baru.length, 1);
   const entri = hasil.baru[0];
@@ -55,15 +55,15 @@ test('bentuk data tanpa padanan bawaan → entri Template Chart baru', () => {
 });
 
 test('bentuk data yang sama tidak membuat entri kedua', () => {
-  const a = widget({ id: 'a', type: 'map' });
-  const b = widget({ id: 'b', type: 'map', title: 'Peta lain' });
+  const a = widget({ id: 'a', type: 'donut-3d' as any });
+  const b = widget({ id: 'b', type: 'donut-3d' as any, title: 'Kartu lain' });
   const hasil = pastikanChartKatalog([a, b], { ada: [] });
   assert.equal(hasil.baru.length, 1, 'dua kartu sebentuk cukup satu entri');
   assert.equal(hasil.widgets[0].chartId, hasil.widgets[1].chartId);
 });
 
 test('gerbang idempoten: dijalankan ulang tidak menambah entri', () => {
-  const w = widget({ id: 'w3', type: 'map' });
+  const w = widget({ id: 'w3', type: 'donut-3d' as any });
   const satu = pastikanChartKatalog([w], { ada: [] });
   assert.equal(satu.baru.length, 1);
   const dua = pastikanChartKatalog(satu.widgets, { ada: satu.baru });
@@ -77,6 +77,7 @@ test('hasil gerbang SELALU punya chartId terdaftar di Template Chart', () => {
     widget({ id: 't', type: 'table', table: { columns: ['a', 'b'], rows: [[1, 2]] } as any }),
     widget({ id: 's', type: 'bar', chart: { series: [{ name: 'S', data: [1] }], xAxis: ['q'] } as any }),
     widget({ id: 'm', type: 'map' }),
+    widget({ id: 'x', type: 'donut-3d' as any }),
     widget({ id: 'h', type: 'heatmap', chart: { series: [{ name: 'S', data: [1, 2] }], xAxis: ['a', 'b'] } as any }),
     widget({ id: 'b', type: 'boxplot', chart: { series: [{ name: 'S', data: [1, 2] }], xAxis: ['a', 'b'] } as any }),
     widget({ id: 'n', type: 'narasi' }),
@@ -93,11 +94,14 @@ test('hasil gerbang SELALU punya chartId terdaftar di Template Chart', () => {
   assert.equal(hasil.widgets.find((w) => w.id === 's')?.chartId, 'bar-tegak-sorot');
   // Heatmap SUDAH punya wajah di Template Chart (peta-panas) → wajah itu dipakai.
   assert.equal(hasil.widgets.find((w) => w.id === 'h')?.chartId, 'peta-panas');
-  // Boxplot belum punya wajah → entri baru, bukan dipaksa jadi bar.
-  const b = hasil.widgets.find((w) => w.id === 'b');
-  assert.ok(String(b?.chartId).startsWith(AWALAN_KUSTOM));
-  assert.equal(b?.chartDasar, 'bar-tegak');
-  assert.ok(hasil.baru.some((k) => k.id === b?.chartId));
+  // Peta dan boxplot sudah punya wajah sendiri di katalog.
+  assert.equal(hasil.widgets.find((w) => w.id === 'm')?.chartId, 'peta-wilayah');
+  assert.equal(hasil.widgets.find((w) => w.id === 'b')?.chartId, 'kotak-sebaran');
+  // Tipe tanpa wajah → entri baru, bukan dipaksa jadi bar.
+  const x = hasil.widgets.find((w) => w.id === 'x');
+  assert.ok(String(x?.chartId).startsWith(AWALAN_KUSTOM));
+  assert.equal(x?.chartDasar, 'narasi-insight');
+  assert.ok(hasil.baru.some((k) => k.id === x?.chartId));
 });
 
 test('dasar dipilih sesuai bentuk data yang bisa digambar', () => {
@@ -117,13 +121,13 @@ test('dasar dipilih sesuai bentuk data yang bisa digambar', () => {
   );
   assert.equal(dasarUntuk(widget({ id: 'n', type: 'map' })), 'narasi-insight');
 
-  // Lewat gerbang: peta tanpa data → entri kustom, dasarnya narasi (bukan kartu kosong).
-  const peta = putusanChart(widget({ id: 'p', type: 'map' }), { ada: [] });
+  // Lewat gerbang: tipe tanpa wajah dan tanpa data → entri kustom, dasarnya narasi.
+  const peta = putusanChart(widget({ id: 'p', type: 'donut-3d' as any }), { ada: [] });
   assert.equal(peta.pakai === 'kustom' && peta.entri.dasar, 'narasi-insight');
 });
 
 test('chart penggambar entri kustom = chart dasarnya', () => {
-  const w = widget({ id: 'w4', type: 'map' });
+  const w = widget({ id: 'w4', type: 'donut-3d' as any });
   const hasil = pastikanChartKatalog([w], { ada: [] });
   const entri = hasil.baru[0];
   const gambar = chartPenggambar(hasil.widgets[0], hasil.baru);

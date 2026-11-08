@@ -290,6 +290,54 @@ const PETA: Record<ChartId, DataChart> = {
     target: 85,
     desimal: 0,
   },
+  // Wajah baru: peta geografis, jadwal kegiatan, dan kotak sebaran.
+  // Nama wilayah mengikuti GeoJSON `/geo/indonesia.geojson` supaya benar-benar
+  // tergambar di peta, bukan nama karangan.
+  'peta-wilayah': {
+    kategori: ['DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Sumatera Utara'],
+    seri: [{ nama: 'Pelanggan', data: [208360, 412880, 318440, 502110, 176220, 289740] }],
+    satuan: 'pelanggan',
+    desimal: 0,
+    peta: [
+      { nama: 'DKI Jakarta', nilai: 208360 },
+      { nama: 'Jawa Barat', nilai: 412880 },
+      { nama: 'Jawa Tengah', nilai: 318440 },
+      { nama: 'Jawa Timur', nilai: 502110 },
+      { nama: 'Banten', nilai: 176220 },
+      { nama: 'Sumatera Utara', nilai: 289740 },
+      { nama: 'Sumatera Barat', nilai: 141300 },
+      { nama: 'Lampung', nilai: 128900 },
+      { nama: 'Kalimantan Timur', nilai: 96400 },
+      { nama: 'Sulawesi Selatan', nilai: 154800 },
+      { nama: 'Bali', nilai: 88400 },
+      { nama: 'Papua', nilai: 42100 },
+    ],
+  },
+  'jadwal-gantt': {
+    kategori: ['Survei lokasi', 'Desain jaringan', 'Pengadaan pipa', 'Pemasangan', 'Uji aliran'],
+    seri: [],
+    satuan: '',
+    desimal: 0,
+    jadwal: [
+      { nama: 'Survei lokasi', mulai: '2026-01-06', selesai: '2026-01-24', progres: 100 },
+      { nama: 'Desain jaringan', mulai: '2026-01-20', selesai: '2026-02-18', progres: 80 },
+      { nama: 'Pengadaan pipa', mulai: '2026-02-10', selesai: '2026-03-20', progres: 45 },
+      { nama: 'Pemasangan', mulai: '2026-03-16', selesai: '2026-05-08', progres: 20 },
+      { nama: 'Uji aliran', mulai: '2026-05-04', selesai: '2026-05-29', progres: 0 },
+    ],
+  },
+  'kotak-sebaran': {
+    kategori: ['Zona 1', 'Zona 2', 'Zona 3', 'Zona 4'],
+    seri: [{ nama: 'Tekanan', data: [1.8, 2.4, 2.1, 1.6] }],
+    satuan: 'bar',
+    desimal: 1,
+    kotak: [
+      { nama: 'Zona 1', min: 1.2, q1: 1.6, median: 1.9, q3: 2.2, maks: 2.6 },
+      { nama: 'Zona 2', min: 1.9, q1: 2.2, median: 2.5, q3: 2.8, maks: 3.1 },
+      { nama: 'Zona 3', min: 1.4, q1: 1.8, median: 2.1, q3: 2.4, maks: 2.9 },
+      { nama: 'Zona 4', min: 1.0, q1: 1.4, median: 1.7, q3: 1.9, maks: 2.2 },
+    ],
+  },
 };
 
 export const contohData = (id: ChartId): DataChart => PETA[id] ?? VOLUME;

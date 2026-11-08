@@ -11,6 +11,7 @@ import { gayaKatalogWidget } from './bingkaiKatalog';
 import { ikonWidget } from './ikonWidget';
 import { normalizeSeriesData } from './ChartEcharts';
 import { chartIdDariTipe } from '../../services/chart/petaTipe';
+import { statistikBox } from './chartOptions';
 import { useChartSelection } from './ChartSelection';
 import { adaGaya } from './widgetStyle';
 import { gayaReplika } from '../referensi/gayaReplika';
@@ -166,8 +167,29 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec; onKlikKosong?: () => vo
       kategori = [selected];
       seri = seri.map((x) => ({ ...x, data: [x.data[i] ?? null] }));
     }
-    return { kategori, seri, satuan: displayUnit, desimal: 1, dariDokumen: true };
-  }, [widget.chart, ikutSeleksi, selected]);
+    const dasar: DataChart = { kategori, seri, satuan: displayUnit, desimal: 1, dariDokumen: true };
+    // Bentuk data khusus tiga wajah baru: peta wilayah, jadwal (gantt), kotak
+    // sebaran. Tanpa ini, chart katalognya tidak punya angka untuk digambar.
+    if (widget.geo?.regions?.length) {
+      dasar.peta = widget.geo.regions.map((r) => ({ nama: r.name, nilai: Number(r.value) }));
+    }
+    if (widget.gantt?.tasks?.length) {
+      dasar.jadwal = widget.gantt.tasks.map((t) => ({
+        nama: t.name,
+        mulai: t.start,
+        selesai: t.end,
+        progres: t.progress,
+      }));
+    }
+    if (widget.chart?.boxRaw?.length) {
+      const namaKelompok = kategori.length >= widget.chart.boxRaw.length ? kategori : [];
+      dasar.kotak = widget.chart.boxRaw.map((sampel, i) => {
+        const [min, q1, median, q3, maks] = statistikBox(sampel);
+        return { nama: namaKelompok[i] || `Kelompok ${i + 1}`, min, q1, median, q3, maks };
+      });
+    }
+    return dasar;
+  }, [widget.chart, widget.geo, widget.gantt, ikutSeleksi, selected]);
   // Gaya pengguna selain desain & warna kartu (keduanya sudah ada di `g`).
   const gayaLain = widget.style ? { ...widget.style, desain: undefined, kartu: undefined } : undefined;
   // gayaReplika (bukan terapkanGaya): wajah katalog mewarnai tiap batang/potongan

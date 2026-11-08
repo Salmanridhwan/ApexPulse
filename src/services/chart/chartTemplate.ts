@@ -62,6 +62,7 @@ import {
   titikBersumbu,
 } from './pembangunOpsi';
 import type { Varian } from './gayaVarian';
+import { jadwalGantt, kotakSebaran, petaWilayah } from './pembangunTambahan';
 import { kpiLensa, wajahLensa } from './varianLensa';
 import { areaRingkas } from './varianPijar';
 import { kpiNadi, stripOs, wajahNadi } from './varianNadi';
@@ -125,6 +126,10 @@ export const MATRIKS: Record<ChartId, Record<Varian, Pembangun>> = {
   'gauge-kesehatan': semua(gaugeKesehatan),
   'peta-panas': semua(petaPanas),
   'treemap-porsi': semua(treemapPorsi),
+  // Wajah baru: peta geografis, jadwal (gantt), dan kotak sebaran (boxplot).
+  'peta-wilayah': semua(petaWilayah),
+  'jadwal-gantt': semua(jadwalGantt),
+  'kotak-sebaran': semua(kotakSebaran),
 
   // Rapat manajemen bagian
   'kpi-target': semua(kpiTarget),

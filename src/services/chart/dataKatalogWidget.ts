@@ -164,8 +164,12 @@ export const grafikKatalog = (w: WidgetSpec): boolean =>
       DAFTAR_CHART.includes(idPenggambar(w) as ChartId) &&
       CHART_DEFAULT[idPenggambar(w) as ChartId].mesin === 'echarts' &&
       !pakaiRancangan(w) &&
-      (w.chart?.xAxis?.length ?? 0) > 0 &&
-      (w.chart?.series?.length ?? 0) > 0
+      // Cukup salah satu bentuk data: sumbu+seri (chart biasa), wilayah (peta),
+      // jadwal (gantt), atau sampel mentah (kotak sebaran).
+      ((w.chart?.xAxis?.length ?? 0) > 0 && (w.chart?.series?.length ?? 0) > 0 ||
+        (w.geo?.regions?.length ?? 0) > 0 ||
+        (w.gantt?.tasks?.length ?? 0) > 0 ||
+        (w.chart?.boxRaw?.length ?? 0) > 0)
   );
 
 /** Kartu digambar wajah Template Chart (HTML atau ECharts), lengkap dengan bingkainya. */

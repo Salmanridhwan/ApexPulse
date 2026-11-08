@@ -9,11 +9,10 @@ import type { ChartId } from './chartDefault';
  * Peta ini yang menghubungkan keduanya supaya dashboard baru memakai desain
  * dari template chart, bukan penyusun opsi lama.
  *
- * Tiga tipe BELUM punya wajah di Template Chart dan sengaja dibiarkan `null`:
- * `map` (peta geografis), `gantt` (jadwal bertanggal), `boxplot` (kuartil).
- * Ketiganya dibuatkan entri Template Chart baru saat dipakai (lihat
- * `katalogKustom.ts`), bukan dipaksa masuk ke wajah yang mirip — bentuknya akan
- * menipu.
+ * Tiga tipe yang dulu belum punya wajah (`map`, `gantt`, `boxplot`) sekarang
+ * sudah punya wajah sendiri di Template Chart: `peta-wilayah`, `jadwal-gantt`,
+ * `kotak-sebaran`. Jadi SEMUA tipe widget punya padanan katalog, dan tidak ada
+ * lagi chart yang dibuat di luar Template Chart.
  */
 export const PETA_TIPE: Partial<Record<WidgetType, ChartId>> = {
   kpi: 'kpi-kartu',
@@ -45,6 +44,10 @@ export const PETA_TIPE: Partial<Record<WidgetType, ChartId>> = {
   sankey: 'sankey-alur',
   treemap: 'treemap-porsi',
   funnel: 'corong-pipeline',
+  // Wajah yang dulu belum ada, sekarang sudah dibuat di Template Chart.
+  map: 'peta-wilayah',
+  gantt: 'jadwal-gantt',
+  boxplot: 'kotak-sebaran',
 };
 
 /** Wajah katalog untuk sebuah tipe widget, atau null bila belum ada. */

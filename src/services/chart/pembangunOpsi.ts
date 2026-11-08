@@ -38,6 +38,13 @@ export interface DataChart {
   warnaIkon?: string;
   /** Satu deret pendek per kategori untuk sparkline di dalam daftar. */
   deretKecil?: number[][];
+  /** Nilai per wilayah untuk peta geografis (`peta-wilayah`). */
+  peta?: Array<{ nama: string; nilai: number }>;
+  /** Jadwal kegiatan untuk `jadwal-gantt`: tanggal mulai/selesai + progres %. */
+  jadwal?: Array<{ nama: string; mulai: string | number; selesai: string | number; progres?: number }>;
+  /** Ringkasan sebaran per kategori untuk `kotak-sebaran` (lima angka kuartil). */
+  kotak?: Array<{ nama: string; min: number; q1: number; median: number; q3: number; maks: number }>;
+
   /**
    * Tabel angka jadi: kepala kolom dan isi yang sudah diformat. Dipakai wajah
    * `tabel-ringkas` saat halaman membutuhkan tabel berkepala, bukan daftar.
@@ -105,7 +112,7 @@ const gradien = (g: GayaVarian, warna: string, tebal = 1) => {
 /** Latar label pil: pil hitam di gaya gelap, kartu lembut di gaya terang. */
 const latarPil = (g: GayaVarian) => (cukupTerang(g.latar) ? g.kartu2 : 'rgba(10,10,11,0.72)');
 
-const tooltip = (g: GayaVarian, s: number) => ({
+export const tooltip = (g: GayaVarian, s: number) => ({
   backgroundColor: g.kartu2,
   borderColor: g.garis,
   borderWidth: 1,
@@ -114,7 +121,7 @@ const tooltip = (g: GayaVarian, s: number) => ({
   textStyle: { color: g.teks, fontSize: 11 * s },
 });
 
-const sumbuKategori = (
+export const sumbuKategori = (
   g: GayaVarian,
   s: number,
   kategori: string[],
