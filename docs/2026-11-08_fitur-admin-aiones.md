@@ -119,6 +119,13 @@ Semua di bawah ini adalah fakta kode, bukan opini desain.
    `requireAdmin` — artinya Admin Instansi yang memanggil langsung lewat HTTP tetap dilayani
    (`server.ts:6391-6394`, `:6427`, `:6452`, `:6581`, `:6599`). Yang benar-benar dikunci
    `isSuperadmin` baru `/api/admin/platform` dan `/api/admin/kuota` (`:6091`, `:6110`, `:6132`).
+   **Sudah diperbaiki (2026-11-08):** ditambahkan `requireSuperadmin()` (`server.ts:253-262`) dan
+   dipakai oleh `POST/PATCH/DELETE /api/admin/tenants`, `POST /api/admin/tenants/:id/sinkron-rag`,
+   `GET /api/admin/kms-organisasi`, `POST /api/admin/kms-uji`, `GET /api/admin/knowledge`,
+   `GET /api/admin/kb-profil`, `GET /api/admin/kb-tersedia`, `POST /api/admin/config`,
+   `POST /api/admin/config-simpan-uji`. `GET /api/admin/config` sengaja tetap `requireAdmin`
+   karena halaman Referensi milik Admin Instansi membacanya untuk status KMS; yang dikunci hanya
+   penulisannya. Uji: langkah "negatif: admin instansi …" memeriksa 403 untuk empat endpoint.
 2. **Kebocoran yang sudah ditutup** (jangan "diperbaiki" lagi): `GET /api/tenants` kini
    mengembalikan satu instansi untuk non-superadmin (`server.ts:887-890`); `GET /api/admin/users`
    difilter per instansi (`:6161-6165`); `PATCH /api/admin/users/:id` menolak akun instansi lain
@@ -130,28 +137,44 @@ Semua di bawah ini adalah fakta kode, bukan opini desain.
    `SUPERADMIN_TERAKHIR` (`server.ts:6343-6346`, `:6369`).
 5. **`POST /api/audit-logs` hanya butuh login** (`server.ts:6043-6048`): pengguna mana pun bisa
    menulis entri log dengan `action`/`target` bebas. Ini memengaruhi kepercayaan isi Jejak Audit.
+   **Sudah diperbaiki (2026-11-08):** endpoint dikunci `requireSuperadmin` — semua entri audit kini
+   dibuat server di dalam handler aksinya sendiri. Uji: `tulisAudit` harus 403 untuk Admin Instansi.
 
 6. **Angka palsu saat data belum siap.** Kartu overview memakai fallback hardcode
    (`stats?.tenantsCount ?? 6`, `totalWidgets ?? 34`, `totalCitations ?? 42`) — `Admin.tsx:1312-1315`.
    Sub-label `6 Sektor Aktif`, `100% Tervalidasi`, `Sehat (Online)` juga statis, tidak dihitung.
-   Untuk uji, angka ini tidak bisa dipakai sebagai oracle; pakai teks/keberadaan elemen.
+   **Sudah diperbaiki (2026-11-08):** fallback dihapus; nilai kosong tampil `—` sampai `stats` tiba,
+   sub-label dihitung dari data (`sektorAktif` dari `tenants`, jumlah widget dari `stats.totalWidgets`),
+   dan `100%` dibuang dari label sitasi (`Admin.tsx:191`, `:1401-1406`).
 7. **Payload ringkasan platform lebih kaya daripada tampilannya.** `RingkasanPlatform` menyediakan
    `dashboard`, `permintaan.selesai`, `analisis.total`, `butir.total` (`src/services/admin/platform.ts:26-38`)
    tetapi UI hanya merender 6 kartu + baris butir disetujui/draf/ditolak (`Admin.tsx:1288-1305`).
 8. **Kuota punya tiga sumber nilai bawaan.** `20` muncul di `server.ts:6118`
    (`kuota ?? 20`), `Admin.tsx:161`, dan `KUOTA_ANALISIS_BAWAAN` (`src/services/analisis/antrean.ts`).
    Ubah satu, dua lainnya tetap.
+   **Sudah diperbaiki (2026-11-08):** `server.ts:6134` memakai `kuota ?? KUOTA_ANALISIS_BAWAAN` dan
+   `Admin.tsx` memakai konstanta yang sama untuk nilai awal form.
 9. **UI tidak memakai semua kemampuan API.** `PATCH /api/admin/users/:id` (ubah peran/instansi)
    tidak pernah dipanggil UI; penyaring audit di server menerima `pengguna`/`dari`/`sampai`/`limit`
    tetapi tab audit hanya mengirim `tenantId` + `aksi`, sehingga data dipotong 500 baris tanpa
    pemberitahuan (`src/services/admin/audit.ts:37`, `server.ts:6006-6015`).
+   **Sudah diperbaiki (2026-11-08):** kolom Peran kini `<select>` yang memanggil `PATCH` itu
+   (`handleUbahPeran`, `Admin.tsx:623`), dan tab audit memakai penyaring lengkap + `limit`/`offset`
+   + tombol **Ekspor CSV** (`Admin.tsx:218-250`, `:2682-2800`).
 10. **Instansi baru bisa kehilangan pemetaan KMS.** `POST /api/admin/tenants` tidak menyalin
     `kmsOrganizationId` dari body (`server.ts:6391-6413`), padahal modal menyediakan pilihan
     "Repositori Dokumen KMS". Buat instansi → buka Ubah → pilih KMS lagi.
+    **Sudah diperbaiki (2026-11-08):** `kmsOrganizationId` ikut disimpan, dan pembuatan/perubahan
+    instansi kini menulis entri audit ("Tambah/Ubah Instansi BUMD"). Uji: langkah "tenants: instansi
+    baru menyimpan pemetaan KMS".
 11. **Kegagalan muat tidak terlihat.** `muatPlatform` (178–187) dan `muatAudit` (190–205) memakai
     `catch {}` kosong + `if (!res.ok) return`; tidak ada penjaga urutan permintaan, sehingga respons
     lama bisa menimpa respons baru saat tombol ditekan berulang. Untuk uji E2E: jangan andalkan
     pesan galat UI — periksa isi DOM atau jaringan.
+    **Sudah diperbaiki (2026-11-08):** kedua pemuat kini menyimpan pesan gagal ke state
+    (`galatPlatform`, `galatAudit`) dan memakainya sebagai penjaga urutan (`platformSeq`/`auditSeq`),
+    sehingga kegagalan tampil sebagai pesan, bukan sebagai "data kosong" (`Admin.tsx:185-187`,
+    `:200-250`).
 12. **Modal "Ubah" instansi mengosongkan Nama Resmi & Kota.** Efek pembacaan KB (`Admin.tsx:1115-1154`)
     berjalan setiap `tenantKbId` berubah, termasuk saat modal dibuka dalam mode edit. Bila
     `GET /api/admin/kb-profil` menjawab `jumlahDokumen: 0` (KB kosong, ID salah, atau provider
@@ -493,3 +516,158 @@ pembacaan kode saja.
 Belum tercakup: RAG nyata (uji koneksi/sinkron/katalog dengan layanan hidup), login Google,
 ekspor CSV audit, paginasi audit, serta seluruh alur peran Admin Instansi dan User.
 
+---
+
+## 9. Uji menyeluruh semua fitur halaman superadmin (2026-11-08, lanjutan)
+
+Perintah yang sama: `npm run test:e2e:admin`. Suite kini **51 langkah** dan mencakup seluruh kontrol
+yang ada di 7 tab, termasuk jalur "RAG hidup" lewat stub layanan RAG lokal (bukan mock aplikasi)
+dan uji negatif peran.
+
+Tambahan harness: stub RAG (`mulaiStubRag()` di skrip) menjawab `/health`, `/knowledge-bases`,
+`/knowledge`, `/search`, `/extract` (422) dan `/query`, sehingga tombol yang butuh layanan nyata
+bisa diuji sampai hasilnya, bukan hanya mode gagal. Uji negatif memakai **konteks browser terpisah**
+(`browser.createBrowserContext()`) supaya login Admin Instansi tidak menimpa cookie sesi superadmin.
+
+### 9.1 Hasil
+
+| Kelompok | Langkah | Hasil |
+|---|---|---|
+| login & kerangka | login API superadmin, 7 tab tampil | lulus |
+| overview | panel ringkasan, "Muat ulang", "Lihat Seluruh Log" → tab audit | lulus |
+| users | tabel 5 kolom, tambah pengguna, reset sandi, setujui permintaan, tolak permintaan, hapus pengguna | lulus |
+| tenants | daftar/ubah/hapus instansi, "Perbarui Semua", "Perbarui RAG" per kartu, auto-isi identitas dari KB, katalog KB (buka, muat ulang, cari, "hanya belum dipakai", "Pakai") | lulus |
+| rag | ganti mode, simpan, "Uji kunci ini" → "Kunci diterima", "Uji koneksi" → "RAG berjalan normal (Jalur A · 3 potongan)", "Periksa isi" → "KB kb_pam_jaya memuat 3 dokumen", "Jadikan default", "Simpan & uji KMS" | lulus |
+| kuota | tabel pemakaian, simpan nilai 25, "Muat ulang" mempertahankan nilai | lulus |
+| alerts | daftar aturan, aktif/nonaktif, ubah ambang lewat `prompt`, hapus aturan | lulus |
+| audit | tabel + 5 penyaring (instansi, aksi, pengguna, dari, sampai), cari aksi, saring instansi, **tombol Ekspor CSV** (href + unduhan diuji), **paginasi UI** (50 baris/halaman + info total) | lulus |
+| users (lanjutan) | ubah peran lewat `<select>` di tabel → `PATCH /api/admin/users/:id` tersimpan di server; kotak "Permintaan Bergabung" yang kosong tetap punya tombol muat ulang | lulus |
+| a11y & mobile | area klik tombol ikon (reset, hapus, toggle sidebar) ≥44 px; di 390 px tabel Pengguna & Audit berubah jadi kartu, `scrollWidth == clientWidth` | lulus |
+| tenants (kode) | instansi baru menyimpan `kmsOrganizationId` yang dikirim modal (dulu dibuang) | lulus |
+| negatif | Admin Instansi: tab kuota tidak ada di DOM, `/api/admin/kuota` 403, `/api/audit-logs?tenantId=` instansi lain tetap dibatasi ke instansinya, `POST /api/admin/tenants` 403, `POST /api/admin/config` 403, `GET /api/admin/kb-tersedia` 403, `POST /api/audit-logs` 403 | lulus |
+| bersih | provider RAG dikembalikan ke mode demo | lulus |
+
+Ringkasan: **51/51 lulus**, 0 galat konsol tak terduga (1 galat sengaja: KMS diarahkan ke port mati),
+0 request gagal. Suite publik `npm run test:e2e` juga dijalankan ulang: **16/16 lulus**.
+
+### 9.2 Audit UX (lapis angka, `scripts/ux-probe.page.js`)
+
+Skor per tab (desktop 1440×900 / mobile 390×844). Angka di bawah adalah **hasil ukur ulang setelah
+perbaikan** bagian 10; angka sebelum perbaikan ada di kolom "awal".
+
+| Tab | Desktop (awal → kini) | Mobile (awal → kini) |
+|---|---|---|
+| overview | 92 → **93 (A)** | 85 → **93 (A)** |
+| users | 86 → **97 (A)** | 86 → **95 (A)** |
+| tenants | 95 → **95 (A)** | 85 → **86 (B)** |
+| rag | 96 → **96 (A)** | 87 → **88 (B)** |
+| kuota | 92 → **93 (A)** | 86 → **93 (A)** |
+| alerts | 97 → **97 (A)** | 88 → **99 (A)** |
+| audit | 92 → **95 (A)** | 82 → **95 (A)** |
+
+Sisa potongan pada tenants/rag mobile berasal dari kepadatan tabel dokumen KB (6 kolom) dan teks
+10–11 px yang memang dipakai panel admin; keduanya belum diubah karena bukan bagian temuan.
+
+Temuan yang paling sering muncul (semua terverifikasi angka + tangkapan layar):
+
+| Severity | Temuan | Bukti | Usul | Status |
+|---|---|---|---|---|
+| major | Tombol aksi baris (reset sandi, hapus pengguna) 22×22 px; tombol ikon header 28–32 px | `ux-users-390.png`, `worst.target` | naikkan area klik ke 44 px (padding + margin negatif) | **diperbaiki** — terukur 44×44 px di uji |
+| major | Tabel Pengguna & Audit butuh scroll horizontal di 390 px; kolom "Target/Entitas" terpotong | `ux-users-390.png`, `ux-audit-390.png` | di ≤640 px ubah baris jadi kartu bertumpuk | **diperbaiki** — kartu `sm:hidden`, overflow 0 |
+| major | Tombol melayang "Asisten" menutupi kartu/baris terakhir di 390 px | `ux-overview-390.png`, `ux-audit-390.png` | beri padding bawah pada area gulir atau pindahkan FAB | **diperbaiki** — `pb-28` pada `<main>` |
+| minor | Tautan teks "Muat ulang" hanya 16 px tinggi | `worst.target` overview/kuota | jadikan tombol 32–44 px | **diperbaiki** — `min-h-[44px]` |
+| minor | Penyaring audit: `<label>` tanpa `htmlFor`, `select` tanpa nama aksesibel, input cari hanya placeholder | `worst.kolomTanpaLabel` / `kolomHanyaPlaceholder` | hubungkan label-id + `aria-label` | **diperbaiki** — 5 label ber-`htmlFor` |
+| minor | Label chip 10 px dan sub-kartu "100% Tervalidasi" terpotong di kartu sempit | `ux-overview-390.png` | naikkan ke 11–12 px, biarkan membungkus | **diperbaiki** — chip 11 px, `100%` dibuang |
+
+### 9.3 Temuan fungsional baru (dari uji, bukan pembacaan kode)
+
+14. **Daftar permintaan bergabung tidak bisa dimuat ulang saat kosong.** Kotak "Permintaan Bergabung"
+    beserta tombol `Muat ulang permintaan` hanya dirender bila `permintaanGabung.length > 0`
+    (`Admin.tsx:1440-1468`). Setelah ada pendaftaran baru, admin tidak melihatnya sampai me-reload
+    seluruh halaman — terverifikasi di uji: baris baru baru muncul setelah `page.reload()`.
+    **Sudah diperbaiki (2026-11-08):** kotak selalu dirender; saat kosong tampil "Tidak ada
+    pendaftaran yang menunggu persetujuan." beserta tombol muat ulang (`Admin.tsx:1540-1560`).
+    Uji regresi: langkah "users: kotak permintaan kosong tetap punya tombol muat ulang".
+15. **Ekspor CSV & paginasi audit tidak ada di UI.** Endpoint mendukung `format=csv` dan
+    `limit`/`offset` (`server.ts:6018-6040`), tetapi tab audit hanya punya penyaring instansi + cari
+    aksi. Terverifikasi lewat API: `GET /api/audit-logs?format=csv` → 200 `text/csv`,
+    `?limit=5` → 5 baris + `total`. Tanpa kontrol, admin tidak bisa mengekspor atau melihat data
+    ke-501 dan seterusnya (`BATAS_AUDIT_BAWAAN`).
+    **Sudah diperbaiki (2026-11-08):** tab audit kini punya tombol **Ekspor CSV** yang membawa semua
+    penyaring aktif dan paginasi 50 baris/halaman dengan info `1–N dari TOTAL`
+    (`UKURAN_HALAMAN_AUDIT`, `Admin.tsx:38`, `:2745-2870`). Uji: "tombol Ekspor CSV mengunduh berkas
+    CSV" dan "paginasi UI menampilkan total & membatasi satu halaman".
+16. **Ubah peran pengguna tidak tersedia di UI.** `PATCH /api/admin/users/:id` ada, tetapi tabel
+    pengguna hanya menyediakan reset sandi dan hapus; peran hanya bisa diberikan saat menyetujui
+    pendaftaran. Untuk menaikkan pengguna lama jadi admin, tidak ada jalur di layar.
+    **Sudah diperbaiki (2026-11-08):** kolom Peran menjadi `<select>` bergaya chip dengan chevron
+    (agar tidak terbaca sebagai label statis) yang memanggil `PATCH /api/admin/users/:id` lewat
+    `handleUbahPeran` (`Admin.tsx:623-641`). Akun `user-superadmin` bawaan dinonaktifkan di UI, dan
+    penolakan server (409 `SUPERADMIN_TERAKHIR`) ditampilkan sebagai pesan galat. Uji: "users: ubah
+    peran lewat pilihan di tabel".
+17. **Pesan galat KMS tidak menyebut tujuan.** "Gagal menghubungi repositori dokumen." tidak memuat
+    Base URL/port yang dicoba (terverifikasi dengan KMS diarahkan ke port mati), sehingga admin tidak
+    tahu apa yang salah.
+    **Sudah diperbaiki (2026-11-08):** `KmsClient.uji()` menyertakan tujuan dan detail kegagalan
+    (`src/services/berkas/kmsClient.ts:218-231`); pesan kini berbunyi
+    `Gagal menghubungi repositori dokumen. Tujuan: http://127.0.0.1:9. fetch failed`. Uji: langkah
+    "Simpan & uji KMS" gagal bila pesan tidak menyebut `127.0.0.1:9` atau `Tujuan:`.
+
+
+## 10. Perbaikan seluruh temuan (2026-11-08)
+
+Semua temuan bagian 9.2 (3 major + 3 minor) dan bagian 9.3 (temuan 14–17) dikerjakan, ditambah
+temuan kode bagian 5 nomor 1, 5, 6, 8, 9, 10, dan 11. Verifikasi: `npm run lint` (0 galat),
+`npm run build` (sukses), `npm run test:e2e:admin` (**51/51**), `npm run test:e2e` (**16/16**),
+0 galat konsol tak terduga, 0 request gagal.
+
+### 10.1 Antarmuka (`src/pages/Admin.tsx`, `src/App.tsx`)
+
+| Temuan | Perbaikan | Letak |
+|---|---|---|
+| Tombol aksi 22 px, tombol ikon header 28–32 px | area klik 44×44 px lewat `p-[15px] -m-[15px]` (tampilan tidak berubah) dan `min-w/min-h-[44px]`; tiap tombol ikon diberi `aria-label` | `Admin.tsx:1267`, `:1293-1310`, `:1545`, `:1690-1710`; `App.tsx:1599` |
+| Tabel Pengguna & Audit scroll horizontal di 390 px | daftar kartu `sm:hidden` + tabel `hidden sm:block`; terukur `scrollWidth == clientWidth` | `Admin.tsx:1623-1679` (`pengguna-kartu`), `:2786-2830` (`audit-kartu`) |
+| FAB "Asisten" menutupi baris terakhir | `<main>` diberi `pb-28 sm:pb-6`; FAB sendiri `min-h-[44px]` | `Admin.tsx:1312`, `App.tsx:1599` |
+| "Muat ulang" 16 px | `min-h-[44px]` + `inline-flex items-center` | `Admin.tsx:1359`, `:2528` |
+| Label penyaring audit tanpa `htmlFor` | 5 label ber-`htmlFor`/`id` (instansi, aksi, pengguna, dari, sampai) | `Admin.tsx:2681-2745` |
+| Chip 10 px, "100% Tervalidasi" | chip 11 px; angka fallback palsu dihapus (`—` saat data belum siap, sub-label dihitung) | `Admin.tsx:191`, `:1401-1406`, `:1564`, `:1657` |
+| Temuan 14: kotak permintaan hilang saat kosong | kotak selalu dirender + teks "Tidak ada pendaftaran yang menunggu persetujuan." + tombol muat ulang tetap ada | `Admin.tsx:1540-1560` |
+| Temuan 15: ekspor CSV & paginasi tak ada | tombol **Ekspor CSV** (membawa penyaring aktif) + paginasi 50 baris/halaman + info `1–N dari TOTAL` | `Admin.tsx:38`, `:2760-2870` |
+| Temuan 16: ubah peran tak ada jalurnya | kolom Peran jadi `<select>` bergaya chip + chevron → `PATCH /api/admin/users/:id`; akun bawaan dinonaktifkan; galat 409 ditampilkan | `Admin.tsx:623-641`, `:1639-1665` |
+| Kegagalan muat tak terlihat (temuan 11) | `galatPlatform`/`galatAudit` + penjaga urutan `platformSeq`/`auditSeq`; pesan galat dirender | `Admin.tsx:185-250` |
+
+### 10.2 Server (`server.ts`, `src/services/berkas/kmsClient.ts`)
+
+| Temuan | Perbaikan | Letak |
+|---|---|---|
+| 1 — tab disembunyikan tapi API terbuka | `requireSuperadmin()` baru; dipakai 12 penjagaan endpoint lintas instansi (tenants CRUD, sinkron-rag, kms-organisasi, kms-uji, knowledge, kb-profil, kb-tersedia, config POST, config-simpan-uji) | `server.ts:253-262` + tiap route |
+| 5 — `POST /api/audit-logs` cukup login | dikunci `requireSuperadmin`; entri audit hanya ditulis server di handler aksinya | `server.ts:6054-6063` |
+| 8 — tiga nilai bawaan kuota | `kuota ?? KUOTA_ANALISIS_BAWAAN`; `Admin.tsx` memakai konstanta yang sama | `server.ts:6134`, `Admin.tsx:166` |
+| 10 — `kmsOrganizationId` dibuang saat buat instansi | field disimpan; pembuatan & perubahan instansi menulis entri audit | `server.ts:6428-6432`, `:6448-6456`, `:6481-6489` |
+| 4 — pesan galat KMS tanpa tujuan | `KmsClient.uji()` menyertakan `Tujuan: <baseUrl>` + detail | `kmsClient.ts:218-231` |
+| teks audit hapus pengguna menyesatkan | "dinonaktifkan" → "dihapus permanen" (endpoint memang menghapus) | `server.ts:6402` |
+
+### 10.3 Yang sengaja belum diubah
+
+- **Temuan 13 (banner "Kata sandi sementara" global).** Banner hanya hilang bila ditutup manual.
+  Membuatnya hilang otomatis saat pindah tab berisiko menghapus satu-satunya salinan sandi
+  sementara sebelum admin menyalinnya; keputusan ada di tangan pemilik produk.
+- **Kepadatan tabel dokumen KB (tab `rag`) dan teks 10–11 px.** Skor mobile tenants/rag (86/88)
+  berasal dari tabel 6 kolom yang masih memaksa scroll; mengubahnya jadi kartu berarti mendesain
+  ulang tampilan katalog dokumen, bukan memperbaiki temuan yang tercatat.
+- **`POST /api/audit-logs` untuk Admin Instansi.** Dikunci total karena tidak ada pemanggil di
+  klien (diverifikasi lewat `grep`); kalau nanti dibutuhkan, buka dengan validasi `action` daftar
+  putih, bukan login saja.
+
+### 10.4 Cara mengulang verifikasi
+
+```bash
+npm run lint
+npm run build
+npm run test:e2e:admin   # 51 langkah, server + data sementara (tidak menyentuh data/dev)
+npm run test:e2e         # 16 langkah publik
+```
+
+Rangkaian uji (`scripts/e2e-superadmin.mjs`, `scripts/ux-probe.page.js`, entri
+`test:e2e:admin` di `package.json`) sengaja **tidak** di-commit sesuai instruksi; dokumen ini
+dan perbaikan kode di atas yang menjadi catatannya.

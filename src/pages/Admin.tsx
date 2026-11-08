@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   FolderOpen,
+  ChevronDown,
   Key,
   KeyRound,
   LogOut,
@@ -31,6 +32,10 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
 import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
 import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
+import { KUOTA_ANALISIS_BAWAAN } from '../services/analisis/antrean';
+
+/** Jumlah baris per halaman jejak audit di UI (server membatasi 500 bawaan). */
+const UKURAN_HALAMAN_AUDIT = 50;
 
 /** Label sektor untuk ditampilkan (sektor tetap dipetakan dari dokumen KB). */
 const LABEL_SEKTOR: Record<BumdSector, string> = {
@@ -157,17 +162,52 @@ export const Admin: React.FC<AdminProps> = ({
   const [tampilKunci, setTampilKunci] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+  /**
+   * Form aturan ambang batas baru.
+   *
+   * Dulu tab ini hanya bisa MENGUBAH aturan yang sudah ada: `POST /api/alerts`
+   * tidak punya jalur di panel, jadi instansi baru tidak bisa membuat aturan
+   * pertamanya dari sini. Satu aturan butuh beberapa nilai sekaligus, jadi
+   * dipakai form — bukan rangkaian `prompt()`.
+   */
+  const [formAturanOpen, setFormAturanOpen] = useState(false);
+  const [formAturan, setFormAturan] = useState({
+    title: '',
+    metricName: '',
+    operator: '>=' as AlertRule['operator'],
+    threshold: '',
+    unit: '%',
+    severity: 'warning' as AlertRule['severity'],
+  });
+  const [galatAturan, setGalatAturan] = useState('');
+  const [menyimpanAturan, setMenyimpanAturan] = useState(false);
   /** Tab Kuota AI (khusus Admin Aiones). */
-  const [kuotaAi, setKuotaAi] = useState<number>(20);
+  const [kuotaAi, setKuotaAi] = useState<number>(KUOTA_ANALISIS_BAWAAN);
   const [kuotaPer, setKuotaPer] = useState<Array<{ tenantId: string; nama: string; terpakai: number; kuota: number; sisa: number }>>([]);
   const [menyimpanKuota, setMenyimpanKuota] = useState(false);
   const [pesanKuota, setPesanKuota] = useState<{ ok: boolean; teks: string } | null>(null);
   /** Ringkasan lintas instansi (Admin Aiones). Null untuk Admin Instansi. */
   const [platform, setPlatform] = useState<any>(null);
   /** Penyaring jejak audit. Admin Instansi tidak bisa mengubah instansinya. */
-  const [filterAudit, setFilterAudit] = useState<{ tenantId: string; aksi: string }>({ tenantId: 'semua', aksi: '' });
+  const [filterAudit, setFilterAudit] = useState<{
+    tenantId: string;
+    aksi: string;
+    pengguna: string;
+    dari: string;
+    sampai: string;
+    offset: number;
+  }>({ tenantId: 'semua', aksi: '', pengguna: '', dari: '', sampai: '', offset: 0 });
+  const [auditTotal, setAuditTotal] = useState(0);
   const [memuatAudit, setMemuatAudit] = useState(false);
+  /** Pesan gagal muat — supaya kegagalan tidak tampil sebagai "data kosong". */
+  const [galatAudit, setGalatAudit] = useState<string | null>(null);
+  const [galatPlatform, setGalatPlatform] = useState<string | null>(null);
+  /** Penjaga urutan permintaan: hanya respons terbaru yang boleh menulis state. */
+  const platformSeq = useRef(0);
+  const auditSeq = useRef(0);
   const superadmin = currentUser?.role === 'superadmin';
+  /** Sektor yang benar-benar dipakai instansi (bukan angka statis). */
+  const sektorAktif = new Set(tenants.map((t) => t.sector)).size;
 
   /**
    * Muat ringkasan platform.
@@ -177,30 +217,50 @@ export const Admin: React.FC<AdminProps> = ({
    */
   const muatPlatform = async () => {
     if (!superadmin) return;
+    // Penjaga urutan: respons lama tidak boleh menimpa respons baru saat tombol
+    // ditekan berulang (dua permintaan berjalan, yang selesai terakhir menang).
+    const urut = ++platformSeq.current;
+    setGalatPlatform(null);
     try {
       const res = await fetch('/api/admin/platform');
-      if (!res.ok) return;
-      setPlatform(await res.json());
-    } catch {
-      /* ringkasan gagal dimuat: kartu tidak ditampilkan, tab lain tetap jalan */
+      if (!res.ok) throw new Error(`Server menjawab HTTP ${res.status}.`);
+      const data = await res.json();
+      if (urut === platformSeq.current) setPlatform(data);
+    } catch (err) {
+      if (urut !== platformSeq.current) return;
+      // Jangan diam: tanpa pesan, admin mengira angkanya nol padahal gagal muat.
+      setGalatPlatform(err instanceof Error ? err.message : 'Ringkasan platform gagal dimuat.');
     }
   };
 
   /** Muat jejak audit sesuai penyaring aktif. */
   const muatAudit = async (saring = filterAudit) => {
+    const urut = ++auditSeq.current;
     setMemuatAudit(true);
+    setGalatAudit(null);
     try {
       const q = new URLSearchParams();
       if (superadmin && saring.tenantId) q.set('tenantId', saring.tenantId);
       if (saring.aksi.trim()) q.set('aksi', saring.aksi.trim());
-      const res = await fetch(`/api/audit-logs${q.toString() ? `?${q}` : ''}`);
-      if (!res.ok) return;
+      if (saring.pengguna.trim()) q.set('pengguna', saring.pengguna.trim());
+      if (saring.dari) q.set('dari', saring.dari);
+      if (saring.sampai) q.set('sampai', saring.sampai);
+      // Selalu minta bentuk berhalaman supaya UI tahu total sebenarnya dan bisa
+      // memberi tahu kalau data lebih banyak dari satu layar.
+      q.set('limit', String(UKURAN_HALAMAN_AUDIT));
+      q.set('offset', String(Math.max(0, saring.offset)));
+      const res = await fetch(`/api/audit-logs?${q}`);
+      if (!res.ok) throw new Error(`Server menjawab HTTP ${res.status}.`);
       const data = await res.json();
-      setAuditLogs(Array.isArray(data) ? data : Array.isArray(data?.logs) ? data.logs : []);
-    } catch {
-      /* biarkan data lama tampil */
+      if (urut !== auditSeq.current) return;
+      const baris = Array.isArray(data) ? data : Array.isArray(data?.logs) ? data.logs : [];
+      setAuditLogs(baris);
+      setAuditTotal(Array.isArray(data) ? baris.length : Number(data?.total ?? baris.length));
+    } catch (err) {
+      if (urut !== auditSeq.current) return;
+      setGalatAudit(err instanceof Error ? err.message : 'Jejak audit gagal dimuat.');
     } finally {
-      setMemuatAudit(false);
+      if (urut === auditSeq.current) setMemuatAudit(false);
     }
   };
 
@@ -512,6 +572,48 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  /** Simpan aturan ambang batas baru (`POST /api/alerts`). */
+  const simpanAturanBaru = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGalatAturan('');
+    if (!formAturan.metricName.trim()) {
+      setGalatAturan('Nama indikator wajib diisi (mis. NRW atau Kepatuhan SOP).');
+      return;
+    }
+    const ambang = Number(String(formAturan.threshold).replace(',', '.'));
+    if (!Number.isFinite(ambang)) {
+      setGalatAturan('Ambang batas harus berupa angka.');
+      return;
+    }
+    setMenyimpanAturan(true);
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formAturan.title.trim() || `${formAturan.metricName.trim()} ${formAturan.operator} ${ambang}${formAturan.unit}`,
+          metricKey: 'kpi',
+          metricName: formAturan.metricName.trim(),
+          operator: formAturan.operator,
+          threshold: ambang,
+          unit: formAturan.unit.trim() || '%',
+          severity: formAturan.severity,
+          channels: ['in_app'],
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Gagal menyimpan aturan (HTTP ${res.status}).`);
+      setFormAturanOpen(false);
+      setFormAturan({ title: '', metricName: '', operator: '>=', threshold: '', unit: '%', severity: 'warning' });
+      await loadData();
+    } catch (err) {
+      // Jangan tutup form: admin harus melihat alasannya dan bisa memperbaiki isian.
+      setGalatAturan(err instanceof Error ? err.message : 'Gagal menyimpan aturan ambang batas.');
+    } finally {
+      setMenyimpanAturan(false);
+    }
+  };
+
   // Isi kolom Knowledge Base dari konfigurasi tersimpan begitu config dimuat.
   useEffect(() => {
     const kb = (systemConfig as any)?.ragKnowledgeBaseId;
@@ -578,12 +680,34 @@ export const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  /** Ubah peran lewat `PATCH /api/admin/users/:id` (dulu endpoint ini tak terpakai UI). */
+  const handleUbahPeran = async (u: User, peran: UserRole) => {
+    if (peran === u.role) return;
+    setGalatAksi(null);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: peran }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Gagal mengubah peran (HTTP ${res.status}).`);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role: peran } : x)));
+    } catch (err) {
+      // Server menolak menurunkan Admin Aiones terakhir — pesannya harus terbaca.
+      setGalatAksi(err instanceof Error ? err.message : 'Gagal mengubah peran.');
+      await loadData();
+    }
+  };
+
   const handleDeleteUser = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menonaktifkan pengguna ini?')) return;
+    // `DELETE /api/admin/users/:id` MENGHAPUS permanen (beserta kredensialnya),
+    // bukan menonaktifkan — teks konfirmasi harus sejujur perilakunya.
+    if (!confirm('Hapus permanen pengguna ini? Akun dan kredensialnya tidak bisa dikembalikan.')) return;
     try {
       const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
       if (!res.ok) {
-        setGalatAksi('Pengguna gagal dinonaktifkan.');
+        setGalatAksi('Pengguna gagal dihapus.');
         return;
       }
       setGalatAksi(null);
@@ -1201,7 +1325,7 @@ export const Admin: React.FC<AdminProps> = ({
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={onToggleSidebar}
-                className="p-1.5 rounded-control text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
+                className="p-[15px] -m-[15px] rounded-control text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
                 title="Buka / Tutup Sidebar"
                 aria-label="Buka atau tutup sidebar"
               >
@@ -1227,15 +1351,17 @@ export const Admin: React.FC<AdminProps> = ({
               <ThemeToggle />
               <button
                 onClick={loadData}
-                className="p-2 rounded-control border border-line hover:bg-surface-2 text-ink-2 hover:text-ink transition-colors"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-control border border-line hover:bg-surface-2 text-ink-2 hover:text-ink transition-colors"
                 title="Segarkan Data"
+                aria-label="Segarkan data panel"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
                 onClick={onLogout}
-                className="p-2 rounded-control border border-line hover:bg-neg/10 text-ink-2 hover:text-neg transition-colors"
+                className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-control border border-line hover:bg-neg/10 text-ink-2 hover:text-neg transition-colors"
                 title="Keluar"
+                aria-label="Keluar dari panel admin"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -1244,7 +1370,7 @@ export const Admin: React.FC<AdminProps> = ({
         </header>
 
         {/* Main Body */}
-        <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar max-w-7xl w-full mx-auto p-4 sm:p-6 pb-28 sm:pb-6 space-y-6">
           {galatAksi && (
             <div className="p-3 bg-neg/10 border border-neg/30 rounded-card text-neg text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
@@ -1283,17 +1409,27 @@ export const Admin: React.FC<AdminProps> = ({
           {activeTab === 'overview' && (
             <div className="space-y-6">
               {/* Ringkasan lintas instansi — hanya Admin Aiones. */}
-              {superadmin && platform && (
+              {superadmin && (platform || galatPlatform) && (
                 <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
                     <div>
                       <h3 className="text-sm font-bold text-ink">Ringkasan Platform</h3>
                       <p className="text-xs text-ink-2">Angka lintas seluruh instansi, dihitung saat halaman dibuka.</p>
                     </div>
-                    <button onClick={() => void muatPlatform()} className="text-xs text-brand hover:underline">
+                    <button
+                      onClick={() => void muatPlatform()}
+                      className="text-xs text-brand hover:underline inline-flex items-center min-h-[44px] px-2 -mx-2"
+                    >
                       Muat ulang
                     </button>
                   </div>
+                  {galatPlatform && (
+                    <p className="text-xs text-neg bg-neg/10 border border-neg/30 rounded-card px-3 py-2">
+                      Ringkasan platform gagal dimuat: {galatPlatform}
+                    </p>
+                  )}
+                  {platform && (
+                  <>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[
                       { label: 'Instansi', nilai: platform.jumlahInstansi, sub: `${platform.akun.total} akun` },
@@ -1313,16 +1449,20 @@ export const Admin: React.FC<AdminProps> = ({
                   <p className="text-[11px] text-ink-2">
                     Butir data: {platform.butir.disetujui} disetujui · {platform.butir.draf} draf · {platform.butir.ditolak} ditolak
                   </p>
+                  </>
+                  )}
                 </div>
               )}
 
               {/* Top Stat Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 {[
-                  { label: 'Total BUMD', nilai: String(stats?.tenantsCount ?? 6), sub: '6 Sektor Aktif', accent: 'var(--color-brand)' },
+                  // Tanpa fallback angka hardcode: kalau data belum siap tampilkan "—",
+                  // supaya admin tidak membaca angka palsu sebagai kenyataan.
+                  { label: 'Total BUMD', nilai: stats ? String(stats.tenantsCount) : '—', sub: `${sektorAktif} sektor aktif`, accent: 'var(--color-brand)' },
                   { label: 'Pengguna Aktif', nilai: String(users.length), sub: 'RBAC Terproteksi', accent: 'var(--color-violet)' },
-                  { label: 'Total Dashboard', nilai: String(stats?.dashboardsCount ?? 6), sub: `${stats?.totalWidgets ?? 34} Widget`, accent: 'var(--color-brand)' },
-                  { label: 'Sitasi Resmi', nilai: String(stats?.totalCitations ?? 42), sub: '100% Tervalidasi', accent: 'var(--color-pos)' },
+                  { label: 'Total Dashboard', nilai: stats ? String(stats.dashboardsCount) : '—', sub: stats ? `${stats.totalWidgets} widget` : 'memuat…', accent: 'var(--color-brand)' },
+                  { label: 'Sitasi Resmi', nilai: stats ? String(stats.totalCitations) : '—', sub: 'Tervalidasi', accent: 'var(--color-pos)' },
                   { label: 'Aturan Ambang', nilai: String(alertRules.length), sub: 'Evaluasi Otomatis', accent: 'var(--color-warn)' },
                   { label: 'Provider RAG', nilai: stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal', sub: 'Sehat (Online)', accent: 'var(--color-brand)' },
                 ].map((m, i) => (
@@ -1349,13 +1489,17 @@ export const Admin: React.FC<AdminProps> = ({
                       Setiap instansi memiliki isolasi data dan pangkalan retrieval dokumen (KB) mandiri
                     </p>
                   </div>
-                  <button
-                    onClick={bukaTambahTenant}
-                    className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Instansi BUMD</span>
-                  </button>
+                  {/* Membuat instansi = kewenangan Admin Aiones. Untuk admin instansi
+                      tombolnya dulu tetap tampil dan berakhir 403 tanpa penjelasan. */}
+                  {superadmin && (
+                    <button
+                      onClick={bukaTambahTenant}
+                      className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Tambah Instansi BUMD</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1436,7 +1580,7 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
                 <button
                   onClick={() => setIsAddUserOpen(true)}
-                  className="px-3.5 py-2 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
+                  className="px-3.5 py-2 min-h-[44px] bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors flex items-center gap-1.5 shadow-xs self-start sm:self-auto"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Tambah Pengguna Baru</span>
@@ -1445,7 +1589,10 @@ export const Admin: React.FC<AdminProps> = ({
 
               {/* Permintaan bergabung: pendaftaran manual & Google sama-sama harus
                   disetujui admin sebelum akunnya bisa dipakai masuk. */}
-              {permintaanGabung.length > 0 && (
+              {/* Selalu dirender: kalau kotaknya hilang saat daftar kosong, tombol
+                  "muat ulang"-nya ikut hilang dan pendaftaran baru tidak terlihat
+                  sampai halaman di-reload. */}
+              {(
                 <div className="border border-warn/40 bg-warn/5 rounded-card overflow-hidden">
                   <div className="px-3.5 py-2.5 border-b border-warn/30 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -1460,12 +1607,18 @@ export const Admin: React.FC<AdminProps> = ({
                     <button
                       type="button"
                       onClick={() => void loadData()}
-                      className="p-1 rounded text-ink-3 hover:text-ink hover:bg-line/60 transition-colors"
+                      className="p-[15px] -m-[15px] rounded text-ink-3 hover:text-ink hover:bg-line/60 transition-colors"
                       title="Muat ulang permintaan"
+                      aria-label="Muat ulang daftar permintaan bergabung"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  {permintaanGabung.length === 0 && (
+                    <p className="px-3.5 py-3 text-xs text-ink-3">
+                      Tidak ada pendaftaran yang menunggu persetujuan.
+                    </p>
+                  )}
                   <div className="divide-y divide-warn/20">
                     {permintaanGabung.map((p) => (
                       <div key={p.id} className="p-3 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
@@ -1473,7 +1626,7 @@ export const Admin: React.FC<AdminProps> = ({
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-ink">{p.name}</span>
                             <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded-chip font-semibold border ${
+                              className={`text-[11px] px-1.5 py-0.5 rounded-chip font-semibold border ${
                                 p.viaGoogle
                                   ? 'text-brand-ink bg-brand/10 border-brand/30'
                                   : 'text-ink-2 bg-surface-2 border-line'
@@ -1530,8 +1683,73 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
               )}
 
-              {/* Table */}
-              <div className="overflow-x-auto border border-line rounded-card">
+              {/* Mobile: kartu bertumpuk. Tabel 5 kolom memaksa scroll horizontal
+                  di 390px dan memotong kolom terakhir. */}
+              <div className="sm:hidden space-y-2" data-testid="pengguna-kartu">
+                {users.map((u) => {
+                  const t = tenants.find((x) => x.id === u.tenantId);
+                  return (
+                    <div key={u.id} className="border border-line rounded-card p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AvatarTile name={u.name} id={u.id} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-ink break-words">{u.name}</p>
+                          <p className="text-[11px] text-ink-2 break-all">{u.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="relative inline-flex items-center">
+                          <select
+                            value={u.role}
+                            onChange={(e) => void handleUbahPeran(u, e.target.value as UserRole)}
+                            disabled={u.id === 'user-superadmin'}
+                            aria-label={`Peran ${u.name}`}
+                            className={`min-h-[44px] text-[11px] font-semibold uppercase rounded-full pl-3 pr-7 py-1 border appearance-none disabled:opacity-70 ${isAdminRole(u.role)
+                                ? 'bg-brand/15 text-brand-ink border-brand/30'
+                                : 'bg-surface-2 text-ink border-line'
+                              }`}
+                          >
+                            <option value="pengguna">Pengguna</option>
+                            <option value="admin">Administrator</option>
+                            {superadmin && <option value="superadmin">Admin Aiones</option>}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-2 w-3.5 h-3.5 text-ink-3" aria-hidden="true" />
+                        </span>
+                        <span className="text-[11px] text-ink-2">
+                          {t ? `${t.logo} ${t.shortName}` : 'Tanpa instansi'}
+                        </span>
+                        {(u.status || 'active') !== 'active' && (
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded-chip font-semibold border ${(u.status || 'active') === 'pending'
+                              ? 'text-warn bg-warn/10 border-warn/30'
+                              : 'text-neg bg-neg/10 border-neg/30'
+                            }`}>
+                            {(u.status || 'active') === 'pending' ? 'Menunggu' : 'Ditolak'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => handleResetPassword(u)}
+                          className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-control border border-line text-[11px] font-semibold text-ink-2 hover:bg-surface-2"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" /> Reset sandi
+                        </button>
+                        {u.id !== 'user-admin' && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-control border border-neg/40 text-[11px] font-semibold text-neg hover:bg-neg/10"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Hapus
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Table (layar ≥640px) */}
+              <div className="hidden sm:block overflow-x-auto border border-line rounded-card">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                     <tr>
@@ -1552,7 +1770,7 @@ export const Admin: React.FC<AdminProps> = ({
                             <span>{u.name}</span>
                             {(u.status || 'active') !== 'active' && (
                               <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded-chip font-semibold border ${
+                                className={`text-[11px] px-1.5 py-0.5 rounded-chip font-semibold border ${
                                   (u.status || 'active') === 'pending'
                                     ? 'text-warn bg-warn/10 border-warn/30'
                                     : 'text-neg bg-neg/10 border-neg/30'
@@ -1564,13 +1782,27 @@ export const Admin: React.FC<AdminProps> = ({
                           </td>
                           <td className="p-3 text-ink-2">{u.email}</td>
                           <td className="p-3">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${isAdminRole(u.role)
-                                  ? 'bg-brand/15 text-brand-ink border border-brand/30'
-                                  : 'bg-surface-2 text-ink'
-                                }`}
-                            >
-                              {labelPeran(u.role)}
+                            {/* Peran bisa diubah langsung dari sini; akun Admin Aiones
+                                terakhir dijaga server (409 SUPERADMIN_TERAKHIR). */}
+                            {/* Tanda panah: tanpa itu select bergaya chip terlihat
+                                seperti label statis, bukan kontrol yang bisa diubah. */}
+                            <span className="relative inline-flex items-center">
+                              <select
+                                value={u.role}
+                                onChange={(e) => void handleUbahPeran(u, e.target.value as UserRole)}
+                                disabled={u.id === 'user-superadmin'}
+                                aria-label={`Peran ${u.name}`}
+                                title={u.id === 'user-superadmin' ? 'Akun Admin Aiones bawaan tidak bisa diubah' : 'Ubah peran pengguna'}
+                                className={`text-[11px] font-semibold uppercase rounded-full pl-2 pr-6 py-1 border appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${isAdminRole(u.role)
+                                    ? 'bg-brand/15 text-brand-ink border-brand/30'
+                                    : 'bg-surface-2 text-ink border-line'
+                                  }`}
+                              >
+                                <option value="pengguna">Pengguna</option>
+                                <option value="admin">Administrator</option>
+                                {superadmin && <option value="superadmin">Admin Aiones</option>}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-1.5 w-3 h-3 text-ink-3" aria-hidden="true" />
                             </span>
                           </td>
                           <td className="p-3">
@@ -1587,16 +1819,18 @@ export const Admin: React.FC<AdminProps> = ({
                             <div className="inline-flex items-center gap-1">
                               <button
                                 onClick={() => handleResetPassword(u)}
-                                className="p-1 rounded text-ink-2 hover:text-brand hover:bg-brand/10 transition-colors"
+                                className="p-[15px] -m-[15px] rounded text-ink-2 hover:text-brand hover:bg-brand/10 transition-colors"
                                 title="Reset kata sandi"
+                                aria-label={`Reset kata sandi ${u.name}`}
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
                               </button>
                               {u.id !== 'user-admin' && (
                                 <button
                                   onClick={() => handleDeleteUser(u.id)}
-                                  className="p-1 rounded text-neg hover:text-neg hover:bg-neg/10 transition-colors"
+                                  className="p-[15px] -m-[15px] rounded text-neg hover:text-neg hover:bg-neg/10 transition-colors"
                                   title="Hapus Pengguna"
+                                  aria-label={`Hapus ${u.name}`}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -2363,7 +2597,12 @@ export const Admin: React.FC<AdminProps> = ({
               <div className="card overflow-hidden">
                 <div className="px-5 py-3 border-b border-line-1 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-ink-1">Pemakaian hari ini</h3>
-                  <button onClick={muatKuota} className="text-xs text-brand-600 hover:underline">Muat ulang</button>
+                  <button
+                    onClick={muatKuota}
+                    className="text-xs text-brand-600 hover:underline inline-flex items-center min-h-[44px] px-2 -mx-2"
+                  >
+                    Muat ulang
+                  </button>
                 </div>
                 <table className="w-full text-xs">
                   <thead className="bg-surface-2 text-ink-2">
@@ -2396,14 +2635,116 @@ export const Admin: React.FC<AdminProps> = ({
 
           {activeTab === 'alerts' && (
             <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-ink">
-                  Daftar Aturan Ambang Batas & Peringatan Otomatis (Global)
-                </h3>
-                <p className="text-xs text-ink-2">
-                  Peringatan dini bagi Direksi dan Pengawas saat indikator melanggar batasan regulasi
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-ink">
+                    Daftar Aturan Ambang Batas &amp; Peringatan Otomatis
+                    {superadmin ? ' (instansi yang dipilih)' : ' (instansi Anda)'}
+                  </h3>
+                  <p className="text-xs text-ink-2">
+                    Peringatan dini bagi Direksi dan Pengawas saat indikator melanggar batasan regulasi
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="tambah-aturan"
+                  onClick={() => { setGalatAturan(''); setFormAturanOpen((v) => !v); }}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{formAturanOpen ? 'Tutup Form' : 'Tambah Aturan'}</span>
+                </button>
               </div>
+
+              {formAturanOpen && (
+                <form onSubmit={simpanAturanBaru} className="p-4 bg-surface-2 border border-line rounded-card space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Nama indikator</span>
+                      <input
+                        data-testid="aturan-indikator"
+                        value={formAturan.metricName}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, metricName: e.target.value }))}
+                        placeholder="mis. NRW"
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Judul aturan (opsional)</span>
+                      <input
+                        value={formAturan.title}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, title: e.target.value }))}
+                        placeholder="Kosongkan untuk dibuat otomatis"
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Operator</span>
+                      <select
+                        value={formAturan.operator}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, operator: e.target.value as AlertRule['operator'] }))}
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      >
+                        <option value=">=">&ge;</option>
+                        <option value="<=">&le;</option>
+                        <option value=">">&gt;</option>
+                        <option value="<">&lt;</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Ambang batas</span>
+                      <input
+                        data-testid="aturan-ambang"
+                        value={formAturan.threshold}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, threshold: e.target.value }))}
+                        inputMode="decimal"
+                        placeholder="mis. 25"
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Satuan</span>
+                      <input
+                        value={formAturan.unit}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, unit: e.target.value }))}
+                        placeholder="%"
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-medium text-ink-2">Tingkat</span>
+                      <select
+                        value={formAturan.severity}
+                        onChange={(e) => setFormAturan((f) => ({ ...f, severity: e.target.value as AlertRule['severity'] }))}
+                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
+                      >
+                        <option value="warning">Peringatan</option>
+                        <option value="critical">Kritis</option>
+                      </select>
+                    </label>
+                  </div>
+                  {galatAturan && (
+                    <p data-testid="galat-aturan" className="text-neg">{galatAturan}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      data-testid="simpan-aturan"
+                      disabled={menyimpanAturan}
+                      className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50"
+                    >
+                      {menyimpanAturan ? 'Menyimpan…' : 'Simpan Aturan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormAturanOpen(false)}
+                      className="px-3 py-1.5 border border-line rounded-control text-ink-2 hover:bg-line/40"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </form>
+              )}
 
               <div className="space-y-3">
                 {alertRules.map((rule) => {
@@ -2499,18 +2840,21 @@ export const Admin: React.FC<AdminProps> = ({
                 </p>
               </div>
 
+              {/* Penyaring: semua label terhubung ke kontrolnya (htmlFor/id) supaya
+                  nama aksesibelnya tidak bergantung pada placeholder. */}
               <div className="flex items-end gap-2 flex-wrap">
                 <div>
-                  <label className="text-[11px] font-semibold text-ink-2 block mb-1">Instansi</label>
+                  <label htmlFor="audit-instansi" className="text-[11px] font-semibold text-ink-2 block mb-1">Instansi</label>
                   <select
+                    id="audit-instansi"
                     value={filterAudit.tenantId}
                     onChange={(e) => {
-                      const baru = { ...filterAudit, tenantId: e.target.value };
+                      const baru = { ...filterAudit, tenantId: e.target.value, offset: 0 };
                       setFilterAudit(baru);
                       void muatAudit(baru);
                     }}
                     disabled={!superadmin}
-                    className="input text-xs py-1.5 min-w-[160px]"
+                    className="input text-xs py-1.5 min-h-[44px] min-w-[160px]"
                     data-testid="filter-audit-instansi"
                   >
                     {superadmin
@@ -2521,28 +2865,109 @@ export const Admin: React.FC<AdminProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-ink-2 block mb-1">Cari aksi</label>
+                  <label htmlFor="audit-aksi" className="text-[11px] font-semibold text-ink-2 block mb-1">Cari aksi</label>
                   <input
+                    id="audit-aksi"
                     value={filterAudit.aksi}
                     onChange={(e) => setFilterAudit({ ...filterAudit, aksi: e.target.value })}
                     onKeyDown={(e) => { if (e.key === 'Enter') void muatAudit(); }}
                     placeholder="mis. dashboard"
-                    className="input text-xs py-1.5 w-40"
+                    className="input text-xs py-1.5 min-h-[44px] w-40"
                     data-testid="filter-audit-aksi"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="audit-pengguna" className="text-[11px] font-semibold text-ink-2 block mb-1">Pengguna</label>
+                  <input
+                    id="audit-pengguna"
+                    value={filterAudit.pengguna}
+                    onChange={(e) => setFilterAudit({ ...filterAudit, pengguna: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void muatAudit(); }}
+                    placeholder="nama pengguna"
+                    className="input text-xs py-1.5 min-h-[44px] w-40"
+                    data-testid="filter-audit-pengguna"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="audit-dari" className="text-[11px] font-semibold text-ink-2 block mb-1">Dari</label>
+                  <input
+                    id="audit-dari"
+                    type="date"
+                    value={filterAudit.dari}
+                    onChange={(e) => setFilterAudit({ ...filterAudit, dari: e.target.value })}
+                    className="input text-xs py-1.5 min-h-[44px]"
+                    data-testid="filter-audit-dari"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="audit-sampai" className="text-[11px] font-semibold text-ink-2 block mb-1">Sampai</label>
+                  <input
+                    id="audit-sampai"
+                    type="date"
+                    value={filterAudit.sampai}
+                    onChange={(e) => setFilterAudit({ ...filterAudit, sampai: e.target.value })}
+                    className="input text-xs py-1.5 min-h-[44px]"
+                    data-testid="filter-audit-sampai"
                   />
                 </div>
                 <button
                   onClick={() => void muatAudit()}
                   disabled={memuatAudit}
-                  className="btn-primary text-xs px-3 py-1.5"
-                  data-testid="muat-audit"
+                  className="btn-primary text-xs px-3 py-1.5 min-h-[44px]"
+                                    data-testid="muat-audit"
                 >
                   {memuatAudit ? 'Memuat…' : 'Terapkan'}
                 </button>
-                <span className="text-[11px] text-ink-2 ml-auto">{auditLogs.length} baris</span>
+                {/* Ekspor CSV sudah didukung server (format=csv); sebelumnya tidak
+                    ada jalurnya di layar. */}
+                <a
+                  href={`/api/audit-logs?${new URLSearchParams({
+                    format: 'csv',
+                    ...(superadmin && filterAudit.tenantId !== 'semua' ? { tenantId: filterAudit.tenantId } : {}),
+                    ...(filterAudit.aksi.trim() ? { aksi: filterAudit.aksi.trim() } : {}),
+                    ...(filterAudit.pengguna.trim() ? { pengguna: filterAudit.pengguna.trim() } : {}),
+                    ...(filterAudit.dari ? { dari: filterAudit.dari } : {}),
+                    ...(filterAudit.sampai ? { sampai: filterAudit.sampai } : {}),
+                  }).toString()}`}
+                  className="btn-ghost text-xs px-3 py-1.5 min-h-[44px] inline-flex items-center gap-1.5"
+                  data-testid="ekspor-audit-csv"
+                  download
+                >
+                  <Database className="w-3.5 h-3.5" /> Ekspor CSV
+                </a>
+                <span className="text-[11px] text-ink-2 ml-auto" data-testid="info-audit">
+                  {auditTotal === 0
+                    ? '0 baris'
+                    : `${filterAudit.offset + 1}–${Math.min(filterAudit.offset + auditLogs.length, auditTotal)} dari ${auditTotal} baris`}
+                </span>
               </div>
 
-              <div className="overflow-x-auto border border-line rounded-card">
+              {galatAudit && (
+                <p className="text-xs text-neg bg-neg/10 border border-neg/30 rounded-card px-3 py-2">
+                  Jejak audit gagal dimuat: {galatAudit}
+                </p>
+              )}
+
+              {/* Mobile: kartu bertumpuk (tabel 5 kolom tidak terbaca di 390px). */}
+              <div className="sm:hidden space-y-2" data-testid="audit-kartu">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="border border-line rounded-card p-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono text-ink-3">
+                        {new Date(log.timestamp).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-surface-2 text-ink-2 break-all">
+                        {log.target}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-ink">{log.action}</p>
+                    <p className="text-[11px] text-ink-2 break-words">{log.details}</p>
+                    <p className="text-[11px] text-ink-3">{log.userName}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden sm:block overflow-x-auto border border-line rounded-card">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
                     <tr>
@@ -2576,6 +3001,37 @@ export const Admin: React.FC<AdminProps> = ({
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Paginasi: sebelumnya data dipotong 500 baris tanpa penanda. */}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => {
+                    const baru = { ...filterAudit, offset: Math.max(0, filterAudit.offset - UKURAN_HALAMAN_AUDIT) };
+                    setFilterAudit(baru);
+                    void muatAudit(baru);
+                  }}
+                  disabled={memuatAudit || filterAudit.offset === 0}
+                  className="btn-ghost text-xs px-3 py-1.5 disabled:opacity-40"
+                  data-testid="audit-sebelumnya"
+                >
+                  ← Sebelumnya
+                </button>
+                <span className="text-[11px] text-ink-3">
+                  Halaman {Math.floor(filterAudit.offset / UKURAN_HALAMAN_AUDIT) + 1} · {UKURAN_HALAMAN_AUDIT} baris/halaman
+                </span>
+                <button
+                  onClick={() => {
+                    const baru = { ...filterAudit, offset: filterAudit.offset + UKURAN_HALAMAN_AUDIT };
+                    setFilterAudit(baru);
+                    void muatAudit(baru);
+                  }}
+                  disabled={memuatAudit || filterAudit.offset + auditLogs.length >= auditTotal}
+                  className="btn-ghost text-xs px-3 py-1.5 disabled:opacity-40"
+                  data-testid="audit-berikutnya"
+                >
+                  Berikutnya →
+                </button>
               </div>
             </div>
           )}

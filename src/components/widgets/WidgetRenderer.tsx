@@ -10,6 +10,7 @@ import { WidgetChart } from './WidgetChart';
 import { gayaKatalogWidget } from './bingkaiKatalog';
 import { ikonWidget } from './ikonWidget';
 import { normalizeSeriesData } from './ChartEcharts';
+import { chartIdDariTipe } from '../../services/chart/petaTipe';
 import { useChartSelection } from './ChartSelection';
 import { adaGaya } from './widgetStyle';
 import { gayaReplika } from '../referensi/gayaReplika';
@@ -97,6 +98,24 @@ const TIPE_CHART = [
 ];
 
 /**
+ * Chart yang BENAR-BENAR menggambar kartu.
+ *
+ * Widget yang memakai entri Template Chart buatan sendiri (`chartId = kustom-…`)
+ * digambar oleh chart bawaan di `chartDasar`, sehingga tidak pernah kosong dan
+ * tetap memakai chart dari Template Chart.
+ */
+const chartPenggambarWidget = (w: WidgetSpec): ChartId | undefined =>
+  (w.chartDasar as ChartId) || (w.chartId as ChartId);
+
+/**
+ * Sama seperti di atas, tetapi untuk kartu berwajah HTML (KPI, tabel, narasi)
+ * yang renderer-nya WAJIB menerima id chart. Widget lama tanpa `chartId` tetap
+ * memakai padanan tipenya, seperti sebelumnya.
+ */
+const chartWajib = (w: WidgetSpec): ChartId =>
+  chartPenggambarWidget(w) || chartIdDariTipe(w.type) || 'kpi-kartu';
+
+/**
  * Seed warna stabil dari id + judul widget. Dipakai agar tiap grafik di dashboard
  * mulai dari hue berbeda (bukan semuanya biru), tanpa berubah antar-render.
  */
@@ -119,7 +138,7 @@ const KartuKatalogHtml: React.FC<{ widget: WidgetSpec; props: PropsKatalog }> = 
   const { varian, g } = gayaKatalogWidget(widget.style, useThemeMode());
   return (
     <div className="w-full h-full min-h-0 flex flex-col">
-      <WidgetChart chartId={widget.chartId as ChartId} varian={varian} gaya={g} ikon={ikonWidget(widget.ikon)} {...props} />
+      <WidgetChart chartId={chartWajib(widget)} varian={varian} gaya={g} ikon={ikonWidget(widget.ikon)} {...props} />
     </div>
   );
 };
@@ -165,7 +184,7 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec; onKlikKosong?: () => vo
   return (
     <div className="w-full flex-1 min-h-[120px] flex flex-col">
       <WidgetChart
-        chartId={widget.chartId as ChartId}
+        chartId={chartWajib(widget)}
         varian={varian}
         gaya={g}
         data={data}
@@ -229,7 +248,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, urutan, 
         style={widget.style}
         warnaSeed={seed}
         padat={padat}
-        chartId={widget.chartId}
+        chartId={chartPenggambarWidget(widget)}
         rancangan={rancangan}
       />
     );

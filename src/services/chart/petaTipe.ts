@@ -9,10 +9,11 @@ import type { ChartId } from './chartDefault';
  * Peta ini yang menghubungkan keduanya supaya dashboard baru memakai desain
  * dari template chart, bukan penyusun opsi lama.
  *
- * Tipe yang belum punya wajah katalog (peta, radar, heatmap, sankey, gantt,
- * treemap, funnel, waterfall, boxplot) sengaja dibiarkan `null`: masih digambar
- * penyusun lama sampai wajahnya dibuat. Jangan dipaksa masuk ke wajah yang
- * mirip, karena bentuknya akan menipu.
+ * Tiga tipe BELUM punya wajah di Template Chart dan sengaja dibiarkan `null`:
+ * `map` (peta geografis), `gantt` (jadwal bertanggal), `boxplot` (kuartil).
+ * Ketiganya dibuatkan entri Template Chart baru saat dipakai (lihat
+ * `katalogKustom.ts`), bukan dipaksa masuk ke wajah yang mirip — bentuknya akan
+ * menipu.
  */
 export const PETA_TIPE: Partial<Record<WidgetType, ChartId>> = {
   kpi: 'kpi-kartu',
@@ -34,6 +35,16 @@ export const PETA_TIPE: Partial<Record<WidgetType, ChartId>> = {
   bubble: 'scatter-gelembung',
   cluster: 'scatter-gelembung',
   gauge: 'gauge-target',
+  // Enam tipe di bawah SEBELUMNYA dibiarkan null padahal wajahnya sudah ada di
+  // Template Chart (`peta-panas`, `radar-aspek`, `air-terjun`, `sankey-alur`,
+  // `treemap-porsi`, `corong-pipeline`). Akibatnya widget bertipe itu jatuh ke
+  // penyusun lama / dibuatkan entri kustom padahal template-nya tersedia.
+  heatmap: 'peta-panas',
+  radar: 'radar-aspek',
+  waterfall: 'air-terjun',
+  sankey: 'sankey-alur',
+  treemap: 'treemap-porsi',
+  funnel: 'corong-pipeline',
 };
 
 /** Wajah katalog untuk sebuah tipe widget, atau null bila belum ada. */

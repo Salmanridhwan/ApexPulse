@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Send,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
@@ -112,6 +113,8 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
   const [pesan, setPesan] = useState<string | null>(null);
   const [saring, setSaring] = useState<StatusPermintaan | 'semua'>('semua');
   const [terpilih, setTerpilih] = useState<PermintaanDaftar | null>(null);
+  /** Id permintaan yang sedang menunggu konfirmasi hapus (admin). */
+  const [konfirmasiHapusId, setKonfirmasiHapusId] = useState<string | null>(null);
   const [bukaForm, setBukaForm] = useState(false);
   const [balasan, setBalasan] = useState('');
   const [alasanTolak, setAlasanTolak] = useState('');
@@ -278,7 +281,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
 
   /* ---------------- Panel detail ---------------- */
   const panelDetail = terpilih ? (
-    <div className="bg-surface rounded-card border border-line p-5">
+    <div className="bg-surface rounded-card border border-line p-5" data-testid="panel-detail-permintaan">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -503,6 +506,55 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
           >
             Hapus permintaan ini
           </button>
+        )}
+
+        {/*
+          Admin instansi boleh menghapus kapan saja — server mengizinkannya
+          (`DELETE /api/permintaan/:id` = 200 untuk admin). Sebelum ini kontrolnya
+          tidak ada di layar, jadi satu-satunya jalan adalah menembak API.
+          Konfirmasi dibuat dua langkah di dalam panel, bukan `window.confirm`,
+          supaya akibatnya terbaca dan alurnya tidak diblokir dialog browser.
+        */}
+        {admin && (
+          <div className="pt-1">
+            {konfirmasiHapusId === terpilih.id ? (
+              <div className="p-3 rounded-control bg-neg/5 border border-neg/25">
+                <p className="text-[11px] text-ink">
+                  Hapus permanen permintaan ini? Riwayat tanggapan dan lampirannya ikut hilang.
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    disabled={sibuk}
+                    onClick={() => {
+                      setKonfirmasiHapusId(null);
+                      void hapus(terpilih);
+                    }}
+                    data-testid="konfirmasi-hapus-permintaan"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-neg hover:opacity-90 rounded-control disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Ya, hapus permanen
+                  </button>
+                  <button
+                    disabled={sibuk}
+                    onClick={() => setKonfirmasiHapusId(null)}
+                    data-testid="batal-hapus-permintaan"
+                    className="px-3 py-1.5 text-xs font-semibold text-ink-2 bg-surface-2 hover:bg-line/60 border border-line rounded-control disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                disabled={sibuk}
+                onClick={() => setKonfirmasiHapusId(terpilih.id)}
+                data-testid="hapus-permintaan-admin"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neg bg-neg/10 hover:bg-neg/20 border border-neg/30 rounded-control disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Hapus permintaan
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

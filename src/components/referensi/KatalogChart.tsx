@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CHART_DEFAULT, DAFTAR_CHART, LABEL_KELOMPOK, type ChartId, type KelompokChart } from '../../services/chart/chartDefault';
 import { GAYA, gayaMode, type Varian } from '../../services/chart/gayaVarian';
 import { bingkaiKatalog } from '../widgets/bingkaiKatalog';
 import { useThemeMode } from '../../theme';
 import { PratinjauChart } from './PratinjauChart';
+import type { ChartKustom } from '../../services/chart/katalogKustom';
 
 /**
  * KATALOG CHART UNTUK SATU GAYA.
@@ -49,6 +50,72 @@ const Kartu: React.FC<{ chartId: ChartId; varian: Varian }> = ({ chartId, varian
   );
 };
 
+
+/**
+ * CHART BUATAN SENDIRI (dibuat otomatis).
+ *
+ * Kalau bentuk data tidak cocok dengan chart bawaan mana pun, sistem membuat
+ * entri Template Chart baru (`kustom-…`) dan kartu di kanvas memakai entri itu.
+ * Bagian ini menampilkannya supaya admin bisa melihat chart apa yang sudah
+ * ditambahkan ke Template Chart — bukan chart liar yang tidak terdaftar.
+ */
+const BagianKustom: React.FC<{ varian: Varian }> = ({ varian }) => {
+  const [daftar, setDaftar] = useState<ChartKustom[]>([]);
+  useEffect(() => {
+    let hidup = true;
+    fetch('/api/chart/kustom', { headers: { 'Content-Type': 'application/json' } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => {
+        if (hidup && Array.isArray(d)) setDaftar(d);
+      })
+      .catch(() => undefined);
+    return () => {
+      hidup = false;
+    };
+  }, []);
+  // Hook WAJIB dipanggil sebelum `return` apa pun: urutan hook tidak boleh berubah
+  // antara render pertama (daftar kosong) dan render berikutnya (daftar terisi).
+  const mode = useThemeMode();
+  if (daftar.length === 0) return null;
+  return (
+    <section data-testid="chart-kustom">
+      <div className="flex items-baseline gap-2 mb-2.5">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-ink-2">Dibuat otomatis dari data</h3>
+        <span className="text-[10px] text-ink-3">{daftar.length} chart</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-stretch">
+        {daftar.map((k) => {
+          const g = gayaMode(varian, mode);
+          const gantiGaya = g !== GAYA[varian] ? g : undefined;
+          const bk = bingkaiKatalog(g);
+          return (
+            <div
+              key={k.id}
+              data-testid={`chart-kustom-${k.id}`}
+              className="rounded-card border overflow-hidden flex flex-col"
+              style={bk.luar}
+            >
+              <div className="px-3.5 pt-3 pb-2.5 border-b" style={bk.kepala}>
+                <p className="text-[13px] font-bold leading-snug truncate" style={bk.judul}>
+                  {k.nama}
+                </p>
+                <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={bk.sub}>
+                  {k.guna}
+                </p>
+              </div>
+              <div className="p-2.5 flex-1">
+                <div className={bk.dalam ? 'rounded-[16px] border p-2' : ''} style={bk.dalam}>
+                  <PratinjauChart chartId={k.dasar} varian={varian} gaya={gantiGaya} tinggi={160} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
 export const KatalogTemplateChart: React.FC<{ varian: Varian }> = ({ varian }) => (
   <div className="space-y-7">
     {URUTAN_KELOMPOK.map((k) => {
@@ -68,5 +135,6 @@ export const KatalogTemplateChart: React.FC<{ varian: Varian }> = ({ varian }) =
         </section>
       );
     })}
+    <BagianKustom varian={varian} />
   </div>
 );

@@ -24,6 +24,11 @@ export const NarasiCard: React.FC<NarasiCardProps> = ({ text, bulletPoints }) =>
         </div>
       )}
 
+      {!text && (!bulletPoints || bulletPoints.length === 0) && (
+        // Kartu tanpa isi tidak boleh jadi kotak hitam kosong: katakan apa adanya.
+        <p className="text-xs text-ink-3 italic">Belum ada isi untuk kartu ini.</p>
+      )}
+
       {text && (
         <div className="prose prose-sm max-w-none text-xs text-ink-2 leading-relaxed">
           <p className="whitespace-pre-line">{text}</p>

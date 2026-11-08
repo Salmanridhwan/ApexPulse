@@ -221,7 +221,12 @@ export class KmsClient {
       const orgs = await this.daftarOrganisasi();
       return { ok: true, jumlahProject: orgs.length, pesan: `Terhubung — ${orgs.length} project terbaca.` };
     } catch (err: any) {
-      return { ok: false, jumlahProject: 0, pesan: err?.message || 'Gagal menghubungi repositori dokumen.' };
+      // Sertakan tujuan yang benar-benar dicoba. Tanpa alamat, pesan "gagal
+      // menghubungi" tidak memberi tahu layanan mana yang tidak menjawab.
+      const tujuan = this.base ? ` Tujuan: ${this.base}.` : '';
+      const detail = err?.detail ? ` ${err.detail}` : '';
+      const pesan = `${err?.message || 'Gagal menghubungi repositori dokumen.'}${tujuan}${detail}`;
+      return { ok: false, jumlahProject: 0, pesan: pesan.trim() };
     }
   }
 }

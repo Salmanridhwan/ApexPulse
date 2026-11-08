@@ -70,6 +70,11 @@ import {
 } from './src/services/permintaan/aturan';
 import { KUOTA_ANALISIS_BAWAAN, sisaKuota } from './src/services/analisis/antrean';
 import { jalankanAnalisis, pemakaianHariIni, petakanKeluaranRag } from './src/services/analisis/jalankan';
+import {
+  antreAnalisisOtomatis,
+  pasangKetergantunganAntrean,
+  statusAntreanOtomatis,
+} from './src/services/analisis/otomatis';
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
@@ -115,6 +120,7 @@ import {
 import { nilaiOperasionalDariWidgets } from './src/services/templates/nilaiOperasional';
 import { gayaDariPermintaan, pilihChart, susunDashboardBerhalaman } from './src/services/builder/susunHalaman';
 import { pakaiChartKatalog } from './src/services/chart/katalogCocok';
+import { pastikanChartKatalog, type ChartKustom } from './src/services/chart/katalogKustom';
 import { MIN_WIDGET_HALAMAN } from './src/services/builder/halamanDiminta';
 import { GAYA } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
@@ -140,6 +146,7 @@ import {
 } from './src/services/impor/tabel';
 import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
 import type { BerkasKMS } from './src/types';
+import type { AnalisisDokumen } from './src/types';
 import {
   BATAS_UKURAN_BYTE,
   cariProjectKmsDariKb,
@@ -241,6 +248,17 @@ function isAdminRole(role: unknown): boolean {
  */
 function requireAdmin(session: SessionPayload, res: Response, pesan = 'Hanya administrator yang boleh melakukan tindakan ini.'): boolean {
   if (isAdminRole(session.role)) return true;
+  res.status(403).json({ error: pesan });
+  return false;
+}
+
+/**
+ * Gerbang khusus fitur lintas instansi (tab Instansi & KB, RAG, Kuota, Jejak Audit
+ * seluruh platform). Menyembunyikan tabnya saja tidak cukup: Admin Instansi yang
+ * memanggil endpoint-nya langsung lewat HTTP tetap dilayani `requireAdmin`.
+ */
+function requireSuperadmin(session: SessionPayload, res: Response, pesan = 'Hanya Admin Aiones yang boleh mengakses fitur lintas instansi ini.'): boolean {
+  if (isSuperadmin(session.role)) return true;
   res.status(403).json({ error: pesan });
   return false;
 }
@@ -432,19 +450,41 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
 }
 
 /**
+ * Pemicu analisis otomatis, dipasang oleh pembuat app (butuh db & RAG).
+ * Dipisah begini karena `segarkanSetelahDokumen` hidup di luar pembuat app.
+ */
+type PemicuAnalisisOtomatis = (
+  tenantId: string,
+  dokumenBaru?: { berkasId: string; judulBerkas: string }
+) => void;
+let pemicuAnalisisOtomatis: PemicuAnalisisOtomatis | null = null;
+
+/**
  * DOKUMEN INSTANSI BERUBAH (unggah, hapus, impor).
  *
  * Geser penanda versi DULU, baru siapkan ulang semua template sekali dengan
  * instansi versi baru. Dulu template dihangatkan dengan versi lama lalu versi
  * digeser, sehingga hasil pertama langsung basi dan penyiapan berjalan dua kali.
+ *
+ * `dokumenBaru` = berkas yang baru masuk; dokumen itu langsung dianalisis di
+ * antrean, dan analisis lama yang jadi basi ikut diantrekan (batasnya diatur
+ * `AUTO_SEGARKAN_MAKS` supaya kuota harian tidak habis oleh satu unggahan).
  */
-function segarkanSetelahDokumen(tenantId: string): void {
+function segarkanSetelahDokumen(
+  tenantId: string,
+  dokumenBaru?: { berkasId: string; judulBerkas: string }
+): void {
   void (async () => {
     try {
       const segar = await db.updateTenant(tenantId, { kbTersinkronPada: new Date().toISOString() });
       if (segar) hangatkanTemplateTenant(segar);
     } catch (err: any) {
       console.warn('[pratinjau] gagal menyegarkan setelah dokumen berubah:', err?.message || err);
+    }
+    try {
+      pemicuAnalisisOtomatis?.(tenantId, dokumenBaru);
+    } catch (err: any) {
+      console.warn('[analisis-otomatis] gagal mengantrekan analisis:', err?.message || err);
     }
   })();
 }
@@ -1430,10 +1470,58 @@ const app = express();
     res.json(dashboard);
   });
 
+  /**
+   * GERBANG TEMPLATE CHART.
+   *
+   * Aturan produk: chart di kanvas selalu diambil dari Template Chart. Setiap
+   * widget yang disimpan lewat API dilewatkan di sini:
+   *  - sudah punya chart bawaan yang sah → dibiarkan;
+   *  - belum cocok dengan chart bawaan mana pun → dibuatkan entri Template Chart
+   *    baru (`kustom-…`) yang menunjuk chart bawaan terdekat, lalu widget memakai
+   *    entri itu (`chartId` = entri, `chartDasar` = chart penggambarnya).
+   * Entri baru disimpan di `systemConfig.chartKatalogKustom` supaya muncul di
+   * halaman Template Chart dan dipakai ulang oleh bentuk data yang sama.
+   */
+  const katalogKustom = (): ChartKustom[] => {
+    const daftar = (db.systemConfig as any).chartKatalogKustom;
+    return Array.isArray(daftar) ? (daftar as ChartKustom[]) : [];
+  };
+
+  const pastikanKatalogWidget = (
+    widgets: any[],
+    session: SessionPayload,
+    tenantId: string
+  ): { widgets: any[]; baru: ChartKustom[] } => {
+    if (!Array.isArray(widgets) || widgets.length === 0) return { widgets: widgets || [], baru: [] };
+    const hasil = pastikanChartKatalog(widgets as WidgetSpec[], { ada: katalogKustom() });
+    if (hasil.baru.length > 0) {
+      db.updateSystemConfig({ chartKatalogKustom: [...katalogKustom(), ...hasil.baru] } as any);
+      for (const entri of hasil.baru) {
+        db.addAuditLog({
+          tenantId,
+          userId: session.userId,
+          userName: session.name,
+          action: 'Tambah Chart Template',
+          target: entri.nama,
+          details: `Dibuat otomatis: bentuk data tidak cocok dengan chart bawaan. Dasar ${entri.dasar} (${entri.id})`,
+        });
+      }
+    }
+    return hasil;
+  };
+
+  /** Entri Template Chart buatan sendiri — ditampilkan bersama chart bawaan. */
+  app.get('/api/chart/kustom', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    res.json(katalogKustom());
+  });
+
   app.post('/api/dashboards', (req: Request, res: Response) => {
     const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
+    const chart = pastikanKatalogWidget(req.body.widgets || [], session, tenantId);
     const newDash: Dashboard = {
       id: `dash-${Date.now()}`,
       tenantId,
@@ -1443,7 +1531,7 @@ const app = express();
       // Tema visual opsional (dipakai dashboard hasil template agar tampil sama
       // dengan pratinjau template). Tanpa tema, dashboard ikut tema aplikasi.
       ...(req.body.tema ? { tema: String(req.body.tema) } : {}),
-      widgets: req.body.widgets || [],
+      widgets: chart.widgets,
       globalFilters: req.body.globalFilters || {
         periode: '2026-Q1',
         unitKerja: 'Semua',
@@ -1468,7 +1556,14 @@ const app = express();
     const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
-    const updated = db.updateDashboard(req.params.id, req.body, tenantId);
+    // Setiap widget yang disimpan WAJIB memakai chart dari Template Chart.
+    // Tanpa gerbang ini, widget dari RAG/impor bisa tersimpan tanpa `chartId` dan
+    // kanvas menggambar chart internal yang tidak terdaftar di Template Chart.
+    const badan = { ...req.body };
+    if (Array.isArray(badan.widgets)) {
+      badan.widgets = pastikanKatalogWidget(badan.widgets, session, tenantId).widgets;
+    }
+    const updated = db.updateDashboard(req.params.id, badan, tenantId);
     if (!updated) {
       return res.status(404).json({ error: 'Dashboard tidak ditemukan.' });
     }
@@ -3658,7 +3753,7 @@ ${kpiItems}
   });
 
   app.post('/api/alerts', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const newRule = {
@@ -3686,7 +3781,7 @@ ${kpiItems}
    * Validasi nilai ketat supaya PATCH tidak diam-diam menormalkan input ngawur.
    */
   app.patch('/api/alerts/:id', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const rule = db.alertRules.find((r) => r.id === req.params.id && r.tenantId === tenantId);
@@ -3735,7 +3830,7 @@ ${kpiItems}
   });
 
   app.delete('/api/alerts/:id', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
+    const session = butuhPenulis(req, res);
     if (!session) return;
     const tenantId = effectiveTenantId(req, session);
     const idx = db.alertRules.findIndex((r) => r.id === req.params.id && r.tenantId === tenantId);
@@ -3932,6 +4027,7 @@ ${kpiItems}
       permintaanId: baru.id,
       untukRole: 'admin',
     });
+    tautkanLampiranKePermintaan(tenantId, baru.id, baru.lampiran);
     db.addAuditLog({
       tenantId,
       userId: session.userId,
@@ -3998,6 +4094,7 @@ ${kpiItems}
         ubah.lampiran = [...permintaan.lampiran, ...tambahan];
       }
       const diperbarui = db.updatePermintaanData(permintaan.id, tenantId, ubah);
+      tautkanLampiranKePermintaan(tenantId, permintaan.id, ubah.lampiran || []);
       return res.json(diperbarui);
     }
 
@@ -4100,6 +4197,7 @@ ${kpiItems}
       },
       patch
     );
+    tautkanLampiranKePermintaan(tenantId, permintaan.id, lampiranBaru);
     notifPermintaan({
       tenantId,
       judul: `Catatan baru: ${permintaan.bidang}`,
@@ -4151,16 +4249,8 @@ ${kpiItems}
    * mengambil daftar bukan alasan menggagalkan analisis: sidiknya saja yang
    * tidak dipakai.
    */
-  const sidikKbInstansi = async (req: Request, session: SessionPayload): Promise<string | undefined> => {
-    try {
-      const { organizationId } = await konteksBerkas(req, session);
-      if (!organizationId) return undefined;
-      const daftar = await klienKms().daftarBerkas(organizationId);
-      return sidikKb(Array.isArray(daftar) ? daftar : []);
-    } catch {
-      return undefined;
-    }
-  };
+  const sidikKbInstansi = async (req: Request, session: SessionPayload): Promise<string | undefined> =>
+    sidikKbUntukTenant(effectiveTenantId(req, session));
 
   /** Kuota analisis instansi ini — dipakai UI untuk memberi tahu sisa hari ini. */
   app.get('/api/analisis/kuota', (req: Request, res: Response) => {
@@ -4193,10 +4283,11 @@ ${kpiItems}
       });
     }
     const analisis = db.getAnalisisDokumen(tenantId).filter((a) => a.status === 'selesai');
-    const perlu = perluSegarKarenaKb(analisis, sidikSekarang);
+    // Satu baris per berkas: baris lama yang sudah digantikan tidak dihitung basi.
+    const perlu = perluSegarTerbaru(tenantId, sidikSekarang);
     res.json({
       sidikKb: sidikSekarang,
-      jumlahDokumen: analisis.length,
+      jumlahDokumen: new Set(analisis.map((a) => a.berkasId)).size,
       perluDibacaUlang: perlu.map((a) => ({ id: a.id, judulBerkas: a.judulBerkas, berkasId: a.berkasId })),
       catatan:
         perlu.length === 0
@@ -4214,6 +4305,21 @@ ${kpiItems}
       permintaanId,
       status: String(req.query.status || '').trim() || undefined,
     });
+    // Analisis otomatis bisa selesai SEBELUM lampirannya menempel ke permintaan.
+    // Barisnya tetap ditampilkan di panel permintaan itu — kalau tidak, admin
+    // melihat "belum dianalisis" padahal dokumennya sudah dibaca dan butirnya ada.
+    if (permintaanId) {
+      const permintaan = db.getPermintaanDataById(permintaanId, tenantId);
+      const berkas = new Set((permintaan?.lampiran || []).map((l) => l.berkasId));
+      if (berkas.size > 0) {
+        const sudahAda = new Set(daftar.map((a) => a.id));
+        for (const a of db.getAnalisisDokumen(tenantId)) {
+          if (sudahAda.has(a.id) || !berkas.has(a.berkasId)) continue;
+          if (req.query.status && a.status !== String(req.query.status)) continue;
+          daftar = [...daftar, a];
+        }
+      }
+    }
     // User hanya boleh melihat analisis untuk permintaannya sendiri.
     if (!isAdminRole(session.role)) {
       const milikSaya = new Set(
@@ -4228,24 +4334,50 @@ ${kpiItems}
    * Jalankan analisis satu dokumen. Sinkron: admin menunggu hasilnya, dan satu
    * dokumen biasanya selesai di bawah satu menit.
    */
-  app.post('/api/analisis', async (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menganalisis dokumen.')) return;
-    const tenantId = effectiveTenantId(req, session);
-
-    const berkasId = String(req.body?.berkasId || '').trim();
-    const judulBerkas = String(req.body?.judulBerkas || '').trim();
-    if (!berkasId || !judulBerkas) {
-      return res.status(400).json({ error: 'berkasId dan judulBerkas wajib diisi.' });
+  /**
+   * Sidik basis dokumen untuk satu instansi, tanpa perlu `req`. Dipakai jalur
+   * otomatis (antrean) yang tidak punya permintaan HTTP.
+   */
+  const sidikKbUntukTenant = async (tenantId: string): Promise<string | undefined> => {
+    try {
+      const tenant = db.tenants.find((t) => t.id === tenantId);
+      const { organizationId } = await projectKmsEfektif(tenant);
+      if (!organizationId) return undefined;
+      const daftar = await klienKms().daftarBerkas(organizationId);
+      return sidikKb(Array.isArray(daftar) ? daftar : []);
+    } catch {
+      return undefined;
     }
+  };
 
-    const permintaanId = String(req.body?.permintaanId || '').trim() || undefined;
+  /**
+   * INTI ANALISIS SATU DOKUMEN.
+   *
+   * Dipakai dua jalur: admin menekan tombol (`POST /api/analisis`) dan antrean
+   * otomatis setelah dokumen masuk. Karena itu fungsi ini tidak memeriksa peran
+   * — pemanggil yang menentukan siapa boleh memicu. Yang dijaga di sini: kuota
+   * harian, cache (dokumen tak berubah tidak dibaca ulang ke RAG), dan audit.
+   */
+  async function analisisSatuBerkas(masukan: {
+    tenantId: string;
+    berkasId: string;
+    judulBerkas: string;
+    permintaanId?: string;
+    ukuranKb?: number;
+    tipe?: string;
+    segarkan?: boolean;
+    abaikanKuota?: boolean;
+    sumber: 'manual' | 'otomatis';
+    pelaku?: { userId: string; name: string };
+  }): Promise<{ kode: number; body: any }> {
+    const { tenantId, berkasId, judulBerkas } = masukan;
+
+    const permintaanId = masukan.permintaanId;
     const permintaan = permintaanId
       ? db.permintaanData.find((p) => p.id === permintaanId && p.tenantId === tenantId)
       : undefined;
     if (permintaanId && !permintaan) {
-      return res.status(404).json({ error: 'Permintaan tidak ditemukan di instansi ini.' });
+      return { kode: 404, body: { error: 'Permintaan tidak ditemukan di instansi ini.' } };
     }
 
     const tenant = db.tenants.find((t) => t.id === tenantId);
@@ -4256,15 +4388,26 @@ ${kpiItems}
     // Dokumen yang isinya belum berubah tidak dibaca ulang ke RAG. Yang membuat
     // cache batal hanya: berkasnya diganti, ada dokumen baru di basis instansi,
     // cache terlalu tua, atau admin minta segarkan.
-    const lampiran = permintaan?.lampiran.find((l) => l.berkasId === berkasId);
+    //
+    // Lampiran dicari di SELURUH permintaan instansi, bukan hanya yang sedang
+    // dibuka: analisis otomatis berjalan beberapa saat setelah unggah, ketika
+    // berkasnya belum tentu sudah menempel ke permintaan. Kalau sidiknya dihitung
+    // dari konteks yang berbeda-beda, dokumen yang sama dianggap "berubah" dan
+    // dibaca ulang — kuota habis tanpa ada isi dokumen yang berubah.
+    const lampiran =
+      permintaan?.lampiran.find((l) => l.berkasId === berkasId) ??
+      db.permintaanData
+        .filter((p) => p.tenantId === tenantId)
+        .flatMap((p) => p.lampiran || [])
+        .find((l) => l.berkasId === berkasId);
     const sidikSekarang = sidikDokumen({
       berkasId,
-      ukuranKb: lampiran?.ukuranKb ?? (typeof req.body?.ukuranKb === 'number' ? req.body.ukuranKb : undefined),
-      tipe: lampiran?.tipe ?? (req.body?.tipe ? String(req.body.tipe) : undefined),
+      ukuranKb: lampiran?.ukuranKb ?? masukan.ukuranKb,
+      tipe: lampiran?.tipe ?? masukan.tipe,
       diunggahPada: lampiran?.diunggahPada,
     });
-    const sidikKbSekarang = await sidikKbInstansi(req, session);
-    const paksa = req.body?.segarkan === true;
+    const sidikKbSekarang = await sidikKbUntukTenant(tenantId);
+    const paksa = masukan.segarkan === true;
     const putusan = putusanCache(db.getAnalisisDokumen(tenantId, { berkasId }), {
       berkasId,
       sidikDokumen: sidikSekarang,
@@ -4277,15 +4420,18 @@ ${kpiItems}
       if (tersimpan) {
         const kuotaKini = (db.systemConfig as any).kuotaAnalisisHarian ?? KUOTA_ANALISIS_BAWAAN;
         const terpakai = pemakaianHariIni(db.getAnalisisDokumen(tenantId));
-        return res.json({
-          analisis: tersimpan,
-          butir: db.getButirData(tenantId, { analisisId: tersimpan.id }),
-          rekomendasi: tersimpan.rekomendasiTemplate || [],
-          dibuang: 0,
-          sisaKuota: sisaKuota(terpakai, kuotaKini),
-          dariCache: true,
-          catatanCache: putusan.alasan,
-        });
+        return {
+          kode: 200,
+          body: {
+            analisis: tersimpan,
+            butir: db.getButirData(tenantId, { analisisId: tersimpan.id }),
+            rekomendasi: tersimpan.rekomendasiTemplate || [],
+            dibuang: 0,
+            sisaKuota: sisaKuota(terpakai, kuotaKini),
+            dariCache: true,
+            catatanCache: putusan.alasan,
+          },
+        };
       }
     }
 
@@ -4323,30 +4469,232 @@ ${kpiItems}
         penyimpanan: db as any,
         ekstraktor,
         konteks,
-        abaikanKuota: req.body?.abaikanKuota === true,
+        abaikanKuota: masukan.abaikanKuota === true,
         sidik: { dokumen: sidikSekarang, kb: sidikKbSekarang },
       });
       db.addAuditLog({
         tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Analisis Dokumen',
+        userId: masukan.pelaku?.userId || 'sistem',
+        userName: masukan.pelaku?.name || 'Sistem (otomatis)',
+        action: masukan.sumber === 'otomatis' ? 'Analisis Dokumen Otomatis' : 'Analisis Dokumen',
         target: judulBerkas,
         details: `Status ${hasil.analisis.status}, ${hasil.butir.length} butir, ${hasil.dibuang} dibuang, sisa kuota ${hasil.sisaKuota}`,
       });
-      const kode = hasil.analisis.status === 'gagal' ? 422 : 201;
-      return res.status(kode).json({
-        analisis: hasil.analisis,
-        butir: hasil.butir,
-        rekomendasi: hasil.rekomendasi,
-        dibuang: hasil.dibuang,
-        sisaKuota: hasil.sisaKuota,
-        dariCache: false,
-        catatanCache: putusan.alasan,
-      });
+      return {
+        kode: hasil.analisis.status === 'gagal' ? 422 : 201,
+        body: {
+          analisis: hasil.analisis,
+          butir: hasil.butir,
+          rekomendasi: hasil.rekomendasi,
+          dibuang: hasil.dibuang,
+          sisaKuota: hasil.sisaKuota,
+          dariCache: false,
+          catatanCache: putusan.alasan,
+        },
+      };
     } catch (err) {
-      return res.status(500).json({ error: jelaskanError(err) });
+      return { kode: 500, body: { error: jelaskanError(err) } };
     }
+  }
+
+  /**
+   * ANTREAN OTOMATIS.
+   *
+   * Dokumen yang baru masuk langsung dibaca di latar belakang, jadi admin tidak
+   * perlu menekan tombol apa pun untuk melihat "data apa saja yang ada".
+   * Analisis lama yang basi karena dokumen baru ikut diantrekan, tetapi dibatasi
+   * `AUTO_SEGARKAN_MAKS` (bawaan 2) supaya satu unggahan tidak menghabiskan
+   * kuota 20 analisis/hari. Isi 0 untuk mematikan penyegaran otomatis.
+   */
+  const AUTO_SEGARKAN_MAKS = Math.max(0, Number(process.env.AUTO_SEGARKAN_MAKS ?? 2) || 0);
+
+  pasangKetergantunganAntrean({
+    jalankan: async (pekerjaan) => {
+      // Tautan permintaan dicari lagi saat pekerjaan mulai: berkas diunggah
+      // lebih dulu, lampirannya menempel beberapa saat kemudian. Tanpa ini,
+      // analisis berjalan tanpa konteks bidang/data yang diminta.
+      const tertaut = db.permintaanData.find(
+        (p) => p.tenantId === pekerjaan.tenantId && p.lampiran?.some((l) => l.berkasId === pekerjaan.berkasId)
+      );
+      const hasil = await analisisSatuBerkas({
+        tenantId: pekerjaan.tenantId,
+        berkasId: pekerjaan.berkasId,
+        judulBerkas: pekerjaan.judulBerkas,
+        permintaanId: pekerjaan.permintaanId || tertaut?.id,
+        segarkan: pekerjaan.sebab === 'segarkan',
+        sumber: 'otomatis',
+      });
+      const status = hasil.body?.analisis?.status || (hasil.kode < 400 ? 'selesai' : 'gagal');
+      // Tautan permintaan bisa muncul SAAT analisis berjalan (berkas diunggah
+      // dulu, lampirannya menempel beberapa detik kemudian). Setelah selesai,
+      // barisnya diarahkan ke permintaan itu — kalau tidak, panel permintaan
+      // menampilkan "belum dianalisis" padahal hasilnya sudah ada di DB.
+      const analisisId = hasil.body?.analisis?.id;
+      if (analisisId) {
+        const taut = db.permintaanData.find(
+          (p) => p.tenantId === pekerjaan.tenantId && p.lampiran?.some((l) => l.berkasId === pekerjaan.berkasId)
+        );
+        const baris = db.getAnalisisDokumenById(analisisId, pekerjaan.tenantId);
+        if (taut && baris && !baris.permintaanId) {
+          db.updateAnalisisDokumen(analisisId, pekerjaan.tenantId, { permintaanId: taut.id });
+          for (const b of db.getButirData(pekerjaan.tenantId, { analisisId })) {
+            if (!b.permintaanId) db.updateButirData(b.id, pekerjaan.tenantId, { permintaanId: taut.id });
+          }
+        }
+      }
+      return { status, pesan: hasil.body?.analisis?.pesanGalat || hasil.body?.error };
+    },
+    log: (pesan) => console.log(pesan),
+  });
+
+  /**
+   * Analisis basi, DIBATASI satu baris per berkas (yang terbaru).
+   *
+   * `perluSegarKarenaKb` menandai setiap baris lama yang sidiknya berbeda. Kalau
+   * dipakai apa adanya, satu dokumen yang sudah dibaca ulang tetap "basi" lewat
+   * baris lamanya, sehingga setiap unggahan berikutnya membaca ulang dokumen yang
+   * sama — kuota habis tanpa data baru.
+   */
+  const perluSegarTerbaru = (tenantId: string, sidikSekarang: string): AnalisisDokumen[] => {
+    const terbaru = new Map<string, AnalisisDokumen>();
+    for (const a of db.getAnalisisDokumen(tenantId)) {
+      if (a.status !== 'selesai') continue;
+      const lama = terbaru.get(a.berkasId);
+      if (!lama || String(a.dibuatPada).localeCompare(String(lama.dibuatPada)) > 0) terbaru.set(a.berkasId, a);
+    }
+    return perluSegarKarenaKb([...terbaru.values()], sidikSekarang);
+  };
+
+  /**
+   * Antrekan dokumen baru + analisis yang basi. Tidak menunggu hasil: pemanggil
+   * (`segarkanSetelahDokumen`) berjalan di latar belakang.
+   */
+  const antrePenyegaranAnalisis = async (
+    tenantId: string,
+    dokumenBaru?: { berkasId: string; judulBerkas: string }
+  ): Promise<number> => {
+    let diantrekan = 0;
+    if (dokumenBaru?.berkasId && dokumenBaru.judulBerkas) {
+      // Kalau berkas ini terlampir di sebuah permintaan, analisisnya ditautkan ke
+      // permintaan itu supaya panel permintaan langsung menampilkan hasilnya.
+      const tertaut = db.permintaanData.find(
+        (p) => p.tenantId === tenantId && p.lampiran?.some((l) => l.berkasId === dokumenBaru.berkasId)
+      );
+      if (
+        antreAnalisisOtomatis({
+          tenantId,
+          berkasId: dokumenBaru.berkasId,
+          judulBerkas: dokumenBaru.judulBerkas,
+          permintaanId: tertaut?.id,
+          sebab: 'unggah',
+        })
+      ) {
+        diantrekan += 1;
+      }
+    }
+    if (AUTO_SEGARKAN_MAKS === 0) return diantrekan;
+    const sidikSekarang = await sidikKbUntukTenant(tenantId);
+    if (!sidikSekarang) return diantrekan;
+    const perlu = perluSegarTerbaru(tenantId, sidikSekarang);
+    for (const a of perlu.slice(0, AUTO_SEGARKAN_MAKS)) {
+      if (
+        antreAnalisisOtomatis({
+          tenantId,
+          berkasId: a.berkasId,
+          judulBerkas: a.judulBerkas,
+          permintaanId: a.permintaanId,
+          sebab: 'segarkan',
+        })
+      ) {
+        diantrekan += 1;
+      }
+    }
+    return diantrekan;
+  };
+
+  /**
+   * Lampiran menempel ke sebuah permintaan: analisisnya ikut ditautkan.
+   *
+   * Dokumen biasanya sudah dibaca otomatis saat diunggah. Membacanya ulang di
+   * sini hanya membakar kuota tanpa menambah data, jadi yang dilakukan:
+   * arahkan analisis & butir yang ada ke `permintaanId`, dan hanya mengantrekan
+   * kalau dokumen itu memang belum pernah dibaca.
+   */
+  const tautkanLampiranKePermintaan = (
+    tenantId: string,
+    permintaanId: string,
+    lampiran: LampiranPermintaan[]
+  ): void => {
+    for (const l of lampiran) {
+      if (!l?.berkasId) continue;
+      const ada = db.getAnalisisDokumen(tenantId, { berkasId: l.berkasId });
+      const selesai = ada.filter((a) => a.status === 'selesai');
+      // Hasil yang sudah ada — berhasil maupun gagal — diarahkan ke permintaan
+      // ini. Analisis yang gagal pun perlu tampil di panel supaya admin tahu
+      // dokumen ini sudah dicoba dibaca dan bisa mengulanginya.
+      const target = selesai.find((a) => !a.permintaanId) || ada.find((a) => !a.permintaanId);
+      if (target) {
+        db.updateAnalisisDokumen(target.id, tenantId, { permintaanId });
+        for (const b of db.getButirData(tenantId, { analisisId: target.id })) {
+          if (!b.permintaanId) db.updateButirData(b.id, tenantId, { permintaanId });
+        }
+        continue;
+      }
+      if (ada.length > 0) continue;
+      antreAnalisisOtomatis({
+        tenantId,
+        berkasId: l.berkasId,
+        judulBerkas: l.nama || l.berkasId,
+        permintaanId,
+        sebab: 'unggah',
+      });
+    }
+  };
+
+  pemicuAnalisisOtomatis = (tenantId, dokumenBaru) => {
+    void antrePenyegaranAnalisis(tenantId, dokumenBaru).catch((err: any) =>
+      console.warn('[analisis-otomatis] gagal menyiapkan antrean:', err?.message || err)
+    );
+  };
+
+  /** Keadaan antrean analisis otomatis — dipakai panel admin & skrip QA. */
+  app.get('/api/analisis/otomatis', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh melihat antrean analisis.')) return;
+    res.json(statusAntreanOtomatis());
+  });
+
+  /**
+   * Jalankan analisis satu dokumen. Sinkron: admin menunggu hasilnya, dan satu
+   * dokumen biasanya selesai di bawah satu menit. Kalau dokumen itu sudah
+   * dibaca otomatis, jawabannya `dariCache: true` tanpa memanggil RAG.
+   */
+  app.post('/api/analisis', async (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menganalisis dokumen.')) return;
+    const tenantId = effectiveTenantId(req, session);
+
+    const berkasId = String(req.body?.berkasId || '').trim();
+    const judulBerkas = String(req.body?.judulBerkas || '').trim();
+    if (!berkasId || !judulBerkas) {
+      return res.status(400).json({ error: 'berkasId dan judulBerkas wajib diisi.' });
+    }
+
+    const hasil = await analisisSatuBerkas({
+      tenantId,
+      berkasId,
+      judulBerkas,
+      permintaanId: String(req.body?.permintaanId || '').trim() || undefined,
+      ukuranKb: typeof req.body?.ukuranKb === 'number' ? req.body.ukuranKb : undefined,
+      tipe: req.body?.tipe ? String(req.body.tipe) : undefined,
+      segarkan: req.body?.segarkan === true,
+      abaikanKuota: req.body?.abaikanKuota === true,
+      sumber: 'manual',
+      pelaku: { userId: session.userId, name: session.name },
+    });
+    return res.status(hasil.kode).json(hasil.body);
   });
 
   app.get('/api/analisis/:id/butir', (req: Request, res: Response) => {
@@ -5211,10 +5559,21 @@ ${kpiItems}
       // Dokumen baru masuk ke basis pengetahuan → pratinjau template instansi ini
       // tidak lagi mewakili isi dokumen. Tandai basi dan siapkan ulang di latar
       // belakang, supaya angka template ikut dokumen terbaru tanpa menunggu klik.
+      // Berkas yang baru masuk itu sendiri ikut dianalisis di antrean otomatis.
       if (tenant?.id) {
         basiikanTenant(tenant.id);
         basiikanWilayah(tenant.id);
-        segarkanSetelahDokumen(tenant.id);
+        // Foto tidak punya angka untuk dibaca: analisis hanya untuk dokumen.
+        const foto = req.body?.tipeRepositori === 'photo';
+        segarkanSetelahDokumen(
+          tenant.id,
+          foto
+            ? undefined
+            : {
+                berkasId: String((berkas as any)?.id || ''),
+                judulBerkas: String(req.body?.judul || nama).trim(),
+              }
+        );
       }
 
       res.status(201).json({ success: true, berkas, knowledgeBase: kbTujuan || null });
@@ -5519,7 +5878,7 @@ ${navigasi}
   app.get('/api/admin/kms-organisasi', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh melihat daftar project KMS.')) return;
+    if (!requireSuperadmin(session, res)) return;
     try {
       const organisasi = await klienKms().daftarOrganisasi();
       res.json({ organisasi, baseUrl: (db.systemConfig as any).kmsApiUrl || '' });
@@ -5532,7 +5891,7 @@ ${navigasi}
   app.post('/api/admin/kms-uji', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menguji koneksi KMS.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const hasil = await klienKms().uji();
     res.status(hasil.ok ? 200 : 502).json(hasil);
   });
@@ -5672,7 +6031,10 @@ ${navigasi}
               // Dokumen baru masuk basis pengetahuan → pratinjau template ikut disegarkan.
               basiikanTenant(tenantImpor.id);
               basiikanWilayah(tenantImpor.id);
-              segarkanSetelahDokumen(tenantImpor.id);
+              segarkanSetelahDokumen(tenantImpor.id, {
+                berkasId: String(berkasImpor?.id || ''),
+                judulBerkas: namaBerkas,
+              });
             }
             db.addAuditLog({
               tenantId: effectiveTenantId(req, session),
@@ -6043,6 +6405,11 @@ ${navigasi}
   app.post('/api/audit-logs', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
+    // Jejak audit adalah bukti kepatuhan: entri tidak boleh ditulis dari klien
+    // dengan `action`/`target` bebas. Dulu endpoint ini hanya butuh login; kini
+    // hanya Admin Aiones (penulis entri lewat alur server tetap berjalan normal,
+    // karena semua aksi admin mencatat log sendiri di dalam handler-nya).
+    if (!requireSuperadmin(session, res, 'Jejak audit hanya ditulis oleh sistem.')) return;
     const { action, target, details } = req.body;
     const log = db.addAuditLog({
       tenantId: effectiveTenantId(req, session),
@@ -6115,7 +6482,7 @@ ${navigasi}
     }
     const kuota = (db.systemConfig as any).kuotaAnalisisHarian ?? undefined;
     res.json({
-      kuota: kuota ?? 20,
+      kuota: kuota ?? KUOTA_ANALISIS_BAWAAN,
       perInstansi: kuotaPerInstansi({
         tenants: db.tenants,
         users: db.users,
@@ -6383,7 +6750,7 @@ ${navigasi}
       userName: session.name,
       action: 'Hapus Pengguna',
       target: req.params.id,
-      details: 'Pengguna dinonaktifkan dari sistem',
+      details: 'Pengguna dihapus permanen dari sistem',
     });
     res.json({ success: true });
   });
@@ -6391,7 +6758,7 @@ ${navigasi}
   app.post('/api/admin/tenants', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const newTenant = {
       id: `tenant-${Date.now()}`,
       name: req.body.name || 'BUMD Baru',
@@ -6407,6 +6774,10 @@ ${navigasi}
       // KB milik instansi di layanan RAG — tanpa ini permintaan instansi jatuh
       // ke KB campur dan bisa menampilkan dokumen instansi lain.
       knowledgeBaseId: typeof req.body.knowledgeBaseId === 'string' ? req.body.knowledgeBaseId.trim() : undefined,
+      // Pemetaan KMS ikut disimpan. Dulu field ini dibuang, sehingga instansi baru
+      // kehilangan project repositori dokumen yang sudah dipilih di modal.
+      kmsOrganizationId:
+        typeof req.body.kmsOrganizationId === 'string' ? req.body.kmsOrganizationId.trim() : undefined,
     };
     const tersimpan = await db.createTenant(newTenant);
 
@@ -6421,13 +6792,21 @@ ${navigasi}
         : { ok: false, error: hasil.error };
     }
     const akhir = db.tenants.find((t) => t.id === tersimpan.id) || tersimpan;
+    db.addAuditLog({
+      tenantId: session.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Tambah Instansi BUMD',
+      target: akhir.name,
+      details: `Instansi ${akhir.name} (${akhir.code}) dibuat; KB=${akhir.knowledgeBaseId || '-'} · KMS=${akhir.kmsOrganizationId || '-'}`,
+    });
     res.status(201).json({ ...akhir, sinkron });
   });
 
   app.patch('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     // Segarkan dulu supaya tenant yang dibuat di instance lain tetap bisa diubah.
     await db.segarkanTenantDariMysql();
     const sebelum = db.tenants.find((t) => t.id === req.params.id);
@@ -6446,13 +6825,21 @@ ${navigasi}
         : { ok: false, error: hasil.error };
     }
     const akhir = db.tenants.find((t) => t.id === req.params.id) || updated;
+    db.addAuditLog({
+      tenantId: session.tenantId,
+      userId: session.userId,
+      userName: session.name,
+      action: 'Ubah Instansi BUMD',
+      target: akhir.name,
+      details: `Perubahan: ${Object.keys(req.body).join(', ') || '-'}`,
+    });
     res.json({ ...akhir, sinkron });
   });
 
   app.delete('/api/admin/tenants/:id', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const target = db.tenants.find((t) => t.id === req.params.id);
     const success = await db.deleteTenant(req.params.id);
     if (!success) {
@@ -6581,7 +6968,7 @@ ${navigasi}
   app.post('/api/admin/tenants/:id/sinkron-rag', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh menyinkronkan RAG.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const hasil = await sinkronTenantRag(req.params.id, session);
     if (!hasil.ok) return res.status(hasil.status).json({ error: hasil.error });
     res.json({
@@ -6599,7 +6986,10 @@ ${navigasi}
   app.get('/api/admin/config', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    // Sengaja tetap `requireAdmin`: halaman Referensi (Repositori Dokumen) yang
+    // terbuka untuk Admin Instansi membaca konfigurasi ini untuk status KMS.
+    // Yang dikunci hanya PENULISANNYA (`POST /api/admin/config`).
+    if (!requireAdmin(session, res, 'Hanya administrator yang boleh melihat konfigurasi sistem.')) return;
     // API key dikirim ter-mask — nilai asli hanya hidup di server.
     res.json({
       ...db.systemConfig,
@@ -6617,7 +7007,7 @@ ${navigasi}
   app.get('/api/admin/knowledge', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const kb = String((req.query.kb as string) || (db.systemConfig as any).ragKnowledgeBaseId || '').trim();
     try {
       const hasil = await ragClient.daftarDokumen(kb);
@@ -6640,7 +7030,7 @@ ${navigasi}
   app.get('/api/admin/kb-profil', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     const kb = String(req.query.kb || '').trim();
     try {
       const hasil = await ragClient.profilInstansi(kb);
@@ -6667,7 +7057,7 @@ ${navigasi}
   app.get('/api/admin/kb-tersedia', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh melihat katalog knowledge base.')) return;
+    if (!requireSuperadmin(session, res)) return;
 
     let hasil: { kbs: any[]; catatan?: string };
     try {
@@ -6710,7 +7100,7 @@ ${navigasi}
   app.post('/api/admin/config-simpan-uji', async (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengubah konfigurasi.')) return;
+    if (!requireSuperadmin(session, res)) return;
 
     const sebelum = { ...db.systemConfig };
     try {
@@ -6769,7 +7159,7 @@ ${navigasi}
   app.post('/api/admin/config', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;
-    if (!requireAdmin(session, res, 'Hanya administrator yang boleh mengakses panel ini.')) return;
+    if (!requireSuperadmin(session, res)) return;
     // API key jangan pernah tersimpan ter-mask sebagai nilai aktif. Dua kasus:
     // (a) nilai yang dikirim sama dengan mask key saat ini -> pertahankan key lama
     // (b) nilai yang dikirim SUDAH BERBENTUK MASK (mis. panel dibuka sebelum key

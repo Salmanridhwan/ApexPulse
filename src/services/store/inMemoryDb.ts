@@ -23,6 +23,7 @@ import {
 import { hashPassword, verifyPassword } from '../auth/session';
 import { SANDI_ADMIN_BAWAAN } from '../auth/password';
 import { dekripsiNilai, enkripsiNilai, pakaiKunciLama, terenkripsi } from '../config/rahasia';
+import { pastikanChartKatalog, type ChartKustom } from '../chart/katalogKustom';
 import { normalisasiPeran, normalisasiPeranAkun } from '../auth/peran';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
@@ -1092,7 +1093,27 @@ export class InMemoryDb {
     return d;
   }
 
+  /**
+   * GERBANG TEMPLATE CHART di lapisan simpan.
+   *
+   * Semua jalur (API, template RAG, impor, dari-butir, duplikat) berakhir di sini,
+   * jadi tidak ada dashboard yang bisa memuat widget tanpa chart katalog. Widget
+   * yang bentuknya tidak cocok dengan chart bawaan dibuatkan entri Template Chart
+   * baru (`kustom-…`) dan entri itu disimpan supaya muncul di halaman Template
+   * Chart serta dipakai ulang oleh bentuk data yang sama.
+   */
+  private gerbangChart(widgets: WidgetSpec[]): WidgetSpec[] {
+    if (!Array.isArray(widgets) || widgets.length === 0) return widgets;
+    const ada = (((this.systemConfig as any)?.chartKatalogKustom as ChartKustom[]) || []).slice();
+    const hasil = pastikanChartKatalog(widgets, { ada });
+    if (hasil.baru.length > 0) {
+      (this.systemConfig as any).chartKatalogKustom = [...ada, ...hasil.baru];
+    }
+    return hasil.widgets;
+  }
+
   createDashboard(dashboard: Dashboard): Dashboard {
+    dashboard = { ...dashboard, widgets: this.gerbangChart(dashboard.widgets) };
     this.dashboards.unshift(dashboard);
     // Tulis per-baris ke tabel dashboard khusus (tahan multi-instance).
     this.trackWrite(this.mysql?.upsertDashboard(dashboard.id, dashboard.tenantId, dashboard, Date.now()));
@@ -1103,11 +1124,13 @@ export class InMemoryDb {
   updateDashboard(id: string, partial: Partial<Dashboard>, tenantId: string): Dashboard | undefined {
     const idx = this.dashboards.findIndex((d) => d.id === id && d.tenantId === tenantId);
     if (idx === -1) return undefined;
-    this.dashboards[idx] = {
+    const berikut: Dashboard = {
       ...this.dashboards[idx],
       ...partial,
       updatedAt: new Date().toISOString(),
     };
+    berikut.widgets = this.gerbangChart(berikut.widgets);
+    this.dashboards[idx] = berikut;
     this.trackWrite(
       this.mysql?.upsertDashboard(id, this.dashboards[idx].tenantId, this.dashboards[idx], Date.now())
     );

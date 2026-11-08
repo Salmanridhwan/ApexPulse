@@ -12,6 +12,13 @@ interface DashboardCanvasProps {
   onDuplicateWidget: (widget: WidgetSpec) => void;
   onReorderWidgets: (orderedIds: string[]) => void;
   onResizeWidget: (widgetId: string, w: number) => void;
+  /**
+   * Boleh tidaknya pemirsa menyusun dashboard (menambah/mengubah widget).
+   *
+   * Dipakai untuk memilih bahasa empty state: peran `pengguna` hanya membaca,
+   * jadi tidak diberi ajakan menyusun yang tidak bisa ia selesaikan.
+   */
+  bolehMenyusun?: boolean;
   /** Opsional: di halaman tautan publik tidak ada sesi instansi, jadi tidak ditampilkan. */
   onOpenChat?: () => void;
   /** Mode lihat-saja (mis. saat filter dashboard aktif): matikan drag & resize. */
@@ -61,6 +68,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   onDuplicateWidget,
   onReorderWidgets,
   onResizeWidget,
+  bolehMenyusun = true,
   onOpenChat,
   readOnly = false,
   preview = false,
@@ -352,6 +360,10 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   };
 
   if (widgets.length === 0) {
+    // Pemirsa yang tidak boleh menyusun dashboard (peran `pengguna`) tidak diberi
+    // bahasa penyusun: dulu judulnya "Bangun dashboard pertama Anda" + CTA "Buat
+    // via Chat", padahal hasil chat-nya hanya bisa diterapkan admin — jalan buntu.
+    const bisaMenyusun = bolehMenyusun !== false;
     return (
       <div className="canvas-tegas flex-1 flex flex-col items-center justify-center p-12 text-center">
         <div className="w-14 h-14 rounded-[6px] flex items-center justify-center mb-4"
@@ -359,12 +371,14 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           <LayoutGrid className="w-7 h-7 text-on-brand" />
         </div>
         <h3 className="text-base font-semibold text-ink">
-          Bangun dashboard pertama Anda
+          {bisaMenyusun ? 'Bangun dashboard pertama Anda' : 'Dashboard ini masih kosong'}
         </h3>
         <p className="text-sm text-ink-2 max-w-md mt-1 mb-6">
-          {onOpenChat
-            ? 'Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.'
-            : 'Dashboard ini belum memiliki widget. Tambahkan widget dari workspace Aiones Boards — halaman ini hanya mengubah widget yang sudah ada.'}
+          {!bisaMenyusun
+            ? 'Belum ada widget yang dibagikan di sini. Widget ditambahkan oleh Admin Instansi; Anda tetap bisa menanyakan data yang tersedia lewat Asisten.'
+            : onOpenChat
+              ? 'Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.'
+              : 'Dashboard ini belum memiliki widget. Tambahkan widget dari workspace Aiones Boards — halaman ini hanya mengubah widget yang sudah ada.'}
         </p>
         <div className="flex items-center gap-3">
           {onOpenChat && (
@@ -373,7 +387,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:brightness-95 rounded-control shadow-sm transition-colors"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Buat via Chat</span>
+              <span>{bisaMenyusun ? 'Buat via Chat' : 'Tanya lewat Asisten'}</span>
             </button>
           )}
         </div>

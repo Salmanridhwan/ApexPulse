@@ -302,6 +302,7 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
     null
   );
   const [versi, setVersi] = useState(0);
+  const [denyut, setDenyut] = useState(0);
 
   const muat = useCallback(async () => {
     try {
@@ -316,13 +317,40 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
     } catch {
       /* biarkan kosong — panel tetap bisa dipakai */
     }
-  }, [permintaan.id]);
+  }, [permintaan.id, admin]);
 
   useEffect(() => {
     void muat();
   }, [muat]);
 
-  const analisisUntuk = (berkasId: string) => daftar.filter((a) => a.berkasId === berkasId);
+  /**
+   * Dokumen dibaca otomatis di latar belakang, jadi panel ini menunggu hasilnya
+   * sendiri. Tanpa ini admin harus menekan F5 untuk melihat data yang sebenarnya
+   * sudah terbaca — dan menyimpulkan "tidak ada data".
+   */
+  const adaMenunggu = useMemo(
+    () => permintaan.lampiran.some((l) => !daftar.some((a) => a.berkasId === l.berkasId)),
+    [permintaan.lampiran, daftar]
+  );
+  useEffect(() => {
+    if (!adaMenunggu || denyut >= 24) return;
+    const t = setTimeout(() => {
+      setDenyut((d) => d + 1);
+      void muat();
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [adaMenunggu, denyut, muat]);
+
+  const analisisUntuk = (berkasId: string) => {
+    // Hanya hasil TERBARU per dokumen yang ditampilkan. Setiap pembacaan ulang
+    // membuat baris baru, dan menampilkan semuanya membuat panel berisi tiga
+    // kartu berjudul sama dengan angka yang berbeda — admin tidak tahu mana
+    // yang berlaku.
+    const milik = daftar.filter((a) => a.berkasId === berkasId);
+    if (milik.length <= 1) return milik;
+    const terbaru = [...milik].sort((a, b) => String(b.dibuatPada).localeCompare(String(a.dibuatPada)))[0];
+    return [terbaru];
+  };
 
   const jalankan = async (lampiran: { berkasId: string; nama: string }, segarkan = false) => {
     setSibuk(true);
@@ -444,16 +472,28 @@ const IsiDokumenPanel: React.FC<{ permintaan: PermintaanData; admin: boolean }> 
           const sudahJalan = hasil.length > 0;
           return (
             <div key={l.berkasId} className="space-y-1.5">
-              {admin && !sudahJalan && (
-                <button
-                  disabled={sibuk}
-                  onClick={() => void jalankan({ berkasId: l.berkasId, nama: l.nama })}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
-                  data-testid={`analisis-berkas-${l.berkasId}`}
+              {!sudahJalan && (
+                <div
+                  className="p-2 rounded-control bg-brand/5 border border-brand/20 text-[11px] flex items-center gap-1.5"
+                  data-testid={`menunggu-analisis-${l.berkasId}`}
                 >
-                  {sibuk ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  Analisis isi dokumen — {l.nama}
-                </button>
+                  <Loader2 className="w-3 h-3 animate-spin text-brand shrink-0" />
+                  <span className="flex-1 min-w-0 text-ink-2">
+                    <span className="font-semibold text-ink">Dokumen dibaca otomatis.</span> Hasilnya muncul di sini
+                    tanpa perlu diklik.
+                  </span>
+                  {admin && (
+                    <button
+                      disabled={sibuk}
+                      onClick={() => void jalankan({ berkasId: l.berkasId, nama: l.nama })}
+                      title="Baca sekarang juga, tanpa menunggu antrean"
+                      className="shrink-0 text-[10px] font-semibold text-brand hover:underline disabled:opacity-50"
+                      data-testid={`analisis-berkas-${l.berkasId}`}
+                    >
+                      Baca sekarang
+                    </button>
+                  )}
+                </div>
               )}
               {hasil.map((a) => (
                 <KartuAnalisis

@@ -80,6 +80,27 @@ const PESAN_SEBAB: Record<SebabAnalisisUlang, string> = {
   'analisis-terakhir-gagal': 'Analisis terakhir gagal, jadi dicoba lagi.',
 };
 
+/**
+ * Apakah dua sidik dokumen menunjuk isi yang sama.
+ *
+ * Sidik dirakit dari beberapa bagian (`berkasId|ukuran|tipe|diunggahPada`), dan
+ * tidak semua bagian selalu tersedia: analisis otomatis berjalan beberapa detik
+ * setelah unggah, ketika lampirannya belum menempel sehingga ukuran/tipe/waktu
+ * belum diketahui. Membandingkan string apa adanya membuat dokumen yang sama
+ * dianggap "berubah" dan dibaca ulang — kuota habis tanpa isi yang berubah.
+ *
+ * Karena itu bagian yang kosong di salah satu sisi diabaikan. Bagian yang ada di
+ * kedua sisi tetap harus sama persis, jadi berkas yang benar-benar diganti
+ * (ukuran/waktu unggah berbeda) tetap memaksa analisis ulang.
+ */
+export function sidikCocok(a?: string, b?: string): boolean {
+  if (!a || !b) return true;
+  if (a === b) return true;
+  const kiri = a.split('|');
+  const kanan = b.split('|');
+  return kiri.every((bagian, i) => !bagian || !kanan[i] || bagian === kanan[i]);
+}
+
 export interface AnalisisUntukCache {
   id: string;
   berkasId: string;
@@ -121,7 +142,7 @@ export function putusanCache(daftar: AnalisisUntukCache[], opsi: OpsiPutusan): P
     return { pakai: false, sebab: 'analisis-terakhir-gagal', alasan: PESAN_SEBAB['analisis-terakhir-gagal'] };
   }
 
-  if (opsi.sidikDokumen && terbaru.sidikDokumen && opsi.sidikDokumen !== terbaru.sidikDokumen) {
+  if (!sidikCocok(opsi.sidikDokumen, terbaru.sidikDokumen)) {
     return { pakai: false, sebab: 'dokumen-berubah', alasan: PESAN_SEBAB['dokumen-berubah'] };
   }
 

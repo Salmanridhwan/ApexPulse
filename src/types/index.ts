@@ -234,6 +234,15 @@ export interface WidgetSpec {
    * Kosong = dipilih otomatis dari `type`. Semua dashboard baru mengisinya.
    */
   chartId?: string;
+  /**
+   * Chart katalog BAWAAN yang benar-benar menggambar kartu ini.
+   *
+   * Diisi hanya kalau `chartId` menunjuk entri katalog buatan sendiri
+   * (`kustom-…`, dibuat otomatis saat tidak ada chart bawaan yang cocok dengan
+   * bentuk datanya). Renderer menggambar dari sini, jadi kartu tidak pernah
+   * kosong dan tetap memakai chart dari Template Chart.
+   */
+  chartDasar?: string;
   title: string;
   subtitle?: string;
   category?: string;

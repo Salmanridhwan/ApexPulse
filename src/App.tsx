@@ -27,6 +27,7 @@ import {
   Sparkles,
   TrendingUp,
   Users,
+  X,
 } from 'lucide-react';
 import { AlertsModal } from './components/AlertsModal';
 import { ChatPanel } from './components/ChatPanel';
@@ -250,6 +251,10 @@ export default function App() {
   // Drawer navigasi mobile: sidebar disembunyikan di <md, dibuka sebagai overlay.
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [hapusKonfirmasi, setHapusKonfirmasi] = useState(false);
+
+  /** Galat aksi dashboard (mis. 403 karena peran tidak berwenang) — dulu gagal senyap. */
+
+  const [galatDashboard, setGalatDashboard] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   // Jumlah pesan riwayat per dashboardId — indikator di kartu DashboardList.
   const [chatCounts, setChatCounts] = useState<Record<string, number>>({});
@@ -530,6 +535,7 @@ export default function App() {
         method: 'DELETE',
       });
       if (res.ok) {
+        setGalatDashboard('');
         setDashboards((prev) => prev.filter((d) => d.id !== dashboardId));
         if (activeDashboard?.id === dashboardId) {
           // Setelah menghapus, jangan langsung membuka dashboard lain —
@@ -537,9 +543,17 @@ export default function App() {
           setActiveDashboard(null);
           setViewMode('dashboards');
         }
+        return;
       }
+      // Server menolak (mis. 403 untuk peran pengguna): tampilkan alasannya,
+      // jangan menutup dialog seolah dashboard sudah terhapus.
+      const data = await res.json().catch(() => null);
+      setGalatDashboard(
+        data?.error || `Dashboard gagal dihapus (HTTP ${res.status}). Coba lagi atau hubungi admin instansi.`
+      );
     } catch (err) {
       console.error('Delete dashboard error:', err);
+      setGalatDashboard('Dashboard gagal dihapus: jaringan atau server tidak menjawab.');
     }
   };
 
@@ -1225,24 +1239,30 @@ export default function App() {
                           <Printer className="w-3.5 h-3.5 shrink-0 text-ink-3" />
                           <span>Cetak / Ekspor</span>
                         </button>
-                        <button
-                          onClick={() => { setIsMoreMenuOpen(false); setIsShareOpen(true); }}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
-                        >
-                          <Share2 className="w-3.5 h-3.5 shrink-0 text-ink-3" />
-                          <span>Bagikan Tautan</span>
-                        </button>
-
-                        {activeDashboard && (
-                          <div className="mt-1 pt-1 border-t border-line">
+                        {/* Bagikan tautan & hapus dashboard = aksi tulis. Untuk peran
+                            pengguna keduanya dulu tetap tampil lalu ditolak 403 tanpa pesan. */}
+                        {isAdminRole(currentUser?.role) && (
+                          <>
                             <button
-                              onClick={() => { setIsMoreMenuOpen(false); setHapusKonfirmasi(true); }}
-                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-neg hover:bg-neg/10 transition-colors"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsShareOpen(true); }}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                             >
-                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                              <span>Hapus Dashboard</span>
+                              <Share2 className="w-3.5 h-3.5 shrink-0 text-ink-3" />
+                              <span>Bagikan Tautan</span>
                             </button>
-                          </div>
+
+                            {activeDashboard && (
+                              <div className="mt-1 pt-1 border-t border-line">
+                                <button
+                                  onClick={() => { setIsMoreMenuOpen(false); setHapusKonfirmasi(true); }}
+                                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-control text-neg hover:bg-neg/10 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Hapus Dashboard</span>
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </>
@@ -1399,6 +1419,10 @@ export default function App() {
                       </div>
 
                       <div className="ml-auto flex items-center gap-1.5">
+                        {/* Menyusun dashboard hanya untuk admin instansi
+                            (`bolehMenyusunDashboard`), jadi tombolnya ikut disembunyikan. */}
+                        {isAdminRole(currentUser?.role) && (
+                        <>
                         <button
                           onClick={() => setIsImportOpen(true)}
                           title="Ubah berkas Excel/CSV menjadi widget dashboard"
@@ -1431,20 +1455,24 @@ export default function App() {
                           <Share2 className="w-3 h-3" />
                           <span className="hidden sm:inline">Bagikan</span>
                         </button>
+                        </>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Strip halaman dashboard (1 halaman atau lebih) */}
+                  {/* Strip halaman dashboard (1 halaman atau lebih).
+                      Aksi tulis halaman hanya untuk admin instansi: HalamanTabs
+                      menyembunyikan kontrol saat handler tidak diberikan. */}
                   {activeDashboard && (
                     <HalamanTabs
                       halaman={halamanDashboard}
                       aktifId={activeDashboard.halamanAktifId}
                       onPilih={pindahHalaman}
-                      onTambah={tambahHalaman}
-                      onGantiNama={gantiNamaHalaman}
-                      onHapus={hapusHalaman}
-                      onGeser={geserHalaman}
+                      onTambah={isAdminRole(currentUser?.role) ? tambahHalaman : undefined}
+                      onGantiNama={isAdminRole(currentUser?.role) ? gantiNamaHalaman : undefined}
+                      onHapus={isAdminRole(currentUser?.role) ? hapusHalaman : undefined}
+                      onGeser={isAdminRole(currentUser?.role) ? geserHalaman : undefined}
                     />
                   )}
 
@@ -1501,6 +1529,7 @@ export default function App() {
                     onDuplicateWidget={handleDuplicateWidget}
                     onReorderWidgets={handleReorderWidgets}
                     onResizeWidget={handleResizeWidget}
+                    bolehMenyusun={isAdminRole(currentUser?.role)}
                     onOpenChat={() => {
                       setIsGlobalStyleOpen(false);
                       setIsChatOpen(true);
@@ -1596,7 +1625,7 @@ export default function App() {
         <button
           onClick={() => setIsChatOpen(true)}
           data-testid="buka-asisten"
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 min-h-[44px] rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
           title="Buka asisten"
         >
           <Sparkles className="w-4 h-4 animate-pulse" />
@@ -1641,6 +1670,24 @@ export default function App() {
         dashboard={activeDashboard}
         tenantId={currentTenant?.id}
       />
+
+      {galatDashboard && (
+        <div
+          role="alert"
+          data-testid="galat-dashboard"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] max-w-[92vw] sm:max-w-md flex items-start gap-2 rounded-card border border-neg/40 bg-surface px-3 py-2 text-xs text-ink shadow-pop"
+        >
+          <span className="flex-1">{galatDashboard}</span>
+          <button
+            type="button"
+            aria-label="Tutup pesan galat"
+            onClick={() => setGalatDashboard('')}
+            className="p-1 -m-1 rounded-control text-ink-3 hover:text-ink"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {hapusKonfirmasi && activeDashboard && (
         <ModalKonfirmasiDashboard

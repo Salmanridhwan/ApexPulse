@@ -42,8 +42,12 @@ const angka = (v: unknown): number | null => {
  * Props `WidgetChart` untuk kartu berwajah HTML, atau `null` bila chartId-nya
  * bukan bentuk HTML atau datanya tidak cukup (kartu tetap memakai renderer lama).
  */
+/** Chart bawaan yang menggambar kartu ini (entri kustom → `chartDasar`-nya). */
+const idPenggambar = (w: WidgetSpec): ChartId | undefined =>
+  (w.chartDasar as ChartId) || (w.chartId as ChartId);
+
 export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
-  const id = w.chartId as ChartId | undefined;
+  const id = idPenggambar(w);
   if (!id || CHART_DEFAULT[id]?.mesin !== 'html') return null;
   const judul = w.title;
 
@@ -156,9 +160,9 @@ export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
 /** Grafik berwajah ECharts dari Template Chart yang datanya cukup untuk digambar. */
 export const grafikKatalog = (w: WidgetSpec): boolean =>
   Boolean(
-    w.chartId &&
-      DAFTAR_CHART.includes(w.chartId as ChartId) &&
-      CHART_DEFAULT[w.chartId as ChartId].mesin === 'echarts' &&
+    idPenggambar(w) &&
+      DAFTAR_CHART.includes(idPenggambar(w) as ChartId) &&
+      CHART_DEFAULT[idPenggambar(w) as ChartId].mesin === 'echarts' &&
       !pakaiRancangan(w) &&
       (w.chart?.xAxis?.length ?? 0) > 0 &&
       (w.chart?.series?.length ?? 0) > 0
