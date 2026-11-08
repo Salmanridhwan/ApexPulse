@@ -39,7 +39,8 @@ const GAYA = `
   header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 28px;background:#fff;border-bottom:1px solid var(--garis)}
   header .merek{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em}
   header .merek img{height:28px;width:auto;display:block}
-  header nav{display:flex;gap:18px;font-size:14px;font-weight:600}
+  header nav{display:flex;gap:6px;font-size:14px;font-weight:600}
+  header nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px}
   main{max-width:1060px;margin:0 auto;padding:44px 24px 72px}
   h1{font-size:clamp(26px,4vw,38px);line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
   .pembuka{color:var(--tinta2);font-size:16px;max-width:640px;margin:0 0 32px}
@@ -51,7 +52,8 @@ const GAYA = `
   .kartu ul{list-style:none;padding:0;margin:0 0 18px;font-size:14px}
   .kartu li{padding:5px 0 5px 22px;position:relative}
   .kartu li:before{content:"";position:absolute;left:2px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--biru);opacity:.75}
-  .kartu .harga{margin-top:auto;font-weight:800;font-size:15px;color:var(--biru-tua)}
+  .kartu .harga{margin-top:auto;font-weight:800;font-size:14px;color:var(--tinta2)}
+  .kartu .tombol{margin-top:12px;display:block;text-align:center}
   .tombol{display:inline-block;background:var(--biru);color:#fff;font-weight:700;padding:11px 18px;border-radius:10px;font-size:14px}
   .tombol:hover{background:var(--biru-tua);text-decoration:none}
   .tombol.garis{background:#fff;color:var(--biru);border:1px solid var(--biru)}
@@ -90,15 +92,19 @@ function kerangka(judul: string, isi: string, kontak: Kontak): string {
 </body></html>`;
 }
 
-/** Tautan kontak: WhatsApp bila diisi, kalau tidak email. */
-function tautanKontak(kontak: Kontak, teks = 'Hubungi kami'): string {
+/** Tautan kontak: WhatsApp bila diisi, kalau tidak email.
+ *  `paket` (opsional) menyebut nama paket di pesan supaya permintaan yang masuk
+ *  sudah menyebut paket yang dilihat pengunjung. */
+function tautanKontak(kontak: Kontak, teks = 'Hubungi kami', paket?: string): string {
+  const isi = paket
+    ? `Halo, saya ingin menanyakan paket ${paket} Aiones Boards untuk instansi kami.`
+    : 'Halo, saya ingin menanyakan Aiones Boards untuk instansi kami.';
   if (kontak.whatsapp) {
     const nomor = kontak.whatsapp.replace(/[^\d]/g, '');
-    const pesan = encodeURIComponent('Halo, saya ingin menanyakan Aiones Boards untuk instansi kami.');
-    return `<a class="tombol" href="https://wa.me/${nomor}?text=${pesan}">${esc(teks)}</a>`;
+    return `<a class="tombol" href="https://wa.me/${nomor}?text=${encodeURIComponent(isi)}">${esc(teks)}</a>`;
   }
-  const subjek = encodeURIComponent('Permintaan penawaran Aiones Boards');
-  return `<a class="tombol" href="mailto:${esc(kontak.email)}?subject=${subjek}">${esc(teks)}</a>`;
+  const subjek = encodeURIComponent(paket ? `Permintaan penawaran paket ${paket}` : 'Permintaan penawaran Aiones Boards');
+  return `<a class="tombol" href="mailto:${esc(kontak.email)}?subject=${subjek}&body=${encodeURIComponent(isi)}">${esc(teks)}</a>`;
 }
 
 const PAKET = [
@@ -147,7 +153,8 @@ export function halamanPaket(kontak: Kontak = konfigKontak()): string {
       <h2>${esc(p.nama)}</h2>
       <p class="untuk">${esc(p.untuk)}</p>
       <ul>${p.fitur.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-      <div class="harga">Penawaran sesuai kebutuhan instansi</div>
+      <div class="harga">Harga: penawaran per instansi</div>
+      ${tautanKontak(kontak, `Minta penawaran ${p.nama}`, p.nama)}
     </div>`
   ).join('\n');
 

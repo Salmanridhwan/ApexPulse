@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  Check,
   MailCheck,
   Eye,
   EyeOff,
@@ -369,15 +370,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
   const tombolUtama =
     'w-full h-12 bg-brand text-on-brand rounded-xl font-semibold text-sm hover:brightness-105 active:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_8px_24px_-8px] shadow-brand/60 transition-all';
 
-  /** Kolom kata sandi dengan tombol lihat/sembunyikan. */
+  /** Kolom kata sandi dengan tombol lihat/sembunyikan. `id` wajib supaya label
+   *  di atasnya benar-benar terhubung ke input (bukan hanya dekorasi visual). */
   const kolomSandi = (
     value: string,
     onChange: (v: string) => void,
-    opsi: { placeholder: string; minLength?: number; autoComplete: string; tombol?: boolean }
+    opsi: { id: string; placeholder: string; minLength?: number; autoComplete: string; tombol?: boolean }
   ) => (
     <div className="relative">
       <KeyRound className={ikonCls} />
       <input
+        id={opsi.id}
         type={showPassword ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -392,8 +395,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
           type="button"
           onClick={() => setShowPassword(!showPassword)}
           aria-label={showPassword ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
+          aria-pressed={showPassword}
           title={showPassword ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-ink-3 hover:text-ink hover:bg-surface"
+          className="absolute right-0.5 top-1/2 -translate-y-1/2 h-11 w-11 flex items-center justify-center rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2"
         >
           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -423,9 +427,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                   {pendingInfo.perluPilih ? <Building2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                 </div>
                 <div className="space-y-1.5">
-                  <h2 className="text-[28px] font-bold tracking-tight text-ink leading-tight">
+                  <h1 className="text-[28px] font-bold tracking-tight text-ink leading-tight">
                     {pendingInfo.perluPilih ? 'Pilih instansi BUMD' : 'Menunggu persetujuan admin'}
-                  </h2>
+                  </h1>
                   <p className="text-sm text-ink-2 leading-relaxed">{pendingInfo.message}</p>
                 </div>
                 <div className="p-4 bg-surface-2 rounded-2xl text-sm space-y-1.5">
@@ -514,7 +518,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                 <div className="mt-6 w-12 h-12 rounded-2xl bg-brand/10 text-brand-ink flex items-center justify-center">
                   <KeyRound className="w-5 h-5" />
                 </div>
-                <h2 className="mt-4 text-[30px] font-bold tracking-tight text-ink leading-[1.1]">Lupa kata sandi?</h2>
+                <h1 className="mt-4 text-[30px] font-bold tracking-tight text-ink leading-[1.1]">Lupa kata sandi?</h1>
                 <p className="mt-2.5 text-[15px] text-ink-2 leading-relaxed">
                   Masukkan email akun Anda. Permintaan diteruskan ke admin instansi, yang akan memberikan kata sandi
                   sementara untuk Anda.
@@ -569,13 +573,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
               </div>
             ) : (
               <>
-                <span className="inline-flex items-center gap-2 text-[11.5px] font-semibold text-brand-ink bg-brand/10 rounded-full pl-2 pr-3 py-1">
+                <span className="inline-flex items-center gap-2 text-xs font-semibold text-brand-ink bg-brand/10 rounded-full pl-2 pr-3 py-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                   Portal Dashboard BUMD
                 </span>
-                <h2 className="mt-4 text-[30px] sm:text-[34px] font-bold tracking-tight text-ink leading-[1.1]">
+                <h1 className="mt-4 text-[30px] sm:text-[34px] font-bold tracking-tight text-ink leading-[1.1]">
                   {mode === 'register' ? 'Mulai dengan akun baru' : 'Selamat datang kembali'}
-                </h2>
+                </h1>
                 <p className="mt-2.5 text-[15px] text-ink-2 leading-relaxed">
                   {mode === 'register'
                     ? 'Daftar sekali, lalu admin instansi Anda akan mengaktifkan akunnya.'
@@ -593,7 +597,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                     type="button"
                     data-testid="tab-masuk"
                     onClick={() => gantiMode('login')}
-                    className={`relative h-9 text-[13px] font-semibold rounded-lg transition-colors ${
+                    className={`relative h-11 text-[13px] font-semibold rounded-lg transition-colors ${
                       mode === 'login' ? 'text-ink' : 'text-ink-3 hover:text-ink-2'
                     }`}
                   >
@@ -603,7 +607,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                     type="button"
                     data-testid="tab-daftar"
                     onClick={() => gantiMode('register')}
-                    className={`relative h-9 text-[13px] font-semibold rounded-lg transition-colors ${
+                    className={`relative h-11 text-[13px] font-semibold rounded-lg transition-colors ${
                       mode === 'register' ? 'text-ink' : 'text-ink-3 hover:text-ink-2'
                     }`}
                   >
@@ -644,8 +648,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                     </div>
 
                     <div>
-                      <label className={labelCls}>Kata sandi</label>
+                      <label htmlFor="masuk-sandi" className={labelCls}>
+                        Kata sandi
+                      </label>
                       {kolomSandi(password, setPassword, {
+                        id: 'masuk-sandi',
                         placeholder: 'Kata sandi Anda',
                         autoComplete: 'current-password',
                         tombol: true,
@@ -653,20 +660,29 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                     </div>
 
                     <div className="flex items-center justify-between gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                      {/* Kotak centang native dibuat 44x44 transparan menutupi
+                          barisnya: area klik tetap besar di layar sentuh, kotak
+                          yang terlihat digambar oleh span di sebelahnya. */}
+                      <label className="relative flex items-center gap-2 min-h-11 pr-1 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={rememberMe}
                           onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded accent-brand"
+                          className="peer absolute left-0 top-1/2 -translate-y-1/2 h-11 w-11 cursor-pointer appearance-none rounded-lg bg-transparent focus-visible:ring-2 focus-visible:ring-brand/40"
                         />
-                        <span className="text-ink-2 text-[13px]">Ingat saya</span>
+                        <span
+                          aria-hidden
+                          className="pointer-events-none w-4 h-4 rounded-[5px] border border-line-strong bg-surface flex items-center justify-center transition-colors peer-checked:bg-brand peer-checked:border-brand"
+                        >
+                          {rememberMe && <Check className="w-3 h-3 text-on-brand" strokeWidth={3} />}
+                        </span>
+                        <span className="pointer-events-none text-ink-2 text-[13px]">Ingat saya</span>
                       </label>
                       <button
                         type="button"
                         data-testid="tombol-lupa-sandi"
                         onClick={() => gantiMode('lupa')}
-                        className="text-[13px] font-semibold text-brand-ink hover:underline"
+                        className="inline-flex items-center min-h-11 px-1 text-[13px] font-semibold text-brand-ink hover:underline"
                       >
                         Lupa kata sandi?
                       </button>
@@ -746,8 +762,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className={labelCls}>Kata sandi</label>
+                        <label htmlFor="daftar-sandi" className={labelCls}>
+                          Kata sandi
+                        </label>
                         {kolomSandi(regPassword, setRegPassword, {
+                          id: 'daftar-sandi',
                           placeholder: 'Min. 8 karakter',
                           minLength: 8,
                           autoComplete: 'new-password',
@@ -755,8 +774,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
                         })}
                       </div>
                       <div>
-                        <label className={labelCls}>Ulangi sandi</label>
+                        <label htmlFor="daftar-sandi-ulang" className={labelCls}>
+                          Ulangi sandi
+                        </label>
                         {kolomSandi(regPassword2, setRegPassword2, {
+                          id: 'daftar-sandi-ulang',
                           placeholder: 'Sekali lagi',
                           autoComplete: 'new-password',
                         })}
@@ -802,13 +824,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
           </div>
         </div>
 
-        <footer className="py-4 text-xs text-ink-3 flex flex-wrap items-center justify-between gap-2">
+        <footer className="py-2 text-xs text-ink-3 flex flex-wrap items-center justify-between gap-x-5 gap-y-1">
           <span>© 2026 Aiones Boards</span>
           <span className="flex items-center gap-5">
-            <a href="/paket" className="hover:text-ink">
+            <a href="/paket" className="inline-flex items-center min-h-11 hover:text-ink">
               Paket &amp; harga
             </a>
-            <a href="/syarat-ketentuan" className="hover:text-ink">
+            <a href="/syarat-ketentuan" className="inline-flex items-center min-h-11 hover:text-ink">
               Syarat &amp; ketentuan
             </a>
           </span>
@@ -837,9 +859,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, tenants }) => {
         <div aria-hidden className="absolute bottom-0 left-1/4 w-[420px] h-[300px] rounded-full bg-[#38c6e2]/25 blur-3xl" />
 
         <div className="relative auth-rise-r max-w-[480px] pr-12">
-          <h1 className="text-[32px] xl:text-[38px] font-bold leading-[1.12] tracking-tight">
+          <h2 className="text-[32px] xl:text-[38px] font-bold leading-[1.12] tracking-tight">
             Rapat kinerja lebih singkat, angkanya langsung dari dokumen.
-          </h1>
+          </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-white/80">
             Unggah laporan keuangan atau RKAP, Aiones menyusunnya menjadi dashboard yang siap dipresentasikan.
           </p>

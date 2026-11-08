@@ -586,8 +586,11 @@ const app = express();
         // index.html memuat Inter/JetBrains Mono dari Google Fonts. Tanpa izin
         // di sini, CSP memblokir stylesheet DAN berkas font-nya, sehingga font
         // bermerek tidak pernah terpakai dan browser diam-diam jatuh ke font
-        // sistem. Dua origin ini saja; sisanya tetap terkunci.
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        // sistem.
+        // accounts.google.com ikut diizinkan karena tombol Google Sign-In
+        // menyisipkan stylesheet sendiri (accounts.google.com/gsi/style).
+        // Tanpa origin itu, tombolnya tampil rusak walau skripnya jalan.
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data: https://fonts.gstatic.com",
         "connect-src 'self' https:",
