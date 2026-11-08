@@ -1114,14 +1114,22 @@ export const Admin: React.FC<AdminProps> = ({
    */
   useEffect(() => {
     const kb = tenantKbId.trim();
+    // Mode UBAH: seluruh field sudah diisi dari instansi terpilih (bukaEditTenant).
+    // Efek ini tidak boleh menimpa atau mengosongkan isian itu — dulu membuka
+    // "Ubah" pada KB yang tidak terbaca mengosongkan Nama Resmi & Kota, sehingga
+    // "Simpan BUMD" langsung menolak dengan "wajib diisi" (lihat temuan 12 di
+    // docs/2026-11-08_fitur-admin-aiones.md).
+    const modeEdit = !!editTenantId;
     if (!kb) {
       setTenantKbInfo(null);
       setTenantProfilGagal(false);
-      setTenantName('');
-      setTenantCity('');
-      setTenantShortName('');
-      setTenantCode('');
-      setTenantSector('pdam');
+      if (!modeEdit) {
+        setTenantName('');
+        setTenantCity('');
+        setTenantShortName('');
+        setTenantCode('');
+        setTenantSector('pdam');
+      }
       return;
     }
     // Mode isi manual: lewati pembacaan KB sama sekali — admin mengisi sendiri,
@@ -1141,19 +1149,21 @@ export const Admin: React.FC<AdminProps> = ({
         if (batal) return;
         setTenantKbInfo(data);
         const dariDokumen = !!data?.nama;
-        if (dariDokumen) {
+        if (dariDokumen && !modeEdit) {
           setTenantName(data.nama);
           setTenantCity(data.kota || '');
           if (data.sektor) setTenantSector(data.sektor);
           // Nama singkat: ambil potongan nama instansi.
           setTenantShortName(String(data.nama).replace(/^Perumda\s+/i, '').slice(0, 24));
-        } else if (data?.jumlahDokumen === 0) {
+        } else if (!modeEdit && data?.jumlahDokumen === 0) {
           // KB benar-benar kosong / ID salah — tidak ada yang bisa diisi.
+          // (Tidak berlaku di mode Ubah: isian admin dipertahankan.)
           setTenantName('');
           setTenantCity('');
         }
-        // Kode instansi selalu diturunkan dari KB ID (mis. kb_pam_jaya → KB_PAM_JAYA).
-        setTenantCode(kb.toUpperCase());
+        // Kode instansi diturunkan dari KB ID saat MEMBUAT instansi baru; di mode
+        // Ubah kode yang sudah ada dibiarkan supaya tidak berubah diam-diam.
+        if (!modeEdit) setTenantCode(kb.toUpperCase());
         // Gagal terisi padahal KB punya dokumen = layanan lambat / dokumen belum
         // selesai diindeks. Tandai supaya UI menawarkan pengisian manual.
         setTenantProfilGagal(!dariDokumen && Number(data?.jumlahDokumen || 0) > 0);
@@ -1176,7 +1186,7 @@ export const Admin: React.FC<AdminProps> = ({
       batal = true;
       clearTimeout(timer);
     };
-  }, [tenantKbId, tenantManual]);
+  }, [tenantKbId, tenantManual, editTenantId]);
 
   return (
     <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-canvas text-ink font-sans">

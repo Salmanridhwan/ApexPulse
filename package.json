@@ -15,7 +15,8 @@
     "backup": "node scripts/backup-db.mjs",
     "backup:unggah": "tsx scripts/unggah-cadangan.ts",
     "restore": "node scripts/restore-db.mjs",
-    "test:e2e": "node scripts/e2e.mjs"
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:admin": "node scripts/e2e-superadmin.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
