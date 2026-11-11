@@ -197,13 +197,17 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   + Dashboard Baru
                 </button>
               )}
-              <button
-                onClick={onPilihData}
-                data-testid="pilih-data-dari-daftar"
-                className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
-              >
-                Pilih data
-              </button>
+              {/* Pintu "Pilih data" juga khusus peran yang boleh menyusun
+                  dashboard; role User tidak melihatnya. */}
+              {bolehMenulis && (
+                <button
+                  onClick={onPilihData}
+                  data-testid="pilih-data-dari-daftar"
+                  className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
+                >
+                  Pilih data
+                </button>
+              )}
             </div>
           </div>
         ) : (

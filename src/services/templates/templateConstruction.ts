@@ -31,6 +31,19 @@ const { kpi, sasaran, poin, teks, grafik, tabel } = alatDeck('cnst', 'Konstruksi
 const TAHUN = ['2024', '2025', 'Outlook 2026', 'RKA 2027'];
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
+/** Kartu jadwal gantt: tugas bertanggal ISO, progres 0-100. */
+const gantt = (
+  title: string,
+  sub: string,
+  w: number,
+  h: number,
+  tugas: Array<{ name: string; start: string; end: string; progress: number }>
+): WidgetSpec => {
+  const kartu = grafik('gantt', 'jadwal-gantt', title, sub, w, h,
+    tugas.map((t) => t.name), [{ name: 'Progres', data: tugas.map((t) => t.progress) }], '%');
+  return { ...kartu, gantt: { tasks: tugas } } as WidgetSpec;
+};
+
 const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
   {
     judul: 'Agenda Meeting',
@@ -65,16 +78,19 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
     judul: 'Executive Summary',
     sub: 'Dashboard KPI konstruksi 2026',
     kartu: [
-      kpi(4, 'Proyek Berjalan', 'Aktif per Desember 2026', '12', 'proyek', 'building', 9.1),
-      kpi(4, 'Nilai Kontrak', 'Total kontrak berjalan', '248,6', 'miliar Rp', 'wallet', 11.4),
-      kpi(4, 'Realisasi Fisik', 'Kumulatif tahun berjalan', '78,4', '%', 'trending-up', 4.6),
-      kpi(4, 'Deviasi Jadwal', 'Terlambat dari rencana', '-2,8', '%', 'clock', -1.2,
+      kpi(3, 'Proyek Berjalan', 'Aktif per Desember 2026', '12', 'proyek', 'building', 9.1),
+      kpi(3, 'Nilai Kontrak', 'Total kontrak berjalan', '248,6', 'miliar Rp', 'wallet', 11.4),
+      kpi(3, 'Realisasi Fisik', 'Kumulatif tahun berjalan', '78,4', '%', 'trending-up', 4.6),
+      kpi(3, 'Deviasi Jadwal', 'Terlambat dari rencana', '-2,8', '%', 'clock', -1.2,
         'Terlambat 2,8% dari rencana'),
-      kpi(4, 'Deviasi Biaya', 'Terhadap anggaran proyek', '-1,6', '%', 'receipt', -0.4,
-        'Lebih hemat 1,6% dari anggaran'),
-      kpi(4, 'Nilai Terbayar', 'Termin sudah dibayar', '186,2', 'miliar Rp', 'file-check', 10.8),
-      teks('Headline Management', 'Pertanyaan kunci rapat', 12, 2,
-        'Apakah proyek konstruksi 2026 berjalan sesuai jadwal, biaya, dan mutu? Realisasi fisik 78,4% dengan biaya 1,6% di bawah anggaran, tetapi deviasi jadwal -2,8% pada empat proyek menandakan keterlambatan pasokan material dan cuaca. Fokus 2027: percepatan pengadaan material kritis dan penguatan pengendalian mutu.'),
+      // Empat indikator yang sama dengan halaman target, dalam persen capaian.
+      grafik('hbar', 'bar-mendatar-target', 'Capaian vs Target 2026', 'Persen capaian terhadap sasaran tahun ini', 7, 4,
+        ['Realisasi fisik', 'Temuan QC tertutup', 'Skor K3', 'Ketepatan subkon'], [
+          { name: 'Capaian 2026', data: [96.6, 87.7, 93.4, 88.2] },
+          { name: 'Target 2026', data: [100, 100, 100, 100] },
+        ], '%'),
+      teks('Headline Management', 'Pertanyaan kunci rapat', 5, 4,
+        'Realisasi fisik 78,4% dengan biaya 1,6% di bawah anggaran, tetapi deviasi jadwal -2,8% pada empat proyek. Fokus 2027: percepatan pengadaan material kritis dan penguatan pengendalian mutu.'),
     ],
   },
   {
@@ -85,11 +101,16 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Berjalan', 'Dalam pelaksanaan', '7', 'proyek', 'trending-up', 16.7),
       kpi(3, 'Terlambat', 'Deviasi jadwal negatif', '4', 'proyek', 'alert-triangle', 33.3),
       kpi(3, 'Nilai Kontrak', 'Total portofolio', '248,6', 'miliar Rp', 'wallet', 11.4),
-      grafik('donut', 'donat-tebal', 'Nilai Kontrak per Jenis Proyek', 'Miliar rupiah, total 248,6', 5, 4,
+      grafik('donut', 'donat-tebal', 'Nilai Kontrak per Jenis Proyek', 'Miliar rupiah, total 248,6', 4, 4,
         ['Gedung', 'Jalan & jembatan', 'Irigasi', 'Fasilitas umum', 'Lainnya'], [
           { name: 'Nilai kontrak', data: [112.4, 68.2, 38.6, 21.4, 8.0] },
         ], 'miliar Rp'),
-      tabel('tabel-status', 'Status Proyek Berjalan', 'Progres fisik dan status', 7, 4,
+      // Nilai yang sama dengan tabel di sebelahnya, dibaca sebagai besaran.
+      grafik('hbar', 'bar-mendatar-peringkat', 'Nilai Kontrak per Proyek Berjalan', 'Miliar rupiah, enam proyek terbesar', 4, 4,
+        ['Gedung kantor cabang', 'Jembatan penghubung', 'Irigasi tersier', 'Renovasi gudang', 'Fasilitas parkir', 'Gedung serbaguna'], [
+          { name: 'Nilai kontrak', data: [64.2, 48.6, 38.4, 32.8, 27.4, 21.6] },
+        ], 'miliar Rp'),
+      tabel('tabel-status', 'Status Proyek Berjalan', 'Progres fisik dan status', 4, 4,
         ['Proyek', 'Fisik', 'Status'],
         [
           ['Gedung kantor cabang', '92%', 'Hampir selesai'],
@@ -105,14 +126,18 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
     judul: 'Progress Fisik Proyek',
     sub: 'Realisasi fisik bulanan dibanding rencana',
     kartu: [
-      kpi(4, 'Rencana Fisik', 'Kumulatif per Desember', '81,2', '%', 'target', 0),
-      kpi(4, 'Realisasi Fisik', 'Kumulatif per Desember', '78,4', '%', 'trending-up', 4.6),
-      kpi(4, 'Deviasi', 'Realisasi minus rencana', '-2,8', '%', 'alert-triangle', -1.2,
+      kpi(3, 'Rencana Fisik', 'Kumulatif per Desember', '81,2', '%', 'target', 0),
+      kpi(3, 'Realisasi Fisik', 'Kumulatif per Desember', '78,4', '%', 'trending-up', 4.6),
+      kpi(3, 'Deviasi', 'Realisasi minus rencana', '-2,8', '%', 'alert-triangle', -1.2,
         'Kurang 2,8 poin dari rencana'),
-      kpi(4, 'Progres Bulanan', 'Desember dibanding November', '6,2', '%', 'calendar-check', 8.8),
-      grafik('combo', 'combo-batang-garis', 'Realisasi vs Rencana Fisik', 'Persen kumulatif, 2026', 12, 4, BULAN, [
+      kpi(3, 'Progres Bulanan', 'Desember dibanding November', '6,2', '%', 'calendar-check', 8.8),
+      grafik('combo', 'combo-batang-garis', 'Realisasi vs Rencana Fisik', 'Persen kumulatif, 2026', 7, 4, BULAN, [
         { name: 'Rencana', data: [6.4, 13.2, 20.8, 28.6, 36.4, 44.2, 52.1, 59.8, 67.4, 74.2, 78.6, 81.2], kind: 'line' },
         { name: 'Realisasi', data: [6.1, 12.8, 19.9, 27.4, 35.2, 42.8, 50.6, 58.1, 65.4, 71.6, 72.2, 78.4] },
+      ], '%'),
+      // Selisih bulanan dari dua deret di atas: Desember 6,2 dan November hanya 0,6.
+      grafik('bar', 'bar-tegak-sorot', 'Progres Fisik Bulanan', 'Poin persen per bulan, 2026', 5, 4, BULAN, [
+        { name: 'Progres bulanan', data: [6.1, 6.7, 7.1, 7.5, 7.8, 7.6, 7.8, 7.5, 7.3, 6.2, 0.6, 6.2] },
       ], '%'),
     ],
   },
@@ -125,11 +150,16 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Nilai Terbayar', 'Termin dibayar pemilik', '186,2', 'miliar Rp', 'file-check', 10.8),
       kpi(3, 'Deviasi Biaya', 'Terhadap anggaran', '-1,6', '%', 'trending-down', 0.4,
         'Hemat 1,6% dari anggaran'),
-      grafik('combo', 'combo-batang-garis', 'Cash Flow per Kuartal', 'Miliar rupiah, biaya vs pembayaran', 12, 4,
+      grafik('combo', 'combo-batang-garis', 'Cash Flow per Kuartal', 'Miliar rupiah, biaya vs pembayaran', 7, 4,
         ['Kuartal 1', 'Kuartal 2', 'Kuartal 3', 'Kuartal 4'], [
           { name: 'Biaya keluar', data: [38.6, 48.4, 56.2, 48.2], kind: 'bar' },
           { name: 'Termin masuk', data: [36.2, 46.8, 54.4, 48.8], kind: 'bar' },
           { name: 'Arus kas bersih', data: [-2.4, -1.6, -1.8, 0.6], kind: 'line' },
+        ], 'miliar Rp'),
+      // Lima komponen menjumlah tepat ke biaya terpakai 191,4 miliar.
+      grafik('donut', 'donat-tipis', 'Struktur Biaya Proyek', 'Miliar rupiah, total 191,4', 5, 4,
+        ['Material', 'Upah', 'Alat', 'Subkontraktor', 'Overhead'], [
+          { name: 'Biaya', data: [96.2, 51.4, 24.8, 12.4, 6.6] },
         ], 'miliar Rp'),
     ],
   },
@@ -141,7 +171,7 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
         ['Perencanaan', 'Pondasi', 'Struktur', 'Finishing', 'Serah terima'], [
           { name: 'Progres', data: [100, 100, 86, 54, 22] },
         ], '%'),
-      tabel('tabel-status', 'Deviasi Jadwal per Proyek', 'Selisih terhadap rencana', 7, 4,
+      tabel('tabel-status', 'Deviasi Jadwal per Proyek', 'Selisih terhadap rencana', 5, 4,
         ['Proyek', 'Deviasi', 'Status'],
         [
           ['Gedung kantor cabang', '-0,4 minggu', 'Baik'],
@@ -151,6 +181,14 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
           ['Fasilitas parkir', '-6,2 minggu', 'Terlambat'],
           ['Gedung serbaguna', '-3,4 minggu', 'Terlambat'],
         ]),
+      // Tanggal tonggak sama dengan grafik di atas, progresnya mengikuti tonggak itu.
+      gantt('Jadwal Tonggak Proyek Induk', 'Periode dan progres tiap tonggak', 12, 3, [
+        { name: 'Perencanaan & perizinan', start: '2026-01-05', end: '2026-02-28', progress: 100 },
+        { name: 'Pekerjaan pondasi', start: '2026-03-01', end: '2026-05-31', progress: 100 },
+        { name: 'Struktur atas', start: '2026-06-01', end: '2026-09-30', progress: 86 },
+        { name: 'Finishing & MEP', start: '2026-10-01', end: '2026-12-31', progress: 54 },
+        { name: 'Serah terima', start: '2026-12-15', end: '2027-02-28', progress: 22 },
+      ]),
     ],
   },
   {
@@ -161,9 +199,13 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Temuan Terbuka', 'Belum ditutup', '18', 'temuan', 'alert-triangle', -31.8),
       kpi(3, 'Waktu Perbaikan', 'Rata-rata penutupan', '4,2', 'hari', 'clock', -14.3),
       kpi(3, 'Nilai Rework', 'Biaya perbaikan ulang', '1,8', 'miliar Rp', 'receipt', -22.6),
-      grafik('bar', 'bar-tegak', 'Temuan QC per Kategori', 'Jumlah temuan, 2026', 12, 4,
+      grafik('bar', 'bar-tegak', 'Temuan QC per Kategori', 'Jumlah temuan, 2026', 7, 4,
         ['Struktur', 'Arsitektur', 'MEP', 'Finishing', 'Lainnya'], [
           { name: 'Temuan', data: [42, 38, 34, 24, 8] },
+        ], 'temuan'),
+      grafik('donut', 'donat-tebal', 'Status Temuan QC', 'Temuan 146: 128 tertutup, 18 terbuka', 5, 4,
+        ['Tertutup', 'Terbuka'], [
+          { name: 'Temuan', data: [128, 18] },
         ], 'temuan'),
     ],
   },
@@ -175,10 +217,10 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Insiden Ringan', 'Sepanjang 2026', '6', 'kejadian', 'alert-triangle', -40.0),
       kpi(3, 'Jam Kerja Aman', 'Tanpa lost time injury', '1,84', 'juta jam', 'clock', 12.6),
       kpi(3, 'Kepatuhan APD', 'Hasil pemeriksaan lapangan', '96,8', '%', 'shield-check', 2.4),
-      grafik('gauge', 'gauge-target', 'Skor K3', 'Skor 1–100, target 95', 6, 4, ['Skor K3'], [
+      grafik('gauge', 'gauge-target', 'Skor K3', 'Skor 1–100, target 95', 3, 4, ['Skor K3'], [
         { name: 'Skor K3', data: [93.4] },
       ], 'poin'),
-      poin('Catatan K3', 'Ringkasan keselamatan kerja', 6, 5,
+      poin('Catatan K3', 'Ringkasan keselamatan kerja', 4, 4,
         'Tidak ada kecelakaan berat sepanjang 2026, dan semua insiden ringan tertangani di hari yang sama.',
         [
           'Zero accident di 10 dari 12 proyek',
@@ -186,6 +228,11 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
           'Pelatihan K3 diikuti 428 pekerja',
           'Toolbox meeting 96% terlaksana',
         ]),
+      // Enam insiden ringan sepanjang 2026, seluruhnya tanpa lost time injury.
+      grafik('bar', 'bar-tegak', 'Insiden Ringan per Kuartal', 'Jumlah kejadian, total 6', 5, 4,
+        ['Kuartal 1', 'Kuartal 2', 'Kuartal 3', 'Kuartal 4'], [
+          { name: 'Insiden ringan', data: [2, 2, 1, 1] },
+        ], 'kejadian'),
     ],
   },
   {
@@ -196,11 +243,11 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Alat Berat', 'Unit dalam pemakaian', '38', 'unit', 'truck', 5.6),
       kpi(3, 'Utilitas Alat', 'Rata-rata pemakaian alat', '84,6', '%', 'calendar-check', 3.2),
       kpi(3, 'Keterlambatan Material', 'Pengiriman melewati jadwal', '24', 'pengiriman', 'clock', -18.6),
-      grafik('donut', 'donat-tebal', 'Komposisi Tenaga Kerja', 'Orang, total 1.486', 5, 4,
+      grafik('donut', 'donat-tebal', 'Komposisi Tenaga Kerja', 'Orang, total 1.486', 4, 4,
         ['Tukang', 'Mandor', 'Operator alat', 'Staf teknis', 'Lainnya'], [
           { name: 'Tenaga kerja', data: [682, 186, 142, 324, 152] },
         ], 'orang'),
-      tabel('tabel-ringkas', 'Material Kritis', 'Status pasokan material utama', 7, 4,
+      tabel('tabel-ringkas', 'Material Kritis', 'Status pasokan material utama', 4, 4,
         ['Material', 'Volume', 'Status'],
         [
           ['Beton readymix', '8.420 m³', 'Aman'],
@@ -210,6 +257,11 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
           ['Pipa HDPE', '6.240 m', 'Terlambat'],
           ['Baja profil', '982 ton', 'Terlambat'],
         ]),
+      // Rata-rata lima jenis alat ini 84,6%, sama dengan KPI utilitas di atas.
+      grafik('bar', 'bar-kapsul', 'Utilitas Alat per Jenis', 'Persen pemakaian, Desember 2026', 4, 4,
+        ['Excavator', 'Crane', 'Dump truck', 'Concrete pump', 'Vibro'], [
+          { name: 'Utilitas', data: [88.6, 82.4, 86.2, 79.8, 85.9] },
+        ], '%'),
     ],
   },
   {
@@ -225,15 +277,18 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
           ['Akses lahan terbatas', 'Pekerjaan tertahan', 'Koordinasi pemilik'],
           ['Tenaga kerja terampil kurang', 'Mutu turun', 'Pelatihan dan rekrut'],
         ]),
-      poin('Kendala Lapangan', 'Ringkasan hambatan dan statusnya', 7, 6,
-        'Tiga kendala menjelaskan sebagian besar deviasi jadwal; dua di antaranya bisa ditekan lewat pengadaan.',
-        [
-          'Pasokan material terlambat (9 proyek)',
-          'Cuaca ekstrem (7 proyek)',
-          'Perubahan desain dari pemilik (5 proyek)',
-          'Akses lahan terbatas (3 proyek)',
-          'Ketersediaan alat berat (2 proyek)',
-        ]),
+      // Jumlah proyek yang terdampak; lima kendala ini yang paling sering muncul di rapat.
+      grafik('hbar', 'bar-mendatar-peringkat', 'Proyek Terdampak per Kendala', 'Jumlah proyek dari 12', 5, 4,
+        ['Material terlambat', 'Cuaca ekstrem', 'Perubahan desain', 'Akses lahan', 'Alat berat'], [
+          { name: 'Proyek terdampak', data: [9, 7, 5, 3, 2] },
+        ], 'proyek'),
+      grafik('hbar', 'bar-mendatar-peringkat', 'Keterlambatan Material per Jenis', 'Pengiriman terlambat, total 24', 7, 3,
+        ['Pipa HDPE', 'Baja profil', 'Batu split', 'Semen', 'Besi beton', 'Beton readymix'], [
+          { name: 'Pengiriman terlambat', data: [8, 7, 4, 3, 1, 1] },
+        ], 'pengiriman'),
+      // 24 dari 1.284 pengiriman terlambat, sisanya 98% tepat waktu.
+      grafik('gauge', 'cincin-progres', 'Pasokan Material Tepat Waktu', 'Dari 1.284 pengiriman 2026', 5, 3,
+        ['Tepat waktu'], [{ name: 'Tepat waktu', data: [98] }], '%'),
     ],
   },
   {
@@ -244,7 +299,11 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
       kpi(3, 'Nilai Pengadaan', 'Kontrak subkontraktor', '86,4', 'miliar Rp', 'wallet', 9.2),
       kpi(3, 'Ketepatan Serah', 'Subkontraktor tepat waktu', '88,2', '%', 'truck', 3.8),
       kpi(3, 'Subkontraktor Bermasalah', 'Masuk evaluasi', '6', 'perusahaan', 'alert-triangle', 20.0),
-      tabel('tabel-status', 'Kinerja Subkontraktor', 'Skor dan status evaluasi', 12, 4,
+      grafik('donut', 'donat-tebal', 'Nilai Pengadaan per Lingkup', 'Miliar rupiah, total 86,4', 5, 4,
+        ['Struktur', 'MEP', 'Finishing', 'Lansekap', 'Pagar & jalan'], [
+          { name: 'Nilai pengadaan', data: [34.2, 22.6, 16.4, 8.2, 5.0] },
+        ], 'miliar Rp'),
+      tabel('tabel-status', 'Kinerja Subkontraktor', 'Skor dan status evaluasi', 7, 4,
         ['Subkontraktor', 'Lingkup', 'Skor', 'Status'],
         [
           ['Subkon A', 'Struktur & pondasi', '94', 'Baik'],
@@ -259,7 +318,7 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
     judul: 'Action Plan',
     sub: 'Tindakan, penanggung jawab, dan tenggat',
     kartu: [
-      tabel('alur-tahap', 'Action Plan 2027', 'Tindakan dan tenggat', 12, 4,
+      tabel('tabel-status', 'Action Plan 2027', 'Tindakan dan tenggat', 7, 4,
         ['Tindakan', 'PIC', 'Tenggat', 'Status'],
         [
           ['Kontrak pasokan material jangka panjang', 'Divisi Pengadaan', 'Jan 2027', 'Berjalan'],
@@ -269,18 +328,31 @@ const HALAMAN: Array<{ judul: string; sub: string; kartu: WidgetSpec[] }> = [
           ['Evaluasi 6 subkontraktor bermasalah', 'Tim Evaluasi', 'Feb 2027', 'Rencana'],
           ['Digitalisasi laporan harian proyek', 'Divisi TI', 'Apr 2027', 'Rencana'],
         ]),
+      grafik('hbar', 'daftar-progres', 'Progres Action Plan', 'Persen penyelesaian per tindakan', 5, 4,
+        ['Kontrak material', 'Vendor cadangan', 'Percepatan proyek', 'Metode K3', 'Evaluasi subkon', 'Laporan digital'], [
+          { name: 'Progres', data: [45, 20, 35, 60, 25, 10] },
+        ], '%'),
     ],
   },
   {
     judul: 'Target & KPI 2027',
     sub: 'Fokus peningkatan kinerja konstruksi',
     kartu: [
-      sasaran(4, 'Realisasi Fisik', 78.4, 95, '%', '≥', 'trending-up'),
-      sasaran(4, 'Deviasi Jadwal', -2.8, 0, '%', '≥', 'clock'),
-      sasaran(4, 'Deviasi Biaya', -1.6, 0, '%', '≤', 'receipt'),
-      sasaran(4, 'Zero Accident', 10, 12, 'proyek', '≥', 'shield-check'),
-      sasaran(4, 'Temuan QC Tertutup', 87.7, 100, '%', '≥', 'clipboard-check'),
-      sasaran(4, 'Ketepatan Subkon', 88.2, 95, '%', '≥', 'truck'),
+      sasaran(3, 'Realisasi Fisik', 78.4, 95, '%', '≥', 'trending-up'),
+      sasaran(3, 'Deviasi Jadwal', -2.8, 0, '%', '≥', 'clock'),
+      sasaran(3, 'Deviasi Biaya', -1.6, 0, '%', '≤', 'receipt'),
+      sasaran(3, 'Zero Accident', 10, 12, 'proyek', '≥', 'shield-check'),
+      // Enam indikator dalam persen capaian, termasuk QC tertutup dan ketepatan subkon.
+      grafik('radar', 'radar-aspek', 'Profil Capaian 2026 vs Target 2027', 'Persen capaian terhadap sasaran', 6, 4,
+        ['Fisik', 'Jadwal', 'Biaya', 'Zero Accident', 'QC Tertutup', 'Ketepatan Subkon'], [
+          { name: 'Capaian 2026', data: [82.5, 97.2, 98.4, 83.3, 87.7, 88.2] },
+          { name: 'Target 2027', data: [100, 100, 100, 100, 100, 100] },
+        ], '%'),
+      grafik('hbar', 'bar-mendatar-target', 'Capaian vs Target KPI 2027', 'Enam indikator, persen capaian', 6, 4,
+        ['Realisasi Fisik', 'Deviasi Jadwal', 'Deviasi Biaya', 'Zero Accident', 'Temuan QC Tertutup', 'Ketepatan Subkon'], [
+          { name: 'Capaian 2026', data: [82.5, 97.2, 98.4, 83.3, 87.7, 88.2] },
+          { name: 'Target 2027', data: [100, 100, 100, 100, 100, 100] },
+        ], '%'),
     ],
   },
   {

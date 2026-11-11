@@ -630,6 +630,9 @@ export const donat: Pembangun = (d, g, s) => {
 export const gaugeTarget: Pembangun = (d, g, s) => {
   const nilai = Number(deret(d)[0] ?? 0);
   const maks = typeof d.maks === 'number' ? d.maks : 100;
+  // Satuan yang diawali huruf diberi spasi supaya tidak menempel ke angka:
+  // "4,3 dari 5", bukan "4,3dari 5". Persen tetap tanpa spasi.
+  const satuanGauge = d.satuan ? (/^[A-Za-z]/.test(d.satuan) ? ` ${d.satuan}` : d.satuan) : '%';
   return {
     tooltip: { show: false },
     series: [
@@ -653,7 +656,7 @@ export const gaugeTarget: Pembangun = (d, g, s) => {
           fontSize: 24 * s,
           fontWeight: 800,
           color: g.teks,
-          formatter: (v: number) => `${format(v, d)}${d.satuan ?? '%'}`,
+          formatter: (v: number) => `${format(v, d)}${satuanGauge}`,
         },
         // Gauge ECharts tidak mendukung markLine pada sumbu. Target ditulis di
         // judul bawah supaya tetap terbaca tanpa membuat seri gagal digambar.
@@ -663,7 +666,7 @@ export const gaugeTarget: Pembangun = (d, g, s) => {
           color: g.teks3,
           fontWeight: 600,
           // eslint-disable-next-line no-template-curly-in-string
-          formatter: typeof d.target === 'number' ? `${d.seri[0]?.nama ?? 'Nilai'} · target ${format(d.target, d)}${d.satuan ?? '%'}` : d.seri[0]?.nama ?? 'Nilai',
+          formatter: typeof d.target === 'number' ? `${d.seri[0]?.nama ?? 'Nilai'} · target ${format(d.target, d)}${satuanGauge}` : d.seri[0]?.nama ?? 'Nilai',
         },
         data: [{ value: nilai, name: d.seri[0]?.nama ?? d.kategori[0] ?? 'Nilai' }],
       },

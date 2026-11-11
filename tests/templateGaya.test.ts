@@ -9,10 +9,10 @@ test('setiap gaya Template Chart punya template dashboard', () => {
   // Pijar, Lensa, Nadi, Kaca memakai kunci tema lama; sisanya kunci varian.
   const lama: Record<string, string> = { ringkasan: 'oranye', analitik: 'analitik', trafik: 'trafik', kaca: 'kaca' };
   for (const v of VARIAN) assert.ok(tema.has(lama[v] ?? v), `template untuk gaya ${v}`);
-  // Deck baru (Keuangan & SDM, Outsourcing, Procurement, Construction, Asrama,
-  // Marketing) dibuka dengan gaya Korporat, sama seperti deck rapat bagian;
-  // gayanya bisa diganti di galeri.
-  assert.equal(DASHBOARD_TEMPLATES.length, 18);
+  // Deck baru (Keuangan & SDM, SDM & Kepegawaian, Kinerja & Target, Outsourcing,
+  // Procurement, Construction, Asrama, Marketing) dibuka dengan gaya Korporat,
+  // sama seperti deck rapat bagian; gayanya bisa diganti di galeri.
+  assert.equal(DASHBOARD_TEMPLATES.length, 20);
   assert.ok(
     DASHBOARD_TEMPLATES.filter((t) => t.id.startsWith('tpl-deck-')).every((t) => t.tema === 'korporat'),
     'deck baru wajib punya tema gaya'

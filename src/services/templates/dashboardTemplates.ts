@@ -2,6 +2,8 @@ import { WidgetSpec, WidgetType } from '../../types';
 import { GAYA, VARIAN, type Varian } from '../chart/gayaVarian';
 import { TEMPLATE_BAGIAN, type InfoBagian } from './templateBagian';
 import { TEMPLATE_KEUANGAN_SDM } from './templateKeuanganSdm';
+import { TEMPLATE_SDM_KEPEGAWAIAN } from './templateSdmKepegawaian';
+import { TEMPLATE_KINERJA_TARGET } from './templateKinerjaTarget';
 import { TEMPLATE_OUTSOURCING } from './templateOutsourcing';
 import { TEMPLATE_PROCUREMENT } from './templateProcurement';
 import { TEMPLATE_CONSTRUCTION } from './templateConstruction';
@@ -554,6 +556,8 @@ const TEMPLATE_GAYA: DashboardTemplate[] = GAYA_TEMPLATE_BARU.map(({ v, tujuan }
 
 export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
   TEMPLATE_KEUANGAN_SDM,
+  TEMPLATE_SDM_KEPEGAWAIAN,
+  TEMPLATE_KINERJA_TARGET,
   TEMPLATE_OUTSOURCING,
   TEMPLATE_PROCUREMENT,
   TEMPLATE_CONSTRUCTION,

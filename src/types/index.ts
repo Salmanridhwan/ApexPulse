@@ -329,6 +329,8 @@ export interface WidgetSpec {
     /** Khusus gauge: nilai minimal & maksimal skala (default 0-100). */
     min?: number;
     max?: number;
+    /** Khusus gauge: angka target yang ditulis di bawah nilai, mis. 4,5 dari skala 1-5. */
+    target?: number;
     /** Khusus scatter/bubble: titik (x, y) dengan ukuran opsional. */
     points?: Array<{ x: number; y: number; size?: number; label?: string; color?: string }>;
     /** Khusus sankey: aliran antar node. */

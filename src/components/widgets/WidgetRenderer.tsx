@@ -168,6 +168,11 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec; onKlikKosong?: () => vo
       seri = seri.map((x) => ({ ...x, data: [x.data[i] ?? null] }));
     }
     const dasar: DataChart = { kategori, seri, satuan: displayUnit, desimal: 1, dariDokumen: true };
+    // Gauge dengan skala sendiri (mis. kepuasan 1-5): tanpa ini ECharts memakai
+    // skala 0-100 sehingga nilai 4,3 hanya mengisi 4,3% busur, bukan 86%.
+    if (typeof widget.chart?.max === 'number') dasar.maks = widget.chart.max;
+    if (typeof widget.chart?.max === 'number') (dasar as DataChart & { max?: number }).max = widget.chart.max;
+    if (typeof widget.chart?.target === 'number') dasar.target = widget.chart.target;
     // Bentuk data khusus tiga wajah baru: peta wilayah, jadwal (gantt), kotak
     // sebaran. Tanpa ini, chart katalognya tidak punya angka untuk digambar.
     if (widget.geo?.regions?.length) {

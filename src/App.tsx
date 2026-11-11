@@ -1269,10 +1269,12 @@ export default function App() {
                 setViewMode('permintaan');
                 setIsMobileNavOpen(false);
               }}
-              onOpenPilihData={() => {
+              /* Pilih Data khusus admin: role User tidak lagi melihat tab menu ini
+                 (penyusunan dashboard dari data dokumen hanya untuk admin). */
+              onOpenPilihData={isAdminRole(currentUser?.role) ? () => {
                 setViewMode('data');
                 setIsMobileNavOpen(false);
-              }}
+              } : undefined}
               onOpenAlerts={() => {
                 setViewMode('alerts');
                 setIsMobileNavOpen(false);
