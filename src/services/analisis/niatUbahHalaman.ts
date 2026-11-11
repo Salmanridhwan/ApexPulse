@@ -71,6 +71,10 @@ export function niatUbahHalaman(pesan: string): boolean {
   const t = normalisasi(pesan || '');
   if (!t) return false;
 
+  // "buatkan halaman kedua/baru/lanjutan" juga lewat jalur usulan, tetapi
+  // usulannya membuat halaman BARU (lihat `niatHalamanBaru`).
+  if (niatHalamanBaru(t)) return true;
+
   if (PENGECUALIAN.some((p) => t.includes(p))) return false;
 
   const adaKataUbah = KATA_UBAH.some((k) => t.includes(k));
@@ -86,6 +90,25 @@ export function niatUbahHalaman(pesan: string): boolean {
   if (mulaiTanya && !menyuruh) return false;
 
   return true;
+}
+
+/**
+ * Apakah admin meminta HALAMAN BARU di dashboard ini?
+ *
+ * "buatkan saya halaman keduanya yang masih menyambung" dulu diperlakukan
+ * sebagai ubah halaman aktif, sehingga empat kartu ditumpuk ke halaman
+ * Ringkasan (5 → 9 kartu) alih-alih membuat halaman kedua. Wajib ada kata
+ * kerja: "saya mau halaman baru" tetap bukan perintah.
+ */
+export function niatHalamanBaru(pesan: string): boolean {
+  const t = normalisasi(pesan || '');
+  if (!t) return false;
+  const kerja = /\b(?:buat|buatkan|bikin|bikinkan|tambah|tambahkan|tambahi|susun|susunkan|siapkan|sediakan)\b/.test(t);
+  if (!kerja) return false;
+  if (/\bdashboard (?:baru|lain)\b/.test(t)) return false;
+  return /\bhalaman(?:nya)?\s+(?:yang\s+)?(?:ke-?\s*)?(?:baru|kedua|ketiga|keempat|kelima|lanjutan|berikut(?:nya)?|selanjutnya|tambahan|lain|lagi|\d+)(?:nya)?\b/.test(t)
+    || /\b(?:tambah|tambahkan|tambahi)\s+(?:satu\s+|1\s+)?halaman\b/.test(t)
+    || /\b(?:satu|1)\s+halaman\s+lagi\b/.test(t);
 }
 
 /** Ringkasan singkat untuk pesan sistem — supaya admin tahu apa yang terjadi. */

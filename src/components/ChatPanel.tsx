@@ -262,9 +262,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {
               id: `msg-${Date.now()}-usulan`,
               sender: 'system',
-              text: `Halaman "${data.judulHalaman || halamanJudul || 'ini'}": ${data.usulan?.ringkasan || 'Usulan siap ditinjau.'} (${data.ringkasanPerubahan}, ${data.jumlahKartuSetelah} kartu setelah diterapkan)${
+              text: `${data.halamanBaru ? 'Halaman baru' : 'Halaman'} "${data.judulHalaman || halamanJudul || 'ini'}": ${data.usulan?.ringkasan || 'Usulan siap ditinjau.'} (${data.ringkasanPerubahan}, ${data.jumlahKartuSetelah} kartu setelah diterapkan)${
                 data.dipangkas > 0 ? `. ${data.dipangkas} kartu usulan tidak dimasukkan karena halaman maksimal 9 kartu` : ''
-              } — tinjau dulu, halaman belum berubah.`,
+              } — tinjau dulu, ${data.halamanBaru ? 'halaman baru dibuat setelah Terapkan' : 'halaman belum berubah'}.`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);
@@ -799,7 +799,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       {
                         id: `msg-${Date.now()}-ok`,
                         sender: 'system',
-                        text: `Diterapkan. Halaman sekarang berisi ${data.jumlahKartu ?? '-'} kartu.`,
+                        text: data.usulan?.halamanBaru
+                          ? `Diterapkan. Halaman baru "${data.usulan.halamanBaru.judul}" dibuat dengan ${data.jumlahKartu ?? '-'} kartu dan sedang dibuka.`
+                          : `Diterapkan. Halaman sekarang berisi ${data.jumlahKartu ?? '-'} kartu.`,
                         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                       },
                     ]);

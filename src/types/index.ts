@@ -821,6 +821,8 @@ export interface PerubahanHalaman {
   urutan?: string[];
   /** Alasan singkat yang dibaca admin, bukan istilah mesin. */
   alasan?: string;
+  /** Butir sumber angka kartu ini — kartu dibangun server dari butir, bukan dari model. */
+  butirId?: string;
 }
 
 export type StatusUsulan = 'menunggu' | 'diterapkan' | 'dibatalkan';
@@ -843,6 +845,12 @@ export interface UsulanHalaman {
   diterapkanPada?: string;
   /** Catatan penolakan/penyebab usulan tidak bisa diterapkan. */
   catatan?: string;
+  /**
+   * Diisi bila admin meminta HALAMAN BARU ("buatkan halaman kedua"). Kartu usulan
+   * masuk ke halaman baru ini, disisipkan tepat setelah `halamanId`, bukan
+   * ditumpuk ke halaman yang sedang dibuka.
+   */
+  halamanBaru?: { judul: string };
 }
 
 export interface ProgressStep {

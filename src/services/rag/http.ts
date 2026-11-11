@@ -2125,7 +2125,7 @@ export class ConfigurableRagClient implements RagClient {
       let payload: any = null;
       let sources: any[] = [];
       for (let k = 0; k < daftarKueri.length; k++) {
-        const res = await denganIzinRag(() =>
+        const kirim = () => denganIzinRag(() =>
           fetch(`${dipakai}/query`, {
           method: 'POST',
           headers: {
@@ -2152,6 +2152,22 @@ export class ConfigurableRagClient implements RagClient {
           signal: ac.signal,
           })
         );
+        /**
+         * Ulangi saat layanan sibuk. Uji chat 11 November: 31 dari 50 pertanyaan
+         * berakhir "layanan dokumen tidak tersedia" karena satu balasan 429
+         * langsung dilempar. Tunggu `retry_after_seconds` lalu coba lagi selama
+         * tenggat permintaan masih cukup.
+         */
+        let res = await kirim();
+        for (let ulang = 0; ulang < 3 && [429, 502, 503, 504].includes(res.status); ulang++) {
+          const tungguMs = ((await lamaTungguSibuk(res)) ?? 3) * 1000;
+          if (Date.now() - start + tungguMs + 8000 > timeoutMs) break;
+          console.warn(`[RAG HTTP] /query dibalas ${res.status}, ulang ke-${ulang + 1} setelah ${tungguMs / 1000} dtk`);
+          await new Promise((r) => setTimeout(r, tungguMs));
+          res = await kirim();
+        }
+        // Kueri kedua (pertanyaan saja) hanya cadangan: kalau gagal, pakai hasil kueri pertama.
+        if (!res.ok && k > 0 && payload) break;
         if (!res.ok) {
           throw new RagServiceError(
             `Layanan RAG menolak permintaan (HTTP ${res.status}).`,

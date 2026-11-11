@@ -107,8 +107,11 @@ import {
   terapkanPerubahan,
   validasiPerubahan,
   pangkasTambahan,
+  bangunDariButir,
   MAKS_WIDGET_HALAMAN,
 } from './src/services/analisis/usulan';
+import { niatHalamanBaru } from './src/services/analisis/niatUbahHalaman';
+import { jawabMetaDashboard } from './src/services/chat/metaDashboard';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { buatPembatasLintas } from './src/services/auth/pembatasLintas';
@@ -165,7 +168,7 @@ import {
 import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
 import type { BerkasKMS } from './src/types';
 import type { AnalisisDokumen } from './src/types';
-import type { ButirData } from './src/types';
+import type { ButirData, HalamanDashboard } from './src/types';
 import { CHART_DEFAULT } from './src/services/chart/chartDefault';
 import {
   BATAS_UKURAN_BYTE,
@@ -2718,6 +2721,17 @@ const app = express();
         }
         catatAsisten({ sender: 'system', text: pesan, actionTaken: 'daftar_dokumen', modeUsed: 'Chatbot RAG' });
         sendEvent('result', { actionTaken: 'daftar_dokumen', message: pesan, modeUsed: 'Chatbot RAG' });
+        sendEvent('done', { ok: true });
+        return res.end();
+      }
+
+      // Case 0a-1: pertanyaan tentang DASHBOARD ITU SENDIRI (jumlah/nama halaman,
+      // sumber data sebuah kartu). Jawabannya ada di metadata dashboard, bukan
+      // di dokumen — dulu dikirim ke RAG dan dijawab "konteks tidak memuat".
+      const jawabanMeta = jawabMetaDashboard(prompt, activeDash);
+      if (jawabanMeta) {
+        catatAsisten({ sender: 'system', text: jawabanMeta, actionTaken: 'meta_dashboard', modeUsed: 'Chatbot RAG' } as any);
+        sendEvent('result', { actionTaken: 'meta_dashboard', message: jawabanMeta, modeUsed: 'Chatbot RAG' });
         sendEvent('done', { ok: true });
         return res.end();
       }
@@ -5673,12 +5687,19 @@ ${kpiItems}
 
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const butir = butirSiapPakai(db.getButirData(tenantId)).slice(0, 40);
+    // "buatkan halaman kedua" → kartu masuk halaman BARU setelah halaman ini,
+    // bukan ditumpuk ke halaman yang sedang dibuka.
+    const mintaHalamanBaru = niatHalamanBaru(perintah);
     const daftarKartu = halaman.widgets.map((w) => `- id=${w.id} | "${w.title}" | tipe ${w.type}`).join('\n');
     const barisButir = butir.map(
         (b) =>
           `- id=${b.id} | "${b.nama}" | ${b.kategori} | ${
-            b.nilai !== undefined && b.nilai !== null ? `nilai ${b.nilai}${b.satuan ? ' ' + b.satuan : ''}` : b.seri ? `deret ${b.seri[0]?.data.join(',')}` : 'tabel'
-          } | sumber: ${b.sitasi.dokumen}${b.sitasi.halaman ? ' hlm ' + b.sitasi.halaman : ''}`
+            b.nilai !== undefined && b.nilai !== null
+              ? `nilai ${b.nilai}${b.satuan ? ' ' + b.satuan : ''}`
+              : b.seri
+                ? `deret ${b.seri[0]?.data.length ?? 0} titik`
+                : 'tabel'
+          } | bentuk ${b.bentukDisarankan} | sumber: ${b.sitasi.dokumen}`
     );
     // Layanan RAG menolak `query` di atas 8000 karakter (HTTP 422). Butir
     // ditambahkan sampai anggaran habis supaya seluruh prompt tetap di bawah batas.
@@ -5696,7 +5717,9 @@ ${kpiItems}
       `Halaman yang sedang dibuka: "${halaman.judul}" (id ${halaman.id}) pada dashboard "${dash.title}".`,
       'Kartu yang ada di halaman ini:',
       daftarKartu || '(belum ada kartu)',
-      `Halaman ini berisi ${halaman.widgets.length} kartu dari batas ${MAKS_WIDGET_HALAMAN}. Kartu baru paling banyak ${Math.max(0, MAKS_WIDGET_HALAMAN - halaman.widgets.length)}, kecuali ada kartu yang dihapus dalam usulan yang sama.`,
+      mintaHalamanBaru
+        ? `Admin meminta HALAMAN BARU yang menyambung halaman ini. Halaman baru masih kosong: isi dengan 4 sampai ${MAKS_WIDGET_HALAMAN} kartu "tambah" dari butir yang BELUM dipakai kartu di atas. Hanya aksi "tambah". Isi "judulHalaman" dengan judul halaman baru yang menyambung judul "${halaman.judul}".`
+        : `Halaman ini berisi ${halaman.widgets.length} kartu dari batas ${MAKS_WIDGET_HALAMAN}. Kartu baru paling banyak ${Math.max(0, MAKS_WIDGET_HALAMAN - halaman.widgets.length)}, kecuali ada kartu yang dihapus dalam usulan yang sama.`,
       '',
       'Butir data yang SUDAH DISETUJUI admin (satu-satunya sumber angka yang boleh dipakai):',
       daftarButir || '(belum ada butir yang disetujui)',
@@ -5704,13 +5727,13 @@ ${kpiItems}
       `Permintaan admin: ${perintah}`,
       '',
       'Balas HANYA dengan JSON tanpa penjelasan lain, bentuk:',
-      '{"ringkasan":"satu kalimat tentang usulan ini","perubahan":[',
-      '{"aksi":"tambah","widget":{"id":"w-baru-1","type":"kpi","title":"...","confidence":"sumber","grid":{"x":0,"y":0,"w":3,"h":2},"kpi":{"value":123,"unit":"..."},"citations":[{"id":"c1","docName":"...","page":1,"chunkSnippet":"...","confidenceScore":0.9,"date":"..."}]},"alasan":"..."},',
+      `{"ringkasan":"satu kalimat tentang usulan ini",${mintaHalamanBaru ? '"judulHalaman":"...",' : ''}"perubahan":[`,
+      '{"aksi":"tambah","butirId":"<id butir>","bentuk":"kpi|bar|line|area|donut|table","judul":"judul kartu","alasan":"..."},',
       '{"aksi":"hapus","widgetId":"w-1","alasan":"..."},',
-      '{"aksi":"ubah","widgetId":"w-2","widget":{...},"alasan":"..."},',
+      '{"aksi":"ubah","widgetId":"w-2","butirId":"<id butir>","bentuk":"bar","judul":"...","alasan":"..."},',
       '{"aksi":"urutkan","urutan":["w-3","w-1"],"alasan":"..."}]}',
       '',
-      'Aturan wajib: JANGAN mengarang angka. Semua nilai harus berasal dari butir di atas, dan setiap kartu baru WAJIB menyertakan citations dengan docName dari butir. Jangan menyentuh halaman lain.',
+      'Aturan wajib: setiap kartu "tambah"/"ubah" WAJIB menyebut butirId dari daftar butir di atas. JANGAN menulis angka sendiri: angka, deret, dan sumber diambil sistem dari butir. Butir berbentuk deret cocok untuk bar/line/area/donut, butir bernilai tunggal untuk kpi, butir tabel untuk table. Jangan menyentuh halaman lain.',
     ].join('\n');
 
     let teksJawaban = '';
@@ -5750,14 +5773,31 @@ ${kpiItems}
       });
     }
 
-    const validasi = validasiPerubahan(mentah?.perubahan, halaman);
+    // Kartu dibangun dari butir (angka + deret + sumber), bukan dari isi tulisan
+    // model. Kartu "tambah" yang tidak bisa dibangun dibuang, bukan menggagalkan
+    // seluruh usulan.
+    const dariButir = bangunDariButir(mentah?.perubahan, butir) as any[] | unknown;
+    let perubahanMentah = Array.isArray(dariButir)
+      ? dariButir.filter((p: any) => !(p?.aksi === 'tambah' && !p?.widget))
+      : dariButir;
+
+    // Halaman baru: sasaran validasi adalah halaman kosong, dan hanya "tambah".
+    const judulBaru = mintaHalamanBaru
+      ? String(mentah?.judulHalaman || '').trim().slice(0, 60) || `${halaman.judul} (lanjutan)`
+      : '';
+    if (mintaHalamanBaru && Array.isArray(perubahanMentah)) {
+      perubahanMentah = perubahanMentah.filter((p: any) => p?.aksi === 'tambah');
+    }
+    const sasaran = mintaHalamanBaru ? { id: `${halaman.id}-baru`, judul: judulBaru, widgets: [] } : halaman;
+
+    const validasi = validasiPerubahan(perubahanMentah, sasaran);
     if (!validasi.sah) {
-      return res.status(422).json({ error: validasi.galat || 'Usulan tidak bisa dipakai.' });
+      return res.status(422).json({ error: validasi.galat || 'Usulan tidak bisa dipakai.', judulHalaman: sasaran.judul });
     }
 
     // Pratinjau dihitung sekarang, supaya admin melihat hasilnya sebelum menyetujui.
     // Kartu baru yang melewati sisa ruang halaman dibuang, bukan menggagalkan usulan.
-    const pangkas = pangkasTambahan(validasi.perubahan, halaman.widgets.length);
+    const pangkas = pangkasTambahan(validasi.perubahan, sasaran.widgets.length);
     if (pangkas.perubahan.length === 0) {
       return res.status(409).json({
         error: `Halaman "${halaman.judul}" sudah berisi ${halaman.widgets.length} kartu (batas ${MAKS_WIDGET_HALAMAN}). Hapus satu kartu dulu, atau buat halaman baru.`,
@@ -5765,7 +5805,7 @@ ${kpiItems}
       });
     }
     const perubahanFinal = pangkas.perubahan;
-    const pratinjau = terapkanPerubahan(halaman.widgets, perubahanFinal);
+    const pratinjau = terapkanPerubahan(sasaran.widgets, perubahanFinal);
     if (!pratinjau.berhasil) {
       return res.status(409).json({ error: pratinjau.galat || 'Usulan tidak bisa diterapkan pada halaman ini.' });
     }
@@ -5774,18 +5814,20 @@ ${kpiItems}
       tenantId,
       dashboardId,
       halamanId: halaman.id,
-      judulHalaman: halaman.judul,
+      judulHalaman: mintaHalamanBaru ? judulBaru : halaman.judul,
       ringkasan: String(mentah?.ringkasan || ringkasUsulan(perubahanFinal)).slice(0, 300),
       perubahan: perubahanFinal,
       asal: 'chat',
       dibuatOleh: session.userId,
       dibuatOlehNama: session.name,
+      ...(mintaHalamanBaru ? { halamanBaru: { judul: judulBaru } } : {}),
     });
 
     res.status(201).json({
       usulan,
       ringkasanPerubahan: ringkasUsulan(perubahanFinal),
-      judulHalaman: halaman.judul,
+      judulHalaman: mintaHalamanBaru ? judulBaru : halaman.judul,
+      halamanBaru: mintaHalamanBaru,
       dipangkas: pangkas.dipangkas,
       jumlahKartuSetelah: pratinjau.jumlahAkhir,
       pratinjauWidgets: pratinjau.widgets,
@@ -5826,7 +5868,8 @@ ${kpiItems}
     const halaman = halamanDari(dash, usulan.halamanId);
     if (!halaman) return res.status(404).json({ error: 'Halamannya sudah tidak ada.' });
 
-    const hasil = terapkanPerubahan(halaman.widgets, usulan.perubahan);
+    // Usulan "halaman baru" diterapkan ke halaman kosong, bukan ke halaman asal.
+    const hasil = terapkanPerubahan(usulan.halamanBaru ? [] : halaman.widgets, usulan.perubahan);
     if (!hasil.berhasil) {
       db.updateUsulanHalaman(usulan.id, tenantId, { catatan: hasil.galat });
       return res.status(409).json({ error: hasil.galat || 'Usulan tidak bisa diterapkan.' });
@@ -5836,8 +5879,18 @@ ${kpiItems}
       dash.halaman && dash.halaman.length > 0
         ? dash.halaman
         : [{ id: halaman.id, judul: halaman.judul, widgets: halaman.widgets }];
-    const halamanBaru = daftarHalaman.map((h) => (h.id === halaman.id ? { ...h, widgets: hasil.widgets } : h));
-    const aktif = dash.halamanAktifId || halaman.id;
+    let halamanBaru: HalamanDashboard[];
+    let aktif = dash.halamanAktifId || halaman.id;
+    if (usulan.halamanBaru) {
+      // Sisipkan tepat setelah halaman asal, lalu buka halaman barunya.
+      const idBaru = `hlm-${Date.now().toString(36)}`;
+      const posisi = daftarHalaman.findIndex((h) => h.id === halaman.id);
+      halamanBaru = [...daftarHalaman];
+      halamanBaru.splice(posisi + 1, 0, { id: idBaru, judul: usulan.halamanBaru.judul, widgets: hasil.widgets });
+      aktif = idBaru;
+    } else {
+      halamanBaru = daftarHalaman.map((h) => (h.id === halaman.id ? { ...h, widgets: hasil.widgets } : h));
+    }
     const halamanAktif = halamanBaru.find((h) => h.id === aktif) || halamanBaru[0];
 
     const diperbarui = db.updateDashboard(

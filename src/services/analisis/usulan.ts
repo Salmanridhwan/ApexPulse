@@ -13,6 +13,7 @@
  */
 
 import type { ButirData, Dashboard, HalamanDashboard, PerubahanHalaman, UsulanHalaman, WidgetSpec } from '../../types';
+import { butirKeWidget } from './butirKeWidget';
 
 /** Batas widget per halaman — sama dengan batas kanvas. */
 export const MAKS_WIDGET_HALAMAN = 9;
@@ -43,7 +44,57 @@ function angkaMasukAkal(w: WidgetSpec | undefined): boolean {
     }
   }
   if (w.table && (!Array.isArray(w.table.columns) || !Array.isArray(w.table.rows))) return false;
-  return true;
+  if (w.dataKosong === true) return true;
+  /**
+   * Kartu bertipe grafik WAJIB membawa deretnya. Dulu kartu `bar`/`line` tanpa
+   * `chart` lolos (tidak ada yang diperiksa), lalu tampil sebagai kartu kosong
+   * setelah Terapkan — persis keluhan "widget muncul tapi chartnya tidak ada".
+   */
+  if (w.type === 'table') return !!w.table && w.table.rows.length > 0;
+  if (TIPE_TANPA_DERET.has(w.type)) return !!w.kpi || !!w.chart || !!w.narasi;
+  return !!w.chart && w.chart.series.some((s) => s.data.length > 0);
+}
+
+/** Tipe yang cukup dengan satu angka (atau teks) — tidak butuh deret grafik. */
+const TIPE_TANPA_DERET = new Set<string>(['kpi', 'bullet-target', 'gauge', 'narasi', 'kpi-strip']);
+
+/** Bentuk yang boleh diminta model untuk kartu dari butir. */
+const BENTUK_SAH = new Set<string>([
+  'kpi', 'bar', 'line', 'area', 'donut', 'pie', 'table', 'horizontal-bar', 'stacked-bar', 'combo', 'gauge',
+]);
+
+/**
+ * KARTU DIBANGUN DARI BUTIR, BUKAN DARI MODEL.
+ *
+ * Model hanya memilih butir mana dan bentuk apa (`butirId` + `widget.type`).
+ * Angka, deret, tabel, dan sitasi diambil dari butir lewat `butirKeWidget`,
+ * jadi kartu grafik selalu membawa datanya. Perubahan yang tidak menyebut butir
+ * dibiarkan apa adanya (validasi yang memutuskan).
+ */
+export function bangunDariButir(
+  perubahan: unknown,
+  butir: ButirData[],
+  stempel: string = String(Date.now())
+): unknown {
+  if (!Array.isArray(perubahan)) return perubahan;
+  const peta = new Map(butir.map((b) => [b.id, b]));
+  return perubahan.map((item, i) => {
+    if (!item || typeof item !== 'object') return item;
+    const p = item as PerubahanHalaman & { bentuk?: string; judul?: string };
+    if (p.aksi !== 'tambah' && p.aksi !== 'ubah') return p;
+    const id = String(p.butirId || (p.widget as any)?.butirId || '').trim();
+    const b = id ? peta.get(id) : undefined;
+    if (!b) return p;
+    const bentukMinta = String(p.bentuk || p.widget?.type || '').trim();
+    const w = butirKeWidget(b, i + 1, BENTUK_SAH.has(bentukMinta) ? { bentuk: bentukMinta as WidgetSpec['type'] } : undefined);
+    if (!w) return p;
+    const judul = String(p.judul || p.widget?.title || '').trim();
+    return {
+      ...p,
+      butirId: b.id,
+      widget: { ...w, id: `w-usl-${stempel}-${i + 1}`, ...(judul ? { title: judul.slice(0, 80) } : {}) },
+    };
+  });
 }
 
 /**

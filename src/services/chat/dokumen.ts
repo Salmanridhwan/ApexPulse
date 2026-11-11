@@ -25,11 +25,19 @@ const POLA: RegExp[] = [
  */
 const BUKAN_INVENTARIS = /\bdokumen\s+(?:sop|rkap|lra|rba|laporan|kontrak|keuangan|anggaran|kinerja|audit|perjanjian|studi)\b/i;
 
+/**
+ * Pertanyaan yang menghitung NILAI di dalam dokumen ("berapa rata-rata nilai
+ * piutang per dokumen?") juga pertanyaan isi. Dulu kalimat ini dijawab dengan
+ * daftar berkas karena memuat "berapa … dokumen".
+ */
+const HITUNG_ISI = /\b(?:rata[- ]?rata|nilai|nominal|rupiah|persen(?:tase)?|piutang|pendapatan|beban|laba|aset|saldo)\b|\b(?:per|setiap|tiap)\s+dokumen\b/i;
+
 /** Apakah pengguna menanyakan ISI repositori (bukan isi salah satu dokumen)? */
 export function adalahPertanyaanDokumen(prompt: unknown): boolean {
   const t = String(prompt || '').trim();
   if (!t || t.length > 240) return false;
   if (BUKAN_INVENTARIS.test(t)) return false;
+  if (HITUNG_ISI.test(t)) return false;
   return POLA.some((p) => p.test(t));
 }
 
