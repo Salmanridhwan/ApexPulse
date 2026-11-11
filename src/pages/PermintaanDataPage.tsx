@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Info,
   ArrowLeft,
   CheckCircle2,
   Clock,
@@ -111,6 +112,12 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
+  /** Warna kotak pesan: hasil negatif (ditolak, perlu data) tidak boleh tampil hijau seperti sukses. */
+  const [nadaPesan, setNadaPesan] = useState<'pos' | 'warn' | 'netral'>('pos');
+  const kabari = (teks: string, nada: 'pos' | 'warn' | 'netral' = 'pos') => {
+    setPesan(teks);
+    setNadaPesan(nada);
+  };
   const [saring, setSaring] = useState<StatusPermintaan | 'semua'>('semua');
   const [terpilih, setTerpilih] = useState<PermintaanDaftar | null>(null);
   /** Id permintaan yang sedang menunggu konfirmasi hapus (admin). */
@@ -168,7 +175,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
           targetSelesai: fTarget,
         }),
       });
-      setPesan('Permintaan terkirim. Admin instansi akan menindaklanjuti.');
+      kabari('Permintaan terkirim. Admin instansi akan menindaklanjuti.');
       setBukaForm(false);
       setFData('');
       setFArah('');
@@ -193,7 +200,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
         body: JSON.stringify({ status, ...(alasan ? { alasanPenolakan: alasan } : {}) }),
       });
       setTerpilih(hasil as PermintaanDaftar);
-      setPesan(`Status diubah menjadi ${LABEL_STATUS[status]}.`);
+      kabari(`Status diubah menjadi ${LABEL_STATUS[status]}.`, status === 'ditolak' ? 'netral' : status === 'perlu_data' ? 'warn' : 'pos');
       setTampilTolak(false);
       setAlasanTolak('');
       await muat();
@@ -219,7 +226,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
       });
       setTerpilih(hasil as PermintaanDaftar);
       setBalasan('');
-      setPesan('Catatan terkirim.');
+      kabari('Catatan terkirim.');
       await muat();
     } catch (err: any) {
       setGalat(err?.message || 'Gagal mengirim catatan.');
@@ -269,7 +276,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
     setGalat(null);
     try {
       await minta(`/api/permintaan/${p.id}`, { method: 'DELETE' });
-      setPesan('Permintaan dihapus.');
+      kabari('Permintaan dihapus.', 'netral');
       setTerpilih(null);
       await muat();
     } catch (err: any) {
@@ -302,7 +309,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
             setTerpilih(null);
             setTampilTolak(false);
           }}
-          className="p-1.5 rounded-control text-ink-3 hover:bg-surface-2 shrink-0"
+          className="inline-flex items-center justify-center min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 p-1.5 rounded-control text-ink-3 hover:bg-surface-2 shrink-0"
           aria-label="Tutup detail"
         >
           <X className="w-4 h-4" />
@@ -399,7 +406,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
               <button
                 disabled={sibuk}
                 onClick={() => void ubahStatus('diproses')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
               >
                 <Clock className="w-3.5 h-3.5" /> Ambil & proses
               </button>
@@ -408,7 +415,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
               <button
                 disabled={sibuk}
                 onClick={() => void ubahStatus('perlu_data')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-coral bg-coral/10 hover:bg-coral/20 border border-coral/30 rounded-control disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-coral bg-coral/10 hover:bg-coral/20 border border-coral/30 rounded-control disabled:opacity-50"
               >
                 <AlertTriangle className="w-3.5 h-3.5" /> Minta data tambahan
               </button>
@@ -417,7 +424,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
               <button
                 disabled={sibuk}
                 onClick={() => void ubahStatus('selesai')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pos bg-pos/10 hover:bg-pos/20 border border-pos/30 rounded-control disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-pos bg-pos/10 hover:bg-pos/20 border border-pos/30 rounded-control disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Tandai selesai
               </button>
@@ -425,7 +432,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
             <button
               disabled={sibuk}
               onClick={() => setTampilTolak((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neg bg-neg/10 hover:bg-neg/20 border border-neg/30 rounded-control disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-neg bg-neg/10 hover:bg-neg/20 border border-neg/30 rounded-control disabled:opacity-50"
             >
               <X className="w-3.5 h-3.5" /> Tolak
             </button>
@@ -468,7 +475,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
               <button
                 disabled={sibuk}
                 onClick={() => void kirimCatatan()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" /> Kirim
               </button>
@@ -485,7 +492,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
                 <button
                   disabled={sibuk}
                   onClick={() => inputBerkas.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-brand/10 border border-line rounded-control disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-brand/10 border border-line rounded-control disabled:opacity-50"
                 >
                   <Upload className="w-3.5 h-3.5" /> Lampirkan dokumen
                 </button>
@@ -530,7 +537,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
                       void hapus(terpilih);
                     }}
                     data-testid="konfirmasi-hapus-permintaan"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-neg hover:opacity-90 rounded-control disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-white bg-neg hover:opacity-90 rounded-control disabled:opacity-50"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Ya, hapus permanen
                   </button>
@@ -549,7 +556,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
                 disabled={sibuk}
                 onClick={() => setKonfirmasiHapusId(terpilih.id)}
                 data-testid="hapus-permintaan-admin"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neg bg-neg/10 hover:bg-neg/20 border border-neg/30 rounded-control disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-neg bg-neg/10 hover:bg-neg/20 border border-neg/30 rounded-control disabled:opacity-50"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Hapus permintaan
               </button>
@@ -567,7 +574,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
         <div className="flex items-start gap-3 min-w-0">
           <button
             onClick={onBackToWorkspace}
-            className="p-2 rounded-control text-ink-2 hover:bg-surface-2 border border-line shrink-0"
+            className="inline-flex items-center justify-center min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 p-2 rounded-control text-ink-2 hover:bg-surface-2 border border-line shrink-0"
             aria-label="Kembali ke workspace"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -591,14 +598,15 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => void muat()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-brand/10 border border-line rounded-control"
+            aria-label="Segarkan daftar permintaan"
+            className="inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 px-3 py-1.5 text-xs font-semibold text-brand-ink bg-surface-2 hover:bg-brand/10 border border-line rounded-control"
           >
             <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Segarkan</span>
           </button>
           {!admin && (
             <button
               onClick={() => setBukaForm((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control"
+              className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control"
               data-testid="tombol-permintaan-baru"
             >
               <Plus className="w-3.5 h-3.5" /> Permintaan Baru
@@ -617,8 +625,22 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
         </div>
       )}
       {pesan && (
-        <div className="mb-4 p-3 rounded-card border bg-pos/15 border-pos/30 text-pos text-xs flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+        <div
+          className={`mb-4 p-3 rounded-card border text-xs flex items-start gap-2 ${
+            nadaPesan === 'pos'
+              ? 'bg-pos/15 border-pos/30 text-pos'
+              : nadaPesan === 'warn'
+                ? 'bg-coral/10 border-coral/30 text-coral'
+                : 'bg-surface-2 border-line text-ink-2'
+          }`}
+        >
+          {nadaPesan === 'pos' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+          ) : nadaPesan === 'warn' ? (
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          ) : (
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          )}
           <span className="flex-1">{pesan}</span>
           <button onClick={() => setPesan(null)} aria-label="Tutup pesan">
             <X className="w-3.5 h-3.5" />
@@ -693,7 +715,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
             <button
               disabled={sibuk || fData.trim().length < 10}
               onClick={() => void kirimBaru()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90 rounded-control disabled:opacity-50"
               data-testid="kirim-permintaan"
             >
               <Send className="w-3.5 h-3.5" /> Kirim permintaan
@@ -713,7 +735,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
       <div className="flex items-center gap-1.5 flex-wrap mb-3">
         <button
           onClick={() => setSaring('semua')}
-          className={`px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
+          className={`min-h-11 sm:min-h-0 px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
             saring === 'semua' ? 'bg-brand/15 text-brand-ink border-brand/30' : 'bg-surface text-ink-2 border-line hover:bg-surface-2'
           }`}
         >
@@ -725,7 +747,7 @@ const PermintaanDataPage: React.FC<PermintaanDataPageProps> = ({ tenantId, peran
             <button
               key={s}
               onClick={() => setSaring(s)}
-              className={`px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
+              className={`min-h-11 sm:min-h-0 px-2.5 py-1 text-[11px] font-semibold rounded-control border transition-colors ${
                 saring === s ? 'bg-brand/15 text-brand-ink border-brand/30' : 'bg-surface text-ink-2 border-line hover:bg-surface-2'
               }`}
             >

@@ -45,7 +45,7 @@ export const areaRingkas: Pembangun = (d: DataChart, g: GayaVarian, s: number) =
       boundaryGap: false,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: g.teks3, fontSize: 9 * s, interval: lompat - 1, margin: 7 * s },
+      axisLabel: { color: g.teks3, fontSize: 9 * s, interval: lompat - 1, margin: 7 * s, alignMinLabel: 'left', alignMaxLabel: 'right' },
     },
     yAxis: {
       type: 'value',

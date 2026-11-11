@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { saranPertanyaan, SARAN_UMUM } from '../services/chat/saranPertanyaan';
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,7 +17,6 @@ import {
   Table2,
   Timer,
   Trash2,
-  Wand2,
   X,
 } from 'lucide-react';
 import type { UsulanHalaman } from '../types';
@@ -216,28 +214,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       batal = true;
     };
   }, [isOpen, dashboardId, isStreaming, tenantId]);
-
-  // Saran pertanyaan disusun dari butir data yang SUDAH DISETUJUI di instansi
-  // aktif. Saran tertulis tetap ("laba bersih", "total aset") sering memakai
-  // istilah yang tidak ada di dokumen, sehingga asisten pasti menjawab tidak ditemukan.
-  const [quickPrompts, setQuickPrompts] = useState<string[]>(SARAN_UMUM);
-  useEffect(() => {
-    if (!isOpen) return;
-    let batalSaran = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/butir-data?status=disetujui&tenantId=${encodeURIComponent(tenantId)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!batalSaran) setQuickPrompts(saranPertanyaan(Array.isArray(data?.butir) ? data.butir : []));
-      } catch {
-        if (!batalSaran) setQuickPrompts(SARAN_UMUM);
-      }
-    })();
-    return () => {
-      batalSaran = true;
-    };
-  }, [isOpen, tenantId]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const prompt = (textToSend || inputPrompt).trim();
@@ -783,35 +759,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Suggested Quick Prompts */}
-      <div className="px-4 py-2 bg-surface-2/50 border-t border-line flex gap-1.5 overflow-x-auto no-scrollbar">
-        {quickPrompts.map((qp, idx) => (
-          <button
-            key={idx}
-            disabled={isStreaming}
-            onClick={() => handleSendMessage(qp)}
-            className="text-[11px] whitespace-nowrap px-2.5 py-1 bg-surface hover:bg-surface-2 border border-line rounded-full text-ink-2 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {qp}
-          </button>
-        ))}
-      </div>
-
-      {/* Konteks halaman — keterangan, bukan tombol: admin tidak perlu
-          mengaktifkan apa pun. Minta perubahan lewat kalimat biasa. */}
-      {dashboardId && halamanId && (
-        <div
-          className="px-3 pt-2 border-t border-line bg-surface flex items-center gap-1.5 text-[10px] text-ink-3"
-          data-testid="konteks-halaman-asisten"
-        >
-          <Wand2 className="w-3 h-3 shrink-0 text-brand" />
-          <span>
-            Halaman{halamanJudul ? ` "${halamanJudul}"` : ''} ikut terbaca. Minta perubahan seperti biasa —
-            hasilnya tampil sebagai usulan dulu, halaman baru berubah setelah Anda menekan Terapkan.
-          </span>
-        </div>
-      )}
 
       {/* Kartu pratinjau usulan */}
       {usulanAktif && (

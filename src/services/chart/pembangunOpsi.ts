@@ -135,6 +135,20 @@ export const sumbuKategori = (
   axisLabel: { color: g.teks3, fontSize: 9.5 * s, interval: jarakLabel },
 });
 
+/**
+ * Sumbu kategori untuk grafik garis/area: garis menempel ke tepi kiri dan kanan
+ * plot. Label pertama rata kiri dan label terakhir rata kanan, supaya
+ * `containLabel` tidak menyisakan celah setengah label di ujung garis.
+ */
+export const sumbuGaris = (g: GayaVarian, s: number, kategori: string[], jarakLabel: number | 'auto' = 0) => {
+  const dasar = sumbuKategori(g, s, kategori, false, jarakLabel);
+  return {
+    ...dasar,
+    boundaryGap: false,
+    axisLabel: { ...dasar.axisLabel, alignMinLabel: 'left', alignMaxLabel: 'right' },
+  };
+};
+
 const sumbuNilai = (g: GayaVarian, s: number, opsi: { maks?: number; satuanSumbu?: string; format?: (v: number) => string } = {}) => ({
   type: 'value',
   max: opsi.maks,
@@ -394,14 +408,14 @@ export const areaGradasi: Pembangun = (d, g, s) => {
   const nilai = deret(d);
   const akhir = nilai.length - 1;
   return {
-    grid: { left: 6 * s, right: 26 * s, top: 16 * s, bottom: 4, containLabel: true },
+    grid: { left: 6 * s, right: 8 * s, top: 16 * s, bottom: 4, containLabel: true },
     tooltip: {
       ...tooltip(g, s),
       trigger: 'axis',
       axisPointer: { type: 'line', lineStyle: { color: `${g.aksen}77`, type: 'dashed', width: 1 } },
       formatter: (p: any[]) => `<div style="font-size:${10 * s}px;color:${g.teks3}">${p[0]?.name ?? ''}</div><b>${labelNilai(Number(p[0]?.value ?? 0), d)}</b>`,
     },
-    xAxis: { ...sumbuKategori(g, s, d.kategori, false, 'auto'), boundaryGap: false },
+    xAxis: sumbuGaris(g, s, d.kategori, 'auto'),
     yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     series: [
       {
@@ -456,9 +470,9 @@ export const areaGradasi: Pembangun = (d, g, s) => {
 
 /** Garis tunggal tanpa area. */
 export const garisTren: Pembangun = (d, g, s) => ({
-  grid: { left: 6 * s, right: 16 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
+  grid: { left: 6 * s, right: 6 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
   tooltip: { ...tooltip(g, s), trigger: 'axis' },
-  xAxis: { ...sumbuKategori(g, s, d.kategori), boundaryGap: false },
+  xAxis: sumbuGaris(g, s, d.kategori),
   yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
   ...(d.seri.length > 1 ? { legend: legendaAtas(g, s) } : {}),
   // Semua seri digambar; seri pertama memakai warna aksen gaya.
@@ -708,9 +722,9 @@ export const barKapsul: Pembangun = (d, g, s) => {
 export const areaBanding: Pembangun = (d, g, s) => {
   const warna = (k: number) => (k === 0 ? g.aksen2 : k === 1 ? g.teks : g.palet[k % g.palet.length]);
   return {
-    grid: { left: 6 * s, right: 14 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
+    grid: { left: 6 * s, right: 6 * s, top: (d.seri.length > 1 ? 26 : 16) * s, bottom: 4, containLabel: true },
     tooltip: { ...tooltip(g, s), trigger: 'axis' },
-    xAxis: { ...sumbuKategori(g, s, d.kategori, false, 'auto'), boundaryGap: false },
+    xAxis: sumbuGaris(g, s, d.kategori, 'auto'),
     yAxis: sumbuNilai(g, s, { format: ringkasSumbu }),
     ...(d.seri.length > 1 ? { legend: legendaAtas(g, s) } : {}),
     series: (d.seri.length ? d.seri : [{ nama: 'Nilai', data: [] }]).map((sr, k) => ({

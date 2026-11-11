@@ -21,6 +21,17 @@ export function dariSeri(n: number): Date {
   return new Date(Math.round((n - 25569) * 86400000));
 }
 
+/**
+ * Judul kolom yang tersimpan sebagai TANGGAL, bukan teks bulan. Excel mengubah
+ * ketikan "Des 1" menjadi tanggal 1 Des 2001 (tampil "Dec-01"), sehingga kolom
+ * bulan itu tidak dikenali pola teks. Mengembalikan nama bulan ("Des") bila
+ * nilainya bilangan bulat dalam rentang nomor seri, selain itu null.
+ */
+export function bulanDariSeri(v: unknown): string | null {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < SERI_MIN || v > SERI_MAKS) return null;
+  return NAMA_BULAN[dariSeri(v).getUTCMonth()];
+}
+
 /** "12 Mar 2026". */
 export function teksTanggal(d: Date): string {
   return `${d.getUTCDate()} ${NAMA_BULAN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;

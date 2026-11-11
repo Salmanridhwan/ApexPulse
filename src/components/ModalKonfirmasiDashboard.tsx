@@ -1,5 +1,6 @@
 import { Copy, LayoutGrid, Trash2 } from 'lucide-react';
 import type { Dashboard } from '../types';
+import { semuaWidget } from '../services/dashboard/halaman';
 
 interface Props {
   aksi?: 'hapus' | 'duplikat' | 'buat';
@@ -12,7 +13,9 @@ interface Props {
 export function ModalKonfirmasiDashboard({ aksi = 'hapus', dashboard, onKonfirmasi, onBatal }: Props) {
   const hapus = aksi === 'hapus';
   const buat = aksi === 'buat';
-  const jumlah = dashboard?.widgets?.length ?? 0;
+  // Semua halaman, bukan proyeksi halaman aktif: kartu menulis "39 Total Widget",
+  // jadi modal hapus permanen tidak boleh menulis "5 widget".
+  const jumlah = dashboard ? semuaWidget(dashboard).length : 0;
 
   return (
     <div

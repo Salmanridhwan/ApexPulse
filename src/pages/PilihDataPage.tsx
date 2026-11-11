@@ -164,6 +164,18 @@ function titikBelumTerisi(b: ButirData): number {
  * strukturnya berubah. Salinan selalu ditimpa jawaban server terbaru, jadi
  * dokumen yang baru dianalisis ikut muncul tanpa perlu membersihkan cache.
  */
+/**
+ * Pesan galat untuk pengguna. `fetch` yang gagal tersambung (server mati atau
+ * sedang restart) melempar TypeError berbahasa Inggris seperti "Failed to fetch".
+ * Pesan itu diganti petunjuk berbahasa Indonesia, galat dari server tetap utuh.
+ */
+function pesanGalat(e: unknown, cadangan: string): string {
+  if (e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String((e as Error)?.message))) {
+    return 'Server tidak bisa dihubungi. Mungkin sedang dimulai ulang atau koneksi terputus. Tunggu sebentar, lalu coba lagi.';
+  }
+  return e instanceof Error && e.message ? e.message : cadangan;
+}
+
 const KUNCI_CACHE = 'pilih-data-cache-v1';
 
 function bacaCache(): { butir: ButirData[]; ringkas: RingkasSumber | null } | null {
@@ -451,7 +463,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
       setDariCache(false);
       simpanCache(daftar, isi?.ringkas ?? null);
     } catch (e) {
-      const pesan = e instanceof Error ? e.message : 'Daftar data tidak bisa dimuat.';
+      const pesan = pesanGalat(e, 'Daftar data tidak bisa dimuat.');
       // Salinan tersimpan tetap ditampilkan; beri tahu bahwa angkanya belum segar.
       setGalat(bacaCache() ? `${pesan} Menampilkan data tersimpan.` : pesan);
     } finally {
@@ -606,7 +618,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
       if (!res.ok) throw new Error(isi?.error || 'Analisis gagal diulang.');
       setCekat((n) => n + 1);
     } catch (e) {
-      setGalat(e instanceof Error ? e.message : 'Analisis gagal diulang.');
+      setGalat(pesanGalat(e, 'Analisis gagal diulang.'));
     } finally {
       setMengulang(null);
     }
@@ -648,7 +660,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
       simpanKanvas([awal]);
       onSelesai(data.dashboard as Dashboard, String(data?.ringkasan || 'Dashboard dibuat.'));
     } catch (e) {
-      setGalat(e instanceof Error ? e.message : 'Dashboard gagal dibuat.');
+      setGalat(pesanGalat(e, 'Dashboard gagal dibuat.'));
     } finally {
       setMembuat(false);
     }
@@ -682,7 +694,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
       if (!res.ok || !data?.dashboard) throw new Error(data?.error || 'Dashboard rekomendasi gagal disusun.');
       onSelesai(data.dashboard as Dashboard, String(data?.ringkasan || 'Dashboard rekomendasi siap.'));
     } catch (e) {
-      setGalat(e instanceof Error ? e.message : 'Dashboard rekomendasi gagal disusun.');
+      setGalat(pesanGalat(e, 'Dashboard rekomendasi gagal disusun.'));
     } finally {
       setMembuatReko(false);
     }
@@ -715,7 +727,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
             key={t.id}
             onClick={() => setTabMini(t.id)}
             data-testid={`tab-mini-${t.id}`}
-            className={`px-3 py-1.5 text-[11px] font-semibold border-b-2 -mb-px transition-colors ${
+            className={`min-h-11 min-w-11 px-3 py-1.5 text-[11px] font-semibold border-b-2 -mb-px transition-colors ${
               tabMini === t.id ? 'border-brand text-brand-ink' : 'border-transparent text-ink-3 hover:text-ink'
             }`}
           >
@@ -749,7 +761,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                   key={k}
                   onClick={() => setKategoriAktif(k)}
                   data-testid={`filter-kategori-${k}`}
-                  className={`px-2.5 py-1.5 rounded-control text-[11px] font-semibold whitespace-nowrap border transition-colors ${
+                  className={`min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 px-2.5 py-1.5 rounded-control text-[11px] font-semibold whitespace-nowrap border transition-colors ${
                     kategoriAktif === k
                       ? 'bg-brand text-on-brand border-brand'
                       : 'bg-surface text-ink-2 border-line hover:bg-surface-2'
@@ -879,7 +891,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
             const semua = daftar.every((b) => diHalamanAktif.has(b.id));
             return (
               <section key={kategori} className="mb-5" data-testid={`kategori-data-${kategori}`}>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border ${
                       WARNA_KATEGORI[kategori] || 'bg-surface-2 text-ink-2 border-line'
@@ -893,7 +905,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                   </span>
                   <button
                     onClick={() => alihkanKategori(daftar)}
-                    className="ml-auto text-[10px] font-semibold text-brand-ink hover:underline"
+                    className="w-full sm:w-auto sm:ml-auto min-h-11 lg:min-h-0 text-left sm:text-right whitespace-nowrap text-[11px] sm:text-[10px] font-semibold text-brand-ink hover:underline"
                   >
                     {semua ? 'Keluarkan semua dari halaman ini' : 'Tambah semua ke halaman ini'}
                   </button>
@@ -1011,7 +1023,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                   disabled={membuatReko || membuat || butir.length === 0}
                   data-testid="pilih-data-rekomendasi"
                   title="Pilih cara AI menyusun dashboard"
-                  className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-brand bg-surface border border-brand/40 hover:bg-brand/10 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 min-h-11 lg:min-h-0 px-3.5 py-2 text-xs font-bold text-brand bg-surface border border-brand/40 hover:bg-brand/10 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {membuatReko ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                   {membuatReko ? `AI menyusun… (${modeReko})` : 'Rekomendasi AI'}
@@ -1103,7 +1115,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                   disabled={membuat || !aturan.boleh}
                   title={aturan.boleh ? undefined : aturan.pesan}
                   data-testid="pilih-data-buat"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 min-h-11 lg:min-h-0 px-4 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {membuat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
                   {membuat ? 'Menyusun…' : 'Buat dashboard'}
@@ -1127,7 +1139,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                     onClick={tambahChartTerkait}
                     data-testid="tambah-chart-terkait"
                     title={saranAturan.map((b) => b.nama).join(', ')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 font-semibold text-brand border border-brand/40 hover:bg-brand/10 rounded-control"
+                    className="inline-flex items-center gap-1 min-h-11 lg:min-h-0 px-2.5 py-1 font-semibold text-brand border border-brand/40 hover:bg-brand/10 rounded-control"
                   >
                     <Plus className="w-3 h-3" />
                     Tambahkan {saranAturan.length} chart terkait
@@ -1177,7 +1189,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
             <button
               onClick={tambahHalaman}
               data-testid="tambah-halaman-kanvas"
-              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+              className="shrink-0 inline-flex items-center justify-center gap-1 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 px-2 py-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
             >
               <Plus className="w-3 h-3" />
               Halaman

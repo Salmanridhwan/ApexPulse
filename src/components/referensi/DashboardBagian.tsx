@@ -70,25 +70,55 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
       <div
         data-testid="halaman-bagian"
         className={`grid grid-cols-12 gap-3 px-4 sm:px-5 pb-3 ${penuh ? 'h-full overflow-auto gulir-tema' : ''}`}
-        style={{ gridAutoRows: `${BARIS}px`, minHeight: TINGGI_MIN, fontSize: '18px' }}
+        // Mode presentasi (`penuh`): baris ikut melar mengisi tinggi layar, supaya
+        // bagian bawah tidak kosong. Di galeri tetap 50px per baris.
+        style={{ gridAutoRows: penuh ? `minmax(${BARIS}px, 1fr)` : `${BARIS}px`, minHeight: TINGGI_MIN, fontSize: '18px' }}
       >
         {isi.map((w) => (
-          <KartuBagian key={w.id} widget={w} gaya={gayaKartu} contoh={contoh} />
+          <KartuBagian
+            key={w.id}
+            widget={w}
+            gaya={gayaKartu}
+            contoh={contoh}
+            pengganti={w.dataKosong ? kartuContoh(halaman?.widgets ?? [], w) : undefined}
+          />
         ))}
       </div>
     </BingkaiKorporat>
   );
 };
 
+/**
+ * KARTU KOSONG DIGAMBAR DENGAN ANGKA CONTOH TEMPLATE (permintaan pemilik
+ * aplikasi: chart tampil penuh, bukan kotak kosong). Kartu template dicari lewat
+ * judulnya di halaman yang sama, karena id kartu dibuat ulang saat template
+ * disalin. Hasilnya tetap bertanda `angkaContoh` dan diberi lencana di kartu,
+ * supaya angka contoh tidak pernah terbaca sebagai angka dokumen.
+ */
+function kartuContoh(contohHalaman: WidgetSpec[], w: WidgetSpec): WidgetSpec | undefined {
+  const asal = contohHalaman.find((c) => c.title === w.title);
+  if (!asal) return undefined;
+  if (!asal.chart && !asal.table && !asal.kpi && !asal.narasi) return undefined;
+  return { ...asal, id: w.id, grid: w.grid, dataKosong: false };
+}
+
 /** Satu kartu halaman bagian: bingkai Template Chart + panel sumber dokumen. */
-const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boolean }> = ({ widget, gaya, contoh }) => {
+const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boolean; pengganti?: WidgetSpec }> = ({
+  widget: asli,
+  gaya,
+  contoh,
+  pengganti,
+}) => {
   const mode = useThemeMode();
   const [buka, setBuka] = useState(false);
   const { g } = gayaKatalogWidget(gaya, mode);
   const bk = bingkaiKatalog(g);
+  // Angka contoh hanya dipakai di kartu yang memang kosong; label tetap jujur.
+  const angkaContoh = Boolean(pengganti);
+  const widget = pengganti ?? asli;
   const w: WidgetSpec = { ...widget, style: { ...(widget.style ?? {}), ...gaya } };
   const sendiri = kartuBerjudulSendiri(w);
-  const bisaSumber = !contoh && !w.dataKosong;
+  const bisaSumber = !contoh && !w.dataKosong && !angkaContoh;
   const lebar = Math.max(1, Math.min(12, w.grid?.w ?? 4));
   const tinggi = Math.max(2, w.grid?.h ?? 3);
   const warnaPanel = { panel: g.kartu2.startsWith('rgba') ? g.padanan ?? g.latar : g.kartu2, teks: g.teks, teks2: g.teks2, teks3: g.teks3, aksen: g.aksen, garis: g.garis };
@@ -101,6 +131,11 @@ const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boo
       <span className="text-[0.66em] leading-snug" style={{ color: g.teks3 }}>
         {w.catatanData || 'Belum ada di dokumen instansi.'}
       </span>
+    </div>
+  ) : angkaContoh ? (
+    // Dipudarkan supaya terlihat beda dari kartu yang angkanya dari dokumen.
+    <div className="h-full min-h-0 flex flex-col" style={{ opacity: 0.6 }}>
+      <WidgetRenderer widget={w} preview padat />
     </div>
   ) : (
     <WidgetRenderer widget={w} preview={contoh} padat onKlikKosong={bisaSumber ? () => setBuka(true) : undefined} />
@@ -145,6 +180,16 @@ const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boo
         </div>
       )}
       {bisaSumber && <PanelSumber widget={w} buka={buka} onTutup={() => setBuka(false)} warna={warnaPanel} />}
+      {angkaContoh && (
+        <span
+          data-testid="lencana-angka-contoh"
+          title={asli.catatanData || 'Indikator ini belum ada di dokumen instansi.'}
+          className="pointer-events-auto absolute bottom-1.5 right-2 z-10 rounded-full border px-2 py-[1px] text-[0.56em] font-semibold"
+          style={{ background: g.kartu2.startsWith('rgba') ? g.padanan ?? g.latar : g.kartu2, borderColor: g.garis, color: g.teks2 }}
+        >
+          {asli.dataTertunda ? 'Angka contoh · sedang diisi' : 'Angka contoh · belum ada di dokumen'}
+        </span>
+      )}
     </div>
   );
 };

@@ -53,15 +53,16 @@ test('opsi tanpa legenda/sumbu tidak dirusak', () => {
   assert.equal(hasil.legend, undefined);
 });
 
-test('kategori yang tidak muat diberi dataZoom dalam, bukan label bertumpuk', () => {
+test('kartu sempit tetap menggambar semua kategori, tanpa dataZoom', () => {
   const banyak = {
     xAxis: { type: 'category', data: Array.from({ length: 36 }, (_, i) => `Akun ${i}`) },
     yAxis: { type: 'value' },
     series: [{ type: 'bar', data: new Array(36).fill(1) }],
   } as any;
   const hasil: any = rapikanUntukUkuran(banyak, 470, 188);
-  assert.ok(Array.isArray(hasil.dataZoom) && hasil.dataZoom.length === 1, 'ada dataZoom');
-  assert.ok(hasil.dataZoom[0].endValue < 36, 'tidak menggambar semua kategori sekaligus');
+  assert.equal(hasil.dataZoom, undefined, 'tidak ada pemotongan data');
+  assert.equal(hasil.xAxis.data.length, 36);
+  assert.equal(hasil.xAxis.axisLabel.hideOverlap, true, 'label dijarangkan, bukan bertumpuk');
 });
 
 test('petak treemap memotong nama panjang supaya tidak keluar petak', () => {

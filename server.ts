@@ -82,7 +82,7 @@ import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform
 import { bolehPindahInstansi, bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, butirKeWidget, ringkasHalaman, tataGrid } from './src/services/analisis/butirKeWidget';
 import { cekAturanDashboard, saranTerkait, MIN_CHART_DASHBOARD } from './src/services/analisis/aturanDashboard';
-import { jumlahPerBulan, kolomTanggal } from './src/services/analisis/tanggalSerial';
+import { bulanDariSeri, jumlahPerBulan, kolomTanggal } from './src/services/analisis/tanggalSerial';
 import {
   bacaRencana,
   buatPrompt,
@@ -6223,6 +6223,9 @@ ${kpiItems}
        */
       const kolomBulan: Array<{ c: number; label: string }> = [];
       const POLA_BULAN = /\b(januari|jan|februari|pebruari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|agt|agus|agu|september|sept|sep|oktober|okt|november|nov|desember|des)\b/;
+      const bulanTeksJudul = barisJudul < 0
+        ? 0
+        : (baris[barisJudul]?.sel || []).filter((s) => typeof s === 'string' && POLA_BULAN.test(teks(s).toLowerCase())).length;
       for (let c = 0; c < lebar; c += 1) {
         if (c === kolomLabel) continue;
         // Judul bulan dicari di sekitar baris judul, bukan hanya tepat di baris
@@ -6238,14 +6241,30 @@ ${kpiItems}
             break;
           }
         }
-        if (!judulBulan) continue;
+        if (!judulBulan) {
+          // Judul bulan yang tersimpan sebagai tanggal Excel ("Dec-01"). Hanya
+          // dibaca di baris judul yang sudah memuat minimal 3 bulan teks, supaya
+          // angka biasa di baris lain tidak dianggap bulan.
+          const bulanSeri = bulanTeksJudul >= 3 ? bulanDariSeri(baris[barisJudul]?.sel?.[c]) : null;
+          if (bulanSeri) kolomBulan.push({ c, label: bulanSeri });
+          continue;
+        }
         const m = judulBulan.toLowerCase().match(POLA_BULAN);
         if (!m) continue;
         const tahun = judulBulan.match(/\b(20\d{2})\b/);
         kolomBulan.push({ c, label: `${NAMA_BULAN[m[1]] || m[1]}${tahun ? ` ${tahun[1]}` : ''}` });
       }
-      if (kolomBulan.length >= 3) {
-        const seriPeriode = kolomBulan.slice(0, BATAS_PERIODE).map(({ c, label }) => {
+      // Bulan yang muncul lebih dari sekali (mis. lima kolom "Dec-01".."Dec-05")
+      // hanya diambil kolom pertamanya. Kolom kembarnya tetap ditandai dilewati
+      // di bawah, supaya tidak muncul sebagai butir terpisah.
+      const labelTerpakai = new Set<string>();
+      const kolomBulanUnik = kolomBulan.filter(({ label }) => {
+        if (labelTerpakai.has(label)) return false;
+        labelTerpakai.add(label);
+        return true;
+      });
+      if (kolomBulanUnik.length >= 3) {
+        const seriPeriode = kolomBulanUnik.slice(0, BATAS_PERIODE).map(({ c, label }) => {
           const data: number[] = [];
           const kategori: string[] = [];
           for (let i = mulai; i < baris.length; i += 1) {

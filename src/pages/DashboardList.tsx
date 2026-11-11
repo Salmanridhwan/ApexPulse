@@ -136,7 +136,15 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] text-ink-2 font-semibold">{m.label}</p>
-                <p className="text-xl font-extrabold text-ink mt-0.5 capitalize truncate">{m.nilai}</p>
+                {/* Nilai teks (sektor) memakai huruf lebih kecil di ponsel dan boleh
+                    pindah baris: di 390px "pendidikan" butuh 109px, tersedia 88px. */}
+                <p
+                  className={`font-extrabold text-ink mt-0.5 capitalize ${
+                    /^\d+$/.test(m.nilai) ? 'text-xl truncate' : 'text-sm sm:text-xl break-words leading-tight'
+                  }`}
+                >
+                  {m.nilai}
+                </p>
               </div>
             </div>
           ))}
@@ -206,7 +214,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
               const chartCount = widgetSemua.filter((w) =>
                 ['line', 'bar', 'donut', 'radar'].includes(w.type)
               ).length;
-              const tableCount = dash.widgets.filter((w) => w.type === 'table').length;
+              const tableCount = widgetSemua.filter((w) => w.type === 'table').length;
 
               // Tanpa efek hover (tilt/lift): kartu tampil datar sesuai permintaan.
               return (
@@ -273,11 +281,13 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                   </div>
 
                   {/* Card Bottom Action Bar */}
-                  <div className="px-4 py-3 bg-surface-2/70 border-t border-line flex items-center justify-between gap-2">
+                  {/* Di ponsel bilah aksi boleh pindah baris supaya label tidak melipat,
+                      dan tombol ikon 40x40 (dulu 26x26; salah tekan Hapus paling berbahaya). */}
+                  <div className="px-4 py-3 bg-surface-2/70 border-t border-line flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onSelectDashboard(dash)}
-                        className="btn-primary px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5"
+                        className="btn-primary px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 whitespace-nowrap"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Buka Kanvas</span>
@@ -287,7 +297,7 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                         <button
                           onClick={() => onOpenChatHistory(dash)}
                           title="Buka riwayat percakapan dashboard ini"
-                          className="px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-2 border border-line rounded-card text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
+                          className="px-3 py-1.5 bg-surface hover:bg-surface-2 text-ink-2 border border-line rounded-card text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-[0.98] whitespace-nowrap"
                         >
                           <Sparkles className="w-3.5 h-3.5 text-brand" />
                           <span>
@@ -300,31 +310,34 @@ export const DashboardList: React.FC<DashboardListProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 ml-auto">
                       {bolehMenulis && (
                       <>
                       <button
                         onClick={() => onShareDashboard(dash)}
-                        className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
+                        className="w-10 h-10 sm:w-auto sm:h-auto sm:p-1.5 inline-flex items-center justify-center text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
                         title="Bagikan Tautan"
+                        aria-label="Bagikan Tautan"
                       >
-                        <Share2 className="w-3.5 h-3.5" />
+                        <Share2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                       </button>
 
                       <button
                         onClick={() => setDuplicateConfirmId(dash.id)}
-                        className="p-1.5 text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
+                        className="w-10 h-10 sm:w-auto sm:h-auto sm:p-1.5 inline-flex items-center justify-center text-ink-2 hover:text-brand-ink hover:bg-surface-2 rounded-control transition-colors"
                         title="Duplikat Dashboard"
+                        aria-label="Duplikat Dashboard"
                       >
-                        <Copy className="w-3.5 h-3.5" />
+                        <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                       </button>
 
                       <button
                         onClick={() => setDeleteConfirmId(dash.id)}
-                        className="p-1.5 text-ink-3 hover:text-neg hover:bg-neg/10 rounded-control transition-colors"
+                        className="w-10 h-10 ml-2 sm:ml-0 sm:w-auto sm:h-auto sm:p-1.5 inline-flex items-center justify-center text-ink-3 hover:text-neg hover:bg-neg/10 rounded-control transition-colors"
                         title="Hapus Dashboard"
+                        aria-label="Hapus Dashboard"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                       </button>
                       </>
                       )}

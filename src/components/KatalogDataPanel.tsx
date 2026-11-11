@@ -170,7 +170,7 @@ export const KatalogDataPanel: React.FC<Props> = ({ permintaan, admin, onSelesai
         </span>
         <button
           onClick={() => void muat()}
-          className="ml-auto inline-flex items-center gap-1 text-[10px] text-ink-3 hover:text-ink"
+          className="ml-auto inline-flex items-center gap-1 min-h-11 sm:min-h-0 px-2 py-1 text-[11px] font-semibold text-brand-ink bg-surface border border-line hover:bg-brand/10 rounded-control"
           data-testid="katalog-muat-ulang"
         >
           {memuat ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}

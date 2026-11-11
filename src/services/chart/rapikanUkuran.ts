@@ -127,25 +127,11 @@ export const rapikanUntukUkuran = (opsi: EChartsOption, lebar: number, tinggi: n
   }
 
   /**
-   * Kategori yang tidak muat di tinggi/lebar kartu (mis. 36 akun beban pada kartu
-   * 188px) membuat label sumbu bertumpuk sampai tak terbaca. Untuk kasus itu
-   * dipasang `dataZoom` dalam: yang tampil hanya sebanyak yang muat, sisanya
-   * bisa digulir dengan roda mouse di dalam kartu.
+   * Semua kategori SELALU digambar, berapa pun lebar kartunya (permintaan pemilik
+   * aplikasi: chart responsif menampilkan semua data). Dulu kartu sempit diberi
+   * `dataZoom` sehingga 12 bulan terpotong di Okt. Label yang tidak muat cukup
+   * dijarangkan oleh `hideOverlap` di sumbu, datanya tidak dibuang.
    */
-  const panjangKategori = (sumbu: any): number => {
-    const s = Array.isArray(sumbu) ? sumbu[0] : sumbu;
-    return Array.isArray(s?.data) ? s.data.length : 0;
-  };
-  const adaZoom = Array.isArray(o.dataZoom) ? o.dataZoom.length > 0 : Boolean(o.dataZoom);
-  if (!adaZoom) {
-    const muatTegak = Math.max(4, Math.floor((tinggi - 56) / 18));
-    const muatDatar = Math.max(4, Math.floor((lebar - 96) / 46));
-    if (panjangKategori(o.yAxis) > muatTegak) {
-      o.dataZoom = [{ type: 'inside', yAxisIndex: 0, startValue: 0, endValue: muatTegak - 1, zoomLock: true }];
-    } else if (panjangKategori(o.xAxis) > muatDatar) {
-      o.dataZoom = [{ type: 'inside', xAxisIndex: 0, startValue: 0, endValue: muatDatar - 1, zoomLock: true }];
-    }
-  }
 
   // Judul & teks tambahan di dalam kanvas grafik ikut mengecil.
   if (o.title) {

@@ -38,6 +38,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   >([]);
   const [memuatTautan, setMemuatTautan] = useState(false);
   const [galatTautan, setGalatTautan] = useState('');
+  /** Token yang sedang diminta konfirmasi cabut (klik pertama = tanya, bukan hapus). */
+  const [konfirmCabut, setKonfirmCabut] = useState<string | null>(null);
 
   const muatDaftarTautan = async () => {
     if (!dashboard) return;
@@ -56,6 +58,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const cabutTautan = async (token: string) => {
     setGalatTautan('');
+    setKonfirmCabut(null);
     try {
       const res = await fetch(`/api/share/${token}`, { method: 'DELETE' });
       const data = await res.json().catch(() => null);
@@ -74,6 +77,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       setShareToken(null);
       setErrorMsg('');
       setGalatTautan('');
+      setKonfirmCabut(null);
       setIsCopied(false);
       setIsCopiedEmbed(false);
       void muatDaftarTautan();
@@ -284,14 +288,37 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                           : ''}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void cabutTautan(t.token)}
-                      title="Cabut tautan ini"
-                      className="p-1.5 rounded-chip text-neg hover:bg-neg/10 transition-colors shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Cabut tidak bisa dibatalkan (penerima langsung kehilangan akses),
+                        jadi klik pertama hanya meminta konfirmasi sebaris. */}
+                    {konfirmCabut === t.token ? (
+                      <div className="flex items-center gap-1 shrink-0" data-testid="konfirmasi-cabut">
+                        <span className="text-[10px] text-ink-2">Cabut?</span>
+                        <button
+                          type="button"
+                          onClick={() => void cabutTautan(t.token)}
+                          className="px-2 py-1 rounded-chip text-[10px] font-bold text-on-brand bg-neg hover:brightness-95"
+                        >
+                          Ya, cabut
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setKonfirmCabut(null)}
+                          className="px-2 py-1 rounded-chip text-[10px] font-bold text-ink-2 border border-line hover:bg-surface-2"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setKonfirmCabut(t.token)}
+                        title="Cabut tautan ini"
+                        aria-label="Cabut tautan ini"
+                        className="p-1.5 rounded-chip text-neg hover:bg-neg/10 transition-colors shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
