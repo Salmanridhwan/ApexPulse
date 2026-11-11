@@ -5375,70 +5375,75 @@ ${kpiItems}
         const lewatDetik = () => (Date.now() - mulaiMs) / 1000;
         const durasiPutaran: number[] = [];
         const awalPutaran1 = Date.now();
-        const item = await ragClient.rencanaDashboard(prompt, SKEMA_RENCANA, {
-          kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId),
-          timeoutMs: 180,
-        });
-        durasiPutaran.push((Date.now() - awalPutaran1) / 1000);
-
         /**
-         * CADANGAN TANPA MODEL.
+         * LAYANAN AI BISA SIBUK.
          *
-         * Layanan AI bisa sibuk (429: batas lima kueri bersamaan per knowledge
-         * base) atau lewat tenggat. Dulu seluruh penyusunan langsung gagal
-         * walau datanya lengkap. Sekarang dashboard tetap disusun dari butir
-         * yang disetujui memakai penyusun lokal yang sama dengan halaman Pilih
-         * Data — angkanya tetap dari dokumen, bukan karangan — dan panel AI
-         * menyebut jujur bahwa susunan dibuat tanpa model.
+         * RAG membatasi lima kueri bersamaan per knowledge base dan dua node
+         * produksi berbagi batas yang sama, jadi satu permintaan bisa dibalas
+         * 429 walau datanya lengkap. Percobaan di dalam klien RAG sudah menunggu
+         * sesuai `retry_after_seconds`; di sini penyusunan menunggu sekali lagi
+         * dengan jeda lebih panjang sambil memberi tahu panel kanvas, lalu
+         * menyerah dengan pesan jujur bila layanan tetap sibuk. Susunan tetap
+         * keputusan model: tidak ada halaman yang dibuat tanpa AI.
          */
-        let catatanCadangan = '';
-        let rencana = item ? bacaRencana(JSON.stringify(item)) : null;
-        let susun = rencana ? susunDariRencana(rencana, kandidat) : null;
-        if (!rencana || !susun || susun.halaman.length === 0) {
-          const halamanButir = butirKeHalaman(kandidat, {
-            judul: `Ringkasan ${tenant?.name || 'instansi'}`,
-          });
-          if (halamanButir.length === 0) {
-            throw new Error(
-              'Layanan AI tidak mengembalikan susunan, dan butir yang disetujui belum punya angka yang bisa ditampilkan.'
+        const JEDA_SIBUK_DETIK = [20, 45];
+        let item: any = null;
+        for (let coba = 0; coba <= JEDA_SIBUK_DETIK.length; coba += 1) {
+          try {
+            item = await ragClient.rencanaDashboard(prompt, SKEMA_RENCANA, {
+              kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId),
+              timeoutMs: 180,
+            });
+            break;
+          } catch (err) {
+            const pesanSibuk = jelaskanError(err);
+            if (!/429|502|503|504|sibuk|timeout/i.test(pesanSibuk) || coba === JEDA_SIBUK_DETIK.length) {
+              throw err;
+            }
+            const jeda = JEDA_SIBUK_DETIK[coba];
+            console.warn(
+              `[rekomendasi] layanan AI sibuk (${pesanSibuk}) — menunggu ${jeda} dtk lalu mencoba lagi (percobaan ${coba + 2}/${JEDA_SIBUK_DETIK.length + 1})`
             );
+            ubah({
+              ai: {
+                tahap: 'memilih',
+                pesan: `Layanan AI sedang sibuk (batas kueri knowledge base). Mencoba lagi dalam ${jeda} detik, percobaan ${coba + 2} dari ${JEDA_SIBUK_DETIK.length + 1}.`,
+                mulai,
+                kandidat: katalog.jumlah,
+                kategori,
+                terpilih: [],
+              },
+            });
+            await new Promise((r) => setTimeout(r, jeda * 1000));
           }
-          susun = {
-            halaman: halamanButir,
-            dipakai: halamanButir.flatMap((h) => h.widgets.map((w) => String(w.id))),
-            dibuang: [],
-          } as typeof susun;
-          catatanCadangan =
-            'Susunan dibuat langsung dari butir dokumen tanpa model, karena layanan AI sedang sibuk. Semua angka tetap dari dokumen yang disetujui.';
-          console.warn('[rekomendasi] memakai cadangan tanpa model:', jelaskanError(new Error('layanan AI sibuk')));
         }
+        durasiPutaran.push((Date.now() - awalPutaran1) / 1000);
+        if (!item) throw new Error('Layanan AI tidak mengembalikan susunan.');
 
-        /** Alias bertipe tegas: `susun` sudah pasti terisi di titik ini,
-         *  baik dari rencana model maupun dari susunan cadangan. */
-        const susunPakai = susun as NonNullable<typeof susun>;
+        const rencana = bacaRencana(JSON.stringify(item));
+        if (!rencana) throw new Error('Jawaban AI tidak bisa dibaca sebagai susunan halaman.');
+
+        const susun = susunDariRencana(rencana, kandidat);
+        if (susun.halaman.length === 0) throw new Error('AI tidak memilih satu pun butir yang dikenal aplikasi.');
 
         /**
          * ATURAN DASHBOARD BARU (semua chart berhubungan).
          * Jumlah chart bebas (aturan minimal 3 chart dihapus 2026-11-11).
          * Chart yang tidak berhubungan dibuang.
-         *
-         * Dilewati saat susunan dibuat cadangan tanpa model: penyusun lokal
-         * sudah mengelompokkan butir per kategori, dan membuang kartu di sini
-         * hanya akan membuat halaman kosong.
          */
-        if (!catatanCadangan) {
+        {
           // Pelengkap boleh diambil dari SEMUA data yang disetujui, bukan hanya yang dicentang.
           const petaKandidat = new Map(semua.map((b) => [`w-${b.id}`, b]));
           const butirDari = (w: WidgetSpec) =>
             petaKandidat.get(String(w.id)) ?? petaKandidat.get(String(w.id).replace(/-\d+$/, ''));
-          const semuaKartu = () => susunPakai.halaman.flatMap((h) => h.widgets);
+          const semuaKartu = () => susun.halaman.flatMap((h) => h.widgets);
           const awal = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
           if (awal.tidakTerkait.length > 0) {
             const buang = new Set(awal.tidakTerkait.map((b) => b.id));
-            for (const h of susunPakai.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
-            susunPakai.halaman = susunPakai.halaman.filter((h) => h.widgets.length > 0);
+            for (const h of susun.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
+            susun.halaman = susun.halaman.filter((h) => h.widgets.length > 0);
           }
-          susunPakai.halaman = tataRapiHalaman(susunPakai.halaman);
+          susun.halaman = tataRapiHalaman(susun.halaman);
           const akhir = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
           if (!akhir.boleh) {
             throw new Error(`Data yang berhubungan tidak cukup untuk dashboard. ${akhir.pesan}`);
@@ -5488,7 +5493,7 @@ ${kpiItems}
           await new Promise((r) => setTimeout(r, 700));
         };
 
-        for (const h of susunPakai.halaman) await tulisHalaman(h);
+        for (const h of susun.halaman) await tulisHalaman(h);
 
         /**
          * PUTARAN LANJUTAN (mendalam 2 putaran, ultra 3 putaran).
@@ -5511,8 +5516,8 @@ ${kpiItems}
             break;
           }
           try {
-            // `susunPakai.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
-            const varianTerpakai = new Set<string>(susunPakai.dipakai);
+            // `susun.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
+            const varianTerpakai = new Set<string>(susun.dipakai);
             // Halaman tersimpan memakai `widgets`; id widget = id varian terpakai.
             for (const h of halaman) for (const w of h.widgets || []) varianTerpakai.add(String(w.id));
             const butirTerpakai = new Set([...varianTerpakai].map((v) => v.split('#')[0]));
@@ -5562,8 +5567,8 @@ ${kpiItems}
                 for (const h of tambahan.halaman) {
                   if (judulAda.has(h.judul.toLowerCase())) continue;
                   judulAda.add(h.judul.toLowerCase());
-                  susunPakai.dipakai.push(...tambahan.dipakai);
-                  susunPakai.dibuang.push(...tambahan.dibuang);
+                  susun.dipakai.push(...tambahan.dipakai);
+                  susun.dibuang.push(...tambahan.dibuang);
                   await tulisHalaman(h);
                   ditambah += 1;
                 }
@@ -5583,26 +5588,13 @@ ${kpiItems}
         }
 
         const judul =
-          String(rencana?.judul || '').trim().slice(0, 80) ||
+          String(rencana.judul || '').trim().slice(0, 80) ||
           `Dashboard ${tenant?.name || 'Instansi'} — ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
         ubah({
           title: judul,
-          description: catatanCadangan
-            ? `${catatanCadangan} ${susunPakai.dipakai.length} butir, mode ${profil.nama}.`
-            : `Disusun AI dari ${susunPakai.dipakai.length} butir data dokumen dalam ${Math.max(1, Math.round(lewatDetik() / 60))} menit (mode ${profil.nama}).`,
+          description: `Disusun AI dari ${susun.dipakai.length} butir data dokumen dalam ${Math.max(1, Math.round(lewatDetik() / 60))} menit (mode ${profil.nama}).`,
           status: 'siap',
-          ai: catatanCadangan
-            ? {
-                tahap: 'selesai',
-                pesan: 'Dashboard selesai disusun tanpa model (layanan AI sibuk).',
-                mode,
-                mulai,
-                kandidat: katalog.jumlah,
-                kategori,
-                terpilih: [...terpilih],
-                galat: catatanCadangan,
-              }
-            : undefined,
+          ai: undefined,
           halaman,
           halamanAktifId: halaman[0].id,
           widgets: halaman[0].widgets,
@@ -5616,14 +5608,19 @@ ${kpiItems}
 
       } catch (err) {
         const pesan = jelaskanError(err);
+        // Pesan gagal dibedakan: sibuk bukan salah data, jadi jangan menyuruh
+        // pengguna memeriksa dokumen — cukup menunggu dan mencoba lagi.
+        const keterangan = /429|502|503|504|sibuk|timeout/i.test(pesan)
+          ? 'Layanan AI sedang sibuk (batas kueri knowledge base). Coba lagi satu dua menit lagi.'
+          : 'AI tidak bisa menyusun dashboard saat ini.';
         console.warn('[rekomendasi] AI gagal:', pesan);
         ubah({
           status: 'gagal',
           title: `Rekomendasi AI gagal — ${tenant?.name || 'instansi'}`,
-          description: 'AI tidak bisa menyusun dashboard saat ini.',
+          description: keterangan,
           ai: {
             tahap: 'gagal',
-            pesan: 'AI tidak bisa menyusun dashboard saat ini.',
+            pesan: keterangan,
             mulai,
             kandidat: katalog.jumlah,
             kategori,
