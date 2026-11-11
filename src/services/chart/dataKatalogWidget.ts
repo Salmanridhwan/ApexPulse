@@ -20,6 +20,8 @@ export interface PropsKatalog {
   data: DataChart;
   judul?: string;
   teks?: string;
+  /** Butir narasi (bila ada, wajah narasi menampilkan daftar bernomor). */
+  butir?: string[];
   teksAngka?: string;
   deltaTeks?: string;
   spark?: number[];
@@ -112,8 +114,14 @@ export function propsKatalogHtml(w: WidgetSpec): PropsKatalog | null {
     }
     case 'narasi-insight': {
       const teks = w.narasi?.text?.trim();
-      if (!teks) return null;
-      return { judul, teks, data: { kategori: [judul], seri: [], dariDokumen: true } };
+      const butir = w.narasi?.bulletPoints?.filter((b) => b.trim().length > 0);
+      if (!teks && !butir?.length) return null;
+      return {
+        judul,
+        teks: teks || undefined,
+        butir: butir?.length ? butir : undefined,
+        data: { kategori: [judul], seri: [], dariDokumen: true },
+      };
     }
     case 'tabel-ringkas': {
       const kolom = w.table?.columns ?? [];

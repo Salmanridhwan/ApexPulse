@@ -99,12 +99,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
   // Form unggah
   const [panelUnggah, setPanelUnggah] = useState(false);
   const [berkasPilih, setBerkasPilih] = useState<File | null>(null);
-  const [fJudul, setFJudul] = useState('');
-  const [fKategori, setFKategori] = useState('');
-  const [fDepartemen, setFDepartemen] = useState('');
-  const [fTahun, setFTahun] = useState(String(new Date().getFullYear()));
-  const [fCatatan, setFCatatan] = useState('');
-  const [fTipe, setFTipe] = useState<'document' | 'photo'>('document');
   const [sedangUnggah, setSedangUnggah] = useState(false);
   const [seretAktif, setSeretAktif] = useState(false);
   const inputBerkas = useRef<HTMLInputElement | null>(null);
@@ -201,39 +195,34 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
 
   const pilihBerkas = (f: File | null) => {
     setBerkasPilih(f);
-    if (f && !fJudul.trim()) {
-      setFJudul(f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim());
-    }
   };
 
   const resetForm = () => {
     setBerkasPilih(null);
-    setFJudul('');
-    setFKategori('');
-    setFDepartemen('');
-    setFTahun(String(new Date().getFullYear()));
-    setFCatatan('');
-    setFTipe('document');
     if (inputBerkas.current) inputBerkas.current.value = '';
   };
+
+  /**
+   * NAMA & JENIS BERKAS DITURUNKAN DARI BERKASNYA.
+   *
+   * Formulir unggah tidak lagi menanyakan judul, kategori, unit, tahun, jenis,
+   * atau catatan: satu-satunya isian adalah berkasnya sendiri. Judul memakai nama
+   * berkas tanpa ekstensi, kategori "Dokumen Instansi", dan foto/gambar dikenali
+   * dari tipe MIME-nya.
+   */
+  const judulDariBerkas = (f: File) =>
+    f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || f.name;
 
   const unggah = async () => {
     if (!berkasPilih) {
       setPesan({ tipe: 'err', teks: 'Pilih berkas terlebih dahulu.' });
       return;
     }
-    if (!fJudul.trim()) {
-      setPesan({ tipe: 'err', teks: 'Judul berkas wajib diisi.' });
-      return;
-    }
-    if (!fKategori.trim()) {
-      setPesan({ tipe: 'err', teks: 'Kategori wajib diisi.' });
-      return;
-    }
     setSedangUnggah(true);
     setPesan(null);
     try {
       const isiBase64 = await bacaBase64(berkasPilih);
+      const judul = judulDariBerkas(berkasPilih);
       const res = await fetch('/api/berkas/unggah', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,12 +232,9 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
           ukuran: berkasPilih.size,
           tipe: berkasPilih.type,
           isiBase64,
-          judul: fJudul.trim(),
-          kategori: fKategori.trim(),
-          departemen: fDepartemen.trim() || undefined,
-          tahun: fTahun ? Number(fTahun) : undefined,
-          catatan: fCatatan.trim() || undefined,
-          tipeRepositori: fTipe,
+          judul,
+          kategori: 'Dokumen Instansi',
+          tipeRepositori: /^image\//i.test(berkasPilih.type) ? 'photo' : 'document',
         }),
       });
       const balasan = await res.json().catch(() => ({}));
@@ -258,7 +244,7 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
       const cdn = balasan?.berkas?.cdnFileId;
       setPesan({
         tipe: 'ok',
-        teks: `Berkas "${fJudul.trim()}" berhasil diunggah ke repositori dokumen${kb ? ` · basis dokumen ${kb}` : ''}${cdn ? ` · salinan media ✓` : ' · salinan media belum tercatat'}${status ? ` · status indeks: ${status}` : ''}.`,
+        teks: `Berkas "${judul}" berhasil diunggah ke repositori dokumen${kb ? ` · basis dokumen ${kb}` : ''}${cdn ? ` · salinan media ✓` : ' · salinan media belum tercatat'}${status ? ` · status indeks: ${status}` : ''}.`,
       });
       resetForm();
       setPanelUnggah(false);
@@ -475,76 +461,6 @@ export const ManajemenBerkasPage: React.FC<ManajemenBerkasPageProps> = ({ tenant
                     data-testid="input-berkas"
                     onChange={(e) => pilihBerkas(e.target.files?.[0] || null)}
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="text-xs">
-                    <span className="label-strong">Judul *</span>
-                    <input
-                      value={fJudul}
-                      onChange={(e) => setFJudul(e.target.value)}
-                      placeholder="mis. Laporan Keuangan 2025"
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                      data-testid="input-judul"
-                    />
-                  </label>
-                  <label className="text-xs">
-                    <span className="label-strong">Kategori *</span>
-                    <input
-                      value={fKategori}
-                      onChange={(e) => setFKategori(e.target.value)}
-                      placeholder="mis. Laporan Keuangan"
-                      list="kategori-berkas"
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                      data-testid="input-kategori"
-                    />
-                    <datalist id="kategori-berkas">
-                      <option value="Laporan Keuangan" />
-                      <option value="Laporan Operasional" />
-                      <option value="Dokumen Legal" />
-                      <option value="SOP & Kebijakan" />
-                      <option value="Rencana Kerja" />
-                      <option value="Dokumentasi Foto" />
-                    </datalist>
-                  </label>
-                  <label className="text-xs">
-                    <span className="label-strong">Unit / Departemen</span>
-                    <input
-                      value={fDepartemen}
-                      onChange={(e) => setFDepartemen(e.target.value)}
-                      placeholder="mis. Divisi Keuangan"
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                    />
-                  </label>
-                  <label className="text-xs">
-                    <span className="label-strong">Tahun</span>
-                    <input
-                      type="number"
-                      value={fTahun}
-                      onChange={(e) => setFTahun(e.target.value)}
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                    />
-                  </label>
-                  <label className="text-xs">
-                    <span className="label-strong">Jenis</span>
-                    <select
-                      value={fTipe}
-                      onChange={(e) => setFTipe(e.target.value as 'document' | 'photo')}
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                    >
-                      <option value="document">Dokumen</option>
-                      <option value="photo">Foto / Gambar</option>
-                    </select>
-                  </label>
-                  <label className="text-xs">
-                    <span className="label-strong">Catatan</span>
-                    <input
-                      value={fCatatan}
-                      onChange={(e) => setFCatatan(e.target.value)}
-                      placeholder="Keterangan singkat (opsional)"
-                      className="w-full bg-surface-2 border border-line rounded-control px-3 py-2 text-ink focus:outline-none focus:ring-1 focus:ring-brand"
-                    />
-                  </label>
                 </div>
 
                 <div className="flex items-center gap-2 mt-4">

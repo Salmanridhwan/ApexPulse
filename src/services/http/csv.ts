@@ -1,5 +1,5 @@
 /**
- * Pembuat CSV sederhana untuk ekspor data (mis. log audit).
+ * Pembuat CSV sederhana untuk ekspor data.
  *
  * ponytail: tidak memakai pustaka CSV — aturan RFC 4180 cukup ditangani di sini
  * (bungkus tanda kutip, gandakan kutip di dalam sel, jaga koma & baris baru).

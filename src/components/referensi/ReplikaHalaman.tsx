@@ -10,6 +10,7 @@ import { KacaOperasional, KacaRingkasan, KacaWilayah } from './DashboardKaca';
 import { KonteksGayaReplika, KonteksVarianTemplate } from '../widgets/konteksGayaReplika';
 import { varianTemplate } from '../../services/templates/dashboardTemplates';
 import type { SumberDok } from '../../services/templates/nilaiOperasional';
+import type { Varian } from '../../services/chart/gayaVarian';
 import type { WidgetSpec } from '../../types';
 import { templateBagianId } from '../../services/templates/templateBagian';
 import { DashboardBagian } from './DashboardBagian';
@@ -35,6 +36,12 @@ interface Props {
   sumberAktif?: boolean;
   /** Sumber per judul widget untuk halaman 1 Pijar. */
   sumberJudul?: Record<string, SumberDok[]>;
+  /**
+   * Gaya Template Chart yang dipakai halaman ini, menimpa gaya bawaan template.
+   * Dipakai galeri Template Dashboard: gaya dipilih TERPISAH dari template, jadi
+   * satu susunan bisa ditampilkan dengan gaya apa pun.
+   */
+  varian?: Varian;
 }
 
 export const pecahTemplateId = (templateId: string): { dasar: string; nomor: 1 | 2 | 3 } => {
@@ -53,12 +60,12 @@ export const ReplikaHalaman: React.FC<Props> = (props) =>
     <DashboardBagian
       templateId={props.replika.templateId}
       widgets={(props.replika.nilai as { widgets?: WidgetSpec[] } | undefined)?.widgets}
-      gaya={props.contoh ? undefined : props.gaya}
+      gaya={props.varian ? { desain: props.varian } : props.contoh ? undefined : props.gaya}
       penuh={props.penuh}
       contoh={props.contoh}
     />
   ) : (
-  <KonteksVarianTemplate.Provider value={varianTemplate(props.replika.templateId)}>
+  <KonteksVarianTemplate.Provider value={props.varian ?? varianTemplate(props.replika.templateId)}>
     <KonteksGayaReplika.Provider value={props.contoh ? undefined : props.gaya}>
       <IsiReplika {...props} />
     </KonteksGayaReplika.Provider>

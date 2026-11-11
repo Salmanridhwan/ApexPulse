@@ -3,7 +3,6 @@ import { ModalKonfirmasiDashboard } from './components/ModalKonfirmasiDashboard'
 import {
   Activity,
   AlertCircle,
-  Bell,
   Building2,
   CheckCircle,
   Clock,
@@ -29,10 +28,10 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { AlertsModal } from './components/AlertsModal';
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
+import { PanelAiMenyusun } from './components/PanelAiMenyusun';
 import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
@@ -67,11 +66,12 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman';
 import { BingkaiKorporat } from './components/referensi/BingkaiKorporat';
 import { templateBagianId } from './services/templates/templateBagian';
+import { tokenTemaDariGaya } from './services/chart/gayaVarian';
 import { Login } from './pages/Login';
 import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 
 // Halaman sekunder di-code-split: tidak membebani bundle awal.
-const Admin = React.lazy(() =>
+const Admin = lazyAman(() =>
   import('./pages/Admin').then((m) => ({ default: m.Admin }))
 );
 /**
@@ -84,10 +84,10 @@ const Admin = React.lazy(() =>
 const HALAMAN_SAH = [
   'dashboards',
   'workspace',
-  'audit',
   'alerts',
   'charts',
   'templates',
+  'data',
   'berkas',
   'permintaan',
   'admin',
@@ -104,32 +104,54 @@ const bacaHash = (): { halaman: Halaman | null; dashboard: string | null } => {
   };
 };
 
-const DashboardList = React.lazy(() =>
+/**
+ * `React.lazy` dengan satu percobaan ulang.
+ *
+ * Setelah aplikasi diperbarui, berkas potongan bundel lama sudah tidak ada.
+ * Kalau tab yang masih terbuka memuatnya, impor gagal dan halaman jadi kosong.
+ * Percobaan kedua biasanya berhasil lewat nama berkas baru dari `index.html`
+ * yang sudah diperbarui; kalau tetap gagal, `PenjagaGalat` yang menangani.
+ */
+function lazyAman<T extends React.ComponentType<any>>(
+  muat: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return React.lazy<T>(() =>
+    muat().catch(async (e) => {
+      await new Promise((r) => setTimeout(r, 400));
+      try {
+        return await muat();
+      } catch {
+        throw e;
+      }
+    })
+  );
+}
+
+const DashboardList = lazyAman(() =>
   import('./pages/DashboardList').then((m) => ({ default: m.DashboardList }))
 );
-const AuditLogPage = React.lazy(() =>
-  import('./pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage }))
-);
-const AlertsPage = React.lazy(() =>
+const AlertsPage = lazyAman(() =>
   import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage }))
 );
-const PermintaanDataPage = React.lazy(() =>
+const PermintaanDataPage = lazyAman(() =>
   import('./pages/PermintaanDataPage').then((m) => ({ default: m.default }))
 );
-const ManajemenBerkasPage = React.lazy(() =>
+const ManajemenBerkasPage = lazyAman(() =>
   import('./pages/ManajemenBerkasPage').then((m) => ({ default: m.ManajemenBerkasPage }))
 );
-const ChartGalleryPage = React.lazy(() =>
+const ChartGalleryPage = lazyAman(() =>
   import('./pages/ChartGalleryPage').then((m) => ({ default: m.ChartGalleryPage }))
 );
-const DashboardTemplatesPage = React.lazy(() =>
+const DashboardTemplatesPage = lazyAman(() =>
   import('./pages/DashboardTemplatesPage').then((m) => ({ default: m.DashboardTemplatesPage }))
 );
-const ShareView = React.lazy(() =>
+const PilihDataPage = lazyAman(() =>
+  import('./pages/PilihDataPage').then((m) => ({ default: m.PilihDataPage }))
+);
+const ShareView = lazyAman(() =>
   import('./pages/ShareView').then((m) => ({ default: m.ShareView }))
 );
 import {
-  AlertRule,
   Dashboard,
   GlobalFilters,
   NotificationItem,
@@ -240,6 +262,43 @@ export default function App() {
   const [drafHalamanAwal, setDrafHalamanAwal] = useState<HalamanDashboard[] | null>(null);
   /** Gaya dashboard sebelum diubah dari panel Gaya; null = belum ada perubahan. */
   const [drafGaya, setDrafGaya] = useState<{ nilai?: WidgetStyle } | null>(null);
+  /**
+   * SELAMA AI MENYUSUN: kanvas menyegarkan dashboard setiap 1,5 detik.
+   *
+   * Endpoint rekomendasi membalas lebih dulu dengan dashboard kosong berstatus
+   * `menyusun`, lalu pekerjaan model menulis kemajuannya ke dashboard yang sama.
+   * Tanpa penyegaran ini kanvas hanya menampilkan keadaan awal sampai pengguna
+   * memuat ulang halaman.
+   */
+  useEffect(() => {
+    if (!activeDashboard || activeDashboard.status !== 'menyusun') return;
+    let hidup = true;
+    const segarkan = async () => {
+      try {
+        const res = await fetch(`/api/dashboards/${activeDashboard.id}`, { credentials: 'include' });
+        if (!res.ok || !hidup) return;
+        const data = (await res.json()) as Dashboard;
+        if (hidup && data?.id) setActiveDashboard(data);
+      } catch {
+        /* jaringan putus sesaat: percobaan berikutnya tetap berjalan */
+      }
+    };
+    const t = setInterval(segarkan, 1500);
+    void segarkan();
+    return () => {
+      hidup = false;
+      clearInterval(t);
+    };
+  }, [activeDashboard?.id, activeDashboard?.status]);
+
+  /* Template Chart khusus admin: pengguna yang membuka #/v/charts
+     dikembalikan ke workspace. Template Dashboard tetap untuk semua peran. */
+  useEffect(() => {
+    if (viewMode === 'charts' && !isAdminRole(currentUser?.role)) {
+      setViewMode('workspace');
+    }
+  }, [viewMode, currentUser?.role]);
+
   useEffect(() => {
     setTampilWidget(false);
     // Draft tata letak dan draft widget tidak boleh terbawa ke dashboard lain.
@@ -269,7 +328,6 @@ export default function App() {
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGlobalStyleOpen, setIsGlobalStyleOpen] = useState(false);
-  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -279,9 +337,8 @@ export default function App() {
   const [editingWidget, setEditingWidget] = useState<WidgetSpec | null>(null);
   const [editorTab, setEditorTab] = useState<'config' | 'correction'>('config');
 
-  // Notifications & Alerts
+  // Notifikasi
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
 
   // Initial Fetch
   useEffect(() => {
@@ -447,14 +504,7 @@ export default function App() {
     // Indikator riwayat di kartu dashboard.
     muatChatCounts(currentTenant.id);
 
-    // Fetch Alerts & Notifications
-    fetch(`/api/alerts?tenantId=${currentTenant.id}`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) setAlertRules(data);
-      })
-      .catch((err) => console.error('Fetch alerts error:', err));
-
+    // Notifikasi
     fetch(`/api/notifications?tenantId=${currentTenant.id}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
@@ -504,18 +554,27 @@ export default function App() {
    * (bukan menahan pengguna 5–15 menit seperti alur lama).
    */
   const handleUseTemplate = async (
-    template: DashboardTemplate
+    template: DashboardTemplate,
+    /** Gaya Template Chart pilihan pengguna — disimpan bersama dashboard baru. */
+    gaya?: string
   ): Promise<{ terisi: number; kosong: number; total: number }> => {
     if (!currentTenant) throw new Error('Pilih instansi terlebih dahulu.');
     const res = await fetch('/api/dashboards/dari-template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId: currentTenant.id, templateId: template.id }),
+      body: JSON.stringify({ tenantId: currentTenant.id, templateId: template.id, gaya }),
     });
     const isi = await res.json().catch(() => null);
+    /**
+     * 409 punya dua arti: data masih disiapkan (`status` belum/proses) ATAU
+     * dokumen instansi tidak memuat angka apa pun untuk template ini
+     * (`status: 'kosong'`). Pesannya diambil dari server supaya pengguna tahu
+     * mana yang sedang terjadi, bukan selalu "masih disiapkan".
+     */
     if (res.status === 409) {
       throw new Error(
-        'Data template masih disiapkan dari dokumen instansi. Tunggu sampai selesai, lalu tekan Simpan lagi.'
+        isi?.error ||
+          'Data template masih disiapkan dari dokumen instansi. Tunggu sampai selesai, lalu tekan Simpan lagi.'
       );
     }
     if (!res.ok || !isi?.dashboard) {
@@ -892,33 +951,6 @@ export default function App() {
     });
   };
 
-  // Trigger Live Alert Evaluation
-  const handleTriggerAlertEvaluation = async () => {
-    if (!currentTenant) return;
-    const res = await fetch('/api/alerts/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId: currentTenant.id }),
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (Array.isArray(data.notifications)) {
-      setNotifications((prev) => [...data.notifications, ...prev]);
-    }
-  };
-
-  const handleAddAlertRule = async (rule: Partial<AlertRule>) => {
-    if (!currentTenant) return;
-    const res = await fetch('/api/alerts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rule),
-    });
-    if (!res.ok) return;
-    const newRule = await res.json();
-    setAlertRules((prev) => [newRule, ...prev]);
-  };
-
   const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.isRead).length : 0;
 
   /**
@@ -1084,14 +1116,11 @@ export default function App() {
                 setViewMode('dashboards');
                 setIsMobileNavOpen(false);
               }}
-              onOpenAudit={() => {
-                setViewMode('audit');
-                setIsMobileNavOpen(false);
-              }}
-              onOpenChartGallery={() => {
+              /* Template Chart khusus admin. Template Dashboard untuk semua peran. */
+              onOpenChartGallery={isAdminRole(currentUser?.role) ? () => {
                 setViewMode('charts');
                 setIsMobileNavOpen(false);
-              }}
+              } : undefined}
               onOpenDashboardTemplates={() => {
                 setViewMode('templates');
                 setIsMobileNavOpen(false);
@@ -1102,6 +1131,10 @@ export default function App() {
               }}
               onOpenPermintaan={() => {
                 setViewMode('permintaan');
+                setIsMobileNavOpen(false);
+              }}
+              onOpenPilihData={() => {
+                setViewMode('data');
                 setIsMobileNavOpen(false);
               }}
               onOpenAlerts={() => {
@@ -1163,10 +1196,10 @@ export default function App() {
                   <span className="text-ink-3">/</span>
                   <span className="text-brand">
                     {viewMode === 'dashboards' ? 'Workspace'
-                      : viewMode === 'audit' ? 'Audit'
-                      : viewMode === 'alerts' ? 'Alert'
+                      : viewMode === 'alerts' ? 'Notifikasi'
                       : viewMode === 'charts' ? 'Chart'
                       : viewMode === 'templates' ? 'Template Dashboard'
+                      : viewMode === 'data' ? 'Pilih Data'
                       : viewMode === 'berkas' ? 'Referensi'
                       : viewMode === 'permintaan' ? (isAdminRole(currentUser?.role) ? 'Kotak Masuk' : 'Permintaan Data')
                       : 'Workspace'}
@@ -1174,15 +1207,15 @@ export default function App() {
                 </div>
                 {/* Judul halaman (baris bawah navbar). Di mode workspace baris ini TIDAK
                     ditampilkan karena hanya mengulang kata "Workspace" padahal judul
-                    dashboard sudah ada di kartu header di bawahnya (permintaan user). */}
-                {viewMode !== 'workspace' && (
+                    dashboard sudah ada di kartu header di bawahnya (permintaan user).
+                    Mode Pilih Data juga tanpa judul: halamannya langsung menampilkan
+                    pencarian dan data, tanpa teks pengantar. */}
+                {viewMode !== 'workspace' && viewMode !== 'data' && (
                   <h1 className="truncate max-w-[42vw] sm:max-w-[28rem] text-sm font-bold text-ink leading-tight mt-0.5">
                     {viewMode === 'dashboards'
                       ? 'Workspace'
-                      : viewMode === 'audit'
-                        ? 'Jejak Audit & Kepatuhan'
-                        : viewMode === 'alerts'
-                          ? 'Ambang Batas & Alert'
+                      : viewMode === 'alerts'
+                          ? 'Notifikasi'
                           : viewMode === 'templates'
                             ? 'Template Dashboard'
                             : viewMode === 'berkas'
@@ -1312,6 +1345,8 @@ export default function App() {
                       handleCreateDashboard();
                       setViewMode('workspace');
                     }}
+                    onBukaTemplate={() => setViewMode('templates')}
+                    onPilihData={() => setViewMode('data')}
                     onOpenChat={() => {
                       setViewMode('workspace');
                       setIsChatOpen(true);
@@ -1332,13 +1367,6 @@ export default function App() {
                     bolehMenulis={isAdminRole(currentUser?.role)}
                   />
                 </React.Suspense>
-              ) : viewMode === 'audit' && isAdminRole(currentUser?.role) ? (
-                <React.Suspense fallback={pageFallback}>
-                  <AuditLogPage
-                    tenantId={currentTenant?.id || 'tenant-pdam'}
-                    onBackToWorkspace={() => setViewMode('workspace')}
-                  />
-                </React.Suspense>
               ) : viewMode === 'alerts' ? (
                 <React.Suspense fallback={pageFallback}>
                   <AlertsPage
@@ -1355,6 +1383,20 @@ export default function App() {
                   <DashboardTemplatesPage
                     currentTenant={currentTenant}
                     onUseTemplate={handleUseTemplate}
+                  />
+                </React.Suspense>
+              ) : viewMode === 'data' ? (
+                <React.Suspense fallback={pageFallback}>
+                  <PilihDataPage
+                    namaInstansi={currentTenant?.name}
+                    onKembali={() => setViewMode('dashboards')}
+                    onBukaPermintaan={() => setViewMode('permintaan')}
+                    onSelesai={(dash) => {
+                      setActiveDashboard(dash);
+                      setDashboards((prev) => [dash, ...prev.filter((x) => x.id !== dash.id)]);
+                      setViewMode('workspace');
+                      if (currentTenant) muatChatCounts(currentTenant.id);
+                    }}
                   />
                 </React.Suspense>
               ) : viewMode === 'permintaan' ? (
@@ -1378,7 +1420,15 @@ export default function App() {
                   className={`flex-1 w-full ${
                     activeDashboard?.tema ? `tema-${activeDashboard.tema} bg-canvas` : ''
                   }`}
-                  style={fontKanvas ? { fontFamily: fontKanvas } : undefined}
+                  style={{
+                    // Gaya Template Chart pilihan pengguna menimpa token tema
+                    // template, supaya dashboard tersimpan tampil sama dengan
+                    // pratinjau galeri (kartu, garis, aksen ikut berganti).
+                    ...(activeDashboard?.gaya?.desain
+                      ? (tokenTemaDariGaya(activeDashboard.gaya.desain) as React.CSSProperties)
+                      : {}),
+                    ...(fontKanvas ? { fontFamily: fontKanvas } : {}),
+                  }}
                 >
                   {/* Tema template (bila ada) membungkus seluruh isi kanvas supaya
                       latar, kartu, dan aksen sama dengan pratinjau template. */}
@@ -1419,6 +1469,19 @@ export default function App() {
                       </div>
 
                       <div className="ml-auto flex items-center gap-1.5">
+                        {/* Mode presentasi langsung di kepala kanvas (dulu hanya di menu ⋮,
+                            sehingga pengguna tidak menemukannya). Untuk semua peran. */}
+                        {jumlahWidgetSemua > 0 && (
+                          <button
+                            onClick={() => setIsPresentationMode(true)}
+                            data-testid="presentasi-dashboard"
+                            title="Buka mode presentasi layar penuh (Esc untuk keluar)"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors"
+                          >
+                            <Presentation className="w-3 h-3 text-ink-3" />
+                            <span className="hidden sm:inline">Mode Presentasi</span>
+                          </button>
+                        )}
                         {/* Menyusun dashboard hanya untuk admin instansi
                             (`bolehMenyusunDashboard`), jadi tombolnya ikut disembunyikan. */}
                         {isAdminRole(currentUser?.role) && (
@@ -1510,6 +1573,10 @@ export default function App() {
                     </PasLayar>
                   ) : (
                   /* Dashboard Canvas Grid */
+                  <>
+                  {(activeDashboard?.status === 'menyusun' || activeDashboard?.status === 'gagal') && (
+                    <PanelAiMenyusun dashboard={activeDashboard} />
+                  )}
                   <ChartSelectionProvider>
                   {(() => {
                   // Gaya Semua Korporat: kanvas dibingkai seperti slide template Rapat
@@ -1551,6 +1618,7 @@ export default function App() {
                   );
                   })()}
                   </ChartSelectionProvider>
+                  </>
                   )}
                   </div>
                   </KanvasTemaContext.Provider>
@@ -1620,16 +1688,19 @@ export default function App() {
           supaya fitur baru tidak terlihat "hilang". */}
       <PemberitahuanVersi />
 
-      {/* Tombol buka asisten (hanya tampil saat panel chat tertutup) */}
-      {!isPresentationMode && !isChatOpen && !isGlobalStyleOpen && (
+      {/* Tombol buka asisten — HANYA di kanvas. Dashboard dari data/template
+          diubah lewat asisten setelah kanvasnya terbuka, bukan dari daftar atau
+          galeri, supaya percakapan selalu punya halaman yang jelas. */}
+      {viewMode === 'workspace' && activeDashboard && !isPresentationMode && !isChatOpen && !isGlobalStyleOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
           data-testid="buka-asisten"
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 min-h-[44px] rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
+          className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex items-center justify-center gap-2.5 px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px] rounded-full font-semibold text-xs text-on-brand bg-brand hover:brightness-95 shadow-pop shadow-brand/25 transition-all duration-200 hover:scale-105 active:scale-95"
           title="Buka asisten"
         >
           <Sparkles className="w-4 h-4 animate-pulse" />
-          <span>Asisten</span>
+          {/* Di layar kecil label disembunyikan supaya tombol tidak menutupi kartu. */}
+          <span className="hidden sm:inline">Asisten</span>
         </button>
       )}
 
@@ -1650,17 +1721,6 @@ export default function App() {
         styleAwal={gayaDashboardAktif}
         targetPalet={targetPalet}
         onApply={handleApplyStyleToAll}
-      />
-
-      {/* 5. Alerts & Notification Center Modal */}
-      <AlertsModal
-        isOpen={isAlertsOpen}
-        onClose={() => setIsAlertsOpen(false)}
-        tenantId={currentTenant?.id || 'tenant-pdam'}
-        alertRules={alertRules}
-        notifications={notifications}
-        onTriggerEvaluate={handleTriggerAlertEvaluation}
-        onAddRule={handleAddAlertRule}
       />
 
       {/* 7. Share Read-Only Link Modal */}

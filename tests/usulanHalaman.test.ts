@@ -241,3 +241,22 @@ test('usulanMenunggu menyaring per halaman dan status', () => {
     ['u1']
   );
 });
+
+test('pangkasTambahan membuang kartu baru yang melewati sisa ruang', async () => {
+  const { pangkasTambahan } = await import('../src/services/analisis/usulan');
+  const tambah = (id: string) => ({ aksi: 'tambah', widget: { id } }) as any;
+  const hasil = pangkasTambahan([tambah('a'), tambah('b'), tambah('c'), tambah('d')], 6, 9);
+  assert.equal(hasil.dipangkas, 1);
+  assert.deepEqual(hasil.perubahan.map((p: any) => p.widget.id), ['a', 'b', 'c']);
+});
+
+test('pangkasTambahan menghitung kartu yang dihapus sebagai ruang kosong', async () => {
+  const { pangkasTambahan } = await import('../src/services/analisis/usulan');
+  const hasil = pangkasTambahan(
+    [{ aksi: 'hapus', widgetId: 'w-1' } as any, { aksi: 'tambah', widget: { id: 'a' } } as any],
+    9,
+    9
+  );
+  assert.equal(hasil.dipangkas, 0);
+  assert.equal(hasil.perubahan.length, 2);
+});

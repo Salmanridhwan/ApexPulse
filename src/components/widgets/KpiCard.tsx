@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Check, Minus, Target } from 'lucide-react';
 import type { WidgetStyle } from '../../types';
+import { angkaRingkas, teksAngkaRingkas } from '../../services/format/angkaRingkas';
 
 interface KpiCardProps {
   value: string | number;
@@ -95,7 +96,18 @@ export const KpiCard: React.FC<KpiCardProps> = ({
 }) => {
   const gradId = useId().replace(/:/g, '');
   const hero = variant === 'hero';
-  const nilaiTampil = useCountUp(String(value));
+  /**
+   * Angka KPI dari butir dokumen datang sebagai deret angka tanpa pemisah
+   * ("3966100000"). Tanpa perapian, kartu menampilkan deret mentah yang sulit
+   * dibaca. Mulai 100.000 diringkas (rb, jt, M, T) lewat `angkaRingkas`; teks lain
+   * ("94,8%", "Rp 1,2 M") dibiarkan apa adanya.
+   */
+  const teksNilai = (() => {
+    if (typeof value === 'number') return Number.isFinite(value) ? angkaRingkas(value, 2) : String(value);
+    const t = String(value ?? '').trim();
+    return teksAngkaRingkas(t);
+  })();
+  const nilaiTampil = useCountUp(teksNilai);
 
   const isPositive = delta !== undefined && delta > 0;
   const isNegative = delta !== undefined && delta < 0;
@@ -207,7 +219,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
               fontSize: hero ? 'clamp(1.15rem, 20cqw, 2.75rem)' : 'clamp(0.95rem, 15.5cqw, 2rem)',
             }}
           >
-            {value}
+            {nilaiTampil}
           </span>
           {satuanAkhir && (
             <span className={`${hero ? 'text-sm' : 'text-xs'} font-normal text-ink-3`}>{satuanAkhir}</span>

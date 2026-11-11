@@ -638,3 +638,41 @@ export const cukupTerang = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
   return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 60;
 };
+
+/**
+ * Token CSS dengan nama variabel yang SAMA seperti kelas `.tema-<kunci>` di
+ * index.css, dihitung dari satu gaya Template Chart.
+ *
+ * Dipakai supaya komponen yang membaca token (kartu, garis, teks, aksen) ikut
+ * berganti saat pengguna memilih gaya lain — tanpa membuat kelas CSS untuk tiap
+ * kombinasi template x gaya. Mode gelap dipakai karena kanvas dashboard selalu
+ * gelap; gaya terang seperti Koran tetap punya versi gelapnya (`gayaMode`).
+ */
+export const tokenTemaDariGaya = (
+  v: Varian,
+  mode: 'light' | 'dark' = 'dark'
+): Record<string, string> => {
+  const g = gayaMode(v, mode);
+  return {
+    '--color-canvas': g.latar,
+    '--color-surface': g.kartu,
+    '--color-surface-2': g.kartu2,
+    '--color-line': g.garis,
+    '--color-line-strong': g.tepi?.warna ?? g.garis,
+    '--color-ink': g.teks,
+    '--color-ink-2': g.teks2,
+    '--color-ink-3': g.teks3,
+    '--color-brand': g.aksen,
+    '--color-brand-ink': g.aksen2,
+    '--color-brand-solid': g.aksen,
+    '--color-on-brand': g.latar,
+    '--color-solid': g.teks,
+    '--color-on-solid': g.latar,
+    '--tegas-accent': g.aksen,
+    '--tegas-ink': g.teks,
+    '--tegas-canvas': g.latar,
+    '--tegas-line': g.garis,
+    '--tegas-card': g.kartu,
+    '--radius-card': `${g.sudutKartu ?? 14}px`,
+  };
+};

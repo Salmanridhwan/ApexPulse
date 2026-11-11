@@ -13,6 +13,7 @@ import { normJudul } from './src/services/builder/permintaanWidget';
 import { skorCocok } from './src/services/builder/halamanDiminta';
 import { WIDGET_CATALOG } from './src/services/builder/catalog';
 import { generateDashboard } from './src/services/builder/generate';
+import { namaiDariIsi } from './src/services/analisis/namaDariIsi';
 import { kunciKembarWidget, labelJumlahWidget } from './src/services/builder/permintaanWidget';
 import {
   bagianSumber,
@@ -56,7 +57,7 @@ import {
   setSecretSesi,
   SessionPayload,
 } from './src/services/auth/session';
-import { AlertRule, BumdSector, ChatMessage, Dashboard, LampiranPermintaan, NotificationItem, OrganisasiKMS, PermintaanData, ProgressStep, StatusPermintaan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
+import { BumdSector, ChatMessage, Dashboard, LampiranPermintaan, NotificationItem, OrganisasiKMS, PermintaanData, ProgressStep, StatusPermintaan, Tenant, TIPE_SERI, UserRole, WidgetGrid, WidgetSpec } from './src/types';
 import {
   SEMUA_STATUS,
   bolehMelihat,
@@ -78,9 +79,20 @@ import {
 import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
-import { BATAS_AUDIT_BAWAAN, saringAudit } from './src/services/admin/audit';
 import { bolehPindahInstansi, bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
-import { butirKeHalaman, ringkasHalaman } from './src/services/analisis/butirKeWidget';
+import { butirKeHalaman, butirKeWidget, ringkasHalaman, tataGrid } from './src/services/analisis/butirKeWidget';
+import { cekAturanDashboard, saranTerkait, MIN_CHART_DASHBOARD } from './src/services/analisis/aturanDashboard';
+import { jumlahPerBulan, kolomTanggal } from './src/services/analisis/tanggalSerial';
+import {
+  bacaRencana,
+  buatPrompt,
+  katalogUntukAi,
+  SKEMA_RENCANA,
+  susunDariRencana,
+  tataRapiHalaman,
+  MODE_REKO,
+  modeRekoSah,
+} from './src/services/analisis/rekomendasiAi';
 import { isiSlotTemplate, slotKosong, widgetTerisi } from './src/services/analisis/butirKeSlotTemplate';
 import {
   butirSiapPakai,
@@ -88,9 +100,10 @@ import {
   ringkasUsulan,
   terapkanPerubahan,
   validasiPerubahan,
+  pangkasTambahan,
+  MAKS_WIDGET_HALAMAN,
 } from './src/services/analisis/usulan';
 import { WidgetSpecSchema } from './src/services/spec/widgetSpec';
-import { buatNotifikasi, evaluasiAturan } from './src/services/alerts';
 import { buatPembatas } from './src/services/auth/rateLimit';
 import { buatPembatasLintas } from './src/services/auth/pembatasLintas';
 import { kataSandiSementara, masalahKataSandi } from './src/services/auth/password';
@@ -102,12 +115,11 @@ import {
   statusCadangan,
   statusUnggahanOffsite,
 } from './src/services/ops/backupTerjadwal';
-import { adaLagiHalaman, potongHalaman, potongUrut } from './src/services/http/halaman';
+import { adaLagiHalaman, potongUrut } from './src/services/http/halaman';
 import { adalahDokumenSambutan, gabungDokumenBasis } from './src/services/berkas/gabungBasis';
 import type { DokumenBasis } from './src/services/berkas/gabungBasis';
-import { keCsv } from './src/services/http/csv';
 import { buatPemeriksaKetersediaan } from './src/services/widgets/ketersediaan';
-import { antreEmail, mailerAktif, penerimaAlert } from './src/services/mailer';
+import { antreEmail, mailerAktif } from './src/services/mailer';
 import { DASHBOARD_TEMPLATES, widgetDariTemplate } from './src/services/templates/dashboardTemplates';
 import { dokumenDariPermintaan, namaTanpaEkstensi } from './src/services/builder/dokumenDiminta';
 import { kumpulkanPotonganLembar, lembarDariBerkas, lembarDariPotongan, widgetDariSumber, type SumberLembar } from './src/services/builder/dashboardLembar';
@@ -122,7 +134,7 @@ import { gayaDariPermintaan, pilihChart, susunDashboardBerhalaman } from './src/
 import { pakaiChartKatalog } from './src/services/chart/katalogCocok';
 import { pastikanChartKatalog, type ChartKustom } from './src/services/chart/katalogKustom';
 import { MIN_WIDGET_HALAMAN } from './src/services/builder/halamanDiminta';
-import { GAYA } from './src/services/chart/gayaVarian';
+import { GAYA, VARIAN, type Varian } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import {
   ambilPratinjau,
@@ -147,6 +159,8 @@ import {
 import { KmsClient, KmsServiceError } from './src/services/berkas/kmsClient';
 import type { BerkasKMS } from './src/types';
 import type { AnalisisDokumen } from './src/types';
+import type { ButirData } from './src/types';
+import { CHART_DEFAULT } from './src/services/chart/chartDefault';
 import {
   BATAS_UKURAN_BYTE,
   cariProjectKmsDariKb,
@@ -253,8 +267,7 @@ function requireAdmin(session: SessionPayload, res: Response, pesan = 'Hanya adm
 }
 
 /**
- * Gerbang khusus fitur lintas instansi (tab Instansi & KB, RAG, Kuota, Jejak Audit
- * seluruh platform). Menyembunyikan tabnya saja tidak cukup: Admin Instansi yang
+ * Gerbang khusus fitur lintas instansi (tab Instansi & KB, RAG, Kuota). Menyembunyikan tabnya saja tidak cukup: Admin Instansi yang
  * memanggil endpoint-nya langsung lewat HTTP tetap dilayani `requireAdmin`.
  */
 function requireSuperadmin(session: SessionPayload, res: Response, pesan = 'Hanya Admin Aiones yang boleh mengakses fitur lintas instansi ini.'): boolean {
@@ -330,7 +343,19 @@ async function startServer() {
  * diulang satu per satu sampai berhasil; yang dokumennya memang tidak memuat
  * indikator itu berhenti lebih awal, jadi batas ini hanya jaring pengaman.
  */
-const BATAS_ISI_TEMPLATE_MS = 900_000;
+const BATAS_ISI_TEMPLATE_MS = 2_700_000;
+
+/**
+ * Kartu template diisi bertahap sampai habis, bukan sekali jalan.
+ *
+ * Dulu jatahnya 15 menit dengan 2 kartu serentak. Template deck punya 58-78
+ * kartu, jadi baru sekitar 10 kartu yang sempat dicoba dan sisanya ditandai
+ * "belum terisi" - pengguna melihat dashboard yang hampir seluruhnya kosong.
+ * Sekarang anggarannya 45 menit, 4 kartu serentak, dan sisa kartu dilanjutkan
+ * pada putaran berikutnya sampai habis (lihat `pekerja` di siapkanTemplateTenant).
+ */
+const PUTARAN_ISI_TEMPLATE = 4;
+const KONKURENSI_ISI_TEMPLATE = 4;
 
 /**
  * Progres pengisian template per pekerjaan (jobId), dibaca UI lewat polling.
@@ -366,7 +391,14 @@ function tandaTemplate(template: any): string {
  * Versi PEMETAAN widget (kategori, unit kerja, angka). Naikkan angka ini setiap
  * kali cara mengisi widget berubah, supaya pratinjau lama tidak terus dipakai.
  */
-const VERSI_PEMETAAN = 'filter-1';
+/**
+ * Naikkan angka ini setiap kali cara mengisi kartu berubah. Entri pratinjau
+ * lama otomatis basi dan diisi ulang dengan aturan baru.
+ *
+ * filter-2: kartu yang kehabisan waktu ditandai `dataTertunda` (bukan "tidak
+ * ada di dokumen"), pengisian dilanjutkan bertahap sampai habis.
+ */
+const VERSI_PEMETAAN = 'filter-2';
 
 /**
  * PILIH WIDGET HALAMAN 2 — hanya data operasional & pelayanan.
@@ -424,27 +456,72 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
     kbId,
     versiKb: versiKbTenant(tenant, template),
     total: dasar.length,
-    pekerja: async (onProgres) => {
-      const hasil = await isiTemplateDariRag(
-        { ...template, widgets: dasar },
-        {
-          sector: tenant.sector as BumdSector,
-          instansi: tenant.name,
-          kbId,
-          rag: ragClient,
-          konkurensi: 2,
-          batasMs: BATAS_ISI_TEMPLATE_MS,
-          putaranMaks: 6,
-          onProgres: (info) =>
-            onProgres({ selesai: info.selesai, total: info.total, judul: info.judul }),
-        }
-      );
-      return {
-        widgets: hasil.widgets,
-        terisi: hasil.terisi,
-        kosong: hasil.kosong,
-        catatan: hasil.catatan,
-      };
+    pekerja: async (onProgres, simpanSebagian) => {
+      /**
+       * PENGISIAN BERTAHAP.
+       *
+       * Putaran 1 mengisi semua kartu. Kalau ada kartu yang kehabisan waktu
+       * (bukan "tidak ada di dokumen"), putaran berikutnya hanya mengerjakan
+       * kartu itu - kartu yang sudah berisi tidak dipanggilkan lagi. Tiap kartu
+       * yang terisi langsung disimpan (`simpanSebagian`), jadi kalau server
+       * sempat mati pun pengisian melanjutkan yang belum selesai (kartu
+       * ber-`confidence: 'sumber'` dilewati), bukan mengulang dari nol.
+       */
+      const sebelumnya = ambilPratinjau(tenant.id, template.id, kbId);
+      const awal =
+        Array.isArray(sebelumnya?.widgets) && sebelumnya!.widgets.length === dasar.length
+          ? sebelumnya!.widgets
+          : dasar;
+      let widgets = awal.map((w) => ({ ...w, grid: { ...w.grid } }));
+      let terisi = widgets.filter((w) => !w.dataKosong).length;
+      let kosong = widgets.length - terisi;
+      let tertunda = widgets.filter((w) => w.dataTertunda).length;
+      const catatan: string[] = [];
+      const batasAkhir = Date.now() + BATAS_ISI_TEMPLATE_MS;
+
+      for (let putaran = 1; putaran <= PUTARAN_ISI_TEMPLATE; putaran += 1) {
+        const sisaMs = batasAkhir - Date.now();
+        if (sisaMs < 60_000) break;
+        const sudahTerisi = (w: any) => w.confidence === 'sumber' && !w.dataKosong;
+        const target =
+          putaran === 1
+            ? widgets.filter((w) => !sudahTerisi(w))
+            : widgets.filter((w) => w.dataTertunda || (w.dataKosong && !w.catatanData));
+        if (target.length === 0) break;
+
+        const hasil = await isiTemplateDariRag(
+          { ...template, widgets: target },
+          {
+            sector: tenant.sector as BumdSector,
+            instansi: tenant.name,
+            kbId,
+            rag: ragClient,
+            konkurensi: KONKURENSI_ISI_TEMPLATE,
+            batasMs: sisaMs,
+            putaranMaks: 6,
+            onKartu: (kartu) => {
+              widgets = widgets.map((w) => (w.id === kartu.id ? kartu : w));
+              simpanSebagian(widgets);
+            },
+            onProgres: (info) =>
+              onProgres({
+                selesai: Math.min(info.selesai, info.total),
+                total: info.total,
+                judul: `${putaran > 1 ? `Lanjutan ${putaran}/${PUTARAN_ISI_TEMPLATE}: ` : ''}${info.judul}`,
+              }),
+          }
+        );
+
+        const peta = new Map(hasil.widgets.map((w) => [w.id, w]));
+        widgets = widgets.map((w) => peta.get(w.id) ?? w);
+        catatan.push(...hasil.catatan);
+        terisi = widgets.filter((w) => !w.dataKosong).length;
+        kosong = widgets.length - terisi;
+        tertunda = widgets.filter((w) => w.dataTertunda).length;
+        if (tertunda === 0) break;
+      }
+
+      return { widgets, terisi, kosong, tertunda, catatan };
     },
   });
 }
@@ -504,7 +581,7 @@ function hangatkanTemplateTenant(tenant: any): void {
   void (async () => {
     // Template rapat bagian disiapkan saat dibuka saja: kartunya banyak dan
     // topiknya khusus, jadi tidak perlu menghabiskan kuota layanan dokumen.
-    for (const t of DASHBOARD_TEMPLATES.filter((x) => !x.bagian)) {
+    for (const t of DASHBOARD_TEMPLATES.filter((x) => !x.bagian && !x.legacy)) {
       try {
         await siapkanTemplateTenant(tenant, t);
       } catch (err) {
@@ -930,7 +1007,7 @@ const app = express();
 
   /**
    * Lupa kata sandi. Aplikasi belum mengirim email ke pengguna, jadi permintaan
-   * diteruskan ke admin instansi (notifikasi + jejak audit, dan email ke
+   * diteruskan ke admin instansi (notifikasi, dan email ke
    * ALERT_EMAIL_TO bila SMTP aktif). Admin lalu memakai "Reset kata sandi" di
    * panel Admin, yang membuat sandi sementara wajib-ganti.
    *
@@ -978,14 +1055,6 @@ const app = express();
     };
     db.notifications.unshift(notif);
     db.simpanNotifikasi(notif);
-    db.addAuditLog({
-      tenantId: user.tenantId,
-      userId: user.id,
-      userName: user.name,
-      action: 'Permintaan Reset Kata Sandi',
-      target: user.email,
-      details: 'Diajukan dari halaman masuk; menunggu admin instansi mereset kata sandi.',
-    });
     if (mailerAktif()) {
       const aman = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
       antreEmail({
@@ -1069,14 +1138,6 @@ const app = express();
       mustChange: wajibGanti,
     });
 
-    db.addAuditLog({
-      tenantId: user.tenantId,
-      userId: user.id,
-      userName: user.name,
-      action: 'Login Pengguna',
-      target: 'Portal Aiones Boards BUMD',
-      details: `Masuk sebagai ${user.role.toUpperCase()} (${user.email})`,
-    });
 
     // Token dikirim via cookie HttpOnly — tidak bisa dicuri JS browser.
     res.setHeader('Set-Cookie', sessionCookieHeader(token));
@@ -1115,7 +1176,7 @@ const app = express();
     res.json(db.tenants.map((t) => ({ id: t.id, name: t.name })));
   });
 
-  /** Terbitkan sesi + audit log untuk user yang sudah lolos verifikasi. */
+  /** Terbitkan sesi untuk user yang sudah lolos verifikasi. */
   function terbitkanSesi(res: Response, user: SafeUser, cara: string) {
     // Kewajiban ganti sandi DIHAPUS (permintaan pemilik aplikasi), juga untuk
     // akun yang masuk lewat Google.
@@ -1127,14 +1188,6 @@ const app = express();
       tenantId: user.tenantId,
       name: user.name,
       mustChange: wajibGanti,
-    });
-    db.addAuditLog({
-      tenantId: user.tenantId,
-      userId: user.id,
-      userName: user.name,
-      action: 'Login Pengguna',
-      target: 'Portal Aiones Boards BUMD',
-      details: `Masuk sebagai ${user.role.toUpperCase()} (${user.email}) — ${cara}`,
     });
     res.setHeader('Set-Cookie', sessionCookieHeader(token));
     return res.json({ user: safeUser(user) });
@@ -1202,14 +1255,6 @@ const app = express();
     };
     db.createUser(newUser, hashPassword(password));
     const instansiTujuan = db.tenants.find((t) => t.id === tenantId);
-    db.addAuditLog({
-      tenantId,
-      userId: newUser.id,
-      userName: newUser.name,
-      action: 'Pendaftaran Akun (menunggu persetujuan)',
-      target: instansiTujuan?.name || tenantId,
-      details: `Pendaftaran mandiri ${newUser.email} menunggu persetujuan admin instansi.`,
-    });
     return res.status(202).json({
       status: 'pending',
       email,
@@ -1285,14 +1330,6 @@ const app = express();
         requestedAt: new Date().toISOString(),
       };
       db.createUser(baru);
-      db.addAuditLog({
-        tenantId: baru.tenantId,
-        userId: baru.id,
-        userName: baru.name,
-        action: 'Pendaftaran via Google (menunggu persetujuan)',
-        target: instansiTujuan.name,
-        details: `Akun Google ${baru.email} menunggu persetujuan admin instansi.`,
-      });
       return res.status(202).json({
         status: 'pending',
         email: baru.email,
@@ -1328,14 +1365,6 @@ const app = express();
             requestedAt: new Date().toISOString(),
           } as any);
           if (diperbarui) user = diperbarui;
-          db.addAuditLog({
-            tenantId: instansiBaru.id,
-            userId: user.id,
-            userName: user.name,
-            action: 'Ubah Instansi Pendaftaran (menunggu persetujuan)',
-            target: instansiBaru.name,
-            details: `Pendaftar ${user.email} memilih instansi lain selagi menunggu persetujuan.`,
-          });
           return res.status(202).json({
             status: 'pending',
             email: user.email,
@@ -1390,14 +1419,6 @@ const app = express();
     }
 
     db.setUserPassword(user.id, hashPassword(baru), false);
-    db.addAuditLog({
-      tenantId: user.tenantId,
-      userId: user.id,
-      userName: user.name,
-      action: 'Ganti Kata Sandi',
-      target: user.name,
-      details: 'Kata sandi akun diganti oleh pemiliknya.',
-    });
 
     // Sesi ditandatangani ulang tanpa penanda wajib-ganti.
     const token = signSession({
@@ -1416,14 +1437,6 @@ const app = express();
     if (session) {
       const user = db.users.find((u) => u.id === session.userId);
       if (user) {
-        db.addAuditLog({
-          tenantId: user.tenantId,
-          userId: user.id,
-          userName: user.name,
-          action: 'Logout Pengguna',
-          target: 'Portal Aiones Boards BUMD',
-          details: 'Sesi pengguna berhasil diakhiri dengan aman',
-        });
       }
     }
     res.setHeader('Set-Cookie', clearSessionCookieHeader());
@@ -1497,14 +1510,6 @@ const app = express();
     if (hasil.baru.length > 0) {
       db.updateSystemConfig({ chartKatalogKustom: [...katalogKustom(), ...hasil.baru] } as any);
       for (const entri of hasil.baru) {
-        db.addAuditLog({
-          tenantId,
-          userId: session.userId,
-          userName: session.name,
-          action: 'Tambah Chart Template',
-          target: entri.nama,
-          details: `Dibuat otomatis: bentuk data tidak cocok dengan chart bawaan. Dasar ${entri.dasar} (${entri.id})`,
-        });
       }
     }
     return hasil;
@@ -1541,14 +1546,6 @@ const app = express();
       updatedAt: new Date().toISOString(),
     };
     db.createDashboard(newDash);
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Buat Dashboard',
-      target: newDash.title,
-      details: `Membuat dashboard baru sektor ${newDash.sector}`,
-    });
     res.status(201).json(newDash);
   });
 
@@ -1636,14 +1633,6 @@ const app = express();
       const presentasi = { slides: hasil.slides, disusunAt: new Date().toISOString(), versi: VERSI_PRESENTASI };
       const updated = db.updateDashboard(dash.id, { widgets: hasil.widgets, presentasi }, tenantId);
 
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Siapkan Presentasi',
-        target: dash.title,
-        details: `Menyusun ${hasil.slides.length} slide (insight RAG: ${hasil.dariRag}, dari data: ${hasil.dariData}).`,
-      });
 
       sendEvent('selesai', {
         dashboard: updated,
@@ -1820,10 +1809,13 @@ const app = express();
       progres: entri?.progres ?? { selesai: 0, total: template.widgets.length, judul: 'Menunggu…' },
       terisi: entri?.terisi ?? 0,
       kosong: entri?.kosong ?? 0,
+      tertunda: entri?.tertunda ?? 0,
       total: template.widgets.length,
       selesaiPada: entri?.selesai ?? null,
       galat: entri?.galat ?? null,
-      widgets: siap ? entri!.widgets : null,
+      // Belum siap tapi sudah ada kartu terisi: kirim sebagian supaya tampil bertahap.
+      widgets: siap ? entri!.widgets : entri?.terisi ? entri.widgets : null,
+      sebagian: !siap && !!entri?.terisi,
     });
   });
 
@@ -1859,7 +1851,7 @@ const app = express();
 
     const segar = await db.updateTenant(tenant.id, { kbTersinkronPada: new Date().toISOString() });
     if (!segar) return res.status(500).json({ error: 'Gagal menandai pembaruan dokumen.' });
-    for (const tpl of DASHBOARD_TEMPLATES.filter((x) => !x.bagian)) void siapkanTemplateTenant(segar, tpl);
+    for (const tpl of DASHBOARD_TEMPLATES.filter((x) => !x.bagian && !x.legacy)) void siapkanTemplateTenant(segar, tpl);
     return res.json({ ok: true, template: DASHBOARD_TEMPLATES.map((t) => t.id) });
   });
 
@@ -1872,17 +1864,70 @@ const app = express();
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
     const versi = versiKbTenant(tenant);
     const entri = daftarPratinjau(tenant.id);
+    const sekarang = Date.now();
+    const daftar = DASHBOARD_TEMPLATES.filter((t) => !t.legacy);
+    const entriDari = (t: any) => entri.find((x) => x.templateId === t.id && x.kbId === kbId);
+    const siapDari = (t: any) => masihBerlaku(entriDari(t) ?? null, versiKbTenant(tenant, t));
+
+    /**
+     * PERKIRAAN KAPAN KARTU TERISI.
+     *
+     * Laju (ms per kartu) diukur dari pengisian yang sudah selesai, atau dari
+     * yang sedang berjalan bila belum ada riwayat. Template galeri biasa diisi
+     * BERURUTAN oleh `hangatkanTemplateTenant`, jadi template yang menunggu
+     * giliran ikut menanggung sisa kartu template di depannya. Template rapat
+     * bagian tidak masuk antrean itu: ia mulai diisi saat dibuka.
+     */
+    const lajuSelesai = entri
+      .filter((x) => x.kbId === kbId && x.selesai && x.mulai && x.progres?.total > 0 && x.status !== 'gagal')
+      .map((x) => (x.selesai! - x.mulai) / x.progres.total)
+      .filter((v) => v > 0);
+    const berjalanKini = entri.find((x) => x.kbId === kbId && x.status === 'proses' && x.progres?.selesai >= 3);
+    const laju = lajuSelesai.length
+      ? lajuSelesai.reduce((a, b) => a + b, 0) / lajuSelesai.length
+      : berjalanKini
+        ? (sekarang - berjalanKini.mulai) / berjalanKini.progres.selesai
+        : 25_000;
+    const sisaKartu = (t: any): number => {
+      const e = entriDari(t);
+      if (siapDari(t)) return 0;
+      if (e?.status === 'proses' && e.progres?.total > 0) return Math.max(0, e.progres.total - e.progres.selesai);
+      return t.widgets.length;
+    };
+    const perkiraan = new Map<string, number>();
+    let kumulatif = 0;
+    for (const t of daftar.filter((x) => !x.bagian)) {
+      const sisa = sisaKartu(t);
+      if (sisa === 0) continue;
+      kumulatif += sisa * laju;
+      perkiraan.set(t.id, kumulatif);
+    }
+    const perkiraanSemuaMs = kumulatif > 0 ? Math.round(kumulatif) : null;
+    for (const t of daftar.filter((x) => x.bagian)) {
+      const sisa = sisaKartu(t);
+      if (sisa > 0) perkiraan.set(t.id, sisa * laju);
+    }
 
     return res.json({
-      templates: DASHBOARD_TEMPLATES.map((t) => {
-        const e = entri.find((x) => x.templateId === t.id && x.kbId === kbId);
-        const siap = masihBerlaku(e ?? null, versiKbTenant(tenant, t));
+      perkiraanSemuaMs,
+      templates: daftar.map((t) => {
+        const e = entriDari(t);
+        const siap = siapDari(t);
+        const p = perkiraan.get(t.id);
         return {
+          // Sisa waktu (ms) sampai semua kartu template ini berisi data asli.
+          perkiraanMs: siap || p == null ? null : Math.round(p),
+          // true = masih menunggu template lain selesai lebih dulu.
+          menungguGiliran: !siap && e?.status !== 'proses' && !t.bagian,
           templateId: t.id,
           status: siap ? 'siap' : e?.status ?? 'belum',
           terisi: e?.terisi ?? 0,
+          kosong: e?.kosong ?? 0,
+          tertunda: e?.tertunda ?? 0,
           total: t.widgets.length,
           progres: e?.progres ?? null,
+          // Dipakai UI untuk perkiraan sisa waktu pengisian.
+          mulaiPada: e?.status === 'proses' ? e.mulai : null,
           selesaiPada: e?.selesai ?? null,
         };
       }),
@@ -1901,6 +1946,17 @@ const app = express();
     const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
 
+    /**
+     * GAYA TERPISAH DARI TEMPLATE: galeri mengirim gaya Template Chart yang
+     * dipilih pengguna (mis. `koran`). Susunan kartu tetap milik template,
+     * sedangkan desain/warna chart disimpan di dashboard sebagai `gaya.desain`.
+     * Gaya tak dikenal diabaikan (dashboard memakai gaya bawaan template).
+     */
+    const gayaDiminta = String(req.body?.gaya || '').trim();
+    const gaya: Varian | undefined = VARIAN.includes(gayaDiminta as Varian)
+      ? (gayaDiminta as Varian)
+      : undefined;
+
     const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
     const versi = versiKbTenant(tenant, template);
     const entri = ambilPratinjau(tenant.id, template.id, kbId);
@@ -1916,6 +1972,42 @@ const app = express();
         error: 'Data template masih disiapkan dari dokumen. Coba lagi sebentar lagi.',
         status: entri?.status ?? 'belum',
         progres: entri?.progres ?? null,
+      });
+    }
+
+    /**
+     * ENTRI "SIAP" TAPI SELURUH KARTU KOSONG.
+     *
+     * Dokumen instansi bisa tidak memuat satu pun indikator template (mis.
+     * template outsourcing dibuka di instansi yang dokumennya soal pendidikan).
+     * Tanpa gerbang ini pengguna tetap bisa menyimpan dashboard berisi 58 kartu
+     * "tidak ditemukan" — terlihat seperti fitur rusak. Lebih jujur menolak dan
+     * meminta dokumen dilengkapi, sama seperti saat data belum disiapkan.
+     */
+    /**
+     * ENTRI YANG MASIH ADA KARTU TERTUNDA.
+     *
+     * Kartu tertunda = belum sempat diisi (waktu/layanan), bukan "tidak ada di
+     * dokumen". Dulu entri seperti ini dianggap siap dan penerapannya menghasilkan
+     * dashboard dengan puluhan kartu kosong. Sekarang ditolak dengan progres yang
+     * jujur, dan pengisian lanjutan sudah berjalan di latar.
+     */
+    if ((entri!.tertunda ?? 0) > 0) {
+      return res.status(409).json({
+        error: `Data template belum lengkap: ${entri!.terisi} dari ${entri!.widgets.length} kartu terisi, ${entri!.tertunda} sedang diisi dari dokumen. Coba lagi beberapa saat.`,
+        status: 'proses',
+        progres: entri!.progres ?? null,
+        terisi: entri!.terisi,
+        tertunda: entri!.tertunda,
+        total: entri!.widgets.length,
+      });
+    }
+
+    if (!entri!.widgets.some((w) => !w.dataKosong)) {
+      return res.status(409).json({
+        error: 'Dokumen instansi belum memuat angka untuk template ini. Lengkapi dokumen lalu coba lagi.',
+        status: 'kosong',
+        progres: entri!.progres ?? null,
       });
     }
 
@@ -2005,6 +2097,9 @@ const app = express();
       // harus sama dengan pratinjau yang dilihat pengguna.
       // Template bagian (gaya Korporat) ikut mode terang/gelap aplikasi, tanpa tema kanvas.
       tema: template.bagian ? undefined : template.tema,
+      // Gaya Template Chart yang dipilih pengguna, DIPISAH dari template:
+      // susunan kartu milik template, desain/warna chart milik pilihan ini.
+      ...(gaya ? { gaya: { desain: gaya } } : {}),
       // Angka dokumen dipetakan ke slot replika template: dipakai kanvas
       // dashboard nyata supaya desainnya identik dengan pratinjau data asli.
       replika: halaman[0].replika,
@@ -2016,14 +2111,6 @@ const app = express();
       updatedAt: new Date().toISOString(),
     };
     db.createDashboard(newDash);
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Buat Dashboard dari Template',
-      target: newDash.title,
-      details: `Template ${template.nama}: ${entri!.terisi} kartu terisi dari dokumen, ${entri!.kosong} kartu belum ada di dokumen.`,
-    });
 
     return res.status(201).json({
       dashboard: newDash,
@@ -2140,14 +2227,6 @@ const app = express();
 
       const widgets = [widgetBaru, ...dash.widgets];
       db.updateDashboard(dash.id, { widgets }, tenantId);
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Tambah Widget dari Saran Asisten',
-        target: widgetBaru.title,
-        details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
-      });
 
       return res.status(201).json({ dashboard: { ...dash, widgets }, widget: widgetBaru });
     } catch (err) {
@@ -2166,14 +2245,6 @@ const app = express();
     if (!success) {
       return res.status(404).json({ error: 'Gagal menghapus dashboard.' });
     }
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Dashboard',
-      target: req.params.id,
-      details: 'Menghapus dashboard dari sistem',
-    });
     res.json({ success: true });
   });
 
@@ -2319,14 +2390,6 @@ const app = express();
     if (!session) return;
     const ok = db.deleteChat(req.params.id, effectiveTenantId(req, session));
     if (!ok) return res.status(404).json({ error: 'Chat tidak ditemukan.' });
-    db.addAuditLog({
-      tenantId: effectiveTenantId(req, session),
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Riwayat Chat',
-      target: req.params.id,
-      details: 'Riwayat percakapan dihapus; dashboard tetap ada',
-    });
     res.json({ success: true });
   });
 
@@ -2771,14 +2834,6 @@ const app = express();
         const halamanBaru = [{ ...(halamanAsal[0] ?? {}), id: halamanAsal[0]?.id ?? 'hlm-1', judul: halamanAsal[0]?.judul ?? 'Ringkasan', widgets: dipilih }];
         const diperbarui =
           db.updateDashboard(activeDash.id, { widgets: dipilih, halaman: halamanBaru, halamanAktifId: halamanBaru[0].id } as any, tenantId) || activeDash;
-        db.addAuditLog({
-          tenantId,
-          userId: session.userId,
-          userName: session.name,
-          action: 'Ringkas Dashboard via Chat',
-          target: activeDash.title,
-          details: `${semuaKartu.length} kartu menjadi ${dipilih.length}: ${dipilih.map((w) => w.title).join(', ')}`,
-        });
         const pesan =
           `Dashboard **"${activeDash.title}"** diringkas menjadi **${dipilih.length} ${dipilih.length === 1 ? 'grafik' : 'kartu'}**: ` +
           dipilih.map((w) => `**${w.title}**`).join(', ') +
@@ -2878,14 +2933,6 @@ const app = express();
             const kartu = { ...(pilih.chartId ? pakaiChartKatalog(cocok, pilih.chartId) : cocok), grid: { ...cocok.grid, w: 6, h: 4 } };
             const isi = denganHalamanAktif(activeDash, [...(activeDash.widgets ?? []), kartu]);
             const diperbarui = db.updateDashboard(activeDash.id, isi as any, tenantId) || activeDash;
-            db.addAuditLog({
-              tenantId,
-              userId: session.userId,
-              userName: session.name,
-              action: 'Tambah Widget via Chat (Tabel Dokumen)',
-              target: kartu.title,
-              details: `Dokumen konteks: "${dokKonteks}"`,
-            });
             const pesan = `Grafik **"${kartu.title}"** ditambahkan dari dokumen **${dokKonteks}** (sumber yang sama dengan dashboard ini).`;
             sendEvent('step', { id: 's0', title: 'Grafik ditambahkan dari dokumen yang sama', status: 'completed' });
             catatAsisten({ sender: 'system', text: pesan, actionTaken: 'add_widget' } as any);
@@ -2979,14 +3026,6 @@ const app = express();
             } as Dashboard);
             chat = db.ensureChatForDashboard(dashBaru.id, tenantId, session.userId, dashBaru.title);
             pesanUserTercatat = false;
-            db.addAuditLog({
-              tenantId,
-              userId: session.userId,
-              userName: session.name,
-              action: 'Buat Dashboard Satu Widget via Chat (RAG)',
-              target: widgetBaru.title,
-              details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
-            });
             const pesan = `Dashboard baru **"${dashBaru.title}"** dibuat berisi satu widget dari data dokumen instansi. Minta widget lain kapan saja untuk menambahkannya.`;
             sendEvent('step', { id: 's0', title: 'Widget dibuat dari dokumen', status: 'completed' });
             catatAsisten({ sender: 'system', text: pesan, actionTaken: 'create_dashboard' } as any);
@@ -3018,14 +3057,6 @@ const app = express();
               title: 'Widget dengan isi sama sudah ada — tidak ditambahkan',
               status: 'failed',
             });
-            db.addAuditLog({
-              tenantId,
-              userId: session.userId,
-              userName: session.name,
-              action: 'Tolak Widget Kembar via Chat',
-              target: kembar.title,
-              details: `Indikator: "${indikator}" · sudah ada di kanvas`,
-            });
             catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
             sendEvent('result', { actionTaken: 'none', message: pesan });
             sendEvent('done', { ok: false });
@@ -3052,14 +3083,6 @@ const app = express();
             }
           }
           db.updateDashboard(activeDash.id, denganHalamanAktif(activeDash, updatedWidgets) as any, tenantId);
-          db.addAuditLog({
-            tenantId,
-            userId: session.userId,
-            userName: session.name,
-            action: 'Tambah Widget via Chat (RAG)',
-            target: widgetBaru.title,
-            details: `Indikator: "${indikator}" · tipe ${widgetBaru.type}`,
-          });
           const pesan = `Widget **"${widgetBaru.title}"** ditambahkan ke kanvas dari data dokumen instansi.`;
           sendEvent('step', { id: 's0', title: 'Widget ditambahkan dari dokumen', status: 'completed' });
           catatAsisten({ sender: 'system', text: pesan, actionTaken: 'add_widget' } as any);
@@ -3110,14 +3133,6 @@ const app = express();
             activeDash.widgets.splice(targetIdx, 1);
             db.updateDashboard(activeDash.id, { widgets: activeDash.widgets }, tenantId);
 
-            db.addAuditLog({
-              tenantId,
-              userId: session.userId,
-              userName: session.name,
-              action: 'Hapus Widget via Chat',
-              target: removed.title,
-              details: `Perintah chat: "${prompt}"`,
-            });
 
             sendEvent('step', { id: 's1', title: `Widget "${removed.title}" berhasil dihapus`, status: 'completed' });
             catatAsisten({
@@ -3184,14 +3199,6 @@ const app = express();
             target.type = newType;
             db.updateDashboard(activeDash.id, { widgets: activeDash.widgets }, tenantId);
 
-            db.addAuditLog({
-              tenantId,
-              userId: session.userId,
-              userName: session.name,
-              action: 'Ubah Tipe Chart via Chat',
-              target: target.title,
-              details: `Diubah ke tipe ${newType}`,
-            });
 
             sendEvent('step', { id: 's1', title: `Tipe visualisasi widget "${target.title}" diubah ke ${newType.toUpperCase()}`, status: 'completed' });
             catatAsisten({
@@ -3434,14 +3441,6 @@ const app = express();
           actionTaken: gagalLayanan ? 'rag_error' : 'none',
           modeUsed: genResult.modeUsed,
         } as any);
-        db.addAuditLog({
-          tenantId,
-          userId: session.userId,
-          userName: session.name,
-          action: gagalLayanan ? 'Generate Dashboard Gagal (Layanan RAG)' : 'Generate Dashboard Gagal',
-          target: prompt.slice(0, 60),
-          details: genResult.alasanGagal || 'Dokumen tidak memadai',
-        });
         sendEvent('result', {
           actionTaken: gagalLayanan ? 'rag_error' : 'none',
           message: pesanGagal,
@@ -3513,14 +3512,6 @@ const app = express();
         pesanUserTercatat = false;
       }
 
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Generate Dashboard Otomatis',
-        target: dashboardTersimpan.title,
-        details: `Via ${genResult.modeUsed}, Sitasi: ${genResult.citationsCount}, Latensi: ${genResult.latencyMs}ms`,
-      });
 
       // Balasan ringkas dalam bahasa pengguna: apa yang dibuat dan di halaman mana.
       const daftarHalaman = (dashboardTersimpan.halaman ?? []).length ? dashboardTersimpan.halaman! : [{ judul: 'Halaman 1', widgets: dashboardTersimpan.widgets } as any];
@@ -3744,183 +3735,6 @@ ${kpiItems}
     }
   });
 
-  // ================= ALERTS & NOTIFICATIONS =================
-  app.get('/api/alerts', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    const rules = db.alertRules.filter((r) => r.tenantId === effectiveTenantId(req, session));
-    res.json(rules);
-  });
-
-  app.post('/api/alerts', (req: Request, res: Response) => {
-    const session = butuhPenulis(req, res);
-    if (!session) return;
-    const tenantId = effectiveTenantId(req, session);
-    const newRule = {
-      id: `alert-${Date.now()}`,
-      tenantId,
-      title: req.body.title || 'Aturan Ambang Batas Baru',
-      metricKey: req.body.metricKey || 'kpi',
-      metricName: req.body.metricName || 'Indikator Utama',
-      operator: req.body.operator || '>=',
-      threshold: Number(req.body.threshold) || 0,
-      unit: req.body.unit || '%',
-      channels: req.body.channels || ['in_app'],
-      severity: req.body.severity || 'warning',
-      isActive: true,
-    };
-    db.alertRules.push(newRule);
-    db.simpanAturanAlert(newRule);
-    db.persist();
-    res.status(201).json(newRule);
-  });
-
-  /**
-   * Ubah aturan ambang batas. Dulu aturan hanya bisa DIBUAT: salah ketik ambang atau
-   * salah indikator membuat aturan permanen (tidak ada jalur ubah/hapus di UI maupun API).
-   * Validasi nilai ketat supaya PATCH tidak diam-diam menormalkan input ngawur.
-   */
-  app.patch('/api/alerts/:id', (req: Request, res: Response) => {
-    const session = butuhPenulis(req, res);
-    if (!session) return;
-    const tenantId = effectiveTenantId(req, session);
-    const rule = db.alertRules.find((r) => r.id === req.params.id && r.tenantId === tenantId);
-    if (!rule) return res.status(404).json({ error: 'Aturan ambang batas tidak ditemukan.' });
-
-    const OPERATOR_SAH: AlertRule['operator'][] = ['>', '>=', '<', '<='];
-    const SEVERITY_SAH: AlertRule['severity'][] = ['info', 'warning', 'critical'];
-    const body = req.body || {};
-
-    if (body.operator !== undefined && !OPERATOR_SAH.includes(body.operator)) {
-      return res.status(400).json({ error: `Operator "${body.operator}" tidak dikenal.`, operatorSah: OPERATOR_SAH });
-    }
-    if (body.severity !== undefined && !SEVERITY_SAH.includes(body.severity)) {
-      return res.status(400).json({ error: `Tingkat keparahan "${body.severity}" tidak dikenal.`, severitySah: SEVERITY_SAH });
-    }
-    if (body.threshold !== undefined) {
-      const angka = Number(body.threshold);
-      if (!Number.isFinite(angka)) return res.status(400).json({ error: 'Ambang batas harus berupa angka.' });
-    }
-    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return res.status(400).json({ error: 'Status aktif harus berupa boolean.' });
-    }
-
-    if (body.title !== undefined) rule.title = String(body.title).trim() || rule.title;
-    if (body.metricKey !== undefined) rule.metricKey = String(body.metricKey).trim() || rule.metricKey;
-    if (body.metricName !== undefined) rule.metricName = String(body.metricName).trim() || rule.metricName;
-    if (body.operator !== undefined) rule.operator = body.operator;
-    if (body.threshold !== undefined) rule.threshold = Number(body.threshold);
-    if (body.unit !== undefined) rule.unit = String(body.unit).trim() || rule.unit;
-    if (body.severity !== undefined) rule.severity = body.severity;
-    if (body.isActive !== undefined) rule.isActive = body.isActive;
-    if (Array.isArray(body.channels) && body.channels.length > 0) {
-      rule.channels = body.channels.map((c: unknown) => String(c)).filter(Boolean) as AlertRule['channels'];
-    }
-
-    db.persist();
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Ubah Ambang Batas',
-      target: rule.metricName,
-      details: `Aturan ${rule.metricName} ${rule.operator} ${rule.threshold} ${rule.unit} (${rule.isActive ? 'aktif' : 'nonaktif'})`,
-    });
-    res.json(rule);
-  });
-
-  app.delete('/api/alerts/:id', (req: Request, res: Response) => {
-    const session = butuhPenulis(req, res);
-    if (!session) return;
-    const tenantId = effectiveTenantId(req, session);
-    const idx = db.alertRules.findIndex((r) => r.id === req.params.id && r.tenantId === tenantId);
-    if (idx < 0) return res.status(404).json({ error: 'Aturan ambang batas tidak ditemukan.' });
-    const [dihapus] = db.alertRules.splice(idx, 1);
-    db.hapusAturanAlert(dihapus.id);
-    db.persist();
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Ambang Batas',
-      target: dihapus.metricName,
-      details: `Aturan ${dihapus.metricName} ${dihapus.operator} ${dihapus.threshold} ${dihapus.unit} dihapus.`,
-    });
-    res.json({ ok: true, id: dihapus.id });
-  });
-
-  // Evaluasi ambang batas: aturan hanya menyala kalau nilai indikator dari dokumen
-  // benar-benar melanggar ambang. Aturan yang aman / tanpa data dilaporkan apa adanya
-  // di `tidakTerlampaui` — tidak ada notifikasi karangan.
-  app.post('/api/alerts/evaluate', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    const tenantId = effectiveTenantId(req, session);
-    const tenant = db.tenants.find((t) => t.id === tenantId);
-    const sector = (tenant?.sector || 'pdam') as BumdSector;
-    const rules = db.alertRules.filter((r) => r.tenantId === tenantId && r.isActive);
-
-    const triggered: NotificationItem[] = [];
-    const terlewat: { ruleId: string; metricName: string; alasan: string }[] = [];
-    let emailDiantre = 0;
-
-    rules.forEach((rule) => {
-      const hasil = evaluasiAturan(rule, sector);
-      if (hasil.status !== 'terlampaui') {
-        terlewat.push({
-          ruleId: rule.id,
-          metricName: rule.metricName,
-          alasan:
-            hasil.status === 'tanpa-data'
-              ? hasil.alasan
-              : `Nilai ${hasil.indikator.nilai} ${hasil.indikator.satuan} masih di dalam ambang ${rule.operator} ${rule.threshold} ${rule.unit}.`,
-        });
-        return;
-      }
-
-      const { indikator } = hasil;
-      // `sentEmail` selalu false di sini — hanya callback mailer di bawah yang
-      // boleh menaikkannya, setelah SMTP benar-benar menerima email.
-      const notif = buatNotifikasi(rule, tenantId, indikator);
-
-      db.notifications.unshift(notif);
-      db.simpanNotifikasi(notif); // ponytail: per-baris, bukan snapshot
-      triggered.push(notif);
-      rule.lastTriggered = notif.timestamp;
-
-      if (rule.channels.includes('email')) {
-        emailDiantre++;
-        antreEmail({
-          subject: `[Aiones Boards ${rule.severity.toUpperCase()}] ${notif.title}`,
-          text: `${notif.message}\n\nInstansi: ${tenant?.name || tenantId}\nWaktu: ${notif.timestamp}`,
-          html:
-            `<p><strong>${notif.title}</strong></p>` +
-            `<p>${notif.message}</p>` +
-            `<p>Instansi: ${tenant?.name || tenantId}<br/>Tingkat: ${rule.severity}<br/>Waktu: ${notif.timestamp}</p>`,
-          onSent: () => {
-            notif.sentEmail = true;
-            db.persist();
-          },
-        });
-      }
-    });
-
-    if (triggered.length > 0) db.persist();
-
-    res.json({
-      evaluated: rules.length,
-      triggeredCount: triggered.length,
-      notifications: triggered,
-      tidakTerlampaui: terlewat,
-      email: {
-        aktif: mailerAktif(),
-        penerima: penerimaAlert(),
-        diantre: emailDiantre,
-      },
-    });
-  });
-
-
   /* ================= PERMINTAAN DATA (User → Admin Instansi) ================= */
 
   /** Notifikasi alur permintaan — penerimanya selalu jelas, tidak menyebar ke seisi instansi. */
@@ -4028,14 +3842,6 @@ ${kpiItems}
       untukRole: 'admin',
     });
     tautkanLampiranKePermintaan(tenantId, baru.id, baru.lampiran);
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Ajukan Permintaan Data',
-      target: `${baru.bidang} — ${baru.dataDiminta.slice(0, 60)}`,
-      details: `Prioritas ${baru.prioritas}, ${baru.lampiran.length} lampiran`,
-    });
     res.status(201).json(baru);
   });
 
@@ -4139,14 +3945,6 @@ ${kpiItems}
         permintaanId: permintaan.id,
         untukUserId: permintaan.pemohonId,
       });
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Ubah Status Permintaan Data',
-        target: `${permintaan.bidang} — ${permintaan.pemohonNama}`,
-        details: `${permintaan.status} → ${statusBaru}`,
-      });
     }
     res.json(diperbarui);
   });
@@ -4230,14 +4028,6 @@ ${kpiItems}
     for (const n of db.notifications.filter((x) => x.permintaanId === permintaan.id)) {
       db.hapusNotifikasi(n.id);
     }
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Permintaan Data',
-      target: `${permintaan.bidang} — ${permintaan.pemohonNama}`,
-      details: `Status terakhir ${permintaan.status}`,
-    });
     res.json({ success: true });
   });
 
@@ -4293,6 +4083,360 @@ ${kpiItems}
         perlu.length === 0
           ? 'Semua hasil analisis masih sesuai dengan dokumen yang ada.'
           : `${perlu.length} analisis dibuat sebelum ada dokumen baru. Baca ulang bila indikator barunya dibutuhkan.`,
+    });
+  });
+
+  /**
+   * DAFTAR BUTIR DATA INSTANSI — bahan layar "pilih data" saat dashboard dibuat
+   * dari permintaan pengguna.
+   *
+   * Tanpa endpoint ini pemilih hanya bisa melihat butir SATU permintaan (lewat
+   * `/api/analisis`), sehingga dari Workspace terlihat seolah belum ada data
+   * sama sekali. Non-admin hanya melihat butir dari permintaannya sendiri.
+   */
+  /**
+   * GABUNG BUTIR LINTAS DOKUMEN (dihitung setiap kali daftar dibaca).
+   *
+   * Satu indikator bisa tersebar di beberapa berkas: "Anggaran Jan 2026" di
+   * dokumen anggaran dan "Anggaran Okt 2026" di berkas susulan. Selama nama
+   * indikatornya sama dan periodenya berbeda, keduanya adalah data yang sama
+   * beda waktu — jadi ditampilkan sebagai SATU butir dengan deret per periode.
+   *
+   * Penggabungan dilakukan saat membaca, bukan disimpan, supaya otomatis ikut
+   * begitu ada dokumen baru: tidak perlu analisis ulang dokumen lama dan tidak
+   * ada duplikasi data di basis. Butir yang tidak punya periode dibiarkan apa
+   * adanya, dan kelompok yang periodenya sama persis tidak digabung.
+   */
+  function gabungButirLintasDokumen(daftar: ButirData[]): ButirData[] {
+    const normal = (t: unknown) =>
+      String(t || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    /**
+     * NAMA INTI — nama butir tanpa keterangan waktu.
+     *
+     * "Pendapatan Jan 2026", "Pendapatan Feb 2026", dan "Pendapatan Mar 2026"
+     * adalah indikator yang sama pada periode berbeda. Tanpa membuang bagian
+     * waktu dari namanya, ketiganya tidak pernah bertemu dan muncul sebagai
+     * kartu terpisah — persis keluhan "ini kan masih satu kesatuan".
+     *
+     * Ekor angka (mis. "· 15231281407.649996") juga dibuang: itu nilai total
+     * kolom yang terpakai sebagai judul, bukan bagian dari nama indikator.
+     */
+    const buangPeriode = (nama: unknown): string => {
+      let s = ` ${String(nama || ' ')} `;
+      /**
+       * Bulan hanya dibuang kalau berpasangan dengan tahun ("Jan 2026"). Bulan
+       * yang berdiri sendiri bisa jadi nama wilayah ("FEB" = Fakultas Ekonomi
+       * dan Bisnis), dan membuangnya membuat nama butir kehilangan awalan.
+       */
+      s = s.replace(
+        /\b(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|agt|aug|sep|sept|okt|oct|nov|des|dec)\b[\s,./-]*(19|20)\d{2}\b/gi,
+        ' '
+      );
+      s = s.replace(/\b(19|20)\d{2}\b/g, ' ');
+      s = s.replace(/\s*[·]\s*[-+]?\d[\d.,]*\s*$/g, ' ');
+      // Keterangan kolom bukan bagian nama indikator; ia jadi identitas sendiri.
+      s = s.replace(/\s*\(?kol(?:om)?\s+[A-Z]{1,2}\)?\s*$/gi, ' ');
+      // "per periode" menerangkan cara ekstraksi, bukan nama indikator.
+      s = s.replace(/\s*[·]?\s*per\s+periode\s*$/gi, ' ');
+      s = s.replace(/\s+/g, ' ').trim();
+      return s.replace(/[·\-\s]+$/, '').trim() || String(nama || '').trim();
+    };
+
+    /**
+     * Huruf kolom bila namanya menyebutkannya, mis. "… (kol B)" atau "· kolom H".
+     * Dipakai sebagai identitas kolom supaya kolom B Januari dan kolom B Februari
+     * bertemu di butir yang sama, sementara kolom H tetap terpisah.
+     */
+    const kolomDariNama = (nama: unknown): string => {
+      const m = String(nama || '').match(/kol(?:om)?\s+([A-Z]{1,2})\)?\s*$/i);
+      return m ? m[1].toUpperCase() : '';
+    };
+
+    /** Nomor urut id butir, dipakai mengurutkan kolom yang namanya tidak jelas. */
+    const nomorId = (b: ButirData): number => {
+      const m = String(b.id).match(/(\d+)$/);
+      return m ? Number(m[1]) : 0;
+    };
+
+    const URUT = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agu', 'sep', 'okt', 'nov', 'des'];
+    const kunciPeriode = (p: string): number => {
+      const m = String(p || '').match(/^([A-Za-z]+)\s*(\d{4})?/);
+      if (!m) return Number.MAX_SAFE_INTEGER;
+      const i = URUT.indexOf(m[1].slice(0, 3).toLowerCase());
+      const tahun = m[2] ? Number(m[2]) : 0;
+      return (i < 0 ? 99 : i) + tahun * 12;
+    };
+    const periodeDari = (b: ButirData): string[] => {
+      const set = new Set<string>();
+      if (b.periode) set.add(b.periode);
+      for (const p of b.periodeTersedia || []) set.add(p);
+      return [...set];
+    };
+
+    /**
+     * Deret 1, 2, 3, … persis: kolom nomor urut yang ikut teranalisis.
+     * Butir seperti ini tidak pernah berarti apa pun sebagai grafik.
+     */
+    const deretNomorUrut = (b: ButirData): boolean => {
+      const seri = b.seri || [];
+      if (seri.length === 0) return false;
+      return seri.every((s) => {
+        const d = s.data || [];
+        if (d.length < 3) return false;
+        // Nomor urut: 1, 2, 3, …
+        const nomor = d.every((v, i) => Number.isInteger(v) && (i === 0 ? v <= 2 : v - d[i - 1] === 1));
+        if (nomor) return true;
+        // Kode akun: bilangan bulat besar yang naik rapat (410201, 410302, …).
+        const bulat = d.every((v) => Number.isInteger(v));
+        if (!bulat || d[0] < 10000) return false;
+        const naik = d.every((v, i) => i === 0 || v > d[i - 1]);
+        return naik && Math.max(...d.slice(1).map((v, i) => v - d[i])) <= 2000;
+      });
+    };
+
+    const kelompok = new Map<string, ButirData[]>();
+    const tanpaPeriode: ButirData[] = [];
+    for (const b of daftar) {
+      if (deretNomorUrut(b)) continue;
+      const periode = periodeDari(b);
+      if (periode.length === 0) {
+        tanpaPeriode.push(b);
+        continue;
+      }
+      const kunci = `${normal(buangPeriode(b.nama))}|${kolomDariNama(b.nama)}`;
+      const isi = kelompok.get(kunci) ?? [];
+      isi.push(b);
+      kelompok.set(kunci, isi);
+    }
+
+    /**
+     * PECAH KELOMPOK YANG PERIODENYA BERTUMPUK.
+     *
+     * Satu lembar bulanan biasanya punya beberapa kolom angka (anggaran,
+     * realisasi, selisih). Setelah keterangan waktu dibuang, ketiganya jatuh ke
+     * kelompok yang sama dan periodenya bertabrakan. Butir seperti itu dipisah
+     * menurut urutan kolomnya, sehingga "kolom ke-1" Jan sampai Agu menjadi satu
+     * butir dengan filter periode, dan begitu pula kolom ke-2 dan ke-3.
+     */
+    /** Nama akhir sebuah kelompok: inti + identitas kolom bila ada. */
+    const namaKelompok = (kunci: string, utama: ButirData): string => {
+    const dasar = buangPeriode(utama.nama);
+    if (!dasar) return String(utama.nama || '').trim();
+      /** Nama yang sudah menyebut kolom ("Kolom M", "… (kol B)") tidak perlu tambahan. */
+      const sudahSebutKolom = /kol(?:om)?\s+[A-Z]{1,2}\b/i.test(dasar);
+      const [inti, sisa] = kunci.split('|');
+      const huruf = (sisa || '').split('#')[0];
+      const posisi = (sisa || '').split('#')[1];
+      if (sudahSebutKolom) return dasar;
+      if (huruf) return `${dasar} · kolom ${huruf}`;
+      /**
+       * Penanda posisi TIDAK ditempelkan ke nama: nomornya urutan internal, bukan
+       * huruf kolom, dan menyesatkan. Butir yang namanya jadi kembar dibedakan
+       * lewat nama dokumennya (lihat `bedakanDokumen`).
+       */
+      void posisi;
+      void inti;
+      return dasar;
+    };
+
+    const kelompokAkhir = new Map<string, ButirData[]>();
+    for (const [kunci, anggota] of kelompok) {
+      const perPeriode = new Map<string, ButirData[]>();
+      for (const a of anggota) {
+        for (const p of periodeDari(a)) {
+          const k = normal(p);
+          const isi = perPeriode.get(k) ?? [];
+          isi.push(a);
+          perPeriode.set(k, isi);
+        }
+      }
+      const bertumpuk = [...perPeriode.values()].some((isi) => isi.length > 1);
+      if (!bertumpuk) {
+        kelompokAkhir.set(kunci, anggota);
+        continue;
+      }
+      const posisi = new Map<ButirData, number>();
+      for (const [, isi] of perPeriode) {
+        isi.sort((a, b) => nomorId(a) - nomorId(b));
+        isi.forEach((a, i) => {
+          if (!posisi.has(a)) posisi.set(a, i);
+        });
+      }
+      for (const a of anggota) {
+        const pos = posisi.get(a) ?? 0;
+        const k = `${kunci}#${pos}`;
+        const isi = kelompokAkhir.get(k) ?? [];
+        isi.push(a);
+        kelompokAkhir.set(k, isi);
+      }
+    }
+
+    const hasil: ButirData[] = [];
+    for (const [kunciKelompok, anggota] of kelompokAkhir) {
+      const semuaPeriode = new Set<string>();
+      for (const a of anggota) for (const p of periodeDari(a)) semuaPeriode.add(p);
+      // Satu anggota saja, atau periodenya sama persis (hasil analisis ulang):
+      // tidak ada yang perlu digabung.
+      if (anggota.length < 2 || semuaPeriode.size < 2) {
+        const utama = anggota[0];
+        // Kelompok yang dipecah per kolom tetap memakai nama bersih + identitas kolom.
+        const namaBaru = namaKelompok(kunciKelompok, utama);
+        hasil.push({
+          ...utama,
+          nama: namaBaru,
+          ...(semuaPeriode.size > 1
+            ? { periodeTersedia: [...semuaPeriode].sort((a, b) => kunciPeriode(a) - kunciPeriode(b)) }
+            : {}),
+        });
+        continue;
+      }
+      const urut = [...anggota].sort((a, b) => String(a.dibuatPada).localeCompare(String(b.dibuatPada)));
+      const utama = urut[0];
+      const seri: any[] = [];
+      const terpakai = new Set<string>();
+      for (const a of urut) {
+        const daftarSeri = a.seri && a.seri.length > 0 ? a.seri : [];
+        const periodeAnggota = periodeDari(a);
+        for (let i = 0; i < daftarSeri.length; i += 1) {
+          const sr = daftarSeri[i];
+          // Nama deret dijadikan label periode supaya legenda dan filter cocok.
+          const label = daftarSeri.length === periodeAnggota.length ? periodeAnggota[i] : sr.nama || periodeAnggota[i];
+          const kunci = `${normal(label)}|${(sr.data || []).join(',')}`;
+          if (terpakai.has(kunci)) continue;
+          terpakai.add(kunci);
+          seri.push({ ...sr, nama: String(label || sr.nama || '') });
+        }
+      }
+      if (seri.length < 2) {
+        hasil.push(utama);
+        continue;
+      }
+      const dokumen = [...new Set(urut.map((a) => a.sitasi?.dokumen).filter(Boolean))];
+      hasil.push({
+        ...utama,
+        seri,
+        periodeTersedia: [...semuaPeriode].sort((a, b) => kunciPeriode(a) - kunciPeriode(b)),
+        sitasi: {
+          dokumen: dokumen.join(' · ') || utama.sitasi?.dokumen || '',
+          ...(utama.sitasi?.halaman ? { halaman: utama.sitasi.halaman } : {}),
+          kutipan: `${semuaPeriode.size} periode dari ${urut.length} butir: ${[...semuaPeriode].slice(0, 6).join(', ')}${semuaPeriode.size > 6 ? ' dan lainnya' : ''}`,
+        },
+        // Nama tanpa keterangan waktu: periodenya sudah jadi filter di kartu.
+        nama: namaKelompok(kunciKelompok, utama),
+        // Jejak anggota dipakai saat menyusun halaman supaya angka tiap periode ikut.
+        ...({ anggotaIds: urut.map((a) => a.id) } as any),
+      });
+    }
+    /**
+     * Nama kembar dari dokumen berbeda (mis. lembar "FEB" ada di Sipil SPM dan
+     * di Tim Pengadaan) dibedakan dengan nama dokumennya, bukan dengan huruf
+     * kolom yang tidak ada hubungannya.
+     */
+    const singkatDok = (d: unknown): string =>
+      String(d || '')
+        .replace(/\.(xlsx|xlsm|xls|csv|pdf|docx)$/i, '')
+        .split('·')[0]
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 28);
+    const dipakai = new Map<string, Set<string>>();
+    const bedakanDokumen = (b: ButirData): ButirData => {
+      const dasar = String(b.nama || '').trim();
+      const dok = singkatDok(b.sitasi?.dokumen);
+      const set = dipakai.get(dasar) ?? new Set<string>();
+      if (set.size > 0 && dok && !set.has(dok)) {
+        const namaBaru = `${dasar} (${dok})`;
+        const setBaru = dipakai.get(namaBaru) ?? new Set<string>();
+        setBaru.add(dok);
+        dipakai.set(namaBaru, setBaru);
+        return { ...b, nama: namaBaru };
+      }
+      set.add(dok);
+      dipakai.set(dasar, set);
+      return b;
+    };
+    // Huruf kolom ("· kolom D", "(kol Q)") diganti keterangan dari isi angkanya.
+    return namaiDariIsi([...hasil, ...tanpaPeriode]).map(bedakanDokumen);
+  }
+
+  app.get('/api/butir-data', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const status = String(req.query.status || '').trim() || undefined;
+    const kategori = String(req.query.kategori || '').trim() || undefined;
+
+    let butir = db.getButirData(tenantId, { status, kategori });
+    if (!isAdminRole(session.role)) {
+      const milik = new Set(
+        db.permintaanData.filter((p) => p.tenantId === tenantId && p.pemohonId === session.userId).map((p) => p.id)
+      );
+      butir = butir.filter((b) => b.permintaanId && milik.has(b.permintaanId));
+    }
+
+    // Data yang sama beda periode (termasuk dari dokumen berbeda) tampil sebagai
+    // satu butir. Dihitung di sini supaya dokumen baru langsung ikut tergabung.
+    butir = gabungButirLintasDokumen(butir);
+
+    const perKategori: Record<string, number> = {};
+    for (const b of butir) {
+      const k = b.kategori || 'Umum';
+      perKategori[k] = (perKategori[k] ?? 0) + 1;
+    }
+
+    /**
+     * RINGKASAN SUMBER DATA — dipakai halaman Pilih Data untuk menjawab "kenapa
+     * kosong". Tanpa ini, dokumen yang sudah diunggah tetapi analisisnya gagal
+     * terlihat sama persis dengan instansi yang memang belum punya dokumen.
+     */
+    const semuaButir = db.getButirData(tenantId);
+    const menunggu = semuaButir.filter((b) => b.status !== 'disetujui').length;
+    const analisis = db.getAnalisisDokumen(tenantId);
+    /**
+     * Kegagalan yang SUDAH TERGANTIKAN tidak lagi ditampilkan.
+     *
+     * Dulu kotak peringatan terus berbunyi "dokumen gagal dianalisis" padahal
+     * dokumen yang sama sudah berhasil dibaca sesudahnya — admin lalu menekan
+     * tombol ulang untuk masalah yang sudah beres. Sekarang yang dihitung hanya
+     * kegagalan terakhir per berkas.
+     */
+    const suksesTerbaru = new Map<string, string>();
+    for (const a of analisis) {
+      if (a.status !== 'selesai') continue;
+      const t = suksesTerbaru.get(a.berkasId);
+      if (!t || a.dibuatPada > t) suksesTerbaru.set(a.berkasId, a.dibuatPada);
+    }
+    const gagal = analisis
+      .filter((a) => a.status === 'gagal')
+      .filter((a) => {
+        const t = suksesTerbaru.get(a.berkasId);
+        return !t || t < a.dibuatPada;
+      })
+      .slice(0, 5)
+      .map((a) => ({
+        id: a.id,
+        berkasId: a.berkasId,
+        judul: a.judulBerkas,
+        galat: a.galat || 'Analisis gagal tanpa keterangan.',
+        dibuatPada: a.dibuatPada,
+      }));
+
+    res.json({
+      total: butir.length,
+      perKategori,
+      butir,
+      ringkas: {
+        dokumen: new Set(analisis.map((a) => a.berkasId)).size,
+        selesai: suksesTerbaru.size,
+        berjalan: analisis.filter((a) => a.status === 'antri' || a.status === 'proses').length,
+        gagal,
+        menunggu,
+        diperbaruiPada: new Date().toISOString(),
+      },
     });
   });
 
@@ -4436,6 +4580,10 @@ ${kpiItems}
     }
 
     const ekstraktor: Ekstraktor = async ({ prompt }) => {
+      // Spreadsheet dibaca langsung dari berkasnya: isi sel tidak bisa diandalkan
+      // lewat pencarian vektor RAG.
+      const lembar = await ekstrakLembarBerkas(tenant, berkasId, judulBerkas);
+      if (lembar) return { ringkasan: lembar.ringkasan, butir: lembar.butir, metode: 'tabel-lokal' as const };
       const hasil = await ragClient.query({
         prompt,
         sector: sector as BumdSector,
@@ -4444,7 +4592,8 @@ ${kpiItems}
         mode: 'structured',
         strictGrounding: true,
         dokumenTarget: judulBerkas,
-        timeoutMs: 120_000,
+        sapuanPenuh: true,
+        timeoutMs: 240_000,
       });
       const mentah = petakanKeluaranRag(hasil.structuredJson, judulBerkas);
       const ringkasan =
@@ -4471,14 +4620,6 @@ ${kpiItems}
         konteks,
         abaikanKuota: masukan.abaikanKuota === true,
         sidik: { dokumen: sidikSekarang, kb: sidikKbSekarang },
-      });
-      db.addAuditLog({
-        tenantId,
-        userId: masukan.pelaku?.userId || 'sistem',
-        userName: masukan.pelaku?.name || 'Sistem (otomatis)',
-        action: masukan.sumber === 'otomatis' ? 'Analisis Dokumen Otomatis' : 'Analisis Dokumen',
-        target: judulBerkas,
-        details: `Status ${hasil.analisis.status}, ${hasil.butir.length} butir, ${hasil.dibuang} dibuang, sisa kuota ${hasil.sisaKuota}`,
       });
       return {
         kode: hasil.analisis.status === 'gagal' ? 422 : 201,
@@ -4562,7 +4703,14 @@ ${kpiItems}
       const lama = terbaru.get(a.berkasId);
       if (!lama || String(a.dibuatPada).localeCompare(String(lama.dibuatPada)) > 0) terbaru.set(a.berkasId, a);
     }
-    return perluSegarKarenaKb([...terbaru.values()], sidikSekarang);
+    /**
+     * Angka yang dibaca langsung dari sel berkas (`tabel-lokal`) tidak
+     * bergantung pada indeks basis dokumen. Dokumen baru masuk tidak membuat
+     * hasilnya basi, jadi tidak perlu diantrekan ulang — kalau ikut diantrekan,
+     * butir dokumen lain sempat terhapus dan dibangun ulang hanya karena ada
+     * satu unggahan baru.
+     */
+    return perluSegarKarenaKb([...terbaru.values()], sidikSekarang).filter((a) => a.metode !== 'tabel-lokal');
   };
 
   /**
@@ -4725,6 +4873,29 @@ ${kpiItems}
     res.json(analisis);
   });
 
+  /**
+   * Setujui semua butir yang masih `draf` di instansi ini.
+   *
+   * Butir baru sudah otomatis disetujui bila angkanya terbaca dari sel dokumen
+   * dengan sitasi (lihat `statusButirAwal`). Ini untuk butir lama yang sudah
+   * terlanjur tersimpan sebagai draf sebelum aturan itu berlaku — supaya admin
+   * tidak perlu mengklik puluhan angka satu per satu.
+   */
+  app.post('/api/analisis/butir/setujui-semua', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireAdmin(session, res, 'Hanya admin instansi yang boleh menyetujui butir data.')) return;
+    const tenantId = effectiveTenantId(req, session);
+    const draf = db.butirData.filter((b) => b.tenantId === tenantId && b.status === 'draf');
+    let jumlah = 0;
+    for (const b of draf) {
+      if (db.updateButirData(b.id, tenantId, { status: 'disetujui' })) jumlah += 1;
+    }
+    if (jumlah > 0) {
+    }
+    res.json({ disetujui: jumlah });
+  });
+
   /** Setujui / tolak / kembalikan butir ke draf. Hanya admin instansi. */
   app.patch('/api/analisis/butir/:id', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -4738,14 +4909,6 @@ ${kpiItems}
     const butir = db.butirData.find((b) => b.id === req.params.id && b.tenantId === tenantId);
     if (!butir) return res.status(404).json({ error: 'Butir tidak ditemukan.' });
     const diperbarui = db.updateButirData(butir.id, tenantId, { status: status as any });
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Ubah Status Butir Data',
-      target: butir.nama,
-      details: `Menjadi ${status}`,
-    });
     res.json(diperbarui);
   });
 
@@ -4757,9 +4920,20 @@ ${kpiItems}
     const tenantId = effectiveTenantId(req, session);
     const lama = db.getAnalisisDokumenById(req.params.id, tenantId);
     if (!lama) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
-    if (lama.status === 'selesai') {
+    /**
+     * Dokumen spreadsheet dibaca langsung dari selnya (`tabel-lokal`): tidak ada
+     * kuota model yang dipakai, jadi membangun ulang butirnya selalu aman dan
+     * justru perlu — perbaikan cara membaca nama kolom hanya berlaku pada
+     * pembacaan ulang. Dokumen jalur RAG tetap dikunci supaya kuota tidak habis
+     * tanpa sengaja.
+     */
+    const bolehUlang = lama.metode === 'tabel-lokal';
+    if (lama.status === 'selesai' && (lama.jumlahButir ?? 0) > 0 && !bolehUlang) {
       return res.status(409).json({ error: 'Analisis ini sudah selesai. Hapus dulu bila ingin menganalisis ulang.' });
     }
+    // Analisis "selesai" yang tidak menghasilkan satu butir pun TETAP boleh dibaca
+    // ulang: hasil kosong seperti itu biasanya gejala layanan sibuk (429) atau
+    // dokumen yang baru selesai diindeks — bukan alasan mengunci admin.
 
     const permintaan = lama.permintaanId
       ? db.permintaanData.find((p) => p.id === lama.permintaanId && p.tenantId === tenantId)
@@ -4769,6 +4943,10 @@ ${kpiItems}
     const sector = (tenant?.sector || 'pdam') as BumdSector;
 
     const ekstraktor: Ekstraktor = async ({ prompt }) => {
+      // Spreadsheet dibaca langsung dari berkasnya: isi sel tidak bisa diandalkan
+      // lewat pencarian vektor RAG.
+      const lembar = await ekstrakLembarBerkas(tenant, lama.berkasId, lama.judulBerkas);
+      if (lembar) return { ringkasan: lembar.ringkasan, butir: lembar.butir, metode: 'tabel-lokal' as const };
       const hasil = await ragClient.query({
         prompt,
         sector,
@@ -4777,7 +4955,18 @@ ${kpiItems}
         mode: 'structured',
         strictGrounding: true,
         dokumenTarget: lama.judulBerkas,
-        timeoutMs: 120_000,
+        /**
+         * SAPUAN PER DOKUMEN.
+         *
+         * Skema tunggal ("baca dokumen ini, ambil indikator angka") ternyata
+         * dikembalikan kosong oleh layanan RAG untuk berkas spreadsheet, padahal
+         * isinya penuh angka. Sapuan memecah pembacaan menjadi lima bagian
+         * (angka utama, deret periode, rincian kategori, perbandingan, tabel) dan
+         * tiap bagian diminta terpisah — cara yang sama dipakai saat mengisi
+         * template dan terbukti mengembalikan angka.
+         */
+        sapuanPenuh: true,
+        timeoutMs: 240_000,
       });
       return {
         ringkasan: (hasil.structuredJson && (hasil.structuredJson as any).description) || hasil.answer || undefined,
@@ -4834,14 +5023,6 @@ ${kpiItems}
     const ada = db.getAnalisisDokumenById(req.params.id, tenantId);
     if (!ada) return res.status(404).json({ error: 'Analisis tidak ditemukan.' });
     db.deleteAnalisisDokumen(ada.id, tenantId);
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Analisis Dokumen',
-      target: ada.judulBerkas,
-      details: `${ada.jumlahButir} butir ikut dihapus`,
-    });
     res.json({ success: true });
   });
 
@@ -4862,7 +5043,15 @@ ${kpiItems}
       return res.status(400).json({ error: 'Pilih minimal satu butir data.' });
     }
 
-    const dipilih = db.getButirData(tenantId).filter((b) => ids.includes(b.id));
+    /**
+     * Butir gabungan lintas dokumen hanya ada di tampilan, bukan di basis data.
+     * Karena itu pilihan disaring dari daftar hasil penggabungan; anggotanya
+     * tetap butir asli di dalam basis, dan seluruh deret periodenya ikut.
+     */
+    const semuaButir = db.getButirData(tenantId);
+    const digabung = gabungButirLintasDokumen(semuaButir.filter((b) => b.status === 'disetujui'));
+    let dipilih = digabung.filter((b) => ids.includes(b.id));
+    if (dipilih.length === 0) dipilih = semuaButir.filter((b) => ids.includes(b.id));
     if (dipilih.length === 0) {
       return res.status(404).json({ error: 'Butir yang dipilih tidak ditemukan di instansi ini.' });
     }
@@ -4899,8 +5088,61 @@ ${kpiItems}
         });
       }
       halamanBaru = [{ judul, widgets: widgetsSlot }];
+    } else if (Array.isArray(req.body?.halaman) && req.body.halaman.length > 0) {
+      /**
+       * SUSUNAN DARI KANVAS PILIH DATA.
+       *
+       * Pengguna sudah menyusun sendiri: beberapa halaman, tiap kartu dengan
+       * bentuk chart pilihannya. Susunan itu dipakai apa adanya, tidak
+       * dikelompokkan ulang per kategori. Bentuk yang tidak ada di katalog
+       * diabaikan (kartu memakai bentuk pilihan sistem).
+       */
+      const petaButir = new Map(dipilih.map((b) => [b.id, b]));
+      // Id kartu unik di SELURUH dashboard, bukan per halaman: butir yang sama
+      // boleh muncul di beberapa halaman, sedangkan editor memilih widget lewat id.
+      const idTerpakai = new Set<string>();
+      halamanBaru = (req.body.halaman as any[]).slice(0, 30).map((h, i) => {
+        const kartu = Array.isArray(h?.kartu) ? h.kartu : [];
+        const widgets = kartu
+          .map((k: any, j: number) => {
+            const b = petaButir.get(String(k?.butirId || ''));
+            if (!b) return null;
+            const diminta = String(k?.chartId || '').trim();
+            const chartId = Object.prototype.hasOwnProperty.call(CHART_DEFAULT, diminta) ? diminta : undefined;
+            const w = butirKeWidget(b, j + 1, chartId ? { chartId } : undefined);
+            if (!w) return null;
+            // Butir yang sama boleh tampil dua kali dengan bentuk berbeda; id kartu harus tetap unik.
+            let id = w.id;
+            for (let n = 2; idTerpakai.has(id); n += 1) id = `${w.id}-${n}`;
+            idTerpakai.add(id);
+            return { ...w, id };
+          })
+          .filter(Boolean);
+        return {
+          judul: String(h?.judul || '').trim().slice(0, 80) || `Halaman ${i + 1}`,
+          widgets: tataGrid(widgets),
+        };
+      }).filter((h) => h.widgets.length > 0);
     } else {
-      halamanBaru = butirKeHalaman(dipilih, { judul });
+      /**
+       * Bentuk chart pilihan pengguna.
+       *
+       * `chartId` menunjuk entri katalog Template Chart (mis. `bar-kapsul`);
+       * hanya id yang benar-benar ada di katalog yang diterima. `bentuk` masih
+       * diterima untuk pemanggil lama (tipe dasar tanpa chart katalog). Yang
+       * tidak dikenal diabaikan, bukan ditolak — dashboard tetap terbentuk
+       * dengan bentuk pilihan sistem.
+       */
+      const BENTUK_DIIZINKAN = ['kpi', 'bar', 'hbar', 'line', 'area', 'pie', 'donut', 'table'] as const;
+      const bentukDiminta = String(req.body?.bentuk || '').trim() as (typeof BENTUK_DIIZINKAN)[number];
+      const bentuk = BENTUK_DIIZINKAN.includes(bentukDiminta) ? bentukDiminta : undefined;
+      const chartDiminta = String(req.body?.chartId || '').trim();
+      const chartId = Object.prototype.hasOwnProperty.call(CHART_DEFAULT, chartDiminta) ? chartDiminta : undefined;
+      halamanBaru = butirKeHalaman(dipilih, {
+        judul,
+        ...(bentuk ? { bentuk } : {}),
+        ...(chartId ? { chartId } : {}),
+      });
     }
     if (halamanBaru.every((h) => h.widgets.length === 0)) {
       return res.status(422).json({
@@ -4933,19 +5175,31 @@ ${kpiItems}
         },
         tenantId
       );
-      db.addAuditLog({
-        tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Tambah Halaman dari Butir',
-        target: lama.title,
-        details: `${tambahan.length} halaman, ${ringkasHalaman(dipilih, halamanBaru)}`,
-      });
       return res.status(201).json({
         dashboard: diperbarui,
         jumlahHalaman: tambahan.length,
         ringkasan: catatanTemplate || ringkasHalaman(dipilih, halamanBaru),
         ...(slotKosongTemplate.length > 0 ? { slotKosong: slotKosongTemplate } : {}),
+      });
+    }
+
+    /**
+     * ATURAN DASHBOARD BARU: minimal 3 chart dan semuanya berhubungan
+     * (lihat `aturanDashboard.ts`). Tidak ada chart yang ditambahkan diam-diam:
+     * pengguna melengkapinya sendiri dari Pilih Data.
+     */
+    const petaWidgetButir = new Map(dipilih.map((b) => [`w-${b.id}`, b]));
+    const kartuAturan = halamanBaru
+      .flatMap((h) => h.widgets)
+      .map((w: any) => petaWidgetButir.get(String(w.id)) ?? petaWidgetButir.get(String(w.id).replace(/-\d+$/, '')))
+      .filter((b): b is ButirData => Boolean(b));
+    const aturan = cekAturanDashboard(kartuAturan);
+    if (!aturan.boleh) {
+      return res.status(422).json({
+        error: aturan.pesan,
+        kode: 'ATURAN_DASHBOARD',
+        kurang: aturan.kurang,
+        tidakTerkait: aturan.tidakTerkait.map((b) => b.id),
       });
     }
 
@@ -4970,20 +5224,336 @@ ${kpiItems}
     const dibuat = db.createDashboard(baru);
 
     if (permintaan) db.updatePermintaanData(permintaan.id, tenantId, { dashboardId: dibuat.id });
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Buat Dashboard dari Butir',
-      target: judul,
-      details: `${halaman.length} halaman, ${ringkasHalaman(dipilih, halamanBaru)}`,
-    });
 
     return res.status(201).json({
       dashboard: dibuat,
       jumlahHalaman: halaman.length,
       ringkasan: catatanTemplate || ringkasHalaman(dipilih, halamanBaru),
       ...(slotKosongTemplate.length > 0 ? { slotKosong: slotKosongTemplate } : {}),
+    });
+  });
+
+  /**
+   * REKOMENDASI AI — dashboard lengkap yang disusun oleh model RAG.
+   *
+   * DUA TAHAP supaya pengguna bisa MENONTON prosesnya:
+   * 1. Permintaan ini langsung membuat dashboard kosong berstatus `menyusun` dan
+   *    membalasnya. Aplikasi pindah ke kanvas saat itu juga.
+   * 2. Pekerjaan model berjalan di latar. Setiap kemajuan ditulis ke dashboard —
+   *    butir yang dikirim, kategori yang tersedia, halaman yang selesai disusun —
+   *    sehingga kanvas bisa menampilkan apa yang sedang diambil AI, bukan layar
+   *    tunggu yang kosong.
+   *
+   * Butir yang dipakai tetap butir asli; model hanya menunjuk id dan chart.
+   */
+  app.post('/api/dashboards/rekomendasi', (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    const sector = (tenant?.sector || 'pdam') as BumdSector;
+
+    const semua = gabungButirLintasDokumen(db.getButirData(tenantId).filter((b) => b.status === 'disetujui'));
+    if (semua.length === 0) {
+      return res.status(422).json({ error: 'Belum ada butir data yang disetujui. Analisis dokumen lebih dulu.' });
+    }
+    const ids: string[] = Array.isArray(req.body?.butirIds) ? req.body.butirIds.map((x: unknown) => String(x)) : [];
+    const kandidat = ids.length > 0 ? semua.filter((b) => ids.includes(b.id)) : semua;
+    if (kandidat.length === 0) {
+      return res.status(404).json({ error: 'Butir yang dipilih tidak ditemukan di instansi ini.' });
+    }
+
+    /**
+     * Rasa penyusunan: `cepat` memangkas katalog supaya model menjawab lebih
+     * dulu, `mendalam` menambah satu putaran untuk halaman lanjutan.
+     */
+    const mode = modeRekoSah(req.body?.mode);
+    const profil = MODE_REKO[mode];
+
+    /** Ringkasan kategori: ditampilkan di kanvas sambil AI bekerja. */
+    const perKategori = new Map<string, number>();
+    for (const b of kandidat) {
+      const k = String(b.kategori || 'umum').toLowerCase();
+      perKategori.set(k, (perKategori.get(k) || 0) + 1);
+    }
+    const kategori = [...perKategori.entries()]
+      .map(([nama, jumlah]) => ({ nama, jumlah }))
+      .sort((a, b) => b.jumlah - a.jumlah);
+
+    const id = `dash-${Date.now()}`;
+    const judulAwal = `AI menyusun dashboard ${tenant?.name || 'instansi'}…`;
+    const mulai = new Date().toISOString();
+    const shell: Dashboard = {
+      id,
+      tenantId,
+      title: judulAwal,
+      description: 'AI sedang menyusun halaman dari butir data dokumen.',
+      sector,
+      widgets: [],
+      halaman: [],
+      halamanAktifId: '',
+      globalFilters: { periode: 'Semua', unitKerja: 'Semua', kategori: 'Semua' },
+      status: 'menyusun',
+      ai: {
+        tahap: 'menyiapkan',
+        pesan: `AI membaca katalog data instansi (mode ${profil.nama.toLowerCase()})`,
+        mode,
+        mulai,
+        kandidat: kandidat.length,
+        kategori,
+        terpilih: [],
+      },
+      createdAt: mulai,
+      updatedAt: mulai,
+    };
+    db.createDashboard(shell);
+
+    const ubah = (patch: Partial<Dashboard>) => {
+      try {
+        db.updateDashboard(id, { ...patch, updatedAt: new Date().toISOString() } as any, tenantId);
+      } catch (err: any) {
+        console.warn('[rekomendasi] gagal menyimpan kemajuan:', err?.message || err);
+      }
+    };
+
+    const permintaan = String(req.body?.prompt || '').trim();
+    const katalog = katalogUntukAi(kandidat, profil.maksVarian, profil.batasKatalog);
+    const prompt = buatPrompt(katalog.teks, katalog.jumlah, permintaan, mode);
+
+    // Pekerjaan model di latar; balasan HTTP sudah dikirim lebih dulu.
+    void (async () => {
+      try {
+        ubah({
+          ai: {
+            tahap: 'katalog',
+            pesan: `${katalog.jumlah} varian dikirim ke AI (mode ${profil.nama}, dari ${kandidat.length} butir disetujui)`,
+            mulai,
+            kandidat: katalog.jumlah,
+            kategori,
+            terpilih: [],
+          },
+        });
+
+        /**
+         * Tahap "memilih" ditulis SEBELUM menunggu model. Panggilan model bisa
+         * berjalan satu sampai dua menit, dan tanpa ini panel terus berbunyi
+         * "membaca katalog" padahal AI sudah lama memilih.
+         */
+        ubah({
+          ai: {
+            tahap: 'memilih',
+            pesan:
+              profil.putaran > 1
+                ? `AI menyusun halaman inti (putaran 1 dari ${profil.putaran}, ${profil.perkiraan})`
+                : `AI memilih halaman dan kartu (biasanya ${profil.perkiraan})`,
+            mulai,
+            kandidat: katalog.jumlah,
+            kategori,
+            terpilih: [],
+          },
+        });
+
+        const item = await ragClient.rencanaDashboard(prompt, SKEMA_RENCANA, {
+          kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId),
+          timeoutMs: 180,
+        });
+        if (!item) throw new Error('Layanan AI tidak mengembalikan susunan.');
+
+        const rencana = bacaRencana(JSON.stringify(item));
+        if (!rencana) throw new Error('Jawaban AI tidak bisa dibaca sebagai susunan halaman.');
+
+        const susun = susunDariRencana(rencana, kandidat);
+        if (susun.halaman.length === 0) throw new Error('AI tidak memilih satu pun butir yang dikenal aplikasi.');
+
+        /**
+         * ATURAN DASHBOARD BARU (minimal 3 chart, semuanya berhubungan).
+         * Pengguna meminta AI menyusun, jadi kekurangan dilengkapi di sini:
+         * chart yang tidak berhubungan dibuang, lalu ditambah butir terkait
+         * dari kandidat sampai mencapai batas minimal.
+         */
+        {
+          // Pelengkap boleh diambil dari SEMUA data yang disetujui, bukan hanya yang dicentang.
+          const petaKandidat = new Map(semua.map((b) => [`w-${b.id}`, b]));
+          const butirDari = (w: WidgetSpec) =>
+            petaKandidat.get(String(w.id)) ?? petaKandidat.get(String(w.id).replace(/-\d+$/, ''));
+          const semuaKartu = () => susun.halaman.flatMap((h) => h.widgets);
+          const awal = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
+          if (awal.tidakTerkait.length > 0) {
+            const buang = new Set(awal.tidakTerkait.map((b) => b.id));
+            for (const h of susun.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
+            susun.halaman = susun.halaman.filter((h) => h.widgets.length > 0);
+          }
+          const sekarang = semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b));
+          const kurang = MIN_CHART_DASHBOARD - sekarang.length;
+          if (kurang > 0) {
+            const tambahan = saranTerkait(sekarang, semua, kurang * 3)
+              .map((b, i) => butirKeWidget(b, sekarang.length + i + 1))
+              .filter((w): w is WidgetSpec => Boolean(w))
+              .slice(0, kurang);
+            if (susun.halaman.length === 0) susun.halaman.push({ judul: 'Ringkasan', widgets: [] });
+            susun.halaman[0].widgets.push(...tambahan);
+          }
+          susun.halaman = tataRapiHalaman(susun.halaman);
+          const akhir = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
+          if (!akhir.boleh) {
+            throw new Error(`Data yang berhubungan tidak cukup untuk dashboard. ${akhir.pesan}`);
+          }
+        }
+
+        const terpilih: string[] = [];
+        const halaman: Array<{ id: string; judul: string; widgets: WidgetSpec[] }> = [];
+
+        /**
+         * Satu halaman langsung ditulis ke dashboard begitu siap, supaya kanvas
+         * terisi sambil menunggu sisa halaman. Pada mode `mendalam` halaman
+         * putaran pertama tampil DULU, baru halaman lanjutan menyusul.
+         */
+        const tulisHalaman = async (h: { judul: string; widgets: WidgetSpec[] }) => {
+          halaman.push({ id: `hlm-${halaman.length + 1}`, judul: h.judul, widgets: h.widgets });
+          for (const w of h.widgets) {
+            const nama = String(w.title || '').trim();
+            if (nama && !terpilih.includes(nama)) terpilih.push(nama);
+          }
+          ubah({
+            title: judulAwal,
+            halaman: [...halaman],
+            halamanAktifId: halaman[0].id,
+            widgets: halaman[0].widgets,
+            ai: {
+              tahap: 'menyusun',
+              pesan: `Halaman ${halaman.length} siap: ${h.judul}`,
+              mode,
+              mulai,
+              kandidat: katalog.jumlah,
+              kategori,
+              terpilih: [...terpilih],
+            },
+          });
+          // Jeda supaya kanvas sempat menggambar halaman satu per satu (panel
+          // kanvas menyegarkan tiap 1,5 detik).
+          await new Promise((r) => setTimeout(r, 700));
+        };
+
+        for (const h of susun.halaman) await tulisHalaman(h);
+
+        /**
+         * PUTARAN LANJUTAN (mendalam 2 putaran, ultra 3 putaran).
+         *
+         * Putaran pertama hanya menyentuh sebagian katalog karena batas panjang
+         * prompt (layanan RAG menolak prompt di atas 8000 karakter). Putaran
+         * berikutnya menerima varian yang BELUM terpakai dan menyusun halaman
+         * tambahan, jadi jumlah halaman bertambah tanpa mengulang topik.
+         *
+         * Kalau satu putaran gagal (layanan sibuk) atau model hanya mengulang
+         * topik yang sudah ada, pengulangan berhenti dan halaman yang sudah jadi
+         * tetap dipakai - pengguna tidak kehilangan hasil sebelumnya.
+         */
+        for (let putaranKe = 2; putaranKe <= profil.putaran; putaranKe += 1) {
+          try {
+            // `susun.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
+            const varianTerpakai = new Set<string>(susun.dipakai);
+            // Halaman tersimpan memakai `widgets`; id widget = id varian terpakai.
+            for (const h of halaman) for (const w of h.widgets || []) varianTerpakai.add(String(w.id));
+            const butirTerpakai = new Set([...varianTerpakai].map((v) => v.split('#')[0]));
+            const sisaButir = kandidat.filter((b) => !butirTerpakai.has(b.id));
+            const katalog2 = katalogUntukAi(
+              sisaButir.length > 0 ? sisaButir : kandidat,
+              profil.maksVarian,
+              profil.batasKatalog,
+            );
+            const teks2 = katalog2.teks
+              .split('\n')
+              .filter((baris) => {
+                const idVarian = baris.replace(/^-\s*/, '').split('|')[0].trim();
+                return idVarian !== '' && !varianTerpakai.has(idVarian);
+              })
+              .join('\n');
+
+            // Tidak ada varian baru lagi: putaran berikutnya tidak akan menambah apa pun.
+            if (teks2.trim() !== '') {
+              ubah({
+                ai: {
+                  tahap: 'memilih',
+                  pesan: `Putaran ${putaranKe} dari ${profil.putaran}: menyusun halaman lanjutan`,
+                  mode,
+                  mulai,
+                  kandidat: katalog.jumlah,
+                  kategori,
+                  terpilih: [...terpilih],
+                },
+              });
+              const item2 = await ragClient.rencanaDashboard(
+                buatPrompt(teks2, katalog2.jumlah, permintaan, mode, true, putaranKe),
+                SKEMA_RENCANA,
+                { kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId), timeoutMs: 240 },
+              );
+              const rencana2 = item2 ? bacaRencana(JSON.stringify(item2)) : null;
+              if (rencana2) {
+                const tambahan = susunDariRencana(rencana2, kandidat);
+                const judulAda = new Set(halaman.map((x) => x.judul.toLowerCase()));
+                let ditambah = 0;
+                for (const h of tambahan.halaman) {
+                  if (judulAda.has(h.judul.toLowerCase())) continue;
+                  judulAda.add(h.judul.toLowerCase());
+                  susun.dipakai.push(...tambahan.dipakai);
+                  susun.dibuang.push(...tambahan.dibuang);
+                  await tulisHalaman(h);
+                  ditambah += 1;
+                }
+                // Semua halaman putaran ini kembar dengan yang sudah ada: berhenti.
+                if (ditambah === 0) break;
+              } else {
+                console.warn(`[rekomendasi] putaran ${putaranKe} tidak menghasilkan rencana`);
+                break;
+              }
+            } else {
+              break;
+            }
+          } catch (err: any) {
+            console.warn(`[rekomendasi] putaran ${putaranKe} dilewati:`, err?.message || err);
+            break;
+          }
+        }
+
+        const judul =
+          String(rencana.judul || '').trim().slice(0, 80) ||
+          `Dashboard ${tenant?.name || 'Instansi'} — ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
+        ubah({
+          title: judul,
+          description: `Disusun AI dari ${susun.dipakai.length} butir data dokumen.`,
+          status: 'siap',
+          ai: undefined,
+          halaman,
+          halamanAktifId: halaman[0].id,
+          widgets: halaman[0].widgets,
+        });
+
+      } catch (err) {
+        const pesan = jelaskanError(err);
+        console.warn('[rekomendasi] AI gagal:', pesan);
+        ubah({
+          status: 'gagal',
+          title: `Rekomendasi AI gagal — ${tenant?.name || 'instansi'}`,
+          description: 'AI tidak bisa menyusun dashboard saat ini.',
+          ai: {
+            tahap: 'gagal',
+            pesan: 'AI tidak bisa menyusun dashboard saat ini.',
+            mulai,
+            kandidat: katalog.jumlah,
+            kategori,
+            terpilih: [],
+            galat: pesan,
+          },
+        });
+      }
+    })();
+
+    return res.status(201).json({
+      dashboard: shell,
+      jumlahHalaman: 0,
+      jumlahKartu: 0,
+      mode,
+      ringkasan: `Mode ${profil.nama} (${profil.perkiraan}): AI menyusun dari ${katalog.jumlah} varian. Halaman muncul satu per satu di kanvas.`,
     });
   });
 
@@ -5021,19 +5591,29 @@ ${kpiItems}
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const butir = butirSiapPakai(db.getButirData(tenantId)).slice(0, 40);
     const daftarKartu = halaman.widgets.map((w) => `- id=${w.id} | "${w.title}" | tipe ${w.type}`).join('\n');
-    const daftarButir = butir
-      .map(
+    const barisButir = butir.map(
         (b) =>
           `- id=${b.id} | "${b.nama}" | ${b.kategori} | ${
             b.nilai !== undefined && b.nilai !== null ? `nilai ${b.nilai}${b.satuan ? ' ' + b.satuan : ''}` : b.seri ? `deret ${b.seri[0]?.data.join(',')}` : 'tabel'
           } | sumber: ${b.sitasi.dokumen}${b.sitasi.halaman ? ' hlm ' + b.sitasi.halaman : ''}`
-      )
-      .join('\n');
+    );
+    // Layanan RAG menolak `query` di atas 8000 karakter (HTTP 422). Butir
+    // ditambahkan sampai anggaran habis supaya seluruh prompt tetap di bawah batas.
+    const ANGGARAN_BUTIR = Math.max(0, 7500 - 2200 - daftarKartu.length - perintah.length - halaman.judul.length - dash.title.length);
+    const butirMuat: string[] = [];
+    let panjangButir = 0;
+    for (const baris of barisButir) {
+      if (panjangButir + baris.length + 1 > ANGGARAN_BUTIR) break;
+      butirMuat.push(baris);
+      panjangButir += baris.length + 1;
+    }
+    const daftarButir = butirMuat.join('\n');
 
     const prompt = [
       `Halaman yang sedang dibuka: "${halaman.judul}" (id ${halaman.id}) pada dashboard "${dash.title}".`,
       'Kartu yang ada di halaman ini:',
       daftarKartu || '(belum ada kartu)',
+      `Halaman ini berisi ${halaman.widgets.length} kartu dari batas ${MAKS_WIDGET_HALAMAN}. Kartu baru paling banyak ${Math.max(0, MAKS_WIDGET_HALAMAN - halaman.widgets.length)}, kecuali ada kartu yang dihapus dalam usulan yang sama.`,
       '',
       'Butir data yang SUDAH DISETUJUI admin (satu-satunya sumber angka yang boleh dipakai):',
       daftarButir || '(belum ada butir yang disetujui)',
@@ -5093,7 +5673,16 @@ ${kpiItems}
     }
 
     // Pratinjau dihitung sekarang, supaya admin melihat hasilnya sebelum menyetujui.
-    const pratinjau = terapkanPerubahan(halaman.widgets, validasi.perubahan);
+    // Kartu baru yang melewati sisa ruang halaman dibuang, bukan menggagalkan usulan.
+    const pangkas = pangkasTambahan(validasi.perubahan, halaman.widgets.length);
+    if (pangkas.perubahan.length === 0) {
+      return res.status(409).json({
+        error: `Halaman "${halaman.judul}" sudah berisi ${halaman.widgets.length} kartu (batas ${MAKS_WIDGET_HALAMAN}). Hapus satu kartu dulu, atau buat halaman baru.`,
+        judulHalaman: halaman.judul,
+      });
+    }
+    const perubahanFinal = pangkas.perubahan;
+    const pratinjau = terapkanPerubahan(halaman.widgets, perubahanFinal);
     if (!pratinjau.berhasil) {
       return res.status(409).json({ error: pratinjau.galat || 'Usulan tidak bisa diterapkan pada halaman ini.' });
     }
@@ -5103,8 +5692,8 @@ ${kpiItems}
       dashboardId,
       halamanId: halaman.id,
       judulHalaman: halaman.judul,
-      ringkasan: String(mentah?.ringkasan || ringkasUsulan(validasi.perubahan)).slice(0, 300),
-      perubahan: validasi.perubahan,
+      ringkasan: String(mentah?.ringkasan || ringkasUsulan(perubahanFinal)).slice(0, 300),
+      perubahan: perubahanFinal,
       asal: 'chat',
       dibuatOleh: session.userId,
       dibuatOlehNama: session.name,
@@ -5112,7 +5701,9 @@ ${kpiItems}
 
     res.status(201).json({
       usulan,
-      ringkasanPerubahan: ringkasUsulan(validasi.perubahan),
+      ringkasanPerubahan: ringkasUsulan(perubahanFinal),
+      judulHalaman: halaman.judul,
+      dipangkas: pangkas.dipangkas,
       jumlahKartuSetelah: pratinjau.jumlahAkhir,
       pratinjauWidgets: pratinjau.widgets,
     });
@@ -5176,14 +5767,6 @@ ${kpiItems}
       diterapkanPada: new Date().toISOString(),
     });
 
-    db.addAuditLog({
-      tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Terapkan Usulan Halaman',
-      target: `${dash.title} — ${halaman.judul}`,
-      details: `${ringkasUsulan(usulan.perubahan)} (asal ${usulan.asal})`,
-    });
 
     res.json({ usulan: usulanSelesai, dashboard: diperbarui, jumlahKartu: hasil.jumlahAkhir });
   });
@@ -5334,6 +5917,606 @@ ${kpiItems}
     const tenant = db.tenants.find((t) => t.id === tenantId);
     const { organizationId, otomatis, projectKms } = await projectKmsEfektif(tenant);
     return { tenantId, tenant, organizationId, otomatis, projectKms };
+  }
+
+  /**
+   * EKSTRAKSI LOKAL UNTUK BERKAS SPREADSHEET (xlsx/xls/csv).
+   *
+   * Layanan RAG mengindeks isi spreadsheet sebagai teks, dan pencarian vektornya
+   * hampir tidak pernah menemukan baris tabel — hasilnya "informasi tidak
+   * ditemukan" walau berkasnya penuh angka. Untuk berkas seperti ini isinya
+   * dibaca LANGSUNG dari file: setiap lembar diurai, kolom angka dan labelnya
+   * diambil, lalu dijadikan butir yang sama bentuknya dengan hasil RAG.
+   *
+   * Angka tetap berasal dari berkas asli (bukan model), dan sitasinya menyebut
+   * lembar asal, jadi bisa diperiksa ulang.
+   */
+  /**
+   * BUTIR PER KOLOM ANGKA — supaya isi dokumen terambil SELURUHNYA.
+   *
+   * Rangkuman widget hanya mengambil dua kolom angka terkuat per lembar, padahal
+   * satu berkas bisa punya ratusan kolom (Sipil SPM: 21 lembar, 275 kolom angka).
+   * Fungsi ini membuat satu butir untuk SETIAP kolom angka: nama kolom menjadi
+   * judul, label baris menjadi kategori, angkanya menjadi deret. Dengan begitu
+   * tidak ada kolom yang hilang, dan tiap butir tetap kecil sehingga halaman
+   * Pilih Data tidak berat.
+   */
+  /**
+   * TIMELINE DARI NAMA LEMBAR.
+   *
+   * Lembar laporan bulanan biasanya bernama "anggaran Biaya Jan 2026" atau
+   * "Pendapatan Maret". Bulan/tahun itu dipakai sebagai label periode supaya
+   * kolom yang sama dari dua belas lembar bisa disatukan menjadi satu butir.
+   *
+   * `tanggal: false` berarti lembarnya tidak menyebut waktu; kolom bernama sama
+   * di lembar seperti itu TIDAK digabung, karena bisa jadi dua hal berbeda.
+   */
+  const NAMA_BULAN: Record<string, string> = {
+    jan: 'Jan', januari: 'Jan', feb: 'Feb', februari: 'Feb', pebruari: 'Feb',
+    mar: 'Mar', maret: 'Mar', apr: 'Apr', april: 'Apr', mei: 'Mei', may: 'Mei',
+    jun: 'Jun', juni: 'Jun', jul: 'Jul', juli: 'Jul', agu: 'Agu', agt: 'Agu',
+    agus: 'Agu', agustus: 'Agu', sep: 'Sep', sept: 'Sep', september: 'Sep',
+    okt: 'Okt', oktober: 'Okt', nov: 'Nov', november: 'Nov', des: 'Des', desember: 'Des',
+  };
+
+  function timelineDariNama(lembar: string): { label: string | null; tanggal: boolean } {
+    const t = String(lembar || '').toLowerCase();
+    const bulan = t.match(/\b(januari|jan|februari|pebruari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|agt|agus|agu|september|sept|sep|oktober|okt|november|nov|desember|des)\b/);
+    const tahun = t.match(/\b(20\d{2})\b/);
+    if (bulan) {
+      const nama = NAMA_BULAN[bulan[1]] || bulan[1];
+      return { label: tahun ? `${nama} ${tahun[1]}` : nama, tanggal: true };
+    }
+    if (tahun) return { label: tahun[1], tanggal: true };
+    return { label: null, tanggal: false };
+  }
+
+  function butirDariKolomLembar(
+    lembar: Array<{ nama: string; baris: Map<number, Array<string | number | null>> }>,
+    judulBerkas: string
+  ): any[] {
+    const BATAS_KOLOM = 400;
+    const BATAS_TITIK = 36;
+    const BATAS_PERIODE = 24;
+    const teks = (v: unknown) => String(v ?? '').trim();
+    /**
+     * KOLOM YANG BUKAN BESARAN.
+     *
+     * Nomor urut baris (1, 2, 3, …) dan kolom kode akun (410201, 410302, …) ikut
+     * terbaca sebagai angka, padahal bukan nilai yang bisa digrafikkan. Tanpa
+     * penyaring ini keduanya muncul sebagai kartu data yang membingungkan.
+     */
+    const bukanBesaran = (data: number[]): boolean => {
+      if (data.length < 3) return false;
+      if (!data.every((v) => Number.isInteger(v))) return false;
+      const menaik = data.every((v, i) => i === 0 || v > data[i - 1]);
+      if (!menaik) return false;
+      const selisih = data.slice(1).map((v, i) => v - data[i]);
+      const maks = Math.max(...data);
+      // Nomor urut: 1,2,3,… atau 1,2,4,… dengan loncatan kecil.
+      if (maks <= 5000 && selisih.every((s) => s >= 1 && s <= 3)) return true;
+      // Kode akun: angka besar berurutan rapat (selisih ratusan/ribuan kecil).
+      if (data[0] >= 10000 && Math.max(...selisih) <= 2000) return true;
+      return false;
+    };
+    const hurufKolom = (c: number) => {
+      let hasil = '';
+      let n = c;
+      do {
+        hasil = String.fromCharCode(65 + (n % 26)) + hasil;
+        n = Math.floor(n / 26) - 1;
+      } while (n >= 0);
+      return hasil;
+    };
+
+    interface Entri {
+      lembar: string;
+      kolom: string;
+      kolomKe: number;
+      timeline: string | null;
+      bertanggal: boolean;
+      data: number[];
+      kategori: string[];
+      /** Kolom tanggal: rentang tanggal asli untuk sitasi. */
+      rentang?: string | null;
+    }
+    const entri: Entri[] = [];
+    const butirBulananPerLembar: any[] = [];
+    const bulanDilewati = new Set<string>();
+    const sidikTerpakai = new Set<string>();
+
+    /**
+     * Judul kolom yang cuma berisi angka atau terlalu pendek ("0", "-") tidak
+     * layak jadi nama butir. Untuk kasus itu nama diambil dari lembarnya.
+     */
+    /**
+     * Nama lembar tanpa keterangan waktu: "Pendapatan Jan 2026" -> "Pendapatan",
+     * "anggaran Biaya Maret 2026" -> "anggaran Biaya". Dipakai sebagai awalan
+     * nama butir supaya indikator dari lembar berbeda tidak tertukar, sekaligus
+     * supaya butir dari bulan berbeda tetap bertemu sebagai satu indikator.
+     */
+    const namaLembarInti = (nama: string): string => {
+      const asli = String(nama || '').trim();
+      /**
+       * Lembar yang namanya HANYA satu bulan ("FEB", "JAN") biasanya bukan bulan
+       * melainkan kode wilayah/fakultas. Jangan dibuang. Yang dibuang hanya bulan
+       * pada nama panjang, atau bulan yang berpasangan dengan tahun.
+       */
+      const sebulan = /^(jan|feb|mar|apr|mei|jun|jul|agu|agt|aug|sep|sept|okt|oct|nov|des|dec)[a-z]*$/i.test(asli);
+      if (sebulan && !/\b(19|20)\d{2}\b/.test(asli)) return asli;
+      let s = ` ${asli} `;
+      s = s.replace(
+        /\b(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|agt|aug|sep|sept|okt|oct|nov|des|dec)\b/gi,
+        ' '
+      );
+      s = s.replace(/\b(19|20)\d{2}\b/g, ' ');
+      s = s.replace(/[-_/\s]+$/g, '').replace(/^[-_/\s]+/g, '');
+      s = s.replace(/\s+/g, ' ').trim();
+      return s || String(nama || '').trim();
+    };
+
+    const namaDasarKolom = (lembar: string, kolom: string): string => {
+      const bersih = String(kolom || '').trim();
+      if (bersih.length < 3 || /^[0-9\s.,%()/\-]+$/.test(bersih)) return `${lembar} · per periode`;
+      return bersih;
+    };
+
+    for (const lb of lembar) {
+      const baris = [...lb.baris.entries()].sort((a, b) => a[0] - b[0]).map(([no, sel]) => ({ no, sel: sel || [] }));
+      if (baris.length === 0) continue;
+      const lebar = Math.max(...baris.map((b) => b.sel.length), 0);
+      if (lebar === 0) continue;
+      const waktu = timelineDariNama(lb.nama);
+
+      /**
+       * Baris judul = baris TERPADAT dalam 20 baris pertama, bukan baris pertama
+       * yang berisi dua teks. Laporan sering diawali nama perusahaan dan judul,
+       * sehingga aturan lama memilih baris judul yang salah dan kolom bulan
+       * (JANUARI, FEBRUARI, …) tidak pernah dikenali.
+       */
+      /**
+       * Baris judul dipilih dari banyaknya SEL TEKS, bukan banyaknya sel berisi.
+       * Baris data angka selalu lebih padat daripada baris judul ("Target",
+       * "Realisasi", …), sehingga hitungan sel berisi pernah memilih baris angka:
+       * judul kolom menjadi nilai total, dan butir diberi nama angka.
+       */
+      let barisJudul = -1;
+      let palingPadat = 0;
+      for (let i = 0; i < Math.min(baris.length, 20); i += 1) {
+        const isi = baris[i].sel.filter((s) => typeof s === 'string' && teks(s).length > 0).length;
+        if (isi > palingPadat) {
+          palingPadat = isi;
+          barisJudul = i;
+        }
+      }
+      if (palingPadat < 2) barisJudul = -1;
+      /**
+       * Baris di bawah judul hanya dipakai sebagai sub-judul kalau memang berisi
+       * teks semua. Kalau ada angkanya, itu baris DATA — memakainya menghasilkan
+       * nama seperti "Vendor · AMAQITA. CV" yang mencampur judul dengan isi.
+       */
+      const selBawah = barisJudul >= 0 ? baris[barisJudul + 1]?.sel || [] : [];
+      const teksBawah = selBawah.filter((s) => typeof s === 'string' && teks(s)).length;
+      const angkaBawah = selBawah.filter((s) => typeof s === 'number').length;
+      const adaSubJudul = barisJudul >= 0 && teksBawah >= 2 && angkaBawah === 0;
+      /**
+       * Nama kolom = judul kelompok + sub-judul.
+       *
+       * Judul tabel sering bertingkat: baris atas "Target / Tahun", "Realisasi",
+       * "Sisa Anggaran" (sel gabungan, hanya terisi di kolom pertama), baris
+       * bawah "Bulan Berjalan", "S.D Bulan Berjalan". Tanpa menggabungkan
+       * keduanya, beberapa kolom berbeda mendapat nama sama ("Bulan Berjalan")
+       * dan pembaca tidak tahu itu target, realisasi, atau sisa.
+       */
+      /**
+       * "Target / Tahun + Tahun" dibaca manusia sebagai "Target setahun",
+       * bukan "Target / Tahun · Tahun". Bentuk ringkas ini dipakai supaya nama
+       * kartu langsung menjelaskan isinya.
+       */
+      const rapiJudulKolom = (atas: string, sub: string): string => {
+        /**
+         * Judul 1–2 huruf (mis. sel berisi "A", "I") bukan nama indikator; itu
+         * sisa label kolom lembar. Diperlakukan kosong supaya pemanggil memakai
+         * nama "Kolom <huruf>" yang jelas asalnya.
+         */
+        // Hanya SATU huruf yang dianggap sisa label ("A", "I"). "No" dan "Tgl"
+        // adalah judul kolom sungguhan, jangan dibuang.
+        const pendek = (t: string) => /^[A-Za-z]$/.test(t.trim());
+        const grup = pendek(String(atas || ''))
+          ? ''
+          : String(atas || '')
+              .replace(/\s*\/\s*tahun\s*$/i, '')
+              .replace(/\s+tahun\s*$/i, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+        // Sub-judul yang ternyata ANGKA (mis. "460649371", "46302") adalah isi
+        // sel data, bukan judul — jangan ditempelkan ke nama.
+        const anakMentah = String(sub || '').trim();
+        const anak = /^[-+]?[\d.,]+$/.test(anakMentah) || pendek(anakMentah) ? '' : anakMentah;
+        const kecil = (t: string) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+        if (!anak) return atas.replace(/tahun$/i, 'setahun').trim();
+        // "Sisa Anggaran" + "Sisa Anggaran Tahun" jangan jadi berulang.
+        if (grup && anak.toLowerCase().includes(grup.toLowerCase())) {
+          const t = anak.replace(/tahun$/i, 'setahun').trim();
+          return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+        }
+        if (!grup) return /tahun$/i.test(anak) ? anak.replace(/tahun$/i, 'setahun').trim() : kecil(anak);
+        if (/^tahun$/i.test(anak)) return `${grup} setahun`;
+        if (/^s\.?d\.?\s*bulan\s+berjalan$/i.test(anak)) return `${grup} s.d. bulan berjalan`;
+        if (/^s\.?d\.?\s*tahun$/i.test(anak)) return `${grup} s.d. tahun`;
+        if (/^bulan\s+berjalan$/i.test(anak)) return `${grup} bulan berjalan`;
+        if (/tahun$/i.test(anak)) return `${grup} ${anak.replace(/tahun$/i, 'setahun').toLowerCase()}`;
+        return `${grup} · ${anak}`;
+      };
+      /**
+       * Judul yang berulang seperti "TGL" dan "No" di lembar pengadaan tidak
+       * berdiri sendiri: setiap pasangannya mengikuti dokumen di sebelah kirinya
+       * (SPPH, SPH, BAKN, SPK, BAST, PAKTA, INV, AMD, SL). Nama seperti
+       * "TGL SPH" jauh lebih jelas daripada "TGL (kol S)".
+       */
+      const GENERIK = /^(tgl\.?|tanggal|no\.?|nomor|nomer)$/i;
+      const hitungJudul = (t: string): number => {
+        if (barisJudul < 0 || !t) return 0;
+        const sel = (baris[barisJudul]?.sel || []) as unknown[];
+        const kunci = t.toLowerCase().trim();
+        return sel.filter((v) => teks(v).toLowerCase().trim() === kunci).length;
+      };
+      const namaBerpasangan = (c: number, nama: string): string => {
+        const sendiriTxt = teks(baris[barisJudul]?.sel?.[c] ?? '');
+        if (!GENERIK.test(sendiriTxt.trim())) return nama;
+        if (hitungJudul(sendiriTxt) < 2) return nama;
+        for (let k = c - 1; k >= 0; k -= 1) {
+          const t = teks(baris[barisJudul]?.sel?.[k] ?? '');
+          if (!t || GENERIK.test(t.trim())) continue;
+          if (t.toLowerCase() === sendiriTxt.toLowerCase()) continue;
+          return `${sendiriTxt} ${t}`.replace(/\s+/g, ' ').slice(0, 60);
+        }
+        return nama;
+      };
+
+      const judulKolom = (c: number): string => {
+        const sub = adaSubJudul ? teks(baris[barisJudul + 1]?.sel?.[c]) : '';
+        let induk = '';
+        if (barisJudul >= 0) {
+          for (let k = c; k >= 0; k -= 1) {
+            const t = teks(baris[barisJudul]?.sel?.[k]);
+            if (t) {
+              induk = t;
+              break;
+            }
+          }
+        }
+        const sendiri = barisJudul >= 0 ? teks(baris[barisJudul]?.sel?.[c]) : '';
+        const atas = sendiri || induk;
+        if (atas || sub) {
+          const rapi = rapiJudulKolom(atas, sub).slice(0, 60);
+          // Judul yang ternyata angka (nilai sel) atau terlalu pendek tidak layak
+          // jadi nama kolom; huruf kolom lebih jujur.
+          if (!/^[-+]?[\d.,]+$/.test(rapi.trim()) && rapi.replace(/[^A-Za-z]/g, '').length >= 2) return namaBerpasangan(c, rapi);
+          return `Kolom ${hurufKolom(c)}`;
+        }
+        const kandidat = [barisJudul, barisJudul + 1, barisJudul - 1].filter((i) => i >= 0 && i < baris.length);
+        for (const i of kandidat) {
+          const t = teks(baris[i]?.sel?.[c]);
+          // Angka di sini isi sel, bukan judul kolom.
+          if (t && !/^[-+]?[\d.,]+$/.test(t) && t.replace(/[^A-Za-z]/g, '').length >= 2) return t.slice(0, 60);
+        }
+        return `Kolom ${hurufKolom(c)}`;
+      };
+      const jumlahTeksPerKolom = new Array(lebar).fill(0);
+      for (const b of baris) {
+        for (let c = 0; c < lebar; c += 1) {
+          const sel = b.sel[c];
+          if (typeof sel === 'string' && teks(sel)) jumlahTeksPerKolom[c] += 1;
+        }
+      }
+      const kolomLabel = jumlahTeksPerKolom.indexOf(Math.max(...jumlahTeksPerKolom));
+      const mulai = barisJudul >= 0 ? barisJudul + 1 : 0;
+
+      /**
+       * KOLOM BERISI PERIODE (Jan, Feb, … Des) dalam satu lembar.
+       *
+       * Banyak laporan menaruh bulan di kolom, bukan di lembar terpisah. Deret
+       * seperti itu bukan dua belas indikator berbeda, melainkan satu indikator
+       * dengan dua belas periode — jadi digabung menjadi satu butir dan
+       * periodenya bisa dipilih di halaman Pilih Data.
+       */
+      const kolomBulan: Array<{ c: number; label: string }> = [];
+      const POLA_BULAN = /\b(januari|jan|februari|pebruari|feb|maret|mar|april|apr|mei|may|juni|jun|juli|jul|agustus|agt|agus|agu|september|sept|sep|oktober|okt|november|nov|desember|des)\b/;
+      for (let c = 0; c < lebar; c += 1) {
+        if (c === kolomLabel) continue;
+        // Judul bulan dicari di sekitar baris judul, bukan hanya tepat di baris
+        // itu: laporan sering punya baris judul bertingkat (judul tabel di atas,
+        // nama bulan di bawahnya).
+        let judulBulan = '';
+        const dari = Math.max(0, (barisJudul < 0 ? 0 : barisJudul) - 3);
+        const sampai = Math.min(baris.length, (barisJudul < 0 ? 6 : barisJudul) + 4);
+        for (let i = dari; i < sampai; i += 1) {
+          const kandidat = teks(baris[i]?.sel?.[c]);
+          if (kandidat && POLA_BULAN.test(kandidat.toLowerCase())) {
+            judulBulan = kandidat;
+            break;
+          }
+        }
+        if (!judulBulan) continue;
+        const m = judulBulan.toLowerCase().match(POLA_BULAN);
+        if (!m) continue;
+        const tahun = judulBulan.match(/\b(20\d{2})\b/);
+        kolomBulan.push({ c, label: `${NAMA_BULAN[m[1]] || m[1]}${tahun ? ` ${tahun[1]}` : ''}` });
+      }
+      if (kolomBulan.length >= 3) {
+        const seriPeriode = kolomBulan.slice(0, BATAS_PERIODE).map(({ c, label }) => {
+          const data: number[] = [];
+          const kategori: string[] = [];
+          for (let i = mulai; i < baris.length; i += 1) {
+            const v = baris[i].sel[c];
+            if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+            data.push(v);
+            kategori.push((teks(baris[i].sel[kolomLabel]) || `baris ${baris[i].no}`).slice(0, 44));
+            if (data.length >= BATAS_TITIK) break;
+          }
+          return { nama: label, data, kategori };
+        }).filter((s) => s.data.length >= 3);
+        if (seriPeriode.length >= 3) {
+          butirBulananPerLembar.push({
+            nama: `${namaDasarKolom(lb.nama, '')}`,
+            seri: seriPeriode,
+            periodeTersedia: seriPeriode.map((s) => s.nama),
+            sitasi: {
+              dokumen: judulBerkas,
+              kutipan: `Lembar "${lb.nama}", kolom periode ${seriPeriode.map((s) => s.nama).join(', ')}`,
+            },
+            keyakinan: 'tinggi',
+          });
+          // Kolom bulan sudah diwakili butir gabungan di atas.
+          for (const { c } of kolomBulan) bulanDilewati.add(`${lb.nama}#${c}`);
+        }
+      }
+
+      for (let c = 0; c < lebar; c += 1) {
+        if (c === kolomLabel) continue;
+        if (bulanDilewati.has(`${lb.nama}#${c}`)) continue;
+        const data: number[] = [];
+        const kategori: string[] = [];
+        for (let i = mulai; i < baris.length; i += 1) {
+          const v = baris[i].sel[c];
+          if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+          const label = teks(baris[i].sel[kolomLabel]) || `baris ${baris[i].no}`;
+          data.push(v);
+          kategori.push(label.slice(0, 44));
+          if (data.length >= BATAS_TITIK) break;
+        }
+        if (data.length < 3) continue;
+        /**
+         * Kolom tanggal (nomor seri Excel 46093, …) diperiksa SEBELUM penyaring
+         * `bukanBesaran`: deret tanggal yang menaik rapat ikut terbuang sebagai
+         * "kode akun". Isinya diganti jumlah baris per bulan dari SEMUA baris,
+         * bukan hanya BATAS_TITIK baris pertama.
+         */
+        const judulMentah = judulKolom(c);
+        if (kolomTanggal(judulMentah, data)) {
+          const semuaNilai: number[] = [];
+          for (let i = mulai; i < baris.length; i += 1) {
+            const v = baris[i].sel[c];
+            if (typeof v === 'number' && Number.isFinite(v)) semuaNilai.push(v);
+          }
+          const per = jumlahPerBulan(semuaNilai);
+          if (per.data.length === 0) continue;
+          const namaTgl = `${judulMentah} · jumlah per bulan`;
+          const sidikTgl = `${lb.nama}|${namaTgl}|${per.data.join(',')}`;
+          if (sidikTerpakai.has(sidikTgl)) continue;
+          sidikTerpakai.add(sidikTgl);
+          entri.push({
+            lembar: lb.nama,
+            kolom: namaTgl,
+            kolomKe: c,
+            timeline: waktu.label,
+            bertanggal: waktu.tanggal,
+            data: per.data.slice(0, BATAS_TITIK),
+            kategori: per.kategori.slice(0, BATAS_TITIK),
+            rentang: per.rentang,
+          });
+          if (entri.length >= BATAS_KOLOM) break;
+          continue;
+        }
+        if (bukanBesaran(data)) continue;
+        const namaKolom = judulMentah;
+        if (/^(no|nomor|kode)$/i.test(namaKolom)) continue;
+        const sidik = `${lb.nama}|${namaKolom}|${data.join(',')}`;
+        if (sidikTerpakai.has(sidik)) continue;
+        sidikTerpakai.add(sidik);
+        entri.push({
+          lembar: lb.nama,
+          kolom: namaKolom,
+          kolomKe: c,
+          timeline: waktu.label,
+          bertanggal: waktu.tanggal,
+          data,
+          kategori,
+        });
+        if (entri.length >= BATAS_KOLOM) break;
+      }
+      if (entri.length >= BATAS_KOLOM) break;
+    }
+
+    /**
+     * PENGGABUNGAN PER TIMELINE.
+     *
+     * Indikator yang sama muncul di banyak lembar bulanan (Januari sampai
+     * Desember). Semuanya disatukan menjadi satu butir: `seri` berisi satu deret
+     * per periode, `periodeTersedia` menyimpan daftarnya. Angka tidak dijumlah
+     * dan tidak dirata-ratakan, hanya deret yang sudah ada yang dikumpulkan.
+     */
+    const namaTerpakai = new Set<string>();
+    const namaButirUnik = (dasar: string, kolomKe: number): string => {
+      let nama = dasar.slice(0, 140);
+      if (namaTerpakai.has(nama.toLowerCase())) nama = `${dasar.slice(0, 128)} (kol ${hurufKolom(kolomKe)})`.slice(0, 140);
+      let n = 2;
+      while (namaTerpakai.has(nama.toLowerCase())) {
+        nama = `${dasar.slice(0, 132)} (${n})`;
+        n += 1;
+      }
+      namaTerpakai.add(nama.toLowerCase());
+      return nama;
+    };
+
+    const perKelompok = new Map<string, Entri[]>();
+    for (const e of entri) {
+      /**
+       * Indikator dibedakan per LEMBAR INTI, bukan hanya nama kolom. Lembar
+       * "anggaran Biaya Jan 2026" dan "Pendapatan Jan 2026" punya judul kolom
+       * yang sama (Target setahun, Realisasi, …); tanpa awalan lembar, keduanya
+       * jatuh ke satu butir dan angkanya bercampur.
+       */
+      const kunci = `${namaLembarInti(e.lembar).toLowerCase()}|${e.kolom.toLowerCase()}`;
+      const daftar = perKelompok.get(kunci) ?? [];
+      daftar.push(e);
+      perKelompok.set(kunci, daftar);
+    }
+
+    const hasil: any[] = [...butirBulananPerLembar];
+    const sudahGabung = new Set<Entri>();
+    for (const [, daftar] of perKelompok) {
+      const bertanggal = daftar.filter((e) => e.bertanggal && e.timeline);
+      const periodeUnik = [...new Set(bertanggal.map((e) => String(e.timeline)))];
+      if (periodeUnik.length < 2) continue;
+      const dipakai = bertanggal.slice(0, BATAS_PERIODE);
+      for (const e of dipakai) sudahGabung.add(e);
+      const kolom = daftar[0].kolom;
+      // Awalan nama lembar (tanpa bulan) menjaga indikator antarlembar tidak tercampur.
+      const dasarKolom = /^(no|nomor|kode|kolom)\b/i.test(kolom)
+        ? namaDasarKolom(namaLembarInti(daftar[0].lembar), kolom)
+        : `${namaLembarInti(daftar[0].lembar)} · ${kolom}`;
+      hasil.push({
+        nama: namaButirUnik(dasarKolom, daftar[0].kolomKe),
+        seri: dipakai.map((e) => ({ nama: String(e.timeline), data: e.data, kategori: e.kategori })),
+        periodeTersedia: periodeUnik.slice(0, BATAS_PERIODE),
+        sitasi: {
+          dokumen: judulBerkas,
+          kutipan: `Kolom "${kolom}" pada ${dipakai.length} periode: ${periodeUnik.slice(0, 6).join(', ')}${periodeUnik.length > 6 ? ' dan lainnya' : ''}`,
+        },
+        keyakinan: 'tinggi',
+      });
+    }
+
+    for (const e of entri) {
+      if (sudahGabung.has(e)) continue;
+      /**
+       * Lembar yang menyebut waktunya ("Anggaran Okt 2026") memakai nama kolom
+       * saja sebagai nama butir, karena periodenya sudah tercatat di `periode`.
+       * Dengan begitu berkas susulan satu bulan otomatis bergabung dengan
+       * indikator yang sama di berkas lain (penggabungan lintas dokumen).
+       */
+      /**
+       * Nama kolom pendek ("Saldo", "Total", "Bayar") tidak menjelaskan apa pun
+       * kalau berdiri sendiri; lembarnya dipakai sebagai awalan. Nama panjang
+       * dibiarkan tanpa awalan supaya butir bulan berbeda tetap bisa bergabung.
+       */
+      const perluAwalan = !(e.bertanggal && e.timeline) || String(e.kolom).trim().length <= 12;
+      // Nama lembar yang hanya berisi bulan ("Januari") habis saat bulan dibuang;
+      // pakai nama aslinya supaya nama butir tidak dimulai dengan "·".
+      const lembarNama = namaLembarInti(e.lembar) || String(e.lembar || '').trim() || 'Lembar';
+      const dasarNama = perluAwalan ? `${lembarNama} · ${e.kolom}` : e.kolom;
+      hasil.push({
+        nama: namaButirUnik(namaDasarKolom(e.lembar, dasarNama), e.kolomKe),
+        seri: [{ nama: e.timeline || e.kolom, data: e.data, kategori: e.kategori }],
+        ...(e.timeline ? { periode: e.timeline } : {}),
+        sitasi: {
+          dokumen: judulBerkas,
+          kutipan: e.rentang
+            ? `Lembar "${e.lembar}", kolom ${e.kolom}: tanggal ${e.rentang}, ${e.data.reduce((a, b) => a + b, 0)} baris dihitung per bulan`
+            : `Lembar "${e.lembar}", kolom ${e.kolom}, ${e.data.length} baris angka terbaca`,
+        },
+        keyakinan: 'tinggi',
+      });
+    }
+    return hasil;
+  }
+
+  /**
+   * EKSTRAKSI LOKAL UNTUK BERKAS SPREADSHEET (xlsx/xls/csv).
+   *
+   * Layanan RAG mengindeks isi spreadsheet sebagai teks, dan pencarian vektornya
+   * hampir tidak pernah menemukan baris tabel — hasilnya "informasi tidak
+   * ditemukan" walau berkasnya penuh angka. Untuk berkas seperti ini isinya
+   * dibaca LANGSUNG dari file: setiap lembar diurai, kolom angka dan labelnya
+   * diambil, lalu dijadikan butir yang sama bentuknya dengan hasil RAG.
+   *
+   * Angka tetap berasal dari berkas asli (bukan model), dan sitasinya menyebut
+   * lembar asal, jadi bisa diperiksa ulang.
+   */
+  async function ekstrakLembarBerkas(
+    tenant: any,
+    berkasId: string,
+    judulBerkas: string
+  ): Promise<{ butir: unknown[]; ringkasan?: string } | null> {
+    try {
+      const { organizationId } = await projectKmsEfektif(tenant);
+      if (!organizationId || !berkasId) return null;
+      /**
+       * Berkas yang BARU diunggah belum tentu langsung muncul di daftar
+       * repositori (layanan KMS memperbarui daftarnya beberapa saat kemudian).
+       * Kalau namanya tidak ditemukan, isinya tetap dicoba diunduh: bentuk
+       * lembarnya sendiri sudah cukup untuk memastikan itu spreadsheet.
+       */
+      const daftar = await klienKms().daftarBerkas(organizationId).catch(() => [] as any[]);
+      const berkas = daftar.find((b: any) => String(b?.id) === String(berkasId));
+      const namaBerkas = String((berkas as any)?.fileName || berkas?.title || judulBerkas || '');
+      const jenisBerkas = String((berkas as any)?.fileType || '').toUpperCase();
+      /**
+       * Hanya jenis yang JELAS bukan lembar angka yang dilewati. Judul berkas di
+       * repositori sering tanpa ekstensi ("Anggaran 2026 FIX"), jadi "tidak
+       * diketahui" harus diperlakukan sebagai mungkin-spreadsheet — kalau tidak,
+       * dokumen baru jatuh ke jalur RAG yang tidak bisa membaca isi sel.
+       */
+      const jelasBukanLembar =
+        /\.(pdf|docx?|pptx?|jpe?g|png|gif|txt|md|zip|rar)$/i.test(namaBerkas) ||
+        ['PDF', 'DOC', 'DOCX', 'PPT', 'PPTX', 'JPG', 'JPEG', 'PNG', 'TXT', 'ZIP'].includes(jenisBerkas);
+      if (jelasBukanLembar) return null;
+      const { isi } = await klienKms().ambilIsiBerkas(String(berkas?.id || berkasId), 'download');
+      const lembar = lembarDariBerkas(isi);
+      if (lembar.length === 0) return null;
+      const hasil = widgetDariSumber({ jenis: 'berkas', lembar, lengkap: true } as any, judulBerkas);
+      /**
+       * Ringkasan widget bersifat tambahan, bukan syarat. Berkas kecil (dua
+       * lembar, empat baris) sering tidak menghasilkan widget apa pun, padahal
+       * kolom angkanya tetap bisa dibaca per sel. Jadi hasil kosong di sini tidak
+       * menggagalkan analisis — butir per kolom tetap dibuat di bawah.
+       */
+      const butir: any[] = petakanKeluaranRag({ widgets: hasil.widgets }, judulBerkas) as any[];
+      if (butir.length === 0 && hasil.widgets.length === 0) {
+        console.log('[lembar] tidak ada widget ringkasan, lanjut ke butir per kolom');
+      }
+      /**
+       * Angka di sini dibaca dari SEL berkas, bukan dikarang model, dan tiap
+       * butir membawa sitasi lembar asalnya. Karena itu keyakinannya tinggi
+       * sehingga langsung disetujui (lihat `statusButirAwal`) — admin tidak
+       * perlu mencentang puluhan angka satu per satu.
+       */
+      for (const b of butir as any[]) b.keyakinan = 'tinggi';
+      // Seluruh kolom angka ikut disimpan, bukan hanya dua kolom terkuat per lembar.
+      const perKolom = butirDariKolomLembar(lembar as any, judulBerkas);
+      const sudah = new Set((butir as any[]).map((b) => String(b.nama || '').toLowerCase()));
+      const tambahan = perKolom.filter((b) => !sudah.has(String(b.nama).toLowerCase()));
+      butir.push(...tambahan);
+      if (butir.length === 0) {
+        console.warn('[lembar] tidak ada butir yang bisa dibentuk dari', namaBerkas);
+        return null;
+      }
+      console.log(
+        `[analisis] ${judulBerkas}: dibaca langsung dari berkas (${lembar.length} lembar) → ${butir.length} butir`
+      );
+      return {
+        butir,
+        ringkasan:
+          `Dibaca langsung dari berkas ${namaBerkas}: ${lembar.length} lembar, ` +
+          `${hasil.widgets.length} rangkuman angka, ${tambahan.length} kolom angka. ` +
+          'Sumber angkanya isi sel, bukan model.',
+      };
+    } catch (err: any) {
+      console.warn('[analisis] gagal membaca lembar berkas:', err?.message || err);
+      return null;
+    }
   }
 
   /** Terjemahkan kegagalan KMS jadi balasan HTTP yang jujur. */
@@ -5512,9 +6695,14 @@ ${kpiItems}
     const galatBerkas = validasiBerkas({ nama, ukuran: req.body?.ukuran, tipe: req.body?.tipe });
     if (galatBerkas) return res.status(400).json({ error: galatBerkas });
 
+    // Metadata kini opsional: formulir unggah hanya meminta berkas. Judul jatuh
+    // ke nama berkas, kategori jatuh ke "Dokumen Instansi".
+    const judulBerkas = String(req.body?.judul || nama).trim();
+    const kategoriBerkas = String(req.body?.kategori || 'Dokumen Instansi').trim();
+
     const galatMeta = validasiMetadata({
-      judul: req.body?.judul || nama,
-      kategori: req.body?.kategori,
+      judul: judulBerkas,
+      kategori: kategoriBerkas,
       organizationId,
     });
     if (galatMeta) return res.status(400).json({ error: galatMeta });
@@ -5538,8 +6726,8 @@ ${kpiItems}
       const berkas = await klienKms().unggahBerkas({
         isi,
         namaBerkas: nama,
-        judul: String(req.body?.judul || nama).trim(),
-        kategori: String(req.body?.kategori).trim(),
+        judul: judulBerkas,
+        kategori: kategoriBerkas,
         organizationId,
         tipeRepositori: req.body?.tipeRepositori === 'photo' ? 'photo' : 'document',
         tahun: req.body?.tahun !== undefined && req.body?.tahun !== '' ? Number(req.body.tahun) : undefined,
@@ -5548,14 +6736,6 @@ ${kpiItems}
         mimeType: req.body?.tipe ? String(req.body.tipe) : undefined,
       });
       const kbTujuan = (await daftarProjectKms().catch(() => [])).find((o) => o.id === organizationId)?.knowledgeBase;
-      db.addAuditLog({
-        tenantId: tenant?.id || session.tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Unggah Berkas',
-        target: String(req.body?.judul || nama),
-        details: `Berkas ${nama} (${(isi.length / 1024).toFixed(0)} KB) diunggah ke project KMS ${organizationId}${kbTujuan ? ` · KB ${kbTujuan}` : ''}${berkas?.cdnFileId ? ` · CDN ${berkas.cdnFileId}` : ''}${berkas?.ragStatus ? ` · status RAG: ${berkas.ragStatus}` : ''}`,
-      });
       // Dokumen baru masuk ke basis pengetahuan → pratinjau template instansi ini
       // tidak lagi mewakili isi dokumen. Tandai basi dan siapkan ulang di latar
       // belakang, supaya angka template ikut dokumen terbaru tanpa menunggu klik.
@@ -5599,14 +6779,6 @@ ${kpiItems}
     }
     try {
       await klienKms().hapusBerkas(req.params.id);
-      db.addAuditLog({
-        tenantId: tenant?.id || session.tenantId,
-        userId: session.userId,
-        userName: session.name,
-        action: 'Hapus Berkas',
-        target: req.params.id,
-        details: `Berkas ${req.params.id} dihapus dari repositori KMS ${organizationId} (beserta CDN & RAG)`,
-      });
       // Dokumen hilang = angka template bisa berubah. Sama seperti unggah: tandai
       // basi dan siapkan ulang di latar belakang.
       if (tenant?.id) {
@@ -5858,16 +7030,6 @@ ${navigasi}
         // Basis instansi hanya diisi kalau memang belum punya sama sekali.
         ...(basisBaru && basisBaru !== tenant.knowledgeBaseId ? { knowledgeBaseId: basisBaru } : {}),
       });
-      db.addAuditLog({
-        tenantId: tenant.id,
-        userId: session.userId,
-        userName: session.name,
-        action: dibuat ? 'Buat Repositori Dokumen' : 'Hubungkan Repositori Dokumen',
-        target: tenant.name,
-        details: `Instansi ${tenant.name} → project KMS ${org.id}${basisBaru ? ` (basis ${basisBaru})` : ''}${
-          basisDiselaraskan ? ' · project diselaraskan ke basis dokumen instansi' : ''
-        }`,
-      });
       res.json({ ok: true, dibuat, basisDokumen: basisBaru, basisDiselaraskan, organisasi: org });
     } catch (err: any) {
       balasGalatKms(res, err);
@@ -5981,14 +7143,6 @@ ${navigasi}
           detail: sah.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
         });
       }
-      db.addAuditLog({
-        tenantId: effectiveTenantId(req, session),
-        userId: session.userId,
-        userName: session.name,
-        action: 'Impor Data Excel/CSV',
-        target: widget.title,
-        details: `Berkas "${tabel.namaSheet}" → ${widget.type}, ${tabel.baris.length} baris.`,
-      });
 
       /**
        * Berkas impor juga disimpan ke REPOSITORI DOKUMEN.
@@ -6036,14 +7190,6 @@ ${navigasi}
                 judulBerkas: namaBerkas,
               });
             }
-            db.addAuditLog({
-              tenantId: effectiveTenantId(req, session),
-              userId: session.userId,
-              userName: session.name,
-              action: 'Impor Data → Repositori',
-              target: namaBerkas,
-              details: `Berkas impor disimpan ke project KMS ${organizationId}${knowledgeBase ? ` · KB ${knowledgeBase}` : ''}${berkasImpor.ragStatus ? ` · status RAG: ${berkasImpor.ragStatus}` : ''}`,
-            });
           }
         }
       } catch (err: any) {
@@ -6114,14 +7260,6 @@ ${navigasi}
       db.simpanPinBagikan(token, hashPin);
     }
     db.persist();
-    db.addAuditLog({
-      tenantId: dash.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Buat Tautan Bagikan',
-      target: dash.title,
-      details: `Mode ${mode}, berlaku ${hari === 0 ? 'tanpa batas' : `${hari} hari`} (${expiresAt || '-'}).`,
-    });
     res.json({ token, shareUrl: `/share/${token}`, mode, expiresAt, pin });
   });
 
@@ -6163,14 +7301,6 @@ ${navigasi}
     delete db.shareTokens[token];
     db.hapusTautanBagikan(token);
     db.persist();
-    db.addAuditLog({
-      tenantId: dash.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Cabut Tautan Bagikan',
-      target: dash.title,
-      details: `Tautan ${token} dicabut (mode ${(typeof meta === 'object' && meta.mode) || 'readonly'}).`,
-    });
     res.json({ ok: true, token });
   });
 
@@ -6297,7 +7427,6 @@ ${navigasi}
       return res.status(400).json({ error: 'Field "title" wajib berupa teks yang tidak kosong.' });
     }
     let sah: WidgetSpec[] = dash.widgets;
-    let rincian = '';
     if (widgets !== undefined) {
       if (!Array.isArray(widgets)) {
         return res.status(400).json({ error: 'Field "widgets" wajib berupa array.' });
@@ -6311,16 +7440,6 @@ ${navigasi}
       if (kandidat.length === 0 && widgets.length > 0) {
         return res.status(400).json({ error: 'Tidak ada widget valid untuk diperbarui.' });
       }
-      const idSebelum = new Set(dash.widgets.map((w) => w.id));
-      const idSesudah = new Set(kandidat.map((w) => w.id));
-      const ditambah = [...idSesudah].filter((id) => !idSebelum.has(id)).length;
-      const dihapus = [...idSebelum].filter((id) => !idSesudah.has(id)).length;
-      rincian = [
-        ditambah > 0 ? `+${ditambah} ditambah` : null,
-        dihapus > 0 ? `-${dihapus} dihapus` : null,
-      ]
-        .filter(Boolean)
-        .join(', ');
       sah = kandidat;
     }
 
@@ -6330,96 +7449,9 @@ ${navigasi}
       dash.tenantId
     );
     if (!updated) return res.status(500).json({ error: 'Gagal menyimpan perubahan.' });
-    db.auditLogs.unshift({
-      id: `audit_${randomBytes(8).toString('hex')}`,
-      tenantId: dash.tenantId,
-      userId: 'public-link',
-      userName: 'Editor Tautan Publik',
-      action: 'UPDATE',
-      target: `Dashboard "${dash.title}" via tautan publik — ${sah.length} widget${rincian ? ` (${rincian})` : ''}${
-        judulBaru !== undefined && judulBaru.trim() !== dash.title ? `, judul diubah menjadi "${judulBaru.trim()}"` : ''
-      }`,
-      timestamp: new Date().toISOString(),
-    } as (typeof db.auditLogs)[number]);
     db.persist();
 
     res.json(updated);
-  });
-
-  // ================= AUDIT LOGS =================
-  app.get('/api/audit-logs', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    // Jejak audit memuat tindakan seluruh pengguna instansi. Menyembunyikan
-    // menunya saja tidak cukup: role pengguna juga tidak boleh membaca datanya.
-    if (!isAdminRole(session.role)) {
-      return res.status(403).json({ error: 'Jejak audit hanya untuk administrator.' });
-    }
-    // Admin Aiones boleh menanyakan instansi mana pun (atau 'semua'). Admin
-    // Instansi TIDAK: parameter `tenantId` dari mereka diabaikan dan diganti
-    // instansinya sendiri, supaya tidak bisa menarik log instansi lain hanya
-    // dengan mengubah URL.
-    const mintaTenant = String(req.query.tenantId || '').trim();
-    const lingkup =
-      isSuperadmin(session.role) && mintaTenant
-        ? mintaTenant
-        : effectiveTenantId(req, session);
-
-    const logs = saringAudit(db.auditLogs, {
-      tenantId: lingkup,
-      aksi: req.query.aksi ? String(req.query.aksi) : undefined,
-      pengguna: req.query.pengguna ? String(req.query.pengguna) : undefined,
-      dari: req.query.dari ? String(req.query.dari) : undefined,
-      sampai: req.query.sampai ? String(req.query.sampai) : undefined,
-      // Saat klien meminta halaman (limit/offset), jangan potong lebih dulu —
-      // total dihitung dari seluruh hasil saringan.
-      batas: req.query.limit !== undefined ? 100000 : BATAS_AUDIT_BAWAAN,
-    });
-
-    // Ekspor CSV untuk kebutuhan audit eksternal (dibuka di Excel).
-    if (String(req.query.format || '').toLowerCase() === 'csv') {
-      const csv = keCsv(logs, [
-        { kunci: 'timestamp', judul: 'Waktu' },
-        { kunci: 'action', judul: 'Aksi' },
-        { kunci: 'target', judul: 'Target' },
-        { kunci: 'userName', judul: 'Pengguna' },
-        { kunci: 'details', judul: 'Detail' },
-        ...(isSuperadmin(session.role) ? [{ kunci: 'tenantId' as const, judul: 'Instansi' }] : []),
-      ]);
-      const tanggal = new Date().toISOString().slice(0, 10);
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="log-audit-${tanggal}.csv"`);
-      res.send(csv);
-      return;
-    }
-
-    // Tanpa `limit` tetap balas array seperti sebelumnya (klien lama aman).
-    if (req.query.limit === undefined) {
-      res.json(logs);
-      return;
-    }
-    const { baris, total, limit, offset } = potongHalaman(logs, req.query.limit, req.query.offset);
-    res.json({ logs: baris, total, limit, offset });
-  });
-
-  app.post('/api/audit-logs', (req: Request, res: Response) => {
-    const session = requireAuth(req, res);
-    if (!session) return;
-    // Jejak audit adalah bukti kepatuhan: entri tidak boleh ditulis dari klien
-    // dengan `action`/`target` bebas. Dulu endpoint ini hanya butuh login; kini
-    // hanya Admin Aiones (penulis entri lewat alur server tetap berjalan normal,
-    // karena semua aksi admin mencatat log sendiri di dalam handler-nya).
-    if (!requireSuperadmin(session, res, 'Jejak audit hanya ditulis oleh sistem.')) return;
-    const { action, target, details } = req.body;
-    const log = db.addAuditLog({
-      tenantId: effectiveTenantId(req, session),
-      userId: session.userId,
-      userName: session.name,
-      action: action || 'Aktivitas',
-      target: target || 'Dashboard',
-      details: details || '',
-    });
-    res.status(201).json({ id: log.id });
   });
 
   // ================= ADMIN MANAGEMENT ROUTES =================
@@ -6433,8 +7465,6 @@ ${navigasi}
     const lintas = bolehPindahInstansi(session.role);
     const dashboards = lintas ? db.dashboards : db.dashboards.filter((d) => d.tenantId === session.tenantId);
     const users = lintas ? db.users : db.users.filter((u) => u.tenantId === session.tenantId);
-    const alertRules = lintas ? db.alertRules : db.alertRules.filter((a) => a.tenantId === session.tenantId);
-    const auditLogs = lintas ? db.auditLogs : db.auditLogs.filter((a) => a.tenantId === session.tenantId);
     const totalWidgets = dashboards.reduce((acc, d) => acc + semuaWidget(d).length, 0);
     const totalCitations = dashboards.reduce(
       (acc, d) => acc + semuaWidget(d).reduce((wAcc, w) => wAcc + (w.citations?.length || 0), 0),
@@ -6446,8 +7476,6 @@ ${navigasi}
       dashboardsCount: dashboards.length,
       totalWidgets,
       totalCitations,
-      alertRulesCount: alertRules.length,
-      auditLogsCount: auditLogs.length,
       ragProvider: db.systemConfig.ragProvider,
     });
   });
@@ -6508,14 +7536,6 @@ ${navigasi}
     }
     db.updateSystemConfig({ kuotaAnalisisHarian: Math.floor(nilai) });
     const disimpan = db.systemConfig;
-    db.addAuditLog({
-      tenantId: effectiveTenantId(req, session),
-      userId: session.userId,
-      userName: session.name,
-      action: 'Ubah Kuota Analisis AI',
-      target: 'systemConfig.kuotaAnalisisHarian',
-      details: `Menjadi ${Math.floor(nilai)} dokumen/instansi/hari`,
-    });
     res.json({ kuotaAnalisisHarian: (disimpan as any).kuotaAnalisisHarian });
   });
 
@@ -6590,14 +7610,6 @@ ${navigasi}
       role: (roleDiminta as UserRole) || user.role,
     } as any);
     if (!updated) return res.status(500).json({ error: 'Gagal menyetujui permintaan.' });
-    db.addAuditLog({
-      tenantId: tenantTujuan,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Setujui Pendaftaran',
-      target: updated.name,
-      details: `Akun ${updated.email} disetujui sebagai ${updated.role} di ${db.tenants.find((t) => t.id === tenantTujuan)?.name || tenantTujuan} (${updated.viaGoogle ? 'Google' : 'kata sandi'}).`,
-    });
     res.json({ ok: true, user: safeUser(updated) });
   });
 
@@ -6612,14 +7624,6 @@ ${navigasi}
     }
     const updated = db.updateUser(user.id, { status: 'rejected' } as any);
     if (!updated) return res.status(500).json({ error: 'Gagal menolak permintaan.' });
-    db.addAuditLog({
-      tenantId: updated.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Tolak Pendaftaran',
-      target: updated.name,
-      details: `Pendaftaran ${updated.email} ditolak${req.body?.alasan ? `: ${String(req.body.alasan).slice(0, 200)}` : '.'}`,
-    });
     res.json({ ok: true, id: updated.id });
   });
 
@@ -6651,14 +7655,6 @@ ${navigasi}
     // pengguna tidak lagi dipaksa menggantinya saat login pertama.
     const sandiAwal = kataSandiSementara();
     db.createUser({ ...newUser, mustChangePassword: false }, hashPassword(sandiAwal));
-    db.addAuditLog({
-      tenantId: newUser.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Tambah Pengguna Baru',
-      target: newUser.name,
-      details: `Peran: ${newUser.role}, Email: ${newUser.email} (sandi sementara, wajib diganti)`,
-    });
     // Kata sandi sementara hanya muncul SEKALI di sini; tidak disimpan dalam bentuk terbaca.
     res.status(201).json({ ...(safeUser(newUser) as any), sandiSementara: sandiAwal });
   });
@@ -6677,14 +7673,6 @@ ${navigasi}
 
     const sandiBaru = kataSandiSementara();
     db.setUserPassword(target.id, hashPassword(sandiBaru), true);
-    db.addAuditLog({
-      tenantId: target.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Reset Kata Sandi',
-      target: target.name,
-      details: 'Kata sandi direset admin; pengguna wajib menggantinya saat login.',
-    });
     res.json({ ok: true, sandiSementara: sandiBaru, email: target.email });
   });
 
@@ -6715,14 +7703,6 @@ ${navigasi}
     if (!updated) {
       return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
     }
-    db.addAuditLog({
-      tenantId: updated.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Perbarui Data Pengguna',
-      target: updated.name,
-      details: `Perubahan: ${Object.keys(req.body).join(', ')}`,
-    });
     res.json(safeUser(updated));
   });
 
@@ -6744,14 +7724,6 @@ ${navigasi}
     if (!success) {
       return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
     }
-    db.addAuditLog({
-      tenantId: target?.tenantId || session.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Pengguna',
-      target: req.params.id,
-      details: 'Pengguna dihapus permanen dari sistem',
-    });
     res.json({ success: true });
   });
 
@@ -6792,14 +7764,6 @@ ${navigasi}
         : { ok: false, error: hasil.error };
     }
     const akhir = db.tenants.find((t) => t.id === tersimpan.id) || tersimpan;
-    db.addAuditLog({
-      tenantId: session.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Tambah Instansi BUMD',
-      target: akhir.name,
-      details: `Instansi ${akhir.name} (${akhir.code}) dibuat; KB=${akhir.knowledgeBaseId || '-'} · KMS=${akhir.kmsOrganizationId || '-'}`,
-    });
     res.status(201).json({ ...akhir, sinkron });
   });
 
@@ -6825,14 +7789,6 @@ ${navigasi}
         : { ok: false, error: hasil.error };
     }
     const akhir = db.tenants.find((t) => t.id === req.params.id) || updated;
-    db.addAuditLog({
-      tenantId: session.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Ubah Instansi BUMD',
-      target: akhir.name,
-      details: `Perubahan: ${Object.keys(req.body).join(', ') || '-'}`,
-    });
     res.json({ ...akhir, sinkron });
   });
 
@@ -6845,16 +7801,6 @@ ${navigasi}
     if (!success) {
       return res.status(404).json({ error: 'Tenant / Instansi BUMD tidak ditemukan.' });
     }
-    db.addAuditLog({
-      // Dicatat pada instansi ADMIN pelaku, bukan instansi yang dihapus —
-      // audit milik instansi target sudah ikut dibersihkan oleh cascade.
-      tenantId: session.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Hapus Instansi BUMD',
-      target: target?.name || req.params.id,
-      details: `Instansi BUMD ${target?.name || req.params.id} beserta seluruh data terkait (pengguna, dashboard, tautan bagikan, notifikasi, aturan alert, cache katalog) dihapus dari sistem`,
-    });
     res.json({ success: true });
   });
 
@@ -6929,16 +7875,6 @@ ${navigasi}
         kbTersinkronPada: new Date().toISOString(),
       });
 
-      db.addAuditLog({
-        tenantId: tenant.id,
-        action: 'SINKRON RAG',
-        target: `Instansi ${tenant.name} → KB ${kb}`,
-        details: `Jumlah dokumen: ${namaSekarang.length}${dokumenBaru.length ? ` · baru: ${dokumenBaru.length}` : ''}${
-          dokumenHilang.length ? ` · hilang: ${dokumenHilang.length}` : ''
-        }`,
-        userId: session.userId,
-        userName: session.name,
-      });
 
       // Dokumen bisa bertambah/berkurang: pratinjau lama tidak lagi mewakili isi
       // dokumen, jadi ditandai basi lalu disiapkan ulang di latar belakang.
@@ -7144,7 +8080,7 @@ ${navigasi}
         ragApiKey: maskKey(db.systemConfig.ragApiKey),
         kmsApiKey: maskKey((db.systemConfig as any).kmsApiKey || ''),
       },
-      // Jejak audit: key hanya ditampilkan sebagai sidik jari, bukan nilai penuh.
+      // Ringkasan perubahan: key hanya ditampilkan sebagai sidik jari, bukan nilai penuh.
       jejak: {
         baseUrlSebelum: sebelum.ragApiUrl,
         baseUrlSesudah: db.systemConfig.ragApiUrl,
@@ -7171,14 +8107,6 @@ ${navigasi}
     // Lewat updateSystemConfig() supaya langsung dicerminkan ke MySQL/data/db.json,
     // bukan hanya tersimpan di memori.
     db.updateSystemConfig(body);
-    db.addAuditLog({
-      tenantId: session.tenantId,
-      userId: session.userId,
-      userName: session.name,
-      action: 'Konfigurasi Sistem',
-      target: 'System Settings',
-      details: `Memperbarui parameter sistem & RAG provider (provider: ${db.systemConfig.ragProvider}, url: ${db.systemConfig.ragApiUrl})`,
-    });
     res.json({
       ...db.systemConfig,
       ragApiKey: maskKey(db.systemConfig.ragApiKey),

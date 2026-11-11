@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ModalKonfirmasiDashboard } from '../components/ModalKonfirmasiDashboard';
+import { PilihCaraBuat } from '../components/PilihCaraBuat';
 import {
   Activity,
   Building2,
@@ -23,6 +24,11 @@ interface DashboardListProps {
   onSelectDashboard: (dashboard: Dashboard) => void;
   onCreateDashboard: () => void;
   onOpenChat: () => void;
+  /** Jalur kedua: pindah ke galeri Template Dashboard. */
+  /** Kosong untuk non-admin: pilihan "Dari template" disembunyikan. */
+  onBukaTemplate?: () => void;
+  /** Jalur pertama: buka halaman Pilih Data. */
+  onPilihData: () => void;
   onDuplicateDashboard: (dashboard: Dashboard) => void;
   onDeleteDashboard: (dashboardId: string) => void;
   onShareDashboard: (dashboard: Dashboard) => void;
@@ -45,6 +51,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
   onSelectDashboard,
   onCreateDashboard,
   onOpenChat,
+  onBukaTemplate,
+  onPilihData,
   onDuplicateDashboard,
   onDeleteDashboard,
   onShareDashboard,
@@ -55,8 +63,33 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [buatOpen, setBuatOpen] = useState(false);
+  /** Layar pilih cara (dua jalur). Jalur data pindah ke halaman sendiri. */
+  const [caraOpen, setCaraOpen] = useState(false);
+  const [jumlahData, setJumlahData] = useState<number | undefined>(undefined);
   const [duplicateConfirmId, setDuplicateConfirmId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  /**
+   * Jumlah data siap pakai untuk kartu jalur pertama. Diambil saat layar pilih
+   * cara dibuka — angka nyata lebih menenangkan daripada "belum ada data" yang
+   * ternyata salah.
+   */
+  useEffect(() => {
+    if (!caraOpen) return;
+    let batal = false;
+    setJumlahData(undefined);
+    fetch('/api/butir-data?status=disetujui', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((isi) => {
+        if (!batal && isi) setJumlahData(Number(isi.total) || 0);
+      })
+      .catch(() => {
+        if (!batal) setJumlahData(0);
+      });
+    return () => {
+      batal = true;
+    };
+  }, [caraOpen]);
 
   // Filter dashboards: hanya pencarian teks. Sektor tidak difilter karena daftar
   // sudah terbatas pada instansi (tenant) yang sedang masuk.
@@ -124,7 +157,8 @@ export const DashboardList: React.FC<DashboardListProps> = ({
 
           {bolehMenulis && (
             <button
-              onClick={() => setBuatOpen(true)}
+              onClick={() => setCaraOpen(true)}
+              data-testid="dashboard-baru"
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs shrink-0 w-full sm:w-auto"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -143,22 +177,24 @@ export const DashboardList: React.FC<DashboardListProps> = ({
             <p className="text-xs text-ink-2 mb-6 leading-relaxed">
               {searchQuery
                 ? 'Tidak ditemukan dashboard dengan kata kunci pencarian tersebut. Coba periksa kembali ejaan Anda.'
-                : 'Belum ada dashboard di kategori ini. Anda dapat membuat dashboard baru atau meminta bantuan asisten AI.'}
+                : 'Belum ada dashboard di kategori ini. Anda dapat memilih data dari dokumen instansi atau memakai template siap pakai.'}
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               {bolehMenulis && (
                 <button
-                  onClick={() => setBuatOpen(true)}
+                  onClick={() => setCaraOpen(true)}
+                  data-testid="dashboard-baru-kosong"
                   className="px-4 py-2 text-xs font-bold text-on-solid bg-solid hover:bg-solid rounded-card transition-all shadow-xs"
                 >
                   + Dashboard Baru
                 </button>
               )}
               <button
-                onClick={onOpenChat}
+                onClick={onPilihData}
+                data-testid="pilih-data-dari-daftar"
                 className="px-4 py-2 text-xs font-bold text-ink-2 bg-surface-2 hover:bg-line/80 rounded-card transition-all border border-line"
               >
-                Gunakan Asisten AI
+                Pilih data
               </button>
             </div>
           </div>
@@ -301,6 +337,24 @@ export const DashboardList: React.FC<DashboardListProps> = ({
           </div>
         )}
       </div>
+      {caraOpen && (
+        <PilihCaraBuat
+          jumlahData={jumlahData}
+          onTutup={() => setCaraOpen(false)}
+          onPilihData={() => {
+            setCaraOpen(false);
+            onPilihData();
+          }}
+          onPilihTemplate={onBukaTemplate ? () => {
+            setCaraOpen(false);
+            onBukaTemplate();
+          } : undefined}
+          onKanvasKosong={() => {
+            setCaraOpen(false);
+            setBuatOpen(true);
+          }}
+        />
+      )}
       {buatOpen && (
         <ModalKonfirmasiDashboard
           aksi="buat"

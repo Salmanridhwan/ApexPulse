@@ -123,6 +123,38 @@ export function validasiPerubahan(
   return { sah: true, perubahan: bersih };
 }
 
+export interface HasilPangkas {
+  perubahan: PerubahanHalaman[];
+  /** Jumlah kartu tambahan yang dibuang karena melewati batas halaman. */
+  dipangkas: number;
+}
+
+/**
+ * Model kadang mengusulkan lebih banyak kartu baru daripada sisa ruang halaman.
+ * Daripada menolak seluruh usulan, kartu tambahan yang berlebih dibuang (yang
+ * pertama dipertahankan) dan jumlahnya dilaporkan. Kartu yang dihapus dalam
+ * usulan yang sama ikut dihitung sebagai ruang kosong.
+ */
+export function pangkasTambahan(
+  perubahan: PerubahanHalaman[],
+  jumlahKartu: number,
+  maks: number = MAKS_WIDGET_HALAMAN
+): HasilPangkas {
+  const jumlahHapus = perubahan.filter((p) => p.aksi === 'hapus').length;
+  let sisa = Math.max(0, maks - jumlahKartu + jumlahHapus);
+  let dipangkas = 0;
+  const hasil = perubahan.filter((p) => {
+    if (p.aksi !== 'tambah') return true;
+    if (sisa > 0) {
+      sisa -= 1;
+      return true;
+    }
+    dipangkas += 1;
+    return false;
+  });
+  return { perubahan: hasil, dipangkas };
+}
+
 export interface HasilTerap {
   berhasil: boolean;
   galat?: string;
@@ -150,7 +182,7 @@ export function terapkanPerubahan(
       if (hasil.length + 1 > maks) {
         return {
           berhasil: false,
-          galat: `Halaman ini sudah berisi ${hasil.length} kartu (batas ${maks}). Hapus satu kartu dulu, atau buat halaman baru.`,
+          galat: `Usulan menambah terlalu banyak kartu: halaman ini berisi ${widgets.length} kartu (batas ${maks}). Hapus satu kartu dulu, atau buat halaman baru.`,
           widgets,
           jumlahAkhir: widgets.length,
         };

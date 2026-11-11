@@ -1,8 +1,10 @@
 import React, { useContext, useEffect, useMemo, useRef } from 'react';
 import { AlertOctagon, AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Gauge, Target } from 'lucide-react';
 import { loadEcharts } from './echartsSetup';
+import { angkaRingkas, teksAngkaRingkas } from '../../services/format/angkaRingkas';
 import { pastikanPetaTerdaftar } from './petaTerdaftar';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
+import { rapikanUntukUkuran } from '../../services/chart/rapikanUkuran';
 import { contohKartu } from '../../services/chart/contohData';
 import { ringkasWilayah } from '../../services/templates/wilayahLayanan';
 import type { DataChart, SpesifikasiHtml } from '../../services/chart/pembangunOpsi';
@@ -29,6 +31,11 @@ export interface WidgetChartProps {
   tinggi?: number | string;
   /** Teks narasi untuk bentuk yang bukan kanvas. */
   teks?: string;
+  /**
+   * Butir-butir narasi (mis. kolom tata kelola). Bila ada, wajah narasi
+   * menampilkan daftar bernomor, bukan satu paragraf terpotong.
+   */
+  butir?: string[];
   /** Judul di dalam kartu, mis. "Insight Keuangan". */
   judul?: string;
   /** Ikon kecil di kepala kartu (kartu KPI). */
@@ -104,6 +111,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   skala = 1,
   tinggi,
   teks,
+  butir,
   judul,
   ikon,
   deltaTeks,
@@ -160,7 +168,18 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
       }
       if (batal || !wadah.current) return;
       instans = ec.init(wadah.current);
-      instans.setOption(hasil.opsi as any, true);
+      /**
+       * Jalur ECharts yang KEDUA (kanvas Template Chart). Sebelumnya hanya
+       * `ChartEcharts` yang menyesuaikan opsi dengan ukuran kartu, sehingga
+       * chart katalog seperti balok mendatar peringkat tetap menumpuk labelnya.
+       */
+      const ukur = () => {
+        const el = wadah.current;
+        if (!el) return '';
+        return `${Math.round(el.clientWidth / 40)}x${Math.round(el.clientHeight / 40)}`;
+      };
+      let kunci = ukur();
+      instans.setOption(rapikanUntukUkuran(hasil.opsi as any, wadah.current.clientWidth, wadah.current.clientHeight) as any, true);
       if (onKlikKosong) {
         instans.getZr().on('click', (e: any) => {
           if (!e?.target) onKlikKosong();
@@ -172,7 +191,15 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
           if (label) onKlikKategori(label);
         });
       }
-      pengamat = new ResizeObserver(() => instans?.resize?.());
+      pengamat = new ResizeObserver(() => {
+        const el = wadah.current;
+        if (!el || !instans) return;
+        instans.resize?.();
+        const sekarang = ukur();
+        if (sekarang === kunci) return;
+        kunci = sekarang;
+        instans.setOption(rapikanUntukUkuran(hasil.opsi as any, el.clientWidth, el.clientHeight) as any, true);
+      });
       pengamat.observe(wadah.current);
     });
     return () => {
@@ -188,6 +215,7 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
         spesifikasi={html}
         data={data}
         teks={teks}
+        butir={butir}
         judul={judul}
         ikon={ikon}
         deltaTeks={deltaTeks}
@@ -362,7 +390,18 @@ const angkaPertama = (data: DataChart): number | null => {
 };
 
 const format = (v: number | null, desimal = 0): string =>
-  v === null ? '—' : v.toLocaleString('id-ID', { maximumFractionDigits: desimal });
+  v === null ? '—' : angkaRingkas(v, desimal);
+
+/**
+ * `teksAngka` datang dari butir dokumen dan sering berupa deret mentah
+ * ("3966100000"). Bilangan lima digit ke atas dirapikan dengan pemisah ribuan;
+ * teks lain ("94,8%", "Rp 1,2 M", "12 bulan") dibiarkan apa adanya.
+ */
+const rapiAngkaTeks = (t?: string): string | undefined => {
+  if (t === undefined || t === null) return t;
+  const s = String(t).trim();
+  return teksAngkaRingkas(s);
+};
 
 /** Jalur sparkline 0..100 dari deret angka. Garis datar bila kurang dari dua titik. */
 const jalurSpark = (deret: Array<number | null>): { garis: string; area: string } => {
@@ -438,6 +477,7 @@ interface BentukProps {
   spesifikasi: SpesifikasiHtml;
   data: DataChart;
   teks?: string;
+  butir?: string[];
   judul?: string;
   ikon?: React.ComponentType<{ className?: string }>;
   deltaTeks?: string;
@@ -465,6 +505,7 @@ const BentukHtml: React.FC<BentukProps> = ({
   spesifikasi,
   data,
   teks,
+  butir,
   judul,
   ikon: Ikon,
   deltaTeks,
@@ -501,7 +542,12 @@ const BentukHtml: React.FC<BentukProps> = ({
       return (
         // Tanpa h-full: di halaman layar penuh (flex kolom) strip ini harus
         // setinggi isinya, bukan setinggi induk, supaya grafik tetap kebagian ruang.
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-[0.8em] shrink-0" style={{ color: g.teks }}>
+        // `auto-fit` + `minmax` membuat petak menyesuaikan lebar kartu; `shrink-0`
+        // dulu memaksa empat kolom sehingga petak meluber dan saling menimpa.
+        <div
+          className="grid gap-[0.6em] w-full min-h-0 overflow-hidden"
+          style={{ color: g.teks, gridTemplateColumns: 'repeat(auto-fit, minmax(6.5em, 1fr))' }}
+        >
           {data.kategori.map((label, i) => (
             <div
               key={label}
@@ -547,7 +593,7 @@ const BentukHtml: React.FC<BentukProps> = ({
             {judul || data.kategori?.[0] || data.seri?.[0]?.nama}
           </p>
           <p className="text-[1.05em] font-extrabold leading-tight truncate" style={{ color: g.teks }}>
-            {teksAngka ?? format(angka, desimal)}
+            {rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
             {satuan && satuan !== '%' ? (
               <span className="text-[0.62em] font-semibold ml-1" style={{ color: g.teks2 }}>
                 {satuan}
@@ -566,7 +612,7 @@ const BentukHtml: React.FC<BentukProps> = ({
     const deltaOs = data.seri?.[1]?.data ?? [];
     return (
       <div className="h-full flex flex-col px-[0.75em] py-[0.7em] min-h-0" style={kotak}>
-        <ul className="flex-1 min-h-0 flex flex-col justify-between gap-[0.28em]">
+        <ul className="flex-1 min-h-0 flex flex-col justify-between gap-[0.28em] overflow-y-auto gulir-tema">
           {data.kategori.map((nama, j) => {
             const seri = data.deretKecil?.[j] ?? [];
             const jalur = seri.length >= 2 ? jalurSpark(seri) : null;
@@ -652,7 +698,7 @@ const BentukHtml: React.FC<BentukProps> = ({
           className="text-[1.5em] font-bold leading-none tabular-nums tracking-tight"
           style={kosong ? { color: g.teks3 } : undefined}
         >
-          {kosong ? '—' : teksAngka ?? format(angka, desimal)}
+          {kosong ? '—' : rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
         </span>
 
         <div className="flex items-center gap-[0.35em] text-[0.72em] font-semibold">
@@ -713,7 +759,7 @@ const BentukHtml: React.FC<BentukProps> = ({
         </span>
         <div className="flex items-baseline gap-[0.35em] min-w-0">
           <span className="text-[1.35em] font-bold leading-none tabular-nums tracking-tight truncate">
-            {(teksAngka ?? format(angka, desimal)) || '\u00A0'}
+            {(rapiAngkaTeks(teksAngka) ?? format(angka, desimal)) || '\u00A0'}
           </span>
           {data.deltaTeks && (
             <span
@@ -821,7 +867,7 @@ const BentukHtml: React.FC<BentukProps> = ({
             className="text-[1.85em] font-extrabold leading-none tabular-nums tracking-tight truncate"
             style={{ color: kosong ? g.teks3 : g.teks }}
           >
-            {kosong ? '—' : teksAngka ?? format(angka, desimal)}
+            {kosong ? '—' : rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
           </span>
           {satuan && !kosong && (
             <span className="text-[0.7em] font-semibold shrink-0" style={{ color: g.teks3 }}>
@@ -861,7 +907,7 @@ const BentukHtml: React.FC<BentukProps> = ({
     const teksDelta = datar ? '0%' : `${naik ? '+' : ''}${String(delta).replace('.', ',')}%`;
     const deret = deretSpark(spark, data);
     const idGrad = `${wajah}-${String(label).replace(/\s+/g, '-')}`;
-    const nilaiTampil = kosong ? '—' : teksAngka ?? format(angka, desimal);
+    const nilaiTampil = kosong ? '—' : rapiAngkaTeks(teksAngka) ?? format(angka, desimal);
     const PanahDelta = datar ? ArrowRight : naik ? ArrowUpRight : ArrowDownRight;
 
     const angkaUtama = (ukuran: string) => (
@@ -1102,7 +1148,7 @@ const BentukHtml: React.FC<BentukProps> = ({
               className="text-[1.55em] font-extrabold leading-none tabular-nums tracking-tight truncate"
               style={{ color: kosong ? g.teks3 : g.teks }}
             >
-              {kosong ? '—' : teksAngka ?? format(angka, desimal)}
+              {kosong ? '—' : rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
             </span>
             {satuan && !kosong && (
               <span className="text-[0.68em] font-semibold shrink-0" style={{ color: g.teks3 }}>
@@ -1154,12 +1200,12 @@ const BentukHtml: React.FC<BentukProps> = ({
           </span>
         </div>
         <span className="text-[1.55em] font-extrabold leading-none tabular-nums tracking-tight" style={{ color: g.aksen }}>
-          {sasaran !== null ? teksSasaran(sasaran) : kosong ? '—' : teksAngka ?? format(angka, desimal)}
+          {sasaran !== null ? teksSasaran(sasaran) : kosong ? '—' : rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
         </span>
         <div className="mt-auto">
           <div className="flex justify-between gap-[0.5em] text-[0.62em] font-semibold mb-[0.3em]" style={{ color: g.teks3 }}>
             <span className="truncate">
-              {kosong ? 'Realisasi belum ada di dokumen' : `Realisasi ${teksAngka ?? format(angka, desimal)}${satuan === '%' ? '%' : ''}`}
+              {kosong ? 'Realisasi belum ada di dokumen' : `Realisasi ${rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}${satuan === '%' ? '%' : ''}`}
             </span>
             {capai !== null && (
               <span className="tabular-nums shrink-0" style={{ color: tercapai ? g.hijau : g.teks }}>
@@ -1336,15 +1382,17 @@ const BentukHtml: React.FC<BentukProps> = ({
     const total = nilai.reduce((a, b) => a + b, 0);
     return (
       <div className="h-full flex flex-col gap-[0.35em] px-[0.8em] py-[0.75em] min-h-0" style={kotak} onClick={onKlik}>
-        <div className="flex-1 min-h-0 flex flex-col justify-center gap-[0.3em]">
+        <div className="flex-1 min-h-0 flex flex-col gap-[0.22em] overflow-hidden">
           {data.kategori.map((tahap, i) => {
             const v = nilai[i] ?? 0;
             const lebar = 38 + (v / puncak) * 62;
+            // Baris berbagi tinggi sama rata: corong dengan 14 tahap pun tidak
+            // lagi meluber keluar kartu, jadi tidak ada baris yang terpotong.
             return (
-              <div key={tahap} className="flex items-center gap-[0.5em]">
-                <div className="flex-1 flex justify-center min-w-0">
+              <div key={tahap} className="flex items-center gap-[0.5em] flex-1 min-h-0">
+                <div className="flex-1 flex justify-center min-w-0 h-full">
                   <div
-                    className="flex items-center justify-center px-[0.6em] py-[0.42em] text-[0.72em] font-bold truncate"
+                    className="flex items-center justify-center px-[0.6em] text-[0.66em] font-bold truncate"
                     style={{
                       width: `${lebar}%`,
                       backgroundColor: g.palet[i % g.palet.length],
@@ -1444,7 +1492,7 @@ const BentukHtml: React.FC<BentukProps> = ({
 
         <div className="flex items-baseline gap-[0.35em] flex-wrap">
           <span className={`${besar ? 'text-[1.55em]' : 'text-[1.2em]'} font-bold leading-none tabular-nums tracking-tight`}>
-            {teksAngka ?? format(angka, desimal)}
+            {rapiAngkaTeks(teksAngka) ?? format(angka, desimal)}
           </span>
           {satuan && (
             <span className="text-[0.72em] font-medium" style={{ color: g.teks3 }}>
@@ -1473,8 +1521,12 @@ const BentukHtml: React.FC<BentukProps> = ({
           </div>
         )}
 
+        {/* Sparkline menyusut: dulu `min-h-[1.4em]` membuat kartu KPI butuh
+            ±167 px pada basis 18px, sedangkan mode presentasi hanya memberi
+            132–144 px sehingga isi kartu terpotong. Sekarang ia hanya tampil
+            bila masih ada sisa ruang; tanpa sisa, kartu tetap utuh. */}
         {besar && (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full flex-1 min-h-[1.4em] max-h-[2em] mt-[0.15em]" aria-hidden>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full flex-1 min-h-0 max-h-[2em] mt-[0.15em]" aria-hidden>
             <defs>
               <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={warna} stopOpacity="0.42" />
@@ -1691,6 +1743,57 @@ const BentukHtml: React.FC<BentukProps> = ({
   }
 
   if (spesifikasi.jenis === 'narasi-insight') {
+    /**
+     * Dua bentuk: strip satu baris (hanya teks, dipakai halaman ringkasan) dan
+     * kartu butir bernomor (dipakai kolom tata kelola/program). Butir dipilih
+     * lebih dulu supaya isinya tidak hilang karena dipotong dua baris.
+     */
+    if (butir?.length) {
+      return (
+        <div
+          className="h-full flex flex-col gap-[0.5em] px-[0.85em] py-[0.75em] overflow-hidden"
+          style={{ ...kotak, borderLeft: `4px solid ${g.aksen}` }}
+        >
+          {/* Judul kartu: dinaikkan dari 0.92em ke 1.02em supaya hierarki jelas. */}
+          <p className="text-[1.02em] font-bold leading-tight" style={{ color: g.teks }}>
+            {judul || 'Insight'}
+          </p>
+          {teks && (
+            <p
+              className="text-[0.84em] leading-relaxed"
+              style={{
+                color: g.teks3,
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {teks}
+            </p>
+          )}
+          {/* Butir: 0.76em → 0.88em, jarak dan nomor ikut diperbesar agar
+              terbaca dari jauh saat rapat. Garis pemisah tipis memisahkan
+              paragraf pengantar dari daftar. */}
+          <ul
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
+            style={{ borderTop: `1px solid ${g.garis}`, paddingTop: '0.45em', gap: '0.42em' }}
+          >
+            {butir.map((b, i) => (
+              <li key={i} className="flex items-start gap-[0.55em] text-[0.88em] leading-snug" style={{ color: g.teks2 }}>
+                <span
+                  className="shrink-0 inline-flex items-center justify-center w-[1.6em] h-[1.6em] rounded-full text-[0.68em] font-bold"
+                  style={{ background: g.aksen, color: '#1a1206' }}
+                >
+                  {i + 1}
+                </span>
+                <span className="min-w-0">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
     return (
       <div
         className="h-full flex items-center gap-[0.6em] px-[0.75em] py-[0.7em]"

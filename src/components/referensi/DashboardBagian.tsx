@@ -38,6 +38,12 @@ const LEBAR_LG: Record<number, string> = {
 
 /** Tinggi satu satuan baris grid kartu, px. */
 const BARIS = 50;
+/**
+ * Tinggi minimum isi satu halaman, px (7 baris x 50 + 6 celah x 12 + pb-3).
+ * Semua halaman deck dirapikan `pasHalaman` menjadi maksimal 7 baris, jadi
+ * dengan tinggi minimum ini setiap slide sama tinggi walau kartunya sedikit.
+ */
+const TINGGI_MIN = 434;
 
 export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, penuh = false, contoh = false }) => {
   const dasar = templateId.split('#')[0];
@@ -46,7 +52,7 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
   const halaman = template ? halamanTemplateBagian(template)[nomor - 1] : undefined;
   const isi = widgets ?? halaman?.widgets ?? [];
   // Desain halaman ikut panel Gaya Semua; tanpa pilihan = Korporat.
-  const gayaKartu: WidgetStyle = { ...(gaya ?? {}), desain: gaya?.desain ?? 'korporat' };
+  const gayaKartu: WidgetStyle = { ...(gaya ?? {}), desain: gaya?.desain ?? 'default' };
   return (
     <BingkaiKorporat
       nomor={nomor}
@@ -56,10 +62,15 @@ export const DashboardBagian: React.FC<Props> = ({ templateId, widgets, gaya, pe
       gaya={gayaKartu}
       penuh={penuh}
     >
+      {/* Basis huruf deck dinaikkan dari bawaan browser (16px) ke 18px.
+          Seluruh ukuran di dalam kartu memakai `em`, jadi satu angka ini
+          memperbesar judul, angka, label, dan butir sekaligus tanpa perlu
+          menyentuh tiap komponen. 18px dipilih karena masih muat di kartu
+          372px setelah butir naik ke 0.88em. */}
       <div
         data-testid="halaman-bagian"
         className={`grid grid-cols-12 gap-3 px-4 sm:px-5 pb-3 ${penuh ? 'h-full overflow-auto gulir-tema' : ''}`}
-        style={{ gridAutoRows: `${BARIS}px` }}
+        style={{ gridAutoRows: `${BARIS}px`, minHeight: TINGGI_MIN, fontSize: '18px' }}
       >
         {isi.map((w) => (
           <KartuBagian key={w.id} widget={w} gaya={gayaKartu} contoh={contoh} />
@@ -84,10 +95,10 @@ const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boo
 
   const isi = w.dataKosong ? (
     <div className="h-full flex flex-col items-center justify-center text-center gap-1 px-3">
-      <span className="text-[13px] font-bold" style={{ color: g.teks3 }}>
+      <span className="text-[0.78em] font-bold" style={{ color: g.teks3 }}>
         —
       </span>
-      <span className="text-[11px] leading-snug" style={{ color: g.teks3 }}>
+      <span className="text-[0.66em] leading-snug" style={{ color: g.teks3 }}>
         {w.catatanData || 'Belum ada di dokumen instansi.'}
       </span>
     </div>
@@ -108,11 +119,11 @@ const KartuBagian: React.FC<{ widget: WidgetSpec; gaya: WidgetStyle; contoh: boo
         <div className="h-full border overflow-hidden flex flex-col kartu-sumber-depan" style={{ ...bk.luar, background: g.kartu, borderRadius: g.sudutKartu ?? 12 }}>
           <div className="px-3 pt-2.5 pb-1.5 flex items-start gap-2 shrink-0">
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold leading-snug truncate" style={bk.judul}>
+              <p className="text-[0.78em] font-bold leading-snug truncate" style={bk.judul}>
                 {w.title}
               </p>
               {w.subtitle && (
-                <p className="text-[11px] leading-snug truncate" style={bk.sub}>
+                <p className="text-[0.66em] leading-snug truncate" style={bk.sub}>
                   {w.subtitle}
                 </p>
               )}

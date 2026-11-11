@@ -28,6 +28,40 @@ export class RagServiceError extends Error {
 }
 
 /**
+ * PEMBATAS LAJU PANGGILAN RAG.
+ *
+ * Layanan RAG membalas 429 begitu permintaan datang beruntun — ini yang membuat
+ * analisis dokumen "gagal" padahal dokumennya normal. Satu analisis saja sudah
+ * memanggil empat ekstraksi fokus berbarengan, dan antrean analisis menjalankan
+ * dua dokumen sekaligus: delapan permintaan dalam satu tarikan napas.
+ *
+ * Batas di sini adalah satu-satunya pagar yang berlaku untuk SEMUA jalur
+ * (/extract maupun /query), supaya halaman lain tidak ikut memicu 429 saat
+ * analisis sedang berjalan.
+ */
+const BATAS_BERSAMAAN_RAG = 2;
+let ragBerjalan = 0;
+const ragMenunggu: Array<() => void> = [];
+
+async function denganIzinRag<T>(kerja: () => Promise<T>): Promise<T> {
+  if (ragBerjalan >= BATAS_BERSAMAAN_RAG) {
+    await new Promise<void>((lanjut) => ragMenunggu.push(lanjut));
+  }
+  ragBerjalan += 1;
+  try {
+    return await kerja();
+  } finally {
+    ragBerjalan -= 1;
+    const berikut = ragMenunggu.shift();
+    if (berikut) berikut();
+  }
+}
+
+function pesanSibuk(pesan: string): boolean {
+  return /429|502|503|504|timeout|ETIMEDOUT|aborted|sibuk/i.test(pesan);
+}
+
+/**
  * Pilih KB pertama yang layak dari daftar kandidat (KB instansi → KB global),
  * dengan MELEWATI KB campur. KB campur (mis. `kb_chat`) berisi dokumen banyak
  * instansi sehingga retrieval-nya tidak bisa dijamin terisolasi; memakainya
@@ -1037,7 +1071,7 @@ export class ConfigurableRagClient implements RagClient {
     instruksi: string,
     skema: any = SKEMA_EKSTRAKSI,
     kbId?: string,
-    opsi?: { lemparSaatGagal?: boolean; timeoutMs?: number; topK?: number }
+    opsi?: { lemparSaatGagal?: boolean; timeoutMs?: number; topK?: number; cobaLagi?: number }
   ): Promise<any | null> {
     const ac = new AbortController();
     // Batas waktu bisa dipersempit per panggilan: saat generasi dashboard, beberapa
@@ -1048,23 +1082,57 @@ export class ConfigurableRagClient implements RagClient {
     // KB per-instansi (kalau ada) menimpa KB global. KB campur dilewati supaya
     // tidak pernah jadi sumber (lihat kbAman).
     const kbEfektif = kbAman(kbId, cfg.kbId);
+    const badannya = JSON.stringify({
+      query: instruksi,
+      ...(kbEfektif ? { knowledge_base_id: kbEfektif } : {}),
+      // top_k bawaan 8 cukup untuk satu widget; sapuan menyeluruh meminta
+      // batas maksimum layanan supaya satu area tidak kehilangan barisnya.
+      top_k: Math.max(1, Math.min(opsi?.topK ?? 8, 50)),
+      output_schema: skema,
+    });
+    const sekali = () =>
+      denganIzinRag(() =>
+        fetch(`${base}/extract`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cfg.apiKey}`,
+          },
+          body: badannya,
+          signal: ac.signal,
+        })
+      );
     try {
-      const res = await fetch(`${base}/extract`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.apiKey}`,
-        },
-        body: JSON.stringify({
-          query: instruksi,
-          ...(kbEfektif ? { knowledge_base_id: kbEfektif } : {}),
-          // top_k bawaan 8 cukup untuk satu widget; sapuan menyeluruh meminta
-          // batas maksimum layanan supaya satu area tidak kehilangan barisnya.
-          top_k: Math.max(1, Math.min(opsi?.topK ?? 8, 50)),
-          output_schema: skema,
-        }),
-        signal: ac.signal,
-      });
+      // Percobaan ulang saat layanan sibuk. Tanpa ini, satu balasan 429 membuat
+      // analisis dokumen tercatat "tidak ada data" padahal dokumennya berisi.
+      // Jeda 4 dtk lalu 8 dtk (sama seperti pengisian template), maksimal tiga kali.
+      const percobaan = Math.max(1, Math.min(opsi?.cobaLagi ?? 1, 4));
+      let res: Response | null = null;
+      let galatTerakhir: unknown = null;
+      for (let coba = 1; coba <= percobaan; coba += 1) {
+        try {
+          const r = await sekali();
+          if (r.ok || ![429, 502, 503, 504].includes(r.status)) {
+            res = r;
+            break;
+          }
+          console.warn(`[rag] /extract dibalas ${r.status} (percobaan ${coba}/${percobaan})`);
+          galatTerakhir = new Error(`Layanan RAG membalas ${r.status}.`);
+          if (coba === percobaan) {
+            res = r;
+            break;
+          }
+        } catch (err) {
+          galatTerakhir = err;
+          const pesan = jelaskanError(err);
+          if (coba === percobaan || !pesanSibuk(pesan)) throw err;
+          console.warn(`[rag] /extract gagal (percobaan ${coba}/${percobaan}): ${pesan}`);
+        }
+        const jeda = ConfigurableRagClient.jedaCobaUlangMs[Math.min(coba - 1, 1)] ?? 8000;
+        await new Promise((r) => setTimeout(r, jeda));
+      }
+      if (!res) throw galatTerakhir ?? new Error('Layanan RAG tidak merespons.');
+
       if (!res.ok) {
         console.warn(`[rag] /extract dibalas ${res.status}`);
         // Pemanggil yang butuh membedakan "dokumen tidak memuat" dari "layanan
@@ -1180,7 +1248,7 @@ export class ConfigurableRagClient implements RagClient {
       // sudah mencakup semua area, dan 4 panggilan tambahan hanya menambah beban
       // sehingga layanan membalas 429.
       options.sapuanPenuh
-        ? Promise.resolve({ widgets: [] as any[], judul: undefined as string | undefined, deskripsi: undefined as string | undefined })
+        ? Promise.resolve({ widgets: [] as any[], judul: undefined as string | undefined, deskripsi: undefined as string | undefined, sibuk: false })
         : this.ekstrakFokusParalel(base, cfg, options),
       // Sapuan menyeluruh: seluruh isi basis dibaca per area. Hanya untuk jalur
       // pembuat dashboard — mahal, jadi tidak dipakai tanya-jawab biasa.
@@ -1296,6 +1364,9 @@ export class ConfigurableRagClient implements RagClient {
     } as unknown as SectorDocumentChunk));
     // Area sapuan yang kosong karena LAYANAN (galat / tenggat), bukan karena dokumen.
     const areaSibuk = (sapuan.areaKosong || []).filter((a: string) => /^(gagal|lewat-tenggat)\(/.test(a));
+    // Ekstraksi fokus yang seluruhnya gagal karena layanan sibuk juga dicatat,
+    // supaya analisis dokumen tidak menyimpulkan "dokumen tanpa angka".
+    if (fokus.sibuk && fokus.widgets.length === 0) areaSibuk.push('fokus-sibuk');
     return { structuredJson, citations, chunks, areaSibuk };
   }
 
@@ -1621,9 +1692,10 @@ export class ConfigurableRagClient implements RagClient {
     base: string,
     cfg: { apiKey?: string; kbId?: string; timeoutMs: number },
     options: RagQueryOptions
-  ): Promise<{ widgets: any[]; judul?: string; deskripsi?: string }> {
+  ): Promise<{ widgets: any[]; judul?: string; deskripsi?: string; sibuk: boolean }> {
     const fokusList = ['kpi', 'grafik', 'tabel', 'narasi'] as const;
     const batas = Math.min(Math.max(40, cfg.timeoutMs || 60), 90);
+    let sibuk = false;
     const hasil = await Promise.allSettled(
       fokusList.map(async (fokus) => {
         const item = await this.ambilPayloadExtract(
@@ -1632,7 +1704,9 @@ export class ConfigurableRagClient implements RagClient {
           this.instruksiFokus(fokus, options.prompt, options.sector, options.instansi, options.kbId),
           SKEMA_FOKUS[fokus],
           options.kbId,
-          { timeoutMs: batas }
+          // lemparSaatGagal: bedakan "dokumen kosong" dari "layanan menolak".
+          // cobaLagi: 429 diulang dengan jeda, bukan langsung dianggap kosong.
+          { timeoutMs: batas, lemparSaatGagal: true, cobaLagi: 3 }
         );
         if (!item) return { fokus, widgets: [] as any[], judul: undefined as string | undefined };
         const widgets = payloadKeWidgetSpec(this.bungkusFokus(fokus, item), options.sector);
@@ -1645,15 +1719,22 @@ export class ConfigurableRagClient implements RagClient {
         return { fokus, widgets, judul };
       })
     );
+    // Kegagalan karena layanan (429/502/timeout) dicatat terpisah: pemanggil
+    // analisis harus tahu ini gangguan sementara, bukan dokumen tanpa angka.
+    for (const h of hasil) {
+      if (h.status === 'rejected' && pesanSibuk(jelaskanError(h.reason))) sibuk = true;
+    }
     const sukses = hasil
       .filter((h) => h.status === 'fulfilled')
       .map((h) => (h as PromiseFulfilledResult<{ fokus: string; widgets: any[]; judul?: string }>).value);
     const widgets = sukses.flatMap((s) => s.widgets);
     const judul = sukses.find((s) => s.judul)?.judul;
     if (widgets.length === 0) {
-      console.warn('[rag] ekstraksi fokus tidak menghasilkan widget (kpi/grafik/tabel/narasi kosong)');
+      console.warn(
+        `[rag] ekstraksi fokus tidak menghasilkan widget (kpi/grafik/tabel/narasi kosong${sibuk ? '; layanan sibuk' : ''})`
+      );
     }
-    return { widgets, judul };
+    return { widgets, judul, sibuk };
   }
 
   /**
@@ -1898,6 +1979,31 @@ export class ConfigurableRagClient implements RagClient {
     }
   }
 
+  /**
+   * RENCANA DASHBOARD OLEH MODEL.
+   *
+   * Memakai `/extract` dengan skema rencana (halaman + kartu), bukan skema
+   * ekstraksi angka. Katalog butir sudah ada di dalam `instruksi`, jadi model
+   * hanya menyusun tata letak: butir mana di halaman mana, chart apa.
+   *
+   * Mengembalikan `null` bila layanan belum dikonfigurasi atau tidak memberi
+   * item — pemanggil wajib menampilkan kegagalan itu apa adanya.
+   */
+  async rencanaDashboard(
+    instruksi: string,
+    skema: any,
+    opsi: { kbId?: string; timeoutMs?: number } = {}
+  ): Promise<any | null> {
+    const cfg = this.getRagConfig();
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
+    const { dipakai } = await this.resolveBase(cfg);
+    return this.ambilPayloadExtract(dipakai, cfg, instruksi, skema, opsi.kbId ?? cfg.kbId, {
+      timeoutMs: opsi.timeoutMs ?? 180,
+      topK: 10,
+      cobaLagi: 2,
+    });
+  }
+
   async query(options: RagQueryOptions): Promise<RagResult> {
     const cfg = this.getRagConfig();
     // TIDAK ADA fallback ke data contoh (mock) di sini. Kalau layanan RAG belum
@@ -1931,6 +2037,20 @@ export class ConfigurableRagClient implements RagClient {
       if (options.mode !== 'prose') {
         const hasil = await this.cobaExtractJalurA(dipakai, cfg, options);
         if (hasil) {
+          // Semua ekstraksi gagal karena layanan menolak (429) atau lewat tenggat:
+          // ini gangguan SEMENTARA. Melempar galat membuat analisis berstatus
+          // "gagal" dan bisa diulang; kalau dibiarkan, jalur B menjawab
+          // "tidak ditemukan" lalu hasil kosong itu tersimpan sebagai "selesai".
+          const hanyaSibuk =
+            hasil.citations.length === 0 &&
+            hasil.areaSibuk.some((a) => /fokus-sibuk|gagal|lewat-tenggat/.test(a));
+          if (hanyaSibuk) {
+            throw new RagServiceError(
+              'Layanan RAG sedang sibuk (HTTP 429). Coba lagi beberapa saat.',
+              'Permintaan ditolak berulang oleh layanan dokumen; analisis belum membaca isi berkas.',
+              429
+            );
+          }
           return {
             provider: 'http',
             mode: 'Jalur A',
@@ -1959,7 +2079,8 @@ export class ConfigurableRagClient implements RagClient {
       let payload: any = null;
       let sources: any[] = [];
       for (let k = 0; k < daftarKueri.length; k++) {
-        const res = await fetch(`${dipakai}/query`, {
+        const res = await denganIzinRag(() =>
+          fetch(`${dipakai}/query`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1983,7 +2104,8 @@ export class ConfigurableRagClient implements RagClient {
             },
           }),
           signal: ac.signal,
-        });
+          })
+        );
         if (!res.ok) {
           throw new RagServiceError(
             `Layanan RAG menolak permintaan (HTTP ${res.status}).`,

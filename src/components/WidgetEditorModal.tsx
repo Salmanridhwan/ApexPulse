@@ -361,7 +361,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
                       Standar Kepatuhan Koreksi Angka BUMD
                     </h4>
                     <p className="text-[11px] text-warn mt-0.5">
-                      Pengguna dapat menimpa angka jika terjadi revisi pembukuan resmi. Nilai asli tetap tersimpan di Jejak Audit, dan kartu widget akan ditandai dengan badge "Dikoreksi Manual".
+                      Pengguna dapat menimpa angka jika terjadi revisi pembukuan resmi. Kartu widget akan ditandai dengan badge "Dikoreksi Manual".
                     </p>
                   </div>
                 </div>

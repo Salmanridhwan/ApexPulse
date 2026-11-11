@@ -128,7 +128,7 @@ export type Ekstraktor = (arg: {
   prompt: string;
   skema: unknown;
   timeoutMs?: number;
-}) => Promise<{ ringkasan?: string; butir?: unknown[] }>;
+}) => Promise<{ ringkasan?: string; butir?: unknown[]; metode?: 'tabel-lokal' | 'rag-extract' }>;
 
 export interface HasilNormalisasi {
   ringkasan?: string;
@@ -300,6 +300,9 @@ export function normalisasiButir(
       nama,
       kategori: kategoriWidget(nama, seri.map((s) => s.nama)),
       ...(teks(o.periode, 40) ? { periode: teks(o.periode, 40) } : {}),
+      ...(Array.isArray(o.periodeTersedia) && o.periodeTersedia.length > 1
+        ? { periodeTersedia: o.periodeTersedia.map((p: unknown) => teks(p, 40)).filter(Boolean).slice(0, 24) }
+        : {}),
       ...(teks(o.satuan, 40) ? { satuan: teks(o.satuan, 40) } : {}),
       ...(nilai !== null ? { nilai } : {}),
       ...(seri.length > 0 ? { seri } : {}),

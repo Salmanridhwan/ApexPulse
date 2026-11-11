@@ -1298,7 +1298,18 @@ export function buildChartOption(
     grid: { left: '3%', right: isCombo ? '4%' : '4%', bottom: '3%', top: adaLegend ? '15%' : '10%', containLabel: true },
     xAxis: isHbar ? axisNilai : axisKategori,
     yAxis: isHbar
-      ? { ...axisKategori, axisLabel: { ...axisKategori.axisLabel, rotate: 0 } }
+      ? {
+          ...axisKategori,
+          axisLabel: {
+            ...axisKategori.axisLabel,
+            rotate: 0,
+            // Label panjang dipotong supaya area grafiknya tidak habis dipakai
+            // teks; nama utuhnya tetap muncul di tooltip.
+            width: 150,
+            overflow: 'truncate',
+            ellipsis: '…',
+          },
+        }
       : isCombo
         ? [axisNilai, { ...axisNilai, splitLine: { show: false } }]
         : axisNilai,

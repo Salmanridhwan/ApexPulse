@@ -29,7 +29,7 @@ import {
   statusSaatKuotaHabis,
 } from './antrean';
 import { SKEMA_BUTIR, instruksiButir, normalisasiButir, type Ekstraktor, type KonteksEkstraksi } from './ekstrakButir';
-import { kategoriTerdeteksi, saranTemplate } from './rekomendasiKategoriTemplate';
+import { kategoriTerdeteksi, saranTemplate, statusButirAwal } from './rekomendasiKategoriTemplate';
 
 /** Bagian penyimpanan yang dipakai — sengaja sempit supaya mudah dipalsukan. */
 export interface PenyimpananAnalisis {
@@ -46,6 +46,7 @@ export interface PenyimpananAnalisis {
     filter?: { permintaanId?: string; status?: string; berkasId?: string }
   ): AnalisisDokumen[];
   hapusButirAnalisis(analisisId: string, tenantId: string): number;
+  deleteAnalisisDokumen?(id: string, tenantId: string): boolean;
   systemConfig: { kuotaAnalisisHarian?: number };
 }
 
@@ -97,6 +98,58 @@ export function petakanKeluaranRag(structuredJson: any, judulBerkas: string): un
 
   const hasil: any[] = [];
   const cocok = (nama: unknown) => (judulBerkas ? cocokDokumen(nama, judulBerkas) : true);
+  const sitasiDari = (c: any) => ({ dokumen: c?.docName, halaman: c?.page, kutipan: c?.chunkSnippet });
+
+  /**
+   * JALUR A MENGEMBALIKAN `widgets`, BUKAN `kpi/grafik/tabel`.
+   *
+   * Dulu pemetaan hanya mengenal bentuk lama, sehingga analisis selalu berakhir
+   * "0 butir" walau ekstraksi dokumen berhasil — kartu yang sudah jadi dibuang
+   * tanpa jejak. Sekarang bentuk `widgets` (bentuk yang benar-benar dipakai
+   * aplikasi) ikut dibaca.
+   */
+  for (const w of Array.isArray(structuredJson.widgets) ? structuredJson.widgets : []) {
+    const cit = Array.isArray(w?.citations) ? w.citations[0] : undefined;
+    if (!cocok(cit?.docName)) continue;
+
+    if (w?.type === 'kpi' && w?.kpi) {
+      hasil.push({
+        nama: w.title,
+        nilai: w.kpi.value,
+        satuan: w.kpi.unit,
+        periode: w.periode,
+        sitasi: sitasiDari(cit),
+        keyakinan: 'tinggi',
+      });
+      continue;
+    }
+
+    if (Array.isArray(w?.chart?.series) && w.chart.series.length > 0) {
+      hasil.push({
+        nama: w.title,
+        seri: w.chart.series.map((s: any) => ({
+          nama: s?.name,
+          data: s?.data,
+          kategori: w.chart.xAxis,
+        })),
+        satuan: w.chart.unit,
+        sitasi: sitasiDari(cit),
+        keyakinan: 'sedang',
+      });
+      continue;
+    }
+
+    const barisTabel = w?.tabel?.baris ?? w?.chart?.rows;
+    if (Array.isArray(barisTabel) && barisTabel.length > 0) {
+      hasil.push({
+        nama: w.title || 'Tabel dokumen',
+        tabel: { kolom: w?.tabel?.kolom ?? w?.chart?.headers, baris: barisTabel },
+        sitasi: sitasiDari(cit),
+        keyakinan: 'sedang',
+      });
+    }
+  }
+  if (hasil.length > 0) return hasil;
 
   for (const k of Array.isArray(structuredJson.kpi) ? structuredJson.kpi : []) {
     if (!cocok(k?.docName)) continue;
@@ -224,7 +277,20 @@ export async function jalankanAnalisis(opsi: OpsiJalankan): Promise<HasilAnalisi
   // `konteks.analisisId` dari pemanggil belum tentu ada — id baris baru inilah
   // yang mengikat butir ke analisisnya. Tanpa ini butir tersimpan dengan
   // analisisId kosong dan tidak bisa ditelusuri kembali ke dokumen asalnya.
-  const bersih = normalisasiButir(mentah, { ...konteks, analisisId: baris.id });
+  // Berkas spreadsheet punya ratusan kolom angka; batas 60 bawaan (untuk jawaban
+  // model) akan memotongnya. Butir baca-sel dibiarkan sampai 600 per dokumen.
+  const batasButir = (mentah as any)?.metode === 'tabel-lokal' ? 600 : undefined;
+  const bersih = normalisasiButir(mentah, { ...konteks, analisisId: baris.id }, batasButir ? { batas: batasButir } : undefined);
+  /**
+   * STATUS AWAL BUTIR.
+   *
+   * Kebijakan `statusButirAwal` sudah ada tetapi tidak pernah dipakai, sehingga
+   * semua butir tertahan sebagai `draf` dan admin harus menyetujui puluhan angka
+   * satu per satu — padahal angkanya terbaca langsung dari sel dokumen.
+   * Aturannya: keyakinan tinggi + sitasi dokumen → langsung disetujui. Yang
+   * diragukan (tanpa sitasi) tetap `draf` untuk diperiksa.
+   */
+  for (const b of bersih.butir) b.status = statusButirAwal(b.keyakinan, b.sitasi);
   const butir = penyimpanan.simpanButirData(bersih.butir);
   const kategori = kategoriTerdeteksi(butir);
   const rekomendasi = saranTemplate(kategori[0] || 'Umum', butir);
@@ -241,6 +307,10 @@ export async function jalankanAnalisis(opsi: OpsiJalankan): Promise<HasilAnalisi
 
   const selesai = penyimpanan.updateAnalisisDokumen(baris.id, konteks.tenantId, {
     status: 'selesai',
+    // Sumber butir dicatat apa adanya: `tabel-lokal` berarti angka dibaca
+    // langsung dari sel berkas, sehingga tidak perlu dibaca ulang hanya karena
+    // ada dokumen lain masuk ke basis (lihat putusanCache).
+    metode: (mentah as any)?.metode === 'tabel-lokal' ? 'tabel-lokal' : 'rag-extract',
     ringkasan: bersih.ringkasan,
     jumlahButir: butir.length,
     kategoriTerdeteksi: kategori,
@@ -249,6 +319,17 @@ export async function jalankanAnalisis(opsi: OpsiJalankan): Promise<HasilAnalisi
     leaseSampai: undefined,
     galat: undefined,
   }) as AnalisisDokumen;
+
+  // Baris GAGAL lama untuk berkas yang sama dibuang: kegagalan itu sudah
+  // tergantikan hasil baru, dan kalau dibiarkan kotak "dokumen gagal dianalisis"
+  // terus menampilkan peringatan yang tidak berlaku lagi.
+  if (typeof penyimpanan.deleteAnalisisDokumen === 'function') {
+    for (const lama of sebelumnya) {
+      if (lama.id !== baris.id && lama.status === 'gagal') {
+        penyimpanan.deleteAnalisisDokumen(lama.id, konteks.tenantId);
+      }
+    }
+  }
 
   return { analisis: selesai, butir, rekomendasi, dibuang: bersih.dibuang, sisaKuota: Math.max(0, sisa - 1) };
 }

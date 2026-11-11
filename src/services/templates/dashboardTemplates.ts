@@ -1,6 +1,13 @@
 import { WidgetSpec, WidgetType } from '../../types';
 import { GAYA, VARIAN, type Varian } from '../chart/gayaVarian';
 import { TEMPLATE_BAGIAN, type InfoBagian } from './templateBagian';
+import { TEMPLATE_KEUANGAN_SDM } from './templateKeuanganSdm';
+import { TEMPLATE_OUTSOURCING } from './templateOutsourcing';
+import { TEMPLATE_PROCUREMENT } from './templateProcurement';
+import { TEMPLATE_CONSTRUCTION } from './templateConstruction';
+import { TEMPLATE_ASRAMA } from './templateAsrama';
+import { TEMPLATE_MARKETING } from './templateMarketing';
+import { pasHalaman } from './pasHalaman';
 
 /**
  * TEMPLATE DASHBOARD — template UMUM berdasarkan TUJUAN, bukan sektor BUMD.
@@ -25,6 +32,37 @@ import { TEMPLATE_BAGIAN, type InfoBagian } from './templateBagian';
  * `citations` dikosongkan — supaya tidak ada dokumen yang diklaim sebagai sumber.
  */
 
+// ============================================================================
+// CARA MENAMBAH TEMPLATE BARU — galeri kini KOSONG, semua template lama ditarik
+// ============================================================================
+/**
+ * Langkah menambah template:
+ *
+ * 1. Tulis satu objek `DashboardTemplate` (pakai `TEMPLATE_RINGKASAN` di bawah
+ *    sebagai acuan bentuk widget/grid). JANGAN isi `legacy`.
+ * 2. Isi `kategoriId`: 'keuangan' | 'pengadaan' | 'pelayanan' | 'operasional' |
+ *    'sdm' | 'kinerja'.
+ * 3. `nama` dan `judulDashboard` WAJIB nama SUSUNAN, bukan nama gaya. Gaya
+ *    (Pijar, Lensa, Nadi, Kaca, Tirta, Aurora, Neon, Blok, Bento, Koran,
+ *    Korporat) dipilih terpisah di galeri, jadi jangan dipakai sebagai nama
+ *    template. Contoh nama susunan: "Realisasi Anggaran", "Paket Pengadaan".
+ * 4. Daftarkan objek itu di `DASHBOARD_TEMPLATES` di bawah.
+ * 5. `tema` hanya titik awal tampilan; pengguna tetap boleh memilih gaya lain.
+ *
+ * TEMPLATE BANYAK HALAMAN (satu halaman = satu slide deck):
+ *   - id diawali `tpl-deck-` (lihat `PREFIKS_TEMPLATE_DECK`), dan isi `bagian`
+ *     dengan `halaman: [{ judul, sub, jumlah }]` — `jumlah` = banyaknya kartu
+ *     halaman itu, berurutan di `widgets`.
+ *   - Acuan lengkap: `templateKeuanganSdm.ts` (14 halaman, 60 kartu).
+ *   - Tiap halaman maksimal 7 baris grid (434px: KPI 3 baris + grafik 4 baris)
+ *     supaya semua slide sama tinggi. `pasHalaman` merapikannya otomatis saat
+ *     template didaftarkan, dan `DashboardBagian` memberi tinggi minimum itu.
+ *
+ * Aturan `legacy`:
+ *   - `legacy: true`  → TIDAK tampil di galeri, tidak disiapkan server (RAG),
+ *                       hanya agar dashboard lama tetap bisa dibaca.
+ *   - tanpa `legacy`  → tampil di galeri pada kategori `kategoriId`.
+ */
 export interface DashboardTemplate {
   id: string;
   nama: string;
@@ -53,7 +91,87 @@ export interface DashboardTemplate {
    * deck dan kata kunci asisten. Kosong = template tiga halaman Pijar.
    */
   bagian?: InfoBagian;
+  /**
+   * Kategori kebutuhan template (lihat `KATEGORI_TEMPLATE`). Galeri
+   * mengelompokkan template per kategori; kosong = dianggap `kinerja`.
+   */
+  kategoriId?: KategoriTemplateId;
+  /**
+   * Gaya Template Chart yang disarankan saat template dibuka di galeri. Kosong =
+   * `default`: gaya memang dipilih terpisah, bukan milik template.
+   */
+  gayaBawaan?: Varian;
+  /**
+   * Template lama yang HANYA mengganti gaya, bukan susunan (dulu `tpl-gaya-*`).
+   * Tidak lagi ditampilkan di galeri karena gaya kini dipilih terpisah dari
+   * template — tetapi tetap disimpan supaya dashboard yang sudah dibuat
+   * dengan template itu masih bisa dibaca.
+   */
+  legacy?: boolean;
 }
+
+// ============================================================================
+// KATEGORI TEMPLATE — satu kategori = satu jenis kebutuhan pemakaian
+// ============================================================================
+/**
+ * Template dikelompokkan menurut KEBUTUHAN, bukan merek dan bukan sektor.
+ * Kategori hanya metadata (nama, urutan, keterangan); susunan isinya tetap
+ * ditentukan oleh template di dalamnya.
+ */
+export type KategoriTemplateId =
+  | 'keuangan'
+  | 'pengadaan'
+  | 'pelayanan'
+  | 'operasional'
+  | 'sdm'
+  | 'kinerja';
+
+export interface KategoriTemplate {
+  id: KategoriTemplateId;
+  nama: string;
+  /** Kebutuhan yang dijawab kategori ini, satu kalimat bahasa pengguna. */
+  deskripsi: string;
+  urutan: number;
+}
+
+export const KATEGORI_TEMPLATE: KategoriTemplate[] = [
+  {
+    id: 'keuangan',
+    nama: 'Keuangan & Anggaran',
+    deskripsi: 'Saldo, pendapatan, beban, laba, dan realisasi anggaran.',
+    urutan: 1,
+  },
+  {
+    id: 'pengadaan',
+    nama: 'Pengadaan & Aset',
+    deskripsi: 'Paket pengadaan, vendor, progres pekerjaan, dan aset.',
+    urutan: 2,
+  },
+  {
+    id: 'pelayanan',
+    nama: 'Pelayanan & Pelanggan',
+    deskripsi: 'Permintaan layanan, pengaduan, waktu tanggap, dan kepuasan.',
+    urutan: 3,
+  },
+  {
+    id: 'operasional',
+    nama: 'Operasional & Produksi',
+    deskripsi: 'Volume produksi, gangguan, pemeliharaan, dan mutu layanan harian.',
+    urutan: 4,
+  },
+  {
+    id: 'sdm',
+    nama: 'SDM & Kepegawaian',
+    deskripsi: 'Jumlah pegawai, komposisi, kehadiran, dan belanja pegawai.',
+    urutan: 5,
+  },
+  {
+    id: 'kinerja',
+    nama: 'Kinerja & Target',
+    deskripsi: 'Capaian indikator, target, kontrak manajemen, dan evaluasi.',
+    urutan: 6,
+  },
+];
 
 /** Label bulan netral untuk deret contoh. */
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -135,7 +253,14 @@ const narasi = (
 // ============================================================================
 const TEMPLATE_RINGKASAN: DashboardTemplate = {
   id: 'tpl-ringkasan',
-  nama: 'Pijar',
+  nama: 'Ringkasan Satu Layar',
+  kategoriId: 'keuangan',
+  /**
+   * Ditarik dari galeri: template lama dihapus dari daftar pilihan dan akan
+   * diganti template baru. Definisi susunannya tetap disimpan supaya dashboard
+   * yang sudah terlanjur dibuat masih bisa dibaca.
+   */
+  legacy: true,
   tujuan:
     'Memberi pimpinan gambaran menyeluruh dalam satu layar: saldo kas, pendapatan, beban, laba, tren bulanan, komposisi beban, transaksi terbaru, arus kas, dan progres target — tanpa membuka laporan.',
   caraPenyampaian:
@@ -144,7 +269,7 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
   fokus: ['Saldo & laba', 'Tren pendapatan', 'Komposisi beban', 'Arus kas', 'Progres target'],
   aksen: '#ff8a1f',
   tema: 'oranye',
-  judulDashboard: 'Pijar',
+  judulDashboard: 'Ringkasan Satu Layar',
   deskripsiDashboard:
     'Empat KPI berikon, grafik batang pendapatan, cincin rincian beban dengan total di tengah, daftar transaksi terbaru, area arus kas, tiga bar progres target, dan strip insight — seluruhnya dalam satu layar. Seluruh angka ilustrasi.',
   widgets: [
@@ -200,7 +325,7 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
     }),
 
     // ── Baris 4: strip insight ──
-    narasi('Insight Keuangan', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 3 },
+    narasi('Insight Keuangan', 'Tiga hal yang perlu diketahui pimpinan', { w: 12, h: 4 },
       'Pendapatan tumbuh 8,2% sementara beban turun 3,4% — margin bersih naik ke 32,1%. Perhatian utama pada realisasi investasi yang baru 57% dari target.',
       [
         'Pendapatan tumbuh 8,2%; beban turun 3,4%.',
@@ -215,7 +340,9 @@ const TEMPLATE_RINGKASAN: DashboardTemplate = {
 // ============================================================================
 const TEMPLATE_ANALITIK: DashboardTemplate = {
   id: 'tpl-analitik',
-  nama: 'Lensa',
+  nama: 'Analitik Rinci',
+  kategoriId: 'kinerja',
+  legacy: true,
   tujuan:
     'Menelusuri kinerja usaha secara rinci: pendapatan, volume transaksi, jumlah pelanggan, rasio capaian, status layanan, sumber pendapatan, transaksi terbaru, nilai per kategori, sebaran per waktu, cara pembayaran, dan tren capaian.',
   caraPenyampaian:
@@ -224,7 +351,7 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
   fokus: ['Tren pendapatan', 'Status layanan', 'Komposisi sumber', 'Nilai per kategori', 'Tren capaian'],
   aksen: '#3b82f6',
   tema: 'analitik',
-  judulDashboard: 'Lensa',
+  judulDashboard: 'Analitik Rinci',
   deskripsiDashboard:
     'Tampilan analitik rinci: 4 angka utama bergaris tren, area perkembangan, batang per status, cincin komposisi, tabel transaksi terbaru, batang per kategori, sebaran per waktu, dan garis tren capaian. Seluruh angka ilustrasi.',
   widgets: [
@@ -279,7 +406,7 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
     narasi(
       'Ringkasan',
       'Kesimpulan cepat dari angka contoh di atas',
-      { w: 8, h: 3 },
+      { w: 8, h: 4 },
       'Pendapatan naik 18,2% dibanding periode lalu dan konversi membaik 5,4%. Kanal pencarian organik menyumbang 28,4% kunjungan, sementara 820 dari 1.522 pesanan sudah selesai.',
       ['Selesaikan 90 pesanan yang dibatalkan akar penyebabnya.', 'Dorong kanal email yang baru 8% kunjungan.'],
     ),
@@ -291,7 +418,9 @@ const TEMPLATE_ANALITIK: DashboardTemplate = {
 // ============================================================================
 const TEMPLATE_TRAFIK: DashboardTemplate = {
   id: 'tpl-trafik',
-  nama: 'Nadi',
+  nama: 'Pemantauan Harian',
+  kategoriId: 'pelayanan',
+  legacy: true,
   tujuan:
     'Memantau denyut layanan dari hari ke hari: angka harian utama, sumber permintaan, perkembangan capaian, komposisi pelanggan, unit dengan beban terbesar, jenis layanan, faktor penilaian, dan porsi tiap kelompok beserta trennya.',
   caraPenyampaian:
@@ -300,7 +429,7 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
   fokus: ['Angka harian', 'Sumber permintaan', 'Komposisi pelanggan', 'Unit teratas', 'Porsi bertren'],
   aksen: '#22d3ee',
   tema: 'trafik',
-  judulDashboard: 'Nadi',
+  judulDashboard: 'Pemantauan Harian',
   deskripsiDashboard:
     'Tampilan pemantauan harian: 5 angka utama bergaris tren, batang harian bertumpuk, garis perkembangan, komposisi, peringkat, cincin jenis layanan, dan porsi bertren. Seluruh angka ilustrasi.',
   widgets: [
@@ -335,7 +464,7 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
     narasi(
       'Ringkasan',
       'Kesimpulan cepat dari angka contoh di atas',
-      { w: 8, h: 3 },
+      { w: 8, h: 4 },
       'Trafik memuncak di pertengahan Januari dengan mesin pencari sebagai sumber utama. Pengunjung bertambah 11 orang, tetapi pengunjung baru turun 24 orang sehingga pemerolehan kanal baru perlu didorong.',
       ['Naikkan porsi pengunjung baru lewat kanal sosial.', 'Pertahankan halaman /program-federal yang menyumbang 40,3%.'],
     ),
@@ -354,7 +483,8 @@ const TEMPLATE_TRAFIK: DashboardTemplate = {
 const TEMPLATE_KACA: DashboardTemplate = {
   ...TEMPLATE_RINGKASAN,
   id: 'tpl-kaca',
-  nama: 'Kaca',
+  nama: 'Paparan Pimpinan',
+  kategoriId: 'kinerja',
   tujuan:
     'Menyajikan ringkasan keuangan, operasional, dan kinerja wilayah dengan tampilan lembut dan bersih, cocok untuk layar rapat dan presentasi pimpinan.',
   caraPenyampaian:
@@ -363,7 +493,7 @@ const TEMPLATE_KACA: DashboardTemplate = {
   fokus: ['Saldo & laba', 'Pendapatan bulanan', 'Capaian indikator', 'Kinerja wilayah'],
   aksen: '#2f8f7d',
   tema: 'kaca',
-  judulDashboard: 'Kaca',
+  judulDashboard: 'Paparan Pimpinan',
   deskripsiDashboard:
     'Tampilan kartu bening tiga halaman: ringkasan keuangan, operasional & pelayanan dengan cincin capaian, serta kinerja per wilayah dengan tabel laporan. Seluruh angka ilustrasi.',
   widgets: TEMPLATE_RINGKASAN.widgets.map((w) => ({ ...w, id: w.id.replace(/^tpl-/, 'tpl-kaca-') })),
@@ -405,6 +535,12 @@ const TEMPLATE_GAYA: DashboardTemplate[] = GAYA_TEMPLATE_BARU.map(({ v, tujuan }
     ...TEMPLATE_RINGKASAN,
     id: `${PREFIKS_TEMPLATE_GAYA}${v}`,
     nama: g.nama,
+    /**
+     * Bukan template baru: susunannya Pijar, hanya warnanya diganti. Karena gaya
+     * kini dipilih terpisah dari template (pemilih gaya di galeri), entri ini
+     * disembunyikan dari galeri dan hanya dipertahankan untuk kompatibilitas.
+     */
+    legacy: true,
     tujuan,
     caraPenyampaian: `Susunan tiga halaman Pijar (ringkasan keuangan, operasional & pelayanan, kinerja wilayah) dengan gaya ${g.nama} dari menu Template Chart: ${g.sebutan}.`,
     deskripsi: `Gaya ${g.nama} dari Template Chart: ${g.sebutan}.`,
@@ -417,6 +553,12 @@ const TEMPLATE_GAYA: DashboardTemplate[] = GAYA_TEMPLATE_BARU.map(({ v, tujuan }
 });
 
 export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
+  TEMPLATE_KEUANGAN_SDM,
+  TEMPLATE_OUTSOURCING,
+  TEMPLATE_PROCUREMENT,
+  TEMPLATE_CONSTRUCTION,
+  TEMPLATE_ASRAMA,
+  TEMPLATE_MARKETING,
   TEMPLATE_RINGKASAN,
   TEMPLATE_ANALITIK,
   TEMPLATE_TRAFIK,
@@ -425,9 +567,47 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
   ...TEMPLATE_BAGIAN,
 ];
 
+/**
+ * Template banyak halaman: setiap halaman dirapikan menjadi maksimal 7 baris
+ * (lihat `pasHalaman`). Diubah di tempat, bukan disalin, supaya semua pemakai
+ * objek template (termasuk `TEMPLATE_BAGIAN` di templateBagian.ts) melihat
+ * ukuran yang sama.
+ */
+for (const t of DASHBOARD_TEMPLATES) {
+  if (!t.bagian?.halaman?.length) continue;
+  let awal = 0;
+  t.widgets = t.bagian.halaman.flatMap((h) => {
+    const potong = t.widgets.slice(awal, awal + h.jumlah);
+    awal += h.jumlah;
+    return pasHalaman(potong);
+  });
+}
+
 /** Cari template berdasarkan id (dipakai halaman galeri). */
 export function templateBerdasarkanId(id: string): DashboardTemplate | undefined {
   return DASHBOARD_TEMPLATES.find((t) => t.id === id);
+}
+
+/**
+ * Kategori sebuah template. Template tanpa `kategoriId` dianggap `kinerja`
+ * supaya penambahan template baru tidak wajib mengisi kategori.
+ */
+export function kategoriDariTemplate(t: DashboardTemplate): KategoriTemplate {
+  const id = t.kategoriId ?? 'kinerja';
+  return KATEGORI_TEMPLATE.find((k) => k.id === id) ?? KATEGORI_TEMPLATE[KATEGORI_TEMPLATE.length - 1];
+}
+
+/**
+ * Template yang tampil di galeri: tanpa duplikat `tpl-gaya-*` (legacy).
+ * Tanpa argumen → semua kategori; dengan `kategoriId` → kategori itu saja.
+ */
+export function templateGaleri(kategoriId?: KategoriTemplateId): DashboardTemplate[] {
+  return DASHBOARD_TEMPLATES.filter((t) => !t.legacy && (!kategoriId || kategoriDariTemplate(t).id === kategoriId));
+}
+
+/** Jumlah template galeri per kategori — untuk lencana di tab kategori. */
+export function jumlahTemplateGaleri(kategoriId: KategoriTemplateId): number {
+  return templateGaleri(kategoriId).length;
 }
 
 /**

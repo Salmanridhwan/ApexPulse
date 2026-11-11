@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { saranPertanyaan, SARAN_UMUM } from '../services/chat/saranPertanyaan';
 import {
   AlertCircle,
   AlertTriangle,
@@ -152,13 +153,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // saat admin berpindah instansi panel tetap menampilkan riwayat instansi
   // sebelumnya, dan permintaan tanpa `tenantId` dijawab server dengan instansi milik
   // akun admin sendiri — riwayat dan jawaban jadi berasal dari dua instansi berbeda.
+  const kunciRiwayatRef = useRef('');
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      kunciRiwayatRef.current = '';
+      return;
+    }
     if (isStreaming) return; // Jangan bersihkan atau muat ulang riwayat saat sedang streaming respon!
 
-    // Kosongkan dulu supaya riwayat instansi lama tidak menyangkut di instansi baru.
-    setMessages([]);
-    setChatId(undefined);
+    // Kosongkan HANYA bila dashboard atau instansi berganti, supaya riwayat lama
+    // tidak menyangkut. Efek ini juga berjalan setiap kali `isStreaming` kembali
+    // false. Kalau di saat itu pesan dikosongkan, prompt dan balasan usulan (yang
+    // tidak disimpan server) ikut lenyap, dan pengguna melihat promptnya terhapus.
+    const kunci = `${dashboardId || ''}|${tenantId}`;
+    if (kunciRiwayatRef.current !== kunci) {
+      kunciRiwayatRef.current = kunci;
+      setMessages([]);
+      setChatId(undefined);
+    }
 
     if (!dashboardId) {
       // Belum ada dashboard terbuka: muat riwayat "percakapan umum" instansi aktif,
@@ -172,7 +184,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           if (batalUmum) return;
           setChatId(data.chat?.id);
           if (Array.isArray(data.chat?.messages) && data.chat.messages.length > 0) {
-            setMessages(data.chat.messages);
+            setMessages((prev) => (data.chat.messages.length >= prev.length ? data.chat.messages : prev));
           }
         } catch (err) {
           if (!batalUmum) console.error('Gagal memuat riwayat chat umum:', err);
@@ -205,13 +217,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
   }, [isOpen, dashboardId, isStreaming, tenantId]);
 
-  const quickPrompts = [
-    `Berapa total aset ${sector.toUpperCase()} tahun 2025?`,
-    `Apa saja indikator kinerja utama ${sector.toUpperCase()}?`,
-    `Buat dashboard kinerja keuangan ${sector.toUpperCase()} 2026`,
-    `Bagaimana pertumbuhan laba bersih tahun ini?`,
-    `Apa program kerja utama ${sector.toUpperCase()} tahun ini?`,
-  ];
+  // Saran pertanyaan disusun dari butir data yang SUDAH DISETUJUI di instansi
+  // aktif. Saran tertulis tetap ("laba bersih", "total aset") sering memakai
+  // istilah yang tidak ada di dokumen, sehingga asisten pasti menjawab tidak ditemukan.
+  const [quickPrompts, setQuickPrompts] = useState<string[]>(SARAN_UMUM);
+  useEffect(() => {
+    if (!isOpen) return;
+    let batalSaran = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/butir-data?status=disetujui&tenantId=${encodeURIComponent(tenantId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!batalSaran) setQuickPrompts(saranPertanyaan(Array.isArray(data?.butir) ? data.butir : []));
+      } catch {
+        if (!batalSaran) setQuickPrompts(SARAN_UMUM);
+      }
+    })();
+    return () => {
+      batalSaran = true;
+    };
+  }, [isOpen, tenantId]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const prompt = (textToSend || inputPrompt).trim();
@@ -249,7 +275,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {
               id: `msg-${Date.now()}-err`,
               sender: 'system',
-              text: data?.error || 'Asisten tidak bisa menyusun usulan untuk halaman ini.',
+              text: `Halaman "${data?.judulHalaman || halamanJudul || 'ini'}": ${data?.error || 'Asisten tidak bisa menyusun usulan untuk halaman ini.'}`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);
@@ -260,7 +286,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {
               id: `msg-${Date.now()}-usulan`,
               sender: 'system',
-              text: `${data.usulan?.ringkasan || 'Usulan siap ditinjau.'} (${data.ringkasanPerubahan}) — tinjau dulu, halaman belum berubah.`,
+              text: `Halaman "${data.judulHalaman || halamanJudul || 'ini'}": ${data.usulan?.ringkasan || 'Usulan siap ditinjau.'} (${data.ringkasanPerubahan}, ${data.jumlahKartuSetelah} kartu setelah diterapkan)${
+                data.dipangkas > 0 ? `. ${data.dipangkas} kartu usulan tidak dimasukkan karena halaman maksimal 9 kartu` : ''
+              } — tinjau dulu, halaman belum berubah.`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);

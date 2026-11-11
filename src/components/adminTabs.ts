@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Bell, Building2, Database, Gauge, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Building2, Database, Gauge, Users } from 'lucide-react';
 
 /**
  * Daftar menu Panel Admin — SATU sumber untuk sidebar utama dan halaman Admin.
@@ -7,10 +7,10 @@ import { Activity, Bell, Building2, Database, Gauge, ShieldCheck, Users } from '
  * Dulu menu ini hidup di dalam `Admin.tsx` sebagai sidebar kedua di dalam halaman,
  * sehingga sidebar utama aplikasi justru disembunyikan saat mode admin dan
  * pengguna berpindah antar dua navigasi. Sekarang menu ini dirender di sidebar
- * utama (grup "Sistem & Tata Kelola"), dan halaman Admin hanya menampilkan isi
+ * utama (grup Panel Admin), dan halaman Admin hanya menampilkan isi
  * tab yang dipilih — tidak ada lagi sidebar kedua.
  */
-export type AdminTabId = 'overview' | 'users' | 'tenants' | 'rag' | 'kuota' | 'alerts' | 'audit';
+export type AdminTabId = 'overview' | 'users' | 'tenants' | 'rag' | 'kuota';
 
 export interface AdminTab {
   id: AdminTabId;
@@ -36,16 +36,14 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'tenants', label: 'Instansi & KB', judul: 'Instansi & Knowledge Base', icon: Building2, peran: 'superadmin' },
   { id: 'rag', label: 'Konfigurasi RAG', judul: 'Konfigurasi RAG', icon: Database, peran: 'superadmin' },
   { id: 'kuota', label: 'Kuota AI', judul: 'Kuota Analisis AI per Instansi', icon: Gauge, peran: 'superadmin' },
-  { id: 'alerts', label: 'Ambang Batas', judul: 'Ambang Batas & Alert', icon: Bell, peran: 'admin' },
-  { id: 'audit', label: 'Jejak Audit', judul: 'Jejak Audit & Kepatuhan', icon: ShieldCheck, peran: 'superadmin' },
 ];
 
 /**
  * Tab yang boleh dilihat satu peran.
  *
  * Admin Instansi hanya melihat tab urusan instansinya sendiri (ringkasan, akun,
- * tampilan menu, ambang batas). Tab lintas instansi — Instansi & KB, RAG, Kuota
- * AI, jejak audit — hanya untuk Admin Aiones, karena isinya menyangkut instansi
+ * tampilan menu). Tab lintas instansi — Instansi & KB, RAG, Kuota
+ * AI — hanya untuk Admin Aiones, karena isinya menyangkut instansi
  * lain.
  */
 export function tabUntukPeran(peran: unknown): AdminTab[] {

@@ -27,7 +27,10 @@ interface Props {
 
 export const BingkaiKorporat: React.FC<Props> = ({ nomor, judul, sub, kaki, gaya, penuh = false, className = '', children }) => {
   const mode = useThemeMode();
-  const { g } = gayaKatalogWidget({ ...(gaya ?? {}), desain: 'korporat' }, mode);
+  // Desain halaman ikut gaya yang dipilih di galeri; tanpa pilihan = `default`.
+  // Dulu `korporat` dipaksa di sini, sehingga latar halaman tidak ikut berganti
+  // saat pengguna memilih gaya lain.
+  const { g } = gayaKatalogWidget(gaya, mode);
   const gelapLatar = g.latar.startsWith('#') && parseInt(g.latar.slice(1, 3), 16) < 90;
   const tintaBadge = gelapLatar ? g.kartu2 : g.teks;
 
@@ -48,7 +51,7 @@ export const BingkaiKorporat: React.FC<Props> = ({ nomor, judul, sub, kaki, gaya
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl font-extrabold leading-tight tracking-tight truncate">{judul}</h2>
           {sub && (
-            <p className="text-[12px] sm:text-[13px] leading-snug truncate" style={{ color: g.teks2 }}>
+            <p className="text-[0.72em] sm:text-[0.78em] leading-snug truncate" style={{ color: g.teks2 }}>
               {sub}
             </p>
           )}
@@ -58,7 +61,7 @@ export const BingkaiKorporat: React.FC<Props> = ({ nomor, judul, sub, kaki, gaya
       <div className={`relative ${penuh ? 'flex-1 min-h-0' : ''}`}>{children}</div>
 
       <footer
-        className="relative shrink-0 mt-auto flex items-center justify-between gap-3 px-4 sm:px-5 py-2 text-[10px] font-semibold uppercase tracking-wider"
+        className="relative shrink-0 mt-auto flex items-center justify-between gap-3 px-4 sm:px-5 py-2 text-[0.6em] font-semibold uppercase tracking-wider"
         style={{ color: g.teks3, borderTop: `1px solid ${g.garis}` }}
       >
         <span className="truncate">{kaki}</span>

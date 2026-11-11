@@ -3,7 +3,7 @@
  *
  * ponytail: satu fungsi kecil dipakai bersama, bukan pustaka paginasi. Tujuan
  * utamanya bukan "fitur paginasi", tapi menjaga agar satu instansi dengan
- * ribuan entri log audit tidak mengirim seluruh riwayat dalam satu respons
+ * ribuan entri tidak mengirim seluruh riwayat dalam satu respons
  * (respons besar = halaman lambat + memori server naik).
  */
 
@@ -46,7 +46,7 @@ export function potongHalaman<T>(
 /**
  * Sama seperti `potongHalaman`, tetapi URUTAN dipertahankan.
  *
- * `potongHalaman` membalik daftar karena dipakai log audit yang tersusun lama→baru.
+ * `potongHalaman` membalik daftar untuk daftar yang tersusun lama→baru.
  * Daftar berkas sudah datang dalam urutan yang bermakna dari repositori dokumen;
  * membaliknya akan mengacak urutan yang dilihat pengguna.
  */

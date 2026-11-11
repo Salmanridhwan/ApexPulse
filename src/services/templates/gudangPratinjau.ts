@@ -29,6 +29,12 @@ export interface EntriPratinjau {
   widgets: WidgetSpec[];
   terisi: number;
   kosong: number;
+  /**
+   * Kartu yang belum selesai diisi karena waktu/layanan habis. Selama angka ini
+   * di atas nol, entri TIDAK boleh berstatus `siap`: itu yang dulu membuat
+   * dashboard terbuat dengan 57 kartu kosong.
+   */
+  tertunda?: number;
   catatan: string[];
   progres: { selesai: number; total: number; judul: string };
   mulai: number;
@@ -41,6 +47,8 @@ export interface HasilPengisian {
   widgets: WidgetSpec[];
   terisi: number;
   kosong: number;
+  /** Jumlah kartu yang masih tertunda (waktu/layanan habis). */
+  tertunda?: number;
   catatan: string[];
 }
 
@@ -95,7 +103,13 @@ export function daftarPratinjau(tenantId: string): EntriPratinjau[] {
  * basis pengetahuan sekarang. Kalau dokumen baru sudah masuk, entri lama basi.
  */
 export function masihBerlaku(e: EntriPratinjau | null | undefined, versiKb: string): boolean {
-  return !!e && e.status === 'siap' && e.versiKb === versiKb && e.widgets.length > 0;
+  return (
+    !!e &&
+    e.status === 'siap' &&
+    (e.tertunda ?? 0) === 0 &&
+    e.versiKb === versiKb &&
+    e.widgets.length > 0
+  );
 }
 
 /** Tandai seluruh entri satu instansi basi (dipakai setelah dokumen berubah). */
@@ -121,7 +135,10 @@ export function siapkanPratinjau(opts: {
   kbId: string;
   versiKb: string;
   total: number;
-  pekerja: (onProgres: (info: { selesai: number; total: number; judul: string }) => void) => Promise<HasilPengisian>;
+  pekerja: (
+    onProgres: (info: { selesai: number; total: number; judul: string }) => void,
+    simpanSebagian: (widgets: WidgetSpec[]) => void
+  ) => Promise<HasilPengisian>;
 }): Promise<EntriPratinjau> {
   const { tenantId, templateId, kbId, versiKb, total, pekerja } = opts;
   const kunci = kunciPratinjau(tenantId, templateId, kbId);
@@ -138,8 +155,9 @@ export function siapkanPratinjau(opts: {
     kbId,
     versiKb,
     status: 'proses',
-    widgets: ada?.widgets ?? [],
-    terisi: 0,
+    // Kartu lama hanya dipakai bila dokumennya masih versi yang sama.
+    widgets: ada?.versiKb === versiKb ? ada.widgets : [],
+    terisi: ada?.versiKb === versiKb ? ada.widgets.filter((w) => !w.dataKosong).length : 0,
     kosong: 0,
     catatan: [],
     progres: { selesai: 0, total, judul: 'Menyiapkan permintaan ke dokumen…' },
@@ -150,16 +168,36 @@ export function siapkanPratinjau(opts: {
 
   const tugas = (async () => {
     try {
-      const hasil = await pekerja((info) => {
-        entri.progres = info;
-        entri.status = 'proses';
-      });
+      const hasil = await pekerja(
+        (info) => {
+          entri.progres = info;
+          entri.status = 'proses';
+        },
+        // Simpan tiap kartu yang terisi: restart server tidak menghapus hasil.
+        (widgets) => {
+          entri.widgets = widgets;
+          entri.terisi = widgets.filter((w) => !w.dataKosong).length;
+          simpanKeBerkas();
+        }
+      );
       entri.widgets = hasil.widgets;
       entri.terisi = hasil.terisi;
       entri.kosong = hasil.kosong;
+      entri.tertunda = hasil.tertunda ?? 0;
       entri.catatan = hasil.catatan;
-      entri.status = 'siap';
+      /**
+       * PENJAGA: entri hanya "siap" bila tidak ada kartu tertunda. Kalau masih
+       * ada, statusnya `belum` supaya kunjungan berikutnya MELANJUTKAN pengisian
+       * (dan supaya tombol "Pakai template" belum menawarkan dashboard setengah
+       * jadi).
+       */
+      entri.status = entri.tertunda > 0 ? 'belum' : 'siap';
       entri.selesai = Date.now();
+      if (entri.tertunda > 0) {
+        console.warn(
+          `[pratinjau] ${templateId} ${tenantId}: ${entri.tertunda} kartu belum terisi, pengisian akan dilanjutkan`
+        );
+      }
       delete entri.galat;
     } catch (err) {
       entri.status = 'gagal';

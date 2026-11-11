@@ -2,7 +2,10 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
-import { hitungBarisKanvas, susunTinggiGrid, tataSatuan } from '../services/tataLetak/satuHalaman';
+import { hitungBarisKanvas, lebarPenuhDeret, susunTinggiGrid, tataSatuan } from '../services/tataLetak/satuHalaman';
+
+/** Kelas statis supaya Tailwind menghasilkan semua lebar 1-12 kolom di layar lebar. */
+const XL_SPAN = ['', 'xl:col-span-1', 'xl:col-span-2', 'xl:col-span-3', 'xl:col-span-4', 'xl:col-span-5', 'xl:col-span-6', 'xl:col-span-7', 'xl:col-span-8', 'xl:col-span-9', 'xl:col-span-10', 'xl:col-span-11', 'xl:col-span-12'];
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -90,6 +93,21 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
   const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
 
+  /**
+   * Perubahan lebar jendela harus selalu memperbarui mode tata letak.
+   *
+   * Dulu `layarLebar` (mode satu halaman) hanya diperbarui di dalam efek yang
+   * langsung berhenti bila mode satu halaman TIDAK aktif. Akibatnya jendela
+   * yang dikecilkan dari desktop tetap memakai baris setinggi layar penuh:
+   * kartu bertumpuk karena baris grid lebih pendek daripada tinggi kartu.
+   */
+  useEffect(() => {
+    const ubah = () => setLayarLebar(window.innerWidth >= 1280);
+    ubah();
+    window.addEventListener('resize', ubah);
+    return () => window.removeEventListener('resize', ubah);
+  }, []);
+
   /** Lebar jendela — menentukan baris KPI memakai 1 baris penuh atau 2 kolom. */
   const [lebarLayar, setLebarLayar] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth));
   useEffect(() => {
@@ -115,7 +133,12 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
     const ukur = () => {
       const el = wadahRef.current;
       if (!el) return;
-      setLayarLebar(window.innerWidth >= 1024);
+      /**
+       * Mode satu halaman butuh grid 12 kolom, dan grid itu baru aktif di `xl`
+       * (1280px). Di 1024-1279px kanvas memakai grid 6 kolom, jadi memaksa satu
+       * halaman hanya menghasilkan baris setinggi nol.
+       */
+      setLayarLebar(window.innerWidth >= 1280);
       const atas = el.getBoundingClientRect().top;
       /**
        * Batas bawah diambil dari INDUK yang bisa digulir (mis. <main class="overflow-y-auto">),
@@ -183,6 +206,11 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const tinggiGrid = useMemo(() => susunTinggiGrid(widgetsLain), [widgetsLain]);
   const barisLain = tinggiGrid.satuan;
   const spanKartu = useMemo(() => new Map(widgetsLain.map((w, i) => [w.id, tinggiGrid.span[i]])), [widgetsLain, tinggiGrid]);
+  /** Lebar akhir di grid 12 kolom: tiap deret dilebarkan sampai penuh (tanpa ruang kosong). */
+  const lebarPenuh = useMemo(() => {
+    const lebar = lebarPenuhDeret(widgetsLain);
+    return new Map(widgetsLain.map((w, i) => [w.id, lebar[i]]));
+  }, [widgetsLain]);
 
   /**
    * Jumlah baris SELURUH kanvas: 1 baris KPI (kalau ada KPI) + baris kartu lain.
@@ -194,7 +222,16 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    * Kolom baris KPI: dibagi rata sebanyak jumlah KPI di layar lebar (SELALU satu
    * baris), dan 2 kolom di layar kecil supaya angka tidak terpotong.
    */
-  const kolomKpi = widgetsKpi.length === 0 ? 0 : lebarLayar >= 1024 ? widgetsKpi.length : Math.min(2, widgetsKpi.length);
+  const kolomKpi =
+    widgetsKpi.length === 0
+      ? 0
+      : lebarLayar >= 1280
+        ? widgetsKpi.length
+        : lebarLayar >= 1024
+          ? Math.min(3, widgetsKpi.length)
+          : lebarLayar >= 640
+            ? Math.min(2, widgetsKpi.length)
+            : 1;
 
   /** Prasyarat mode satu halaman (dipakai juga untuk memilih jarak/padding). */
   const pasSatuHalamanAwal = satuHalaman && layarLebar && tinggiTersedia > 0 && barisKanvas > 0;
@@ -282,26 +319,46 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const renderKartu = (widget: WidgetSpec, urutan: number, kpi: boolean) => {
     // Saat resize aktif, pakai lebar preview agar perubahan terlihat live.
     const wAktif = resizeId === widget.id && previewW !== null ? previewW : widget.grid?.w;
-    let colSpan = 'col-span-1 md:col-span-4 lg:col-span-2';
+    /**
+     * Grid 12 kolom baru dipakai mulai 1280px (`xl`). Antara 1024-1279px kartu
+     * masih memakai grid 6 kolom: pada 12 kolom, kartu 3 kolom hanya ~225px dan
+     * grafiknya tidak terbaca.
+     */
+    let colSpan = 'col-span-1 md:col-span-4 xl:col-span-2';
     if (wAktif >= 10) {
-      colSpan = 'col-span-1 md:col-span-12 lg:col-span-12';
+      colSpan = 'col-span-1 md:col-span-12 xl:col-span-12';
     } else if (wAktif >= 7) {
-      colSpan = 'col-span-1 md:col-span-12 lg:col-span-8';
+      colSpan = 'col-span-1 md:col-span-12 xl:col-span-8';
     } else if (wAktif >= 5) {
-      colSpan = 'col-span-1 md:col-span-6 lg:col-span-6';
+      colSpan = 'col-span-1 md:col-span-6 xl:col-span-6';
     } else if (wAktif >= 4) {
-      colSpan = 'col-span-1 md:col-span-6 lg:col-span-4';
+      colSpan = 'col-span-1 md:col-span-6 xl:col-span-4';
     } else if (wAktif >= 3) {
-      colSpan = 'col-span-1 md:col-span-4 lg:col-span-3';
+      colSpan = 'col-span-1 md:col-span-4 xl:col-span-3';
     }
+    // Di luar resize, lebar xl mengikuti deret yang sudah dipenuhkan 12 kolom.
+    const xlPenuh = !kpi && resizeId !== widget.id ? lebarPenuh.get(widget.id) : undefined;
+    if (xlPenuh) colSpan = colSpan.replace(/xl:col-span-\d+/, XL_SPAN[xlPenuh]);
 
-    // Kartu grid membentang `span` satuan baris; tinggi minimum lama hanya untuk baris KPI.
-    const span = kpi ? undefined : spanKartu.get(widget.id) ?? 4;
-    const tinggiMin = span ? '' : ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
-      'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
-      'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
-      ? 'min-h-[248px]'
-      : 'min-h-[110px]';
+    /**
+     * Kartu grid membentang `span` satuan baris HANYA di layar lebar (lg, 12 kolom).
+     * Di bawah itu grid memakai 1-6 kolom dan tinggi baris tetap, sehingga
+     * `span` akan menghasilkan kartu sangat tinggi atau sangat pendek. Di layar
+     * kecil tinggi kartu ditentukan kelas min-height responsif.
+     */
+    /**
+     * Bentang baris hanya sah kalau baris grid memang dikendalikan mode satu
+     * halaman. Di luar itu baris tumbuh mengikuti isi; memaksa `span` membuat
+     * grid menghitung baris yang tidak ada hubungannya dengan tinggi kartu.
+     */
+    const span = kpi || !pasSatuHalaman ? undefined : spanKartu.get(widget.id) ?? 4;
+    const tinggiMin = span
+      ? ''
+      : ['line', 'bar', 'area', 'hbar', 'combo', 'pie', 'donut', 'treemap',
+          'funnel', 'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot',
+          'heatmap', 'radar', 'map', 'gantt', 'table'].includes(widget.type)
+        ? 'min-h-[220px] sm:min-h-[260px] xl:min-h-[300px]'
+        : 'min-h-[96px] sm:min-h-[110px]';
 
     return (
       <div
@@ -402,11 +459,15 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       style={pasSatuHalaman ? { height: tinggiTersedia, padding: PADDING } : undefined}
     >
       <div
-        style={
-          skala < 1
+        style={{
+          ...(skala < 1
             ? { transform: `scale(${skala})`, transformOrigin: 'top left', width: `${100 / skala}%` }
-            : undefined
-        }
+            : {}),
+          /* Samakan basis huruf dengan halaman galeri (18px). Tanpa ini mode
+             presentasi mewarisi 16px dari luar, sehingga ukuran kartu yang
+             dihitung untuk 18px terpotong saat dipresentasikan. */
+          fontSize: '18px',
+        }}
       >
         {/* ===== BARIS KPI TUNGGAL (selalu satu baris, selebar kanvas dibagi rata) ===== */}
         {widgetsKpi.length > 0 && (
@@ -427,7 +488,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         {/* ===== Kartu lain: grid 12 kolom ===== */}
         {widgetsLain.length > 0 && (
           <div
-            className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 auto-rows-min"
+            className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-6 xl:grid-cols-12 auto-rows-min"
             style={
               pasSatuHalaman
                 ? {
@@ -437,7 +498,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                     columnGap: JARAK,
                     paddingBottom: 0,
                   }
-                : { gap: 16, gridAutoRows: `${SATUAN_BIASA}px` }
+                : undefined
             }
           >
             {widgetsLain.map((widget, i) => renderKartu(widget, widgetsKpi.length + i, false))}

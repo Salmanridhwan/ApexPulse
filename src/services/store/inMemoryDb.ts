@@ -4,8 +4,6 @@ import { DbSnapshot, MysqlStore } from './mysqlStore';
 import { daftarBerubah, gabungKonfig, kunciKonfigBerubah } from './sinkronKonfig';
 import path from 'path';
 import {
-  AlertRule,
-  AuditLog,
   BumdSector,
   Chat,
   ChatMessage,
@@ -109,7 +107,9 @@ const SUPERADMIN_DEMO: SafeUser = {
 /** Password seed khusus per userId (selain default DEMO_PASSWORD). */
 const SEED_PASSWORDS: Record<string, string> = {
   // Akun admin memakai sandi bawaan yang berlaku sekarang.
-  'user-admin-gmail': SANDI_ADMIN_BAWAAN,
+  // Untuk kemudahan uji manual lokal, akun admin@gmail.com sengaja memakai
+  // sandi pendek "123" (di bawah aturan minimal 10 karakter) — hanya akun uji.
+  'user-admin-gmail': '123',
   'user-user-gmail': '123',
 };
 
@@ -119,9 +119,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 interface PersistedState {
   dashboards?: Dashboard[];
   chats?: Chat[];
-  alertRules?: AlertRule[];
   notifications?: NotificationItem[];
-  auditLogs?: AuditLog[];
   shareTokens?: Record<string, string>;
   sharePins?: Record<string, string>;
   systemConfig?: typeof InMemoryDb.prototype.systemConfig;
@@ -230,54 +228,10 @@ export class InMemoryDb {
    */
   public ketersediaanPreset: KetersediaanPreset[] = [];
 
-  public alertRules: AlertRule[] = [
-    {
-      id: 'alert-1',
-      tenantId: 'tenant-pdam',
-      title: 'Peringatan Ambang Batas NRW Air',
-      metricKey: 'nrw',
-      metricName: 'Tingkat Kehilangan Air (NRW)',
-      operator: '>=',
-      threshold: 25.0,
-      unit: '%',
-      channels: ['in_app', 'email'],
-      severity: 'warning',
-      isActive: true,
-      lastTriggered: '2026-03-31T08:00:00.000Z',
-    },
-    {
-      id: 'alert-2',
-      tenantId: 'tenant-bank',
-      title: 'Peringatan Rasio NPL Kritis OJK',
-      metricKey: 'npl',
-      metricName: 'Rasio NPL Gross',
-      operator: '>=',
-      threshold: 5.0,
-      unit: '%',
-      channels: ['in_app', 'email'],
-      severity: 'critical',
-      isActive: true,
-    },
-    {
-      id: 'alert-3',
-      tenantId: 'tenant-rsud',
-      title: 'Kapasitas Tempat Tidur BOR Melampaui Batas',
-      metricKey: 'bor',
-      metricName: 'Bed Occupancy Rate (BOR)',
-      operator: '>=',
-      threshold: 85.0,
-      unit: '%',
-      channels: ['in_app', 'email'],
-      severity: 'warning',
-      isActive: true,
-    },
-  ];
-
   public notifications: NotificationItem[] = [
     {
       id: 'notif-1',
       tenantId: 'tenant-pdam',
-      alertRuleId: 'alert-1',
       title: 'Evaluasi NRW Zona Timur Terdeteksi 22,4%',
       message: 'Tingkat kehilangan air di DMA-04 berada dalam batas kendali aman (< 25%).',
       severity: 'info',
@@ -298,19 +252,6 @@ export class InMemoryDb {
     },
   ];
 
-  public auditLogs: AuditLog[] = [
-    {
-      id: 'audit-init',
-      tenantId: 'tenant-pdam',
-      userId: 'user-admin',
-      userName: 'Budi Santoso',
-      action: 'Inisialisasi Sistem',
-      target: 'AionesBoard Engine',
-      details: 'Sistem boot up dengan 6 tenant BUMD dan 40 preset katalog widget.',
-      timestamp: new Date().toISOString(),
-    },
-  ];
-
   public systemConfig = {
     ragProvider: 'mock' as 'mock' | 'http',
     ragApiUrl: 'https://api-rag-bumd.pemda.go.id/v1',
@@ -327,7 +268,6 @@ export class InMemoryDb {
     smtpPort: 587,
     smtpUser: 'alert@bumd-pemda.go.id',
     smtpFrom: 'AionesBoard Alert System <alert@aionesboard.id>',
-    auditRetentionDays: 90,
     /**
      * Batas analisis dokumen (RAG) per instansi per hari. Analisis memanggil
      * model dan memakan token, jadi harus ada pagar — 20 dokumen/hari cukup
@@ -388,9 +328,9 @@ export class InMemoryDb {
   /**
    * Snapshot untuk mirror ke MySQL.
    *
-   * ponytail: hanya koleksi yang BELUM punya tabel per-baris. alertRules,
-   * notifications, auditLogs, shareTokens, sharePins, systemConfig, users,
-   * credentials, deletedTenantIds ditulis satu-satu lewat `simpan*`/`addAuditLog`,
+   * ponytail: hanya koleksi yang BELUM punya tabel per-baris.
+   * notifications, shareTokens, sharePins, systemConfig, users,
+   * credentials, deletedTenantIds ditulis satu-satu lewat `simpan*`,
    * karena snapshot penuh (DELETE + insert state instance ini) menghapus data
    * yang dibuat instance backend lain.
    */
@@ -444,11 +384,7 @@ export class InMemoryDb {
       if (loaded) {
         if (Array.isArray(loaded.dashboards)) this.dashboards = loaded.dashboards;
         if (Array.isArray(loaded.chats)) this.chats = loaded.chats;
-        if (Array.isArray(loaded.alertRules) && loaded.alertRules.length > 0) {
-          this.alertRules = loaded.alertRules;
-        }
         if (Array.isArray(loaded.notifications)) this.notifications = loaded.notifications;
-        if (Array.isArray(loaded.auditLogs)) this.auditLogs = loaded.auditLogs;
         if (Array.isArray(loaded.users)) this.users = loaded.users;
         if (Array.isArray(loaded.tenants)) this.tenants = loaded.tenants;
         if (Array.isArray(loaded.ketersediaanPreset)) {
@@ -868,7 +804,7 @@ export class InMemoryDb {
   /**
    * Muat state yang dipersistenkan ke data/db.json supaya dashboard
    * yang dibuat audiens demo tidak hilang saat server restart/PM2 reload.
-   * Tenants, users, dan alertRules bawaan tetap di-seed dari kode.
+   * Tenants dan users bawaan tetap di-seed dari kode.
    */
   private loadPersisted() {
     try {
@@ -876,11 +812,7 @@ export class InMemoryDb {
       const parsed = JSON.parse(readFileSync(DB_FILE, 'utf-8')) as PersistedState;
       if (Array.isArray(parsed.dashboards)) this.dashboards = parsed.dashboards;
       if (Array.isArray(parsed.chats)) this.chats = parsed.chats;
-      if (Array.isArray(parsed.alertRules) && parsed.alertRules.length > 0) {
-        this.alertRules = parsed.alertRules;
-      }
       if (Array.isArray(parsed.notifications)) this.notifications = parsed.notifications;
-      if (Array.isArray(parsed.auditLogs)) this.auditLogs = [...parsed.auditLogs, ...this.auditLogs];
       if (parsed.shareTokens) this.shareTokens = parsed.shareTokens;
       if (parsed.sharePins) this.sharePins = parsed.sharePins;
       // Konfigurasi sistem (termasuk RAG provider/url/key dari panel admin)
@@ -1035,9 +967,7 @@ export class InMemoryDb {
       const state: PersistedState = {
         dashboards: this.dashboards,
         chats: this.chats,
-        alertRules: this.alertRules,
         notifications: this.notifications,
-        auditLogs: this.auditLogs.slice(0, 5000),
         shareTokens: this.shareTokens,
         sharePins: this.sharePins,
         systemConfig: this.systemConfig,
@@ -1169,23 +1099,6 @@ export class InMemoryDb {
     return copy;
   }
 
-  addAuditLog(entry: Omit<AuditLog, 'id' | 'timestamp'>): AuditLog {
-    const log: AuditLog = {
-      ...entry,
-      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toISOString(),
-    };
-    this.auditLogs.unshift(log);
-    // ponytail: satu entri = satu baris di `audit_log`, jadi audit dari instance
-    // lain tidak terhapus. Memori dibatasi 5.000 entri (bukan 500) dan tabel
-    // dipangkas di atas 20.000 supaya tetap ringan.
-    this.trackWrite(this.mysql?.upsertAuditLog(log));
-    if (this.auditLogs.length > 5000) this.auditLogs.length = 5000;
-    if (this.auditLogs.length % 500 === 0) this.trackWrite(this.mysql?.trimAuditLogs(20000));
-    this.persist();
-    return log;
-  }
-
   // ===== Koleksi kecil: tulis per-baris (tanpa snapshot penuh) =====
 
   /** Simpan satu notifikasi milik instansi (dulu ikut snapshot → hilang antar instance). */
@@ -1197,15 +1110,6 @@ export class InMemoryDb {
   public hapusNotifikasi(id: string): void {
     this.notifications = this.notifications.filter((n) => n.id !== id);
     this.trackWrite(this.mysql?.deleteBaris('notifications', id));
-  }
-
-  /** Simpan/perbarui satu aturan alert. */
-  public simpanAturanAlert(r: AlertRule): void {
-    this.trackWrite(this.mysql?.upsertBaris('alertRules', r.id, r));
-  }
-
-  public hapusAturanAlert(id: string): void {
-    this.trackWrite(this.mysql?.deleteBaris('alertRules', id));
   }
 
   /** Tautan bagikan (mode lihat/edit) — satu baris per token. */
@@ -1474,7 +1378,7 @@ export class InMemoryDb {
    * harus ikut membersihkan semua jejaknya: pengguna + kredensialnya (termasuk di
    * tabel auth MySQL agar tidak "hidup lagi" lewat sinkronisasi multi-instance),
    * dashboard + percakapan, tautan bagikan (token & PIN) milik dashboard itu,
-   * notifikasi, aturan alert, catatan ketersediaan preset katalog, dan log audit
+   * notifikasi, aturan alert, dan catatan ketersediaan preset katalog
    * instansi tersebut. Kalau tidak, sisa data ini masih tampil/terbaca walau
    * instansinya sudah dihilangkan.
    */
@@ -1530,10 +1434,6 @@ export class InMemoryDb {
     const notifHapus = this.notifications.filter((n) => n.tenantId === id);
     this.notifications = this.notifications.filter((n) => n.tenantId !== id);
     for (const n of notifHapus) this.trackWrite(this.mysql?.deleteBaris('notifications', n.id));
-    const aturanHapus = this.alertRules.filter((a) => a.tenantId === id);
-    this.alertRules = this.alertRules.filter((a) => a.tenantId !== id);
-    for (const a of aturanHapus) this.hapusAturanAlert(a.id);
-    this.auditLogs = this.auditLogs.filter((a) => a.tenantId !== id);
     this.ketersediaanPreset = this.ketersediaanPreset.filter((k) => k.tenantId !== id);
 
     // 3j) Permintaan data instansi ini. Lampirannya menunjuk berkas KMS milik

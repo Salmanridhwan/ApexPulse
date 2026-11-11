@@ -5,7 +5,7 @@ export type BumdSector = 'pdam' | 'pasar' | 'bank' | 'rsud' | 'transportasi' | '
  *
  * Tiga peran:
  * - `superadmin` — Admin Aiones (pihak pengelola platform): lintas instansi,
- *   konfigurasi RAG/KMS, akun admin instansi, audit lintas instansi.
+ *   konfigurasi RAG/KMS, akun admin instansi.
  * - `admin` — Admin Instansi (pihak konsumen): mengelola dashboard instansinya,
  *   menerima permintaan data dari `pengguna`, menyusun halaman.
  * - `pengguna` — User: mengajukan permintaan data, mengunggah dokumen, menulis
@@ -259,6 +259,14 @@ export interface WidgetSpec {
    * Kanvas menampilkan penanda "belum ada di dokumen" — TIDAK ada angka contoh.
    */
   dataKosong?: boolean;
+  /**
+   * true = kartu ini BELUM selesai diisi karena waktu pengambilan habis, bukan
+   * karena indikatornya tidak ada. Pengisian dilanjutkan otomatis di latar;
+   * kanvas menampilkan "sedang diisi" supaya tidak tertukar dengan "tidak ada
+   * di dokumen". Tanpa penanda ini, 48 dari 57 kartu kosong pernah dilaporkan
+   * sebagai "indikator tidak ditemukan" padahal dokumennya belum selesai dibaca.
+   */
+  dataTertunda?: boolean;
   /** Alasan singkat kenapa kartu dikosongkan (ditampilkan di kanvas). */
   catatanData?: string;
   /**
@@ -335,6 +343,21 @@ export interface WidgetSpec {
     /** Khusus boxplot: nilai mentah per kategori. */
     boxRaw?: number[][];
   };
+  /**
+   * BEBERAPA PERIODE DALAM SATU KARTU.
+   *
+   * Satu indikator yang punya angka untuk beberapa periode (mis. target per
+   * bulan dari beberapa dokumen) disimpan sebagai satu butir. Di kartu, tiap
+   * periode menjadi satu entri di sini, dan kepala kartu menampilkan pemilih
+   * periode. `chart` di atas tetap berisi periode yang sedang tampil.
+   */
+  periodeData?: Array<{
+    periode: string;
+    xAxis: string[];
+    series: Array<{ name: string; data: number[] }>;
+  }>;
+  /** Periode yang sedang ditampilkan kartu (kosong = semua periode). */
+  periodeAktif?: string;
   /** Khusus treemap: hierarki nilai (nama + nilai, boleh punya anak). */
   treemap?: {
     name: string;
@@ -422,6 +445,28 @@ export interface Dashboard {
   title: string;
   description: string;
   sector: BumdSector;
+  /**
+   * KEPALA PENYUSUNAN OLEH AI.
+   *
+   * `menyusun` hanya ada selama model masih bekerja: kanvas dibuka langsung
+   * setelah tombol ditekan, lalu keadaan ini yang ditampilkan sebagai panel
+   * "AI sedang bekerja" dan diperbarui berkala. `gagal` beserta `ai.galat`
+   * dipakai saat model tidak bisa dihubungi supaya pengguna tahu alasannya.
+   */
+  status?: 'menyusun' | 'siap' | 'gagal';
+  ai?: {
+    tahap: string;
+    pesan: string;
+    mulai: string;
+    /** Jumlah butir yang dikirim ke model sebagai katalog. */
+    kandidat: number;
+    kategori: Array<{ nama: string; jumlah: number }>;
+    /** Nama butir yang sudah dipilih AI (bertambah saat halaman disusun). */
+    terpilih: string[];
+    /** Rasa penyusunan yang dipilih pengguna (cepat / seimbang / mendalam). */
+    mode?: 'cepat' | 'seimbang' | 'mendalam' | 'ultra';
+    galat?: string;
+  };
   /**
    * TEMA VISUAL dashboard (opsional).
    *
@@ -570,25 +615,9 @@ export interface KetersediaanPreset {
   checkedAt: string;
 }
 
-export interface AlertRule {
-  id: string;
-  tenantId: string;
-  title: string;
-  metricKey: string;
-  metricName: string;
-  operator: '>' | '<' | '>=' | '<=';
-  threshold: number;
-  unit: string;
-  channels: ('in_app' | 'email')[];
-  severity: 'info' | 'warning' | 'critical';
-  isActive: boolean;
-  lastTriggered?: string;
-}
-
 export interface NotificationItem {
   id: string;
   tenantId: string;
-  alertRuleId?: string;
   title: string;
   message: string;
   severity: 'info' | 'warning' | 'critical';
@@ -752,6 +781,11 @@ export interface ButirData {
   /** Diisi `kategoriWidget()` deterministik, bukan tebakan model. */
   kategori: string;
   periode?: string;
+  /**
+   * Daftar periode pada butir gabungan (mis. Jan 2026 … Sept 2026).
+   * Satu butir boleh memuat banyak periode; `seri` berisi satu deret per periode.
+   */
+  periodeTersedia?: string[];
   satuan?: string;
   nilai?: number | null;
   seri?: SeriButir[];
@@ -883,17 +917,6 @@ export interface RAGProbeResult {
   sampleChunksCount: number;
   zodValidationPassed: boolean;
   details: string[];
-}
-
-export interface AuditLog {
-  id: string;
-  tenantId: string;
-  userId: string;
-  userName: string;
-  action: string;
-  target: string;
-  details: string;
-  timestamp: string;
 }
 
 /* ================= MANAJEMEN BERKAS (KMS) ================= */

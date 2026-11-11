@@ -8,16 +8,24 @@ import {
   Clock,
   Database,
   Eye,
-  LayoutGrid,
   LayoutTemplate,
   Loader2,
+  Palette,
   Presentation,
   Sparkles,
-  Target,
   RefreshCw,
 } from 'lucide-react';
 import { BumdSector, Dashboard, ProgresIsiTemplate, Tenant, WidgetSpec } from '../types';
-import { DASHBOARD_TEMPLATES, DashboardTemplate, widgetDariTemplate } from '../services/templates/dashboardTemplates';
+import {
+  DASHBOARD_TEMPLATES,
+  DashboardTemplate,
+  KATEGORI_TEMPLATE,
+  kategoriDariTemplate,
+  jumlahTemplateGaleri,
+  templateGaleri,
+  widgetDariTemplate,
+  type KategoriTemplateId,
+} from '../services/templates/dashboardTemplates';
 import { ReplikaHalaman } from '../components/referensi/ReplikaHalaman';
 import { halamanTemplateBagian } from '../services/templates/templateBagian';
 import { pesanGalatRamah } from '../services/ui/pesanGalat';
@@ -30,10 +38,25 @@ import {
 } from '../services/templates/nilaiOperasional';
 import { CONTOH_WILAYAH, type NilaiWilayah } from '../services/templates/wilayahLayanan';
 import { AKSEN_TEMA, KanvasTemaContext } from '../theme';
-import { GAYA, VARIAN, cukupTerang, type Varian } from '../services/chart/gayaVarian';
+import { GAYA, VARIAN, cukupTerang, tokenTemaDariGaya, type Varian } from '../services/chart/gayaVarian';
 
-/** Tema template ke gaya chart katalog (untuk contoh warna di tab). */
-const VARIAN_TEMA: Record<string, Varian> = { oranye: 'ringkasan', analitik: 'analitik', trafik: 'trafik', kaca: 'kaca' };
+/**
+ * Gaya Template Chart BAWAAN sebuah template.
+ *
+ * Gaya dipilih TERPISAH dari template: bawaannya `default` untuk semua template,
+ * dan template hanya boleh menyarankan gaya lain lewat `gayaBawaan`. Kunci `tema`
+ * tidak lagi dipakai untuk memilih gaya — `tema` mengatur warna kanvas dashboard
+ * lama, sedangkan gaya mengatur desain chart dan latar halaman.
+ */
+const varianBawaanTemplate = (t: DashboardTemplate): Varian => t.gayaBawaan ?? 'default';
+
+/**
+ * Token CSS yang sama dengan kelas `.tema-<kunci>` di index.css, dihitung dari
+ * satu gaya Template Chart. Dipasang langsung di wadah pratinjau supaya KARTU,
+ * bingkai, dan aksen ikut berganti bersama grafiknya — kalau hanya konteks
+ * varian yang diganti, grafik berubah tapi kartunya tetap warna template.
+ */
+const variabelGaya = (v: Varian): React.CSSProperties => tokenTemaDariGaya(v) as React.CSSProperties;
 import {
   nilaiAnalitikDariWidgets,
   nilaiDariWidgets,
@@ -54,7 +77,9 @@ interface DashboardTemplatesPageProps {
    * berapa yang belum ada di dokumen; melempar galat bila layanan RAG gagal.
    */
   onUseTemplate: (
-    template: DashboardTemplate
+    template: DashboardTemplate,
+    /** Gaya Template Chart pilihan pengguna — disimpan bersama dashboard. */
+    gaya?: Varian
   ) => Promise<{ terisi: number; kosong: number; total: number }>;
 }
 
@@ -70,30 +95,42 @@ interface DashboardTemplatesPageProps {
 interface StatusTemplate {
   templateId: string;
   status: 'belum' | 'proses' | 'siap' | 'gagal';
+  /** Kartu yang sudah berisi angka dokumen. */
   terisi: number;
+  /** Kartu yang indikatornya memang tidak ada di dokumen. */
+  kosong?: number;
+  /** Kartu yang belum selesai diisi (waktu/layanan habis) — pengisian lanjut sendiri. */
+  tertunda?: number;
   total: number;
   progres: { selesai: number; total: number; judul: string } | null;
   selesaiPada: number | null;
+  /** Waktu pengisian dimulai (ms), hanya selama status `proses`. */
+  mulaiPada?: number | null;
+  /** Perkiraan server (ms) sampai semua kartu template ini berisi data asli. */
+  perkiraanMs?: number | null;
+  /** Template masih menunggu template lain selesai diisi lebih dulu. */
+  menungguGiliran?: boolean;
 }
 
-/** Ringkas komposisi widget: "4 KPI · 11 Grafik · 1 Tabel · 1 Narasi". */
-const komposisi = (t: DashboardTemplate): string => {
-  const hitung = (tipe: string[]) => t.widgets.filter((w) => tipe.includes(w.type)).length;
-  const bagian: string[] = [];
-  const nKpi = hitung(['kpi', 'bullet-target']);
-  const nGrafik = hitung([
-    'line', 'area', 'bar', 'hbar', 'combo', 'pie', 'donut', 'treemap', 'funnel',
-    'waterfall', 'sankey', 'scatter', 'bubble', 'histogram', 'boxplot', 'heatmap',
-    'radar', 'map', 'gantt', 'gauge',
-  ]);
-  const nTabel = hitung(['table']);
-  const nNarasi = hitung(['narasi']);
-  if (nKpi) bagian.push(`${nKpi} KPI`);
-  if (nGrafik) bagian.push(`${nGrafik} Grafik`);
-  if (nTabel) bagian.push(`${nTabel} Tabel`);
-  if (nNarasi) bagian.push(`${nNarasi} Narasi`);
-  return bagian.join(' · ');
-};
+/** "12 menit" atau "1 jam 20 menit". */
+function teksDurasi(ms: number): string {
+  const menit = Math.max(1, Math.round(ms / 60_000));
+  if (menit < 60) return `${menit} menit`;
+  const sisa = menit % 60;
+  return `${Math.floor(menit / 60)} jam${sisa ? ` ${sisa} menit` : ''}`;
+}
+
+/**
+ * Perkiraan kapan SEMUA kartu template terisi data asli, dihitung server dari
+ * laju pengisian nyata (ms per kartu) dan antrean template di depannya. Deck
+ * 50-70 kartu memang butuh 20-30 menit; pengguna perlu tahu itu, bukan mengira
+ * halamannya menggantung.
+ */
+function teksSisaWaktu(st: StatusTemplate | undefined): string {
+  if (!st?.perkiraanMs) return '';
+  const jam = new Date(Date.now() + st.perkiraanMs).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return ` · semua kartu terisi ± ${teksDurasi(st.perkiraanMs)} lagi (sekitar pukul ${jam})`;
+}
 
 /**
  * Halaman "Template Dashboard": galeri template UMUM.
@@ -115,8 +152,26 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   onUseTemplate,
   progres,
 }) => {
-  // Template aktif untuk dipratinjau. Default: template pertama.
-  const [aktifId, setAktifId] = useState<string>(() => DASHBOARD_TEMPLATES[0].id);
+  // Template aktif untuk dipratinjau. Default: template pertama di galeri.
+  const [aktifId, setAktifId] = useState<string>(
+    () => templateGaleri()[0]?.id ?? DASHBOARD_TEMPLATES[0].id
+  );
+
+  /**
+   * KATEGORI — template dikelompokkan menurut KEBUTUHAN (keuangan, pengadaan,
+   * pelayanan, operasional, SDM, kinerja). Memilih kategori hanya menyaring
+   * kartu template; susunan isi tetap milik template yang dipilih.
+   */
+  const [kategoriId, setKategoriId] = useState<KategoriTemplateId>(
+    () => kategoriDariTemplate(templateGaleri()[0] ?? DASHBOARD_TEMPLATES[0]).id
+  );
+
+  /**
+   * GAYA TERPISAH DARI TEMPLATE — gaya Template Chart (12 varian) dipilih sendiri
+   * dan berlaku untuk template mana pun. `null` = ikut gaya bawaan template,
+   * sehingga template baru tidak perlu menyebut gaya sama sekali.
+   */
+  const [gaya, setGaya] = useState<Varian | null>(null);
 
   /** Status pengambilan angka dari dokumen saat tombol "Pakai Template Ini" ditekan. */
   const [memuat, setMemuat] = useState(false);
@@ -144,6 +199,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   const [presentasi, setPresentasi] = useState(false);
   /** Kesiapan data asli per template (dibaca dari server, diperbarui berkala). */
   const [statusTpl, setStatusTpl] = useState<Record<string, StatusTemplate>>({});
+  /** Perkiraan server (ms) sampai semua template galeri selesai diisi data asli. */
+  const [perkiraanSemua, setPerkiraanSemua] = useState<number | null>(null);
   /** Hasil pratinjau dengan angka dokumen; `null` = masih menampilkan contoh. */
   const [asli, setAsli] = useState<{ widgets: WidgetSpec[]; terisi: number; kosong: number } | null>(
     null
@@ -168,7 +225,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     try {
       const res = await fetch('/api/templates/status');
       if (!res.ok) return;
-      const data = (await res.json()) as { templates?: StatusTemplate[] };
+      const data = (await res.json()) as { templates?: StatusTemplate[]; perkiraanSemuaMs?: number | null };
+      setPerkiraanSemua(data.perkiraanSemuaMs ?? null);
       const peta: Record<string, StatusTemplate> = {};
       for (const t of data.templates ?? []) peta[t.templateId] = t;
       setStatusTpl(peta);
@@ -190,6 +248,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     [aktifId]
   );
 
+  /** Gaya yang benar-benar dipakai pratinjau: pilihan pengguna, atau bawaan template. */
+  const gayaTampil: Varian = gaya ?? varianBawaanTemplate(aktif);
+  /** Kartu template untuk kategori yang sedang dibuka. */
+  const templateKategori = useMemo(() => templateGaleri(kategoriId), [kategoriId]);
+
+  /**
+   * Apakah galeri berisi template sama sekali. Saat semua template lama ditarik,
+   * halaman berhenti di daftar kategori + keterangan kosong: pemilih gaya,
+   * pratinjau, dan tombol simpan tidak ada gunanya kalau tidak ada template.
+   */
+  const adaTemplate = templateGaleri().length > 0;
+
   // Salin widget dengan id unik & segar supaya React key stabil dan penyuntingan
   // (saat template benar-benar dipakai) tidak menyentuh definisi template.
 
@@ -197,16 +267,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   const bagian = aktif.bagian;
   const jumlahHalaman = bagian ? bagian.halaman.length : 3;
 
-  /** Ringkasan susunan untuk chip di kartu info (mengikuti tampilan acuannya). */
-  const susunanChip = bagian
-    ? `${aktif.widgets.length} kartu · ${jumlahHalaman} halaman · gaya Korporat`
-    : aktif.id === 'tpl-analitik'
-      ? '4 angka utama · 7 grafik · 1 tabel · 3 halaman'
-      : aktif.id === 'tpl-trafik'
-        ? '5 angka utama · 4 grafik · 3 daftar · 3 halaman'
-        : aktif.id === 'tpl-kaca'
-          ? '5 angka utama · 3 grafik · cincin capaian · tabel · 3 halaman'
-          : '4 angka utama · 3 grafik · daftar · progres · 3 halaman';
+  /** Ringkasan susunan template (dipakai kartu template & keterangan bawah). */
 
   const widgetPratinjau = useMemo(() => widgetDariTemplate(aktif, 0), [aktif]);
 
@@ -252,6 +313,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           replika={{ templateId: `${aktif.id}#${nomor}`, nilai: { widgets: isi } }}
           contoh={!asli}
           sumberAktif={Boolean(asli)}
+          varian={gayaTampil}
         />
       );
     }
@@ -272,6 +334,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         contoh={!asli}
         sumberAktif={Boolean(asli)}
         sumberJudul={sumberJudul}
+        varian={gayaTampil}
       />
     );
   };
@@ -329,7 +392,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     setMemuat(true);
     setGalat(null);
     try {
-      await onUseTemplate(aktif);
+      await onUseTemplate(aktif, gayaTampil);
     } catch (err) {
       setGalat(pesanGalatRamah(err));
     } finally {
@@ -345,6 +408,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
    * benar-benar dibuka yang disiapkan, supaya layanan dokumen tidak dibanjiri.
    */
   useEffect(() => {
+    // Galeri kosong: tidak ada template yang perlu disiapkan.
+    if (!adaTemplate) return;
     void (async () => {
       try {
         const res = await fetch(`/api/templates/pratinjau?templateId=${encodeURIComponent(aktif.id)}`);
@@ -481,6 +546,10 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
       if (data.status === 'gagal') {
         throw new Error(data.galat || 'Penyiapan data dari dokumen gagal.');
       }
+      // Belum siap: tampilkan dulu kartu yang sudah terisi, sisanya menyusul.
+      if (Array.isArray(data.widgets) && (data.terisi ?? 0) > 0) {
+        setAsli({ widgets: data.widgets, terisi: data.terisi ?? 0, kosong: data.kosong ?? 0 });
+      }
       return false;
     };
     try {
@@ -509,12 +578,18 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
   const statusTeks = memuat
     ? 'Membuat dashboard dari data yang sudah siap…'
     : st?.status === 'siap'
-      ? `Data asli siap · ${st.terisi}/${st.total} kartu berisi angka dokumen`
+      ? st.tertunda
+        ? `Data asli ${st.terisi} dari ${st.total} kartu · ${st.tertunda} kartu masih diisi dari dokumen`
+        : `Data asli siap · ${st.terisi} dari ${st.total} indikator cocok dengan dokumen Anda`
       : st?.status === 'proses'
-        ? `Menyiapkan data asli dari dokumen… ${st.terisi}/${st.total} kartu`
+        ? `Menyiapkan data asli dari dokumen… ${st.progres?.selesai ?? st.terisi}/${st.progres?.total ?? st.total} kartu${teksSisaWaktu(st)}`
         : st?.status === 'gagal'
-          ? 'Penyiapan data asli gagal — tekan tombol pratinjau untuk mencoba lagi'
-          : 'Data asli belum disiapkan — tekan tombol pratinjau untuk memulai';
+          ? `Penyiapan data asli gagal — tekan tombol pratinjau untuk mencoba lagi${teksSisaWaktu(st)}`
+          : st?.tertunda
+            ? `${st.tertunda} kartu masih menunggu diisi ulang dari dokumen${teksSisaWaktu(st)}`
+            : st?.menungguGiliran && st.perkiraanMs
+              ? `Menunggu giliran, template lain sedang diisi lebih dulu${teksSisaWaktu(st)}`
+              : `Data asli belum disiapkan — tekan tombol pratinjau untuk memulai${teksSisaWaktu(st)}`;
 
   return (
     <div className="flex-1 bg-canvas min-h-screen flex flex-col">
@@ -528,14 +603,35 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             <h2 className="text-sm font-bold text-ink flex items-center gap-2 flex-wrap">
               <span>Template Dashboard</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-line text-ink-2 font-semibold">
-                {DASHBOARD_TEMPLATES.length} template
+                {templateGaleri().length} template · {KATEGORI_TEMPLATE.length} kategori
               </span>
+              {perkiraanSemua ? (
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-line text-ink-2 font-semibold inline-flex items-center gap-1"
+                  title="Template galeri diisi berurutan. Template rapat bagian mulai diisi saat dibuka."
+                >
+                  <Clock className="w-3 h-3" />
+                  Semua template terisi data asli ± {teksDurasi(perkiraanSemua)} lagi
+                </span>
+              ) : null}
             </h2>
             <p className="text-xs text-ink-2 mt-1 leading-relaxed max-w-3xl">
-              Tiap template punya tujuan dan cara penyampaian sendiri. Tekan{' '}
-              <strong>Pratinjau dengan data asli</strong> untuk melihatnya berisi angka dokumen
-              instansi Anda, lalu <strong>Simpan sebagai dashboard</strong> — tanpa menunggu.
+              {adaTemplate ? (
+                <>
+                  Template dikelompokkan menurut <strong>kebutuhan</strong>, dan <strong>gaya tampilan
+                  dipilih terpisah</strong> — satu susunan bisa dipakai dengan gaya apa pun. Tekan{' '}
+                  <strong>Pratinjau dengan data asli</strong> untuk melihatnya berisi angka dokumen
+                  instansi Anda, lalu <strong>Simpan sebagai dashboard</strong> — tanpa menunggu.
+                </>
+              ) : (
+                <>
+                  Template dikelompokkan menurut <strong>kebutuhan</strong>, dan <strong>gaya tampilan
+                  dipilih terpisah</strong> dari susunannya. Daftar di bawah sudah siap menerima
+                  template baru.
+                </>
+              )}
             </p>
+            {adaTemplate && (
             <p className="text-[10.5px] text-brand-ink mt-2 flex items-start gap-1.5 leading-relaxed max-w-3xl">
               <Database className="w-3 h-3 mt-0.5 shrink-0" />
               <span>
@@ -544,118 +640,169 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
                 tidak ada di dokumen ditandai <strong>kosong</strong>.
               </span>
             </p>
+            )}
           </div>
         </div>
 
-        {/* Tab pilihan template — satu tab per template (bukan per sektor) */}
+        {/* KATEGORI — template dikelompokkan menurut KEBUTUHAN pemakaian, bukan
+            merek dan bukan sektor. Kategori hanya menyaring; susunan isi tetap
+            milik template yang dipilih. */}
         <div
           role="tablist"
-          aria-label="Pilih template dashboard"
-          className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 border-b border-line"
+          aria-label="Kategori template dashboard"
+          className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 border-b border-line"
         >
-          {DASHBOARD_TEMPLATES.map((t) => {
-            const terpilih = t.id === aktif.id;
-            // Tiap tab memakai warna template-nya sendiri; campuran dengan token
-            // tema (ink/surface) membuat teks & latar tetap terbaca di gelap maupun terang.
-            const palet = GAYA[VARIAN_TEMA[t.tema] ?? (VARIAN.includes(t.tema as Varian) ? (t.tema as Varian) : 'ringkasan')].palet.filter(cukupTerang).slice(0, 3);
+          {KATEGORI_TEMPLATE.map((k) => {
+            const terpilih = k.id === kategoriId;
+            const jumlah = jumlahTemplateGaleri(k.id);
             return (
               <button
-                key={t.id}
+                key={k.id}
                 role="tab"
                 aria-selected={terpilih}
-                data-testid={`tab-template-${t.id}`}
-                onClick={() => setAktifId(t.id)}
+                data-testid={`tab-kategori-${k.id}`}
+                onClick={() => {
+                  setKategoriId(k.id);
+                  // Langsung pindah ke template pertama kategori ini, supaya
+                  // pratinjau di bawah tidak menampilkan template kategori lain.
+                  const pertama = templateGaleri(k.id)[0];
+                  if (pertama) setAktifId(pertama.id);
+                }}
+                title={k.deskripsi}
                 className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-t-control text-xs font-semibold border-b-2 transition-colors ${
-                  terpilih ? '' : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
-                }`}
-                style={
                   terpilih
-                    ? {
-                        borderBottomColor: t.aksen,
-                        background: `color-mix(in srgb, ${t.aksen} 14%, transparent)`,
-                        color: `color-mix(in srgb, ${t.aksen} 45%, var(--color-ink))`,
-                      }
-                    : undefined
-                }
-                title={`${t.nama} — ${t.tujuan}`}
+                    ? 'border-brand text-ink bg-surface-2'
+                    : 'border-transparent text-ink-2 hover:text-ink hover:bg-surface-2'
+                }`}
               >
-                <span className="flex -space-x-1 shrink-0" aria-hidden="true">
-                  {palet.map((w, i) => (
-                    <span
-                      key={i}
-                      className="w-2.5 h-2.5 rounded-full ring-2 ring-surface"
-                      style={{ background: w, opacity: terpilih || i === 0 ? 1 : 0.55 }}
-                    />
-                  ))}
-                </span>
-                <span className="whitespace-nowrap">{t.nama}</span>
-                <span className="text-[9.5px] font-medium text-ink-3">{t.widgets.length}</span>
+                <span className="whitespace-nowrap">{k.nama}</span>
+                <span className="text-[9.5px] font-medium text-ink-3">{jumlah}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Kartu info template aktif — meniru kepala dashboard di workspace */}
-        <div className="card mb-4">
-          <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <span
-                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-chip text-on-brand mb-1.5"
-                style={{ background: aktif.aksen }}
+        {/* Template di kategori terpilih — ringkas: nama susunan + jumlah kartu.
+            Rincian tujuan cukup muncul sebagai tooltip saat kursor diarahkan. */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {templateKategori.map((t) => {
+            const terpilih = t.id === aktif.id;
+            return (
+              <button
+                key={t.id}
+                data-testid={`tab-template-${t.id}`}
+                aria-pressed={terpilih}
+                onClick={() => setAktifId(t.id)}
+                title={t.tujuan}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-card border text-left transition-colors ${
+                  terpilih ? 'border-brand bg-surface-2' : 'border-line bg-surface hover:bg-surface-2'
+                }`}
               >
-                <LayoutTemplate className="w-3 h-3" />
-                {aktif.nama}
-              </span>
-              <h1 className="text-lg sm:text-xl font-extrabold text-ink tracking-tight mb-1">
-                {aktif.judulDashboard}
-              </h1>
-              <p className="text-xs text-ink-2 leading-relaxed max-w-3xl">{aktif.deskripsiDashboard}</p>
-              <p className="text-[11px] text-ink-2 leading-relaxed max-w-3xl mt-2 flex items-start gap-1.5">
-                <Target className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
-                <span>
-                  <span className="font-semibold text-ink-3">Tujuan: </span>
-                  {aktif.tujuan}
-                </span>
+                <span className="text-xs font-bold text-ink truncate">{t.nama}</span>
+                {/**
+                  * KECOCOKAN DENGAN DOKUMEN — ditampilkan SEBELUM dipakai, supaya
+                  * tidak ada lagi kejutan dashboard berisi puluhan kartu kosong.
+                  * Angka ini hanya muncul kalau template sudah pernah diisi.
+                  */}
+                {(() => {
+                  const s = statusTpl[t.id];
+                  if (!s || (s.status !== 'siap' && !s.terisi)) return null;
+                  const tertunda = s.tertunda ?? 0;
+                  return (
+                    <span
+                      className={`ml-auto text-[10px] font-semibold shrink-0 ${
+                        tertunda > 0 ? 'text-brand-ink' : s.terisi === 0 ? 'text-ink-3' : 'text-pos'
+                      }`}
+                      title={
+                        tertunda > 0
+                          ? `${s.tertunda} kartu sedang diisi dari dokumen`
+                          : `${s.terisi} dari ${s.total} indikator cocok dengan dokumen instansi`
+                      }
+                      data-testid={`cocok-${t.id}`}
+                    >
+                      {tertunda > 0 ? `${s.terisi}/${s.total} · diisi` : `${s.terisi}/${s.total} cocok`}
+                    </span>
+                  );
+                })()}
+              </button>
+            );
+          })}
+          {templateKategori.length === 0 && (
+            <div className="w-full border border-dashed border-line rounded-card p-6 text-center">
+              <p className="text-xs font-semibold text-ink-2">
+                {adaTemplate ? 'Belum ada template di kategori ini' : 'Belum ada template'}
               </p>
-              <p className="text-[11px] text-ink-2 leading-relaxed max-w-3xl mt-1 flex items-start gap-1.5">
-                <BarChart3 className="w-3 h-3 mt-0.5 shrink-0 text-ink-3" />
-                <span>
-                  <span className="font-semibold text-ink-3">Cara penyampaian: </span>
-                  {aktif.caraPenyampaian}
-                </span>
+              <p className="text-[11px] text-ink-3 mt-1 leading-relaxed">
+                {adaTemplate
+                  ? `Kategori ${KATEGORI_TEMPLATE.find((k) => k.id === kategoriId)?.nama} masih kosong. Pilih kategori lain dulu.`
+                  : 'Template dashboard sedang disusun ulang. Galeri akan terisi begitu template baru ditambahkan.'}
               </p>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {aktif.fokus.map((f) => (
-                  <span
-                    key={f}
-                    className="text-[9.5px] font-semibold text-ink-2 bg-surface-2 border border-line px-1.5 py-0.5 rounded-chip"
-                  >
-                    {f}
-                  </span>
-                ))}
-              </div>
-              {/* Chip susunan: pratinjau kini memakai tampilan referensi, jadi
-                  jumlahnya ditulis apa adanya (bukan dari daftar widget). */}
-              <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 border border-line px-2 py-0.5 rounded-chip">
-                  <LayoutGrid className="w-3 h-3 text-ink-3" />
-                  {susunanChip}
-                </span>
-                <span className="text-line-strong text-xs">·</span>
-                <span className="text-[11px] text-ink-3">Tampilan referensi, satu halaman</span>
-                <span className="text-line-strong text-xs">·</span>
-                {!asli && (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-warn font-medium">
-                    <Sparkles className="w-3 h-3" />
-                    Angka ilustrasi
-                  </span>
-                )}
-              </div>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Toolbar bawah — tombol pakai template */}
-          <div className="border-t border-line px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface-2 rounded-b-card">
+        {/* Selebihnya hanya berguna kalau ada template: pemilih gaya, toolbar,
+            pratinjau, dan keterangan simpan. */}
+        {adaTemplate && (
+          <>
+        {/* GAYA — dipilih TERPISAH dari template. Susunan kartu milik template,
+            desain & warna chart milik gaya. Daftar gaya sama untuk semua kategori. */}
+        <div className="card mb-4 px-4 py-3">
+          <div className="flex items-start gap-2 mb-2">
+            <Palette className="w-3.5 h-3.5 text-ink-3 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-ink">Gaya tampilan</p>
+              <p className="text-[11px] text-ink-3 leading-relaxed">
+                Gaya dari menu Template Chart, berlaku untuk template mana pun di kategori mana pun.
+              </p>
+            </div>
+            {gaya && (
+              <button
+                onClick={() => setGaya(null)}
+                data-testid="gaya-bawaan"
+                className="ml-auto shrink-0 text-[10.5px] font-semibold text-ink-2 hover:text-ink underline"
+              >
+                Pakai gaya bawaan
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {VARIAN.map((v) => {
+              const terpilih = v === gayaTampil;
+              const palet = GAYA[v].palet.filter(cukupTerang).slice(0, 3);
+              return (
+                <button
+                  key={v}
+                  onClick={() => setGaya(v)}
+                  data-testid={`gaya-${v}`}
+                  aria-pressed={terpilih}
+                  title={`${GAYA[v].nama} — ${GAYA[v].sebutan}`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-control border text-[11px] font-semibold transition-colors ${
+                    terpilih ? 'border-brand bg-surface-2 text-ink' : 'border-line text-ink-2 hover:bg-surface-2'
+                  }`}
+                >
+                  <span className="flex -space-x-1 shrink-0" aria-hidden="true">
+                    {palet.map((w, i) => (
+                      <span
+                        key={i}
+                        className="w-2 h-2 rounded-full ring-1 ring-surface"
+                        style={{ background: w }}
+                      />
+                    ))}
+                  </span>
+                  {GAYA[v].nama}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Toolbar template aktif — tombol pratinjau, simpan, dan presentasi.
+            Keterangan teks template (nama, tujuan, cara penyampaian, fokus,
+            susunan) sengaja TIDAK ditampilkan: pratinjau di bawah sudah
+            memperlihatkan isinya, jadi teks itu hanya mengulang. */}
+        <div className="card mb-4">
+          <div className="px-4 sm:px-5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface-2 rounded-card">
             <div className="flex items-center gap-1.5 min-w-0">
               {st?.status === 'siap' ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-pos shrink-0" />
@@ -664,7 +811,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               ) : (
                 <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
               )}
-              <span className="text-[11px] text-ink-3 font-medium truncate">
+              <span className="text-[11px] text-ink-3 font-medium leading-snug">
                 {memuat && progres && progres.total > 0
                   ? `${progres.terisi}/${progres.total} kartu terisi · ${detik} dtk · ${progres.judul || 'menyiapkan…'}`
                   : statusTeks}
@@ -805,7 +952,11 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
           // Gaya Korporat mengikuti mode terang/gelap aplikasi, seperti di menu Template Chart.
           <div className="rounded-card">{replikaTampil(Number(halamanAktif), false)}</div>
         ) : (
-        <div className={`tema-${aktif.tema || 'oranye'} rounded-card p-1.5 -m-1.5`} data-theme="dark">
+        <div
+          className={`tema-${aktif.tema || 'oranye'} rounded-card p-1.5 -m-1.5`}
+          data-theme="dark"
+          style={gaya ? variabelGaya(gayaTampil) : undefined}
+        >
           <KanvasTemaContext.Provider
             value={
               asli || asli2 ? { mode: 'dark', aksen: AKSEN_TEMA[aktif.tema || 'oranye'] } : null
@@ -824,6 +975,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             Angkanya ikut diperbarui setiap kali dokumen instansi bertambah atau berubah.
           </span>
         </p>
+          </>
+        )}
       </div>
 
       {/* Mode presentasi pratinjau — layar penuh, seluruh dashboard dalam satu

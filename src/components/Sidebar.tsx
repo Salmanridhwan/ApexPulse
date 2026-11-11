@@ -4,7 +4,7 @@ import {
   ClipboardCheck,
   Gauge,
   ClipboardList,
-  History,
+  Database,
   Layers,
   LayoutTemplate,
   Shield,
@@ -36,10 +36,9 @@ export interface SidebarProps {
   onSelectDashboard: (dashboard: Dashboard) => void;
   onCreateDashboard: () => void;
   onOpenDashboardList: () => void;
-  onOpenAudit: () => void;
   onOpenAlerts: () => void;
   unreadAlertsCount: number;
-  currentView?: 'workspace' | 'dashboards' | 'audit' | 'alerts' | 'charts' | 'templates' | 'berkas' | 'permintaan' | 'admin';
+  currentView?: 'workspace' | 'dashboards' | 'alerts' | 'charts' | 'templates' | 'data' | 'berkas' | 'permintaan' | 'admin';
   onOpenAdmin: () => void;
   /** Tab Panel Admin yang sedang aktif (dipakai saat currentView === 'admin'). */
   adminTab?: AdminTabId;
@@ -53,6 +52,8 @@ export interface SidebarProps {
   onOpenManajemenBerkas?: () => void;
   /** Buka halaman Permintaan Data (User) / Kotak Masuk Permintaan (Admin Instansi). */
   onOpenPermintaan?: () => void;
+  /** Buka halaman Pilih Data — susun dashboard dari butir dokumen yang disetujui. */
+  onOpenPilihData?: () => void;
   currentUser: User | null;
   onLogout: () => void;
 }
@@ -68,7 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectDashboard,
   onCreateDashboard,
   onOpenDashboardList,
-  onOpenAudit,
   onOpenAlerts,
   unreadAlertsCount,
   currentView = 'workspace',
@@ -79,6 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenDashboardTemplates,
   onOpenManajemenBerkas,
   onOpenPermintaan,
+  onOpenPilihData,
   currentUser,
   onLogout,
 }) => {
@@ -218,37 +219,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </>
             )}
           </button>
+          {/* Jalur pertama pembuatan dashboard: data yang sudah disetujui admin. */}
+          {onOpenPilihData && (
+            <button
+              onClick={onOpenPilihData}
+              className={`w-full flex items-center gap-2.5 py-2 px-2.5 mt-0.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'data' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+              title="Pilih Data — susun dashboard dari data dokumen instansi yang sudah disetujui"
+              data-testid="buka-pilih-data"
+            >
+              {currentView === 'data' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+              <Database className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'data' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+              {!isCollapsed && <span className="flex-1 truncate">Pilih Data</span>}
+            </button>
+          )}
         </div>
 
-        {/* GRUP 1b: Permintaan Data — pintu kerja antar-peran.
-            User mengajukan, admin instansi menindaklanjuti. Satu halaman, label
-            menyesuaikan peran supaya tiap pihak melihat namanya sendiri. */}
-        {onOpenPermintaan && (
+        {/* GRUP 1b: Data & Dokumen — Permintaan Data (Kotak Masuk untuk admin)
+            dan Repositori Dokumen dalam satu section. */}
+        {(onOpenPermintaan || onOpenManajemenBerkas) && (
           <div>
-            {!isCollapsed && (
-              <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">
-                Permintaan
-              </div>
-            )}
-            <button
-              onClick={onOpenPermintaan}
-              className={`w-full flex items-center gap-2.5 py-2 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'permintaan' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
-              title={isAdminRole(currentUser?.role) ? 'Kotak Masuk — permintaan data dari user instansi' : 'Permintaan Data — ajukan data yang Anda butuhkan'}
-              data-testid="buka-permintaan"
-            >
-              {currentView === 'permintaan' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-              <Inbox className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'permintaan' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-              {!isCollapsed && (
-                <span className="flex-1 truncate">
-                  {isAdminRole(currentUser?.role) ? 'Kotak Masuk' : 'Permintaan Data'}
-                </span>
+            {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Data &amp; Dokumen</div>}
+            <div className="space-y-0.5">
+              {onOpenPermintaan && (
+                <button
+                  onClick={onOpenPermintaan}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'permintaan' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title={isAdminRole(currentUser?.role) ? 'Kotak Masuk — permintaan data dari user instansi' : 'Permintaan Data — ajukan data yang Anda butuhkan'}
+                  data-testid="buka-permintaan"
+                >
+                  {currentView === 'permintaan' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <Inbox className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'permintaan' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && (
+                    <span className="flex-1 truncate">
+                      {isAdminRole(currentUser?.role) ? 'Kotak Masuk' : 'Permintaan Data'}
+                    </span>
+                  )}
+                </button>
               )}
-            </button>
+              {onOpenManajemenBerkas && (
+                <button
+                  onClick={onOpenManajemenBerkas}
+                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'berkas' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
+                  title="Repositori Dokumen — unggah & kelola dokumen instansi"
+                  data-testid="buka-manajemen-berkas"
+                >
+                  {currentView === 'berkas' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
+                  <FolderOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'berkas' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
+                  {!isCollapsed && <span className="flex-1 truncate">Repositori Dokumen</span>}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* GRUP 2: Referensi */} 
-        {(onOpenChartGallery || onOpenDashboardTemplates || onOpenManajemenBerkas) && (
+        {/* GRUP 2: Referensi — Template Dashboard untuk semua peran,
+            Template Chart khusus admin (App tidak mengirim callback untuk pengguna). */}
+        {(onOpenChartGallery || onOpenDashboardTemplates) && (
           <div>
             {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Referensi</div>}
             <div className="space-y-0.5">
@@ -276,34 +302,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!isCollapsed && <span className="flex-1 truncate">Template Chart</span>}
                 </button>
               )}
-              {onOpenManajemenBerkas && (
-                <button
-                  onClick={onOpenManajemenBerkas}
-                  className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'berkas' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`}
-                  title="Repositori Dokumen — unggah & kelola dokumen instansi"
-                  data-testid="buka-manajemen-berkas"
-                >
-                  {currentView === 'berkas' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-                  <FolderOpen className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'berkas' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-                  {!isCollapsed && <span className="flex-1 truncate">Repositori Dokumen</span>}
-                </button>
-              )}
             </div>
           </div>
         )}
 
-        {/* GRUP 3: Tata Kelola & Sistem — KHUSUS ADMIN.
-            Role pengguna tidak boleh melihat Jejak Audit, dan grup yang isinya
-            tinggal satu tombol itu tidak boleh tampil kosong. */}
+        {/* GRUP 3: Panel Admin (tanpa judul grup) — KHUSUS ADMIN.
+            Role pengguna tidak boleh melihat Panel Admin, jadi grup ini
+            disembunyikan agar tidak tampil kosong. */}
         {isAdminRole(currentUser?.role) && (
         <div>
-          {!isCollapsed && <div className="px-2 pb-1.5 mt-4 text-[11px] font-semibold text-shell-ink-2 tracking-wider uppercase">Sistem & Tata Kelola</div>}
           <div className="space-y-0.5">
-            <button onClick={onOpenAudit} className={`w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-control text-xs transition-colors text-left group relative overflow-hidden ${isCollapsed ? 'justify-center px-0' : ''} ${currentView === 'audit' ? 'bg-shell-active text-shell-ink font-bold shadow-inset' : 'text-shell-ink-2 hover:bg-shell-hover hover:text-shell-ink font-medium'}`} title="Jejak Audit & Kepatuhan Regulasi">
-              {currentView === 'audit' && <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-brand" />}
-              <History className={`w-4 h-4 shrink-0 transition-colors ${currentView === 'audit' ? 'text-brand' : 'text-shell-ink-2 group-hover:text-shell-ink'}`} />
-              {!isCollapsed && <span className="flex-1 truncate">Jejak Audit</span>}
-            </button>
             {isAdminRole(currentUser?.role) && (
               <div>
                 {!isCollapsed && (

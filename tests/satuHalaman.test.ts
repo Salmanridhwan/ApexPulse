@@ -119,12 +119,20 @@ test('grid.h menjadi bentang baris; kartu satu deret disamakan tingginya', async
 });
 
 test('satuan baris tidak pernah di bawah minimum: layar sempit = gulir, bukan potong', async () => {
-  const { tataSatuan, SATUAN_MIN } = await import('../src/services/tataLetak/satuHalaman');
+  const { tataSatuan, SATUAN_MIN, SATUAN_MIN_KOMPAK } = await import('../src/services/tataLetak/satuHalaman');
   const lega = tataSatuan(900, true, 8, 10);
   assert.equal(lega.gulir, false);
   assert.ok(lega.satuan >= SATUAN_MIN);
   assert.ok(lega.kpi + 10 + 8 * lega.satuan + 7 * 10 <= 900);
   const sempit = tataSatuan(400, true, 16, 10);
   assert.equal(sempit.gulir, true);
-  assert.equal(sempit.satuan, SATUAN_MIN);
+  assert.equal(sempit.satuan, SATUAN_MIN_KOMPAK);
+});
+
+test('laptop 1366x768 tetap satu layar tanpa gulir (basis huruf 18px)', async () => {
+  const { tataSatuan } = await import('../src/services/tataLetak/satuHalaman');
+  // Sisa tinggi setelah header presentasi & padding: 768 - 72 - 24.
+  const r = tataSatuan(672, true, 8, 10);
+  assert.equal(r.gulir, false, 'halaman deck harus muat satu layar di laptop 1366x768');
+  assert.ok(r.kpi + 10 + 8 * r.satuan + 7 * 10 <= 672);
 });

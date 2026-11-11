@@ -61,9 +61,13 @@ export interface OpsiIsiTemplate {
     /** Jumlah kartu yang sudah berisi angka (untuk progres "X dari N terisi"). */
     terisiTotal?: number;
   }) => void;
+  /** Dipanggil setiap satu kartu BERHASIL terisi, supaya hasilnya bisa langsung disimpan. */
+  onKartu?: (widget: WidgetSpec) => void;
 }
 
 export interface HasilIsiTemplate {
+  /** Kartu yang belum diisi karena waktu/layanan habis — masih akan diulang. */
+  tertunda: number;
   widgets: WidgetSpec[];
   terisi: number;
   kosong: number;
@@ -260,13 +264,26 @@ function kerangka(w: WidgetSpec): WidgetSpec {
   delete sisa.gantt;
   delete sisa.treemap;
   delete sisa.dataKosong;
+  delete sisa.dataTertunda;
   delete sisa.catatanData;
   return sisa;
 }
 
-/** Kosongkan data angka sebuah kartu (tanpa menghapus susunan/id/grid template). */
-function kosongkan(w: WidgetSpec, alasan: string): WidgetSpec {
-  return { ...kerangka(w), dataKosong: true, catatanData: alasan, citations: [] };
+/**
+ * Kosongkan data angka sebuah kartu (tanpa menghapus susunan/id/grid template).
+ *
+ * `tertunda` membedakan dua sebab kosong: `true` = waktu habis / layanan sibuk
+ * (masih akan diisi), `false` = dokumen memang tidak memuat indikatornya.
+ * Perbedaan ini menentukan apakah kartu diulang dan apa yang ditulis di kanvas.
+ */
+function kosongkan(w: WidgetSpec, alasan: string, tertunda = false): WidgetSpec {
+  return {
+    ...kerangka(w),
+    dataKosong: true,
+    ...(tertunda ? { dataTertunda: true } : {}),
+    catatanData: alasan,
+    citations: [],
+  };
 }
 
 /** Penanda: panggilan dihentikan karena anggaran waktu habis. */
@@ -409,7 +426,9 @@ export async function isiTemplateDariRag(
       }
     }
 
-    selesai += 1;
+    // `selesai` hanya ditambah sekali di bawah (kartu yang tidak 'sibuk').
+    // Dulu juga ditambah di sini, sehingga progres mencapai 100% saat baru
+    // separuh kartu diproses dan perkiraan sisa waktu jadi meleset.
     let keluar: WidgetSpec;
     const valid = !!hasil?.data && punyaDataValid(hasil.data as WidgetSpec);
 
@@ -456,11 +475,19 @@ export async function isiTemplateDariRag(
         dataKosong: false,
       };
     } else {
+      /**
+       * `belumSelesai` = kartu belum diisi karena anggaran waktu habis atau
+       * layanan membalas galat (429/timeout). Kartu ini BUKAN "tidak ada di
+       * dokumen" dan harus diulang, bukan dilaporkan kosong permanen.
+       */
+      const belumSelesai = lewat || Boolean(galatTerakhir);
       const alasan = lewat
-        ? 'Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini belum terisi.'
-        : hasil?.alasan || 'Indikator ini tidak ditemukan di dokumen instansi.';
+        ? 'Waktu pengambilan angka habis sebelum dokumen selesai dibaca. Kartu ini sedang dilanjutkan.'
+        : hasil?.alasan || (galatTerakhir
+            ? `Pengambilan angka terhenti karena layanan dokumen sibuk (${galatTerakhir}). Kartu ini sedang dilanjutkan.`
+            : 'Indikator ini tidak ditemukan di dokumen instansi.');
       if (lewat) catatan.push(`"${w.title}": waktu habis`);
-      keluar = kosongkan(w, alasan);
+      keluar = kosongkan(w, alasan, belumSelesai);
     }
 
     // 'sibuk' = gagal karena layanan (429/timeout) → layak dicoba lagi.
@@ -470,7 +497,14 @@ export async function isiTemplateDariRag(
       : lewat || galatTerakhir
         ? 'sibuk'
         : 'tidak-ada';
-    if (status === 'terisi') jumlahTerisi += 1;
+    if (status === 'terisi') {
+      jumlahTerisi += 1;
+      try {
+        opsi.onKartu?.(keluar);
+      } catch {
+        /* penyimpanan sebagian hanya pelengkap */
+      }
+    }
     if (status !== 'sibuk') selesai += 1;
     onProgres?.({
       selesai: Math.min(selesai, total),
@@ -548,5 +582,11 @@ export async function isiTemplateDariRag(
 
   kedaluwarsa = statusKartu.some((s) => s === 'sibuk');
   const terisi = widgets.filter((w) => w && !w.dataKosong).length;
-  return { widgets, terisi, kosong: total - terisi, catatan, kedaluwarsa };
+  /**
+   * `tertunda` = kartu yang belum diisi karena waktu/layanan, bukan karena
+   * indikatornya tidak ada. Pemanggil memakai angka ini untuk memutuskan
+   * melanjutkan pengisian dan untuk menahan status "siap".
+   */
+  const tertunda = widgets.filter((w) => w && w.dataTertunda).length;
+  return { widgets, terisi, kosong: total - terisi, tertunda, catatan, kedaluwarsa };
 }

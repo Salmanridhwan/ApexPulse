@@ -27,6 +27,42 @@ export function lebarKolom(w: number | undefined): number {
 }
 
 /**
+ * Lebar akhir tiap kartu (1-12 kolom) supaya TIDAK ADA RUANG KOSONG di kanvas.
+ *
+ * Kartu dipasang per deret persis seperti CSS grid (lihat `lebarKolom`). Deret
+ * yang belum mencapai 12 kolom dilebarkan: sisa kolom dibagi rata, sisa
+ * pembagian ke kartu terakhir. Pengelompokan deret tidak berubah karena jumlah
+ * tiap deret tetap <= 12, jadi `susunTinggiGrid` dan `hitungBarisGrid` tetap sah.
+ * Ini juga merapikan dashboard lama yang tersimpan dengan pola bertumpuk
+ * (hero 7 + dua kartu 5) yang tidak bisa digambar grid berbasis deret.
+ */
+export function lebarPenuhDeret(widgets: Array<Pick<WidgetSpec, 'grid'>>): number[] {
+  const hasil = widgets.map((w) => lebarKolom(w.grid?.w));
+  let mulai = 0;
+  let kolom = 0;
+  const tutup = (akhir: number) => {
+    const n = akhir - mulai;
+    if (n <= 0) return;
+    const sisa = KOLOM_KANVAS - kolom;
+    if (sisa > 0) {
+      const tiap = Math.floor(sisa / n);
+      for (let i = mulai; i < akhir; i++) hasil[i] += tiap;
+      hasil[akhir - 1] += sisa - tiap * n;
+    }
+    mulai = akhir;
+  };
+  hasil.forEach((c, i) => {
+    if (kolom + c > KOLOM_KANVAS) {
+      tutup(i);
+      kolom = 0;
+    }
+    kolom += c;
+  });
+  tutup(hasil.length);
+  return hasil;
+}
+
+/**
  * Jumlah baris grid 12 kolom untuk daftar widget ini (pemasangan murni).
  * Mengembalikan 0 kalau tidak ada widget (tidak ada yang perlu dipas-kan).
  */
@@ -49,11 +85,15 @@ export function hitungBarisGrid(widgets: Pick<WidgetSpec, 'grid'>[]): number {
  * Tinggi kartu dalam satuan baris grid (`grid.h`). Dulu `grid.h` tidak pernah
  * dipakai kanvas: semua kartu satu baris setinggi sama, sehingga grafik 120 px
  * terpotong di kartu 84 px. Bawaan per tipe bila `grid.h` kosong.
+ *
+ * Batas atas dinaikkan dari 8 ke 10 setelah huruf deck naik ke basis 18px:
+ * kartu agenda berisi 8 butir butuh sekitar 9 satuan, dan Memotongnya di 8
+ * membuat butir terakhir terpotong di mode presentasi.
  */
 export function spanTinggi(w: Pick<WidgetSpec, 'grid'> & { type?: string }): number {
   const bawaan = w.type === 'kpi' || w.type === 'narasi' ? 2 : 4;
   const h = Number(w.grid?.h);
-  return Math.max(2, Math.min(8, Number.isFinite(h) && h > 0 ? Math.round(h) : bawaan));
+  return Math.max(2, Math.min(10, Number.isFinite(h) && h > 0 ? Math.round(h) : bawaan));
 }
 
 /**
@@ -85,8 +125,47 @@ export function susunTinggiGrid(widgets: Array<Pick<WidgetSpec, 'grid'> & { type
   return { span, satuan };
 }
 
-/** Tinggi minimum satu satuan baris (px): kartu grafik 4 satuan ≈ 250 px, label sumbu terbaca. */
-export const SATUAN_MIN = 56;
+/**
+ * Tinggi minimum satu satuan baris (px).
+ *
+ * Dinaikkan dari 56 ke 64 setelah ukuran huruf deck naik ke basis 18px: pada
+ * 56 px kartu grafik `h=4` hanya dapat 224 px sehingga label sumbu dan teks
+ * kartu terpotong di mode presentasi. 64 px memberi 256 px untuk `h=4`, cukup
+ * untuk satu baris label + judul + satuan.
+ */
+export const SATUAN_MIN = 64;
+
+/**
+ * Batas minimum yang masih boleh dipakai saat layar terlalu pendek.
+ *
+ * Di laptop 1366x768 sisa tinggi setelah header hanya ~672 px, sedangkan 12
+ * satuan x 64 px + jarak butuh ~768 px. Dulu layanan ini langsung menyalakan
+ * gulir, sehingga 23 halaman deck bergulir saat dipresentasikan. Nilai 56 px
+ * adalah ukuran lama yang masih terbaca (grafik `h=4` = 224 px), jadi dipakai
+ * sebagai cadangan agar slaid tetap utuh satu layar.
+ */
+export const SATUAN_MIN_KOMPAK = 56;
+
+/**
+ * Tinggi minimum baris KPI (px).
+ *
+ * Kartu KPI berisi judul + ikon + angka besar + delta + sparkline; pada basis
+ * huruf 18px kebutuhan itu ±132 px (tanpa sparkline). Dulu batas bawahnya 96 px,
+ * sehingga judul kartu dan label delta terpotong di mode presentasi. 132 px
+ * masih muat di laptop 1366x768 selama kartu lain memakai 8 satuan.
+ */
+export const KPI_MIN = 132;
+
+/**
+ * Batas atas tinggi baris KPI (px) di mode satu halaman.
+ *
+ * Dihitung dari layar tersempit yang harus tetap satu layar (laptop
+ * 1366x768 → sisa tinggi isi 672 px): `kpi + 10 + 8x56 + 7x10 <= 672`
+ * memberi 144 px. Rumus `tinggiIsi * 0.22` menghasilkan 148 px, yaitu 4 px
+ * lebih — cukup untuk memicu gulir di seluruh deck. 144 px masih memuat
+ * seluruh isi kartu KPI (butuh ±132 px).
+ */
+export const KPI_MAKS_SATU_HALAMAN = 144;
 
 /**
  * Tinggi baris KPI dan satuan baris kartu lain untuk mode satu halaman.
@@ -102,12 +181,17 @@ export function tataSatuan(
   jarak: number,
   kpiMaks: number = TINGGI_KPI_MAKS
 ): { kpi: number; satuan: number; gulir: boolean } {
-  const kpi = adaKpi ? Math.min(kpiMaks, Math.max(96, Math.round(tinggiIsi * 0.22))) : 0;
+  const kpi = adaKpi ? Math.min(Math.min(kpiMaks, KPI_MAKS_SATU_HALAMAN), Math.max(KPI_MIN, Math.round(tinggiIsi * 0.22))) : 0;
   if (satuan <= 0) return { kpi: adaKpi ? Math.min(kpiMaks, Math.max(0, tinggiIsi)) : 0, satuan: 0, gulir: false };
   const sisa = tinggiIsi - (adaKpi ? kpi + jarak : 0);
   const t = Math.floor((sisa - jarak * (satuan - 1)) / satuan);
   if (t >= SATUAN_MIN) return { kpi, satuan: t, gulir: false };
-  return { kpi, satuan: SATUAN_MIN, gulir: true };
+  // Layar pendek (laptop 1366x768) — turunkan ke ukuran kompak dulu supaya
+  // slide tetap satu layar. Gulir hanya kalau ukuran kompak pun tidak muat.
+  if (t >= SATUAN_MIN_KOMPAK) return { kpi, satuan: SATUAN_MIN_KOMPAK, gulir: false };
+  // Masih tidak muat: biarkan kartu menggulir. JANGAN mengecilkan baris KPI di
+  // bawah KPI_MIN — dulu dicoba sampai 72 px, dan judul/angka kartu terpotong.
+  return { kpi, satuan: SATUAN_MIN_KOMPAK, gulir: true };
 }
 
 /**

@@ -93,7 +93,7 @@ test('wajah khas hanya dipakai bila diminta', () => {
 
 test('label sumbu angka besar diringkas', () => {
   assert.equal(ringkasSumbu(612400000), '612,4 jt');
-  assert.equal(ringkasSumbu(2059000000000), '2,1 T');
+  assert.equal(ringkasSumbu(2059000000000), '2,06 T');
   assert.equal(ringkasSumbu(950), '950');
 });
 
@@ -131,9 +131,14 @@ test('tipe widget kanvas memakai wajah katalog bila sudah ada', () => {
   assert.equal(chartIdDariTipe('donut'), 'donat-tebal');
   assert.equal(chartIdDariTipe('kpi'), 'kpi-kartu');
   assert.equal(chartIdDariTipe('table'), 'tabel-ringkas');
-  // Tipe yang belum punya wajah dibiarkan memakai penyusun lama.
-  assert.equal(chartIdDariTipe('radar'), null);
-  assert.equal(chartIdDariTipe('sankey'), null);
+  // Sejak ketiga wajah baru (`peta-wilayah`, `jadwal-gantt`, `kotak-sebaran`)
+  // dibuat di Template Chart, SEMUA tipe punya padanan katalog — tidak ada lagi
+  // chart yang disusun di luar Template Chart.
+  assert.equal(chartIdDariTipe('radar'), 'radar-aspek');
+  assert.equal(chartIdDariTipe('sankey'), 'sankey-alur');
+  assert.equal(chartIdDariTipe('map'), 'peta-wilayah');
+  assert.equal(chartIdDariTipe('gantt'), 'jadwal-gantt');
+  assert.equal(chartIdDariTipe('boxplot'), 'kotak-sebaran');
 });
 
 test('batang tegak dan garis tren menggambar semua seri', () => {

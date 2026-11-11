@@ -109,6 +109,8 @@ export interface AnalisisUntukCache {
   selesaiPada?: string;
   sidikDokumen?: string;
   sidikKb?: string;
+  /** `tabel-lokal` = angka dibaca dari sel berkas, tidak bergantung indeks RAG. */
+  metode?: string;
 }
 
 export interface OpsiPutusan {
@@ -146,7 +148,15 @@ export function putusanCache(daftar: AnalisisUntukCache[], opsi: OpsiPutusan): P
     return { pakai: false, sebab: 'dokumen-berubah', alasan: PESAN_SEBAB['dokumen-berubah'] };
   }
 
-  if (opsi.sidikKb && terbaru.sidikKb && opsi.sidikKb !== terbaru.sidikKb) {
+  /**
+   * DOKUMEN BARU DI BASIS hanya membatalkan cache hasil RAG.
+   *
+   * Butir yang dibaca langsung dari sel berkas (`tabel-lokal`) tidak terpengaruh
+   * indeks basis dokumen: isinya tetap sama selama berkasnya tidak diganti.
+   * Dulu setiap unggahan baru membuat SEMUA dokumen dianalisis ulang — menit
+   * demi menit menunggu tanpa satu angka pun berubah.
+   */
+  if (terbaru.metode !== 'tabel-lokal' && opsi.sidikKb && terbaru.sidikKb && opsi.sidikKb !== terbaru.sidikKb) {
     return { pakai: false, sebab: 'kb-berubah', alasan: PESAN_SEBAB['kb-berubah'] };
   }
 

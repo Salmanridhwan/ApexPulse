@@ -17,6 +17,11 @@ import type { DashboardTemplate } from './dashboardTemplates';
  */
 
 export const PREFIKS_TEMPLATE_BAGIAN = 'tpl-bagian-';
+/**
+ * Awalan template DECK multi-halaman (satu halaman = satu slide). Dirender
+ * `DashboardBagian` seperti template rapat, tetapi boleh tampil di galeri.
+ */
+export const PREFIKS_TEMPLATE_DECK = 'tpl-deck-';
 
 export interface HalamanBagian {
   judul: string;
@@ -36,7 +41,7 @@ export interface InfoBagian {
 type Isi = Partial<WidgetSpec>;
 
 /** Pembuat kartu untuk satu bagian; id unik per bagian. */
-function pembuat(kode: string, kategori: string) {
+export function pembuat(kode: string, kategori: string) {
   let n = 0;
   const kartu = (type: WidgetType, chartId: string, title: string, subtitle: string, w: number, h: number, isi: Isi = {}): WidgetSpec => {
     n += 1;
@@ -55,9 +60,16 @@ function pembuat(kode: string, kategori: string) {
     };
   };
   return {
-    /** Kartu KPI berikon bulat. */
+    /** Kartu bebas: tipe + chart katalog + ukuran grid sendiri. */
+    kartu,
+    /** Kartu KPI berikon bulat.
+     *
+     * Tinggi 3 baris grid (150 px) bukan 2 (100 px): pada galeri satu baris =
+     * 50 px, sedangkan kartu KPI butuh ±132 px setelah basis huruf naik ke
+     * 18px (judul + ikon + angka + delta). Dengan 100 px judul dan label delta
+     * terpotong. */
     kpi: (title: string, subtitle: string, value: string | number, unit: string, ikon: string, delta?: number, deltaLabel = 'vs tahun lalu') =>
-      kartu('kpi', 'kpi-kartu', title, subtitle, 4, 2, {
+      kartu('kpi', 'kpi-kartu', title, subtitle, 4, 3, {
         ikon,
         kpi: { value, unit, delta, deltaLabel: delta === undefined ? subtitle : deltaLabel },
       }),
@@ -109,6 +121,8 @@ function jadikan(r: Rancangan): DashboardTemplate {
   return {
     id: `${PREFIKS_TEMPLATE_BAGIAN}${r.kode}`,
     nama: r.nama,
+    kategoriId: 'kinerja',
+    legacy: true,
     tujuan: r.tujuan,
     caraPenyampaian: `Gaya Korporat dari menu Template Chart, ${jumlahHal} halaman seperti deck rapat: ${r.halaman.map((h) => h.judul).join(', ')}.`,
     deskripsi: `Rapat manajemen ${r.nama}: ${r.fokus.slice(0, 3).join(', ').toLowerCase()}, isu, action plan, dan KPI 2027.`,
@@ -242,8 +256,9 @@ const RAPAT_MANAJEMEN = jadikan({
 
 export const TEMPLATE_BAGIAN: DashboardTemplate[] = [RAPAT_MANAJEMEN];
 
-/** true bila id (boleh bernomor halaman, `tpl-bagian-x#3`) milik template bagian. */
-export const templateBagianId = (id: string | undefined): boolean => Boolean(id && id.startsWith(PREFIKS_TEMPLATE_BAGIAN));
+/** true bila id (boleh bernomor halaman, `tpl-deck-x#3`) milik template deck. */
+export const templateBagianId = (id: string | undefined): boolean =>
+  Boolean(id && (id.startsWith(PREFIKS_TEMPLATE_BAGIAN) || id.startsWith(PREFIKS_TEMPLATE_DECK)));
 
 /** Nomor halaman dari id replika `tpl-bagian-x#n` (bawaan 1). */
 export const nomorHalamanBagian = (id: string): number => {

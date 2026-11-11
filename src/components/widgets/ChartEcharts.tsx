@@ -9,14 +9,26 @@ import { buildOpsi, DAFTAR_CHART, type ChartId } from '../../services/chart/char
 import { chartIdDariTipe } from '../../services/chart/petaTipe';
 import { terapkanRancangan } from '../../services/chart/rancanganRag';
 import { GAYA } from '../../services/chart/gayaVarian';
+import { angkaRingkas } from '../../services/format/angkaRingkas';
+import { ringkasAngkaSemuaKomponen } from '../../services/chart/angkaSemuaKomponen';
 import { terapkanGaya } from './widgetStyle';
+import { rapikanUntukUkuran } from '../../services/chart/rapikanUkuran';
 import { pastikanPetaTerdaftar as pastikanPetaIndonesia, NAMA_PETA } from './petaTerdaftar';
 import { WidgetType, type RancanganChart, type WidgetStyle } from '../../types';
 
 // echarts hanya dimuat saat widget chart pertama dirender — tidak ikut bundle
 // awal. Modul tree-shaken (lihat echartsSetup.ts) supaya bundel tidak 1 MB.
 let echartsPromise: Promise<typeof import('./echartsSetup')> | null = null;
-const loadEcharts = () => (echartsPromise ??= import('./echartsSetup'));
+/**
+ * Kalau unduhan chunk gagal (jaringan putus, cache basi setelah deploy),
+ * janji yang gagal tidak boleh disimpan — kalau disimpan, setiap percobaan
+ * berikutnya memakai janji yang sama dan grafik tidak akan pernah muncul.
+ */
+const loadEcharts = () =>
+  (echartsPromise ??= import('./echartsSetup').catch((e) => {
+    echartsPromise = null;
+    throw e;
+  }));
 
 /** Mulai unduh chunk echarts lebih awal (saat dashboard dibuka),
  *  bukan menunggu chart pertama dirender. Idempoten — aman dipanggil berkali-kali. */
@@ -28,6 +40,8 @@ export const preloadEcharts = (): Promise<unknown> => loadEcharts();
  * di sini, sehingga chart katalog tidak bisa memakainya.
  */
 const pastikanPetaTerdaftar = (_echarts?: any): Promise<void> => pastikanPetaIndonesia();
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIT NORMALIZATION
@@ -153,11 +167,23 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ECharts | null>(null);
+  /** Opsi sebelum penyesuaian ukuran — dipakai ulang setiap kartu berubah ukuran. */
+  const opsiDasarRef = useRef<EChartsOption | null>(null);
+  /** Ukuran terakhir yang sudah digambar, supaya tidak menggambar ulang tiap piksel. */
+  const ukuranRef = useRef('');
   const { selected, setSelected } = useChartSelection();
   const themeMode = useThemeMode();
   /** Aksen khusus bidang (mis. pratinjau template gelap-oranye); undefined = ikut tema. */
   const aksenKanvas = useAksenKanvas();
   const [showData, setShowData] = useState(false);
+  /**
+   * Fase pemuatan mesin chart. Selama chunk echarts belum siap, area grafik
+   * sengaja tidak dibiarkan kosong: ada keterangan "menyiapkan grafik" dan
+   * tombol coba lagi bila unduhannya gagal.
+   */
+  const [fase, setFase] = useState<'muat' | 'siap' | 'gagal'>('muat');
+  /** Penghitung percobaan: menaikkannya memaksa efek render chart dijalankan lagi. */
+  const [ulang, setUlang] = useState(0);
 
   const { normalizedSeries, displayUnit } = useMemo(
     () => normalizeSeriesData(series, unit),
@@ -311,7 +337,16 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       // supaya semua tipe chart ikut tanpa perlu tahu soal fitur ini.
       option = terapkanGaya(option, style, T.series);
 
-      chart.setOption(option, true);
+      // Aturan angka ringkas (rb/jt/M/T) untuk semua komponen, termasuk bawaan ECharts.
+      option = ringkasAngkaSemuaKomponen(option);
+
+      /**
+       * Opsi disimpan sebagai dasar, lalu digambar lewat `rapikanUntukUkuran`
+       * supaya label/legenda/sumbu ikut ukuran kartu sejak gambar pertama.
+       */
+      opsiDasarRef.current = option;
+      ukuranRef.current = `${Math.round(chartRef.current.clientWidth / 40)}x${Math.round(chartRef.current.clientHeight / 40)}`;
+      chart.setOption(rapikanUntukUkuran(option, chartRef.current.clientWidth, chartRef.current.clientHeight), true);
 
       // Klik area grafik → seleksi kategori lintas-chart (klik lagi = batal).
       if (isSeleksi) {
@@ -347,8 +382,25 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       }
 
       window.addEventListener('resize', handleResize);
-      resizeObserver = new ResizeObserver(() => chartInstanceRef.current?.resize());
+      /**
+       * Ukuran kartu berubah (jendela dikecilkan, panel dibuka) harus menggambar
+       * ulang opsi yang sudah disesuaikan, bukan hanya `resize()` — kalau hanya
+       * resize, legenda & label tetap versi lebar lama lalu bertumpuk.
+       */
+      resizeObserver = new ResizeObserver(() => {
+        const el = chartRef.current;
+        const ch = chartInstanceRef.current;
+        if (!el || !ch) return;
+        ch.resize();
+        const kunci = `${Math.round(el.clientWidth / 40)}x${Math.round(el.clientHeight / 40)}`;
+        if (kunci === ukuranRef.current || !opsiDasarRef.current) return;
+        ukuranRef.current = kunci;
+        ch.setOption(rapikanUntukUkuran(opsiDasarRef.current, el.clientWidth, el.clientHeight), true);
+      });
       resizeObserver.observe(chartRef.current);
+      if (!disposed) setFase('siap');
+    }).catch(() => {
+      if (!disposed) setFase('gagal');
     });
 
     return () => {
@@ -357,7 +409,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       if (container && handleDomClick) container.removeEventListener('click', handleDomClick);
       resizeObserver?.disconnect();
     };
-  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style, chartId, rancangan]);
+  }, [type, view, stacked, showLegend, min, max, displayUnit, selected, setSelected, themeMode, aksenKanvas, isSeleksi, points, links, waterfall, boxRaw, treemapData, geoData, ganttData, style, chartId, rancangan, ulang]);
 
   // Buang instance chart saat komponen unmount permanen (widget dihapus).
   useEffect(() => {
@@ -464,10 +516,12 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
           {tabel.baris.map((row, ri) => (
             <tr key={ri} className={ri % 2 ? 'bg-surface-2/50' : ''}>
               {row.map((cell, ci) => (
-                <td key={ci} className="text-ink-2 border border-line px-2 py-1 font-mono">
-                  {typeof cell === 'number'
-                    ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(cell)
-                    : cell}
+                <td
+                  key={ci}
+                  className="text-ink-2 border border-line px-2 py-1 font-mono"
+                  title={typeof cell === 'number' ? angkaRingkas(cell, 2) : undefined}
+                >
+                  {typeof cell === 'number' ? angkaRingkas(cell, 2) : cell}
                 </td>
               ))}
             </tr>
@@ -499,6 +553,32 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
       {!padat && <div className="flex justify-end mb-1">{toggleDataButton}</div>}
       <div className={`relative flex-1 ${padat ? 'min-h-0' : 'min-h-[190px]'}`}>
         <div ref={chartRef} className={`absolute inset-0 ${showData ? 'invisible' : ''}`} />
+
+        {/* Mesin chart belum siap: beri keterangan, jangan biarkan kosong. */}
+        {fase !== 'siap' && TIPE_ECHARTS.includes(type) && !showData && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center px-4">
+            {fase === 'muat' ? (
+              <>
+                <span className="w-5 h-5 rounded-full border-2 border-line border-t-brand animate-spin" />
+                <span className="text-[11px] text-ink-3">Menyiapkan grafik…</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[11px] text-ink-3">Grafik belum bisa dimuat.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFase('muat');
+                    setUlang((n) => n + 1);
+                  }}
+                  className="px-2.5 py-1 rounded-control text-[11px] font-semibold border border-line bg-surface text-ink-2 hover:bg-surface-2"
+                >
+                  Coba lagi
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {/**
          * Cincin (donut) diberi TOTAL di lubang tengahnya — mengikuti dashboard
          * keuangan pada referensi desain. Ditulis sebagai lapisan HTML (bukan
@@ -512,7 +592,7 @@ export const ChartEcharts: React.FC<ChartEchartsProps> = ({
             style={{ top: showLegend ? '35%' : '50%', transform: 'translateY(-50%)' }}
           >
             <div className="text-[15px] font-bold leading-none text-ink tabular-nums">
-              {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(totalDonut)}
+              {angkaRingkas(totalDonut, 1)}
               {displayUnit ? (
                 <span className="ml-0.5 text-[9px] font-medium text-ink-3">
                   {displayUnit.replace(/^Miliar\s*Rp$/i, 'M').replace(/^Juta\s*Rp$/i, 'jt').replace(/^Miliar$/i, 'M')}

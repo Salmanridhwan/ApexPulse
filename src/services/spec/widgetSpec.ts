@@ -78,7 +78,7 @@ export const KpiDataSchema = z.object({
   target: z.number().optional(),
   targetLabel: z.string().optional(),
   sparkline: z.array(z.number()).optional(),
-  /** Asal grafik tren (jejak audit: seri dokumen / turunan delta / turunan nilai). */
+  /** Asal grafik tren (seri dokumen / turunan delta / turunan nilai). */
   sparklineAsal: z.enum(['dokumen-seri', 'turunan-delta', 'turunan-nilai']).optional(),
 });
 

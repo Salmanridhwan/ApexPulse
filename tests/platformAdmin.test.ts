@@ -27,7 +27,6 @@ test('Admin Instansi tidak melihat tab lintas instansi', () => {
   assert.ok(!id.includes('tenants'), 'daftar instansi lain tidak boleh terlihat');
   assert.ok(!id.includes('rag'), 'konfigurasi RAG platform tidak boleh terlihat');
   assert.ok(!id.includes('kuota'), 'kuota AI semua instansi tidak boleh terlihat');
-  assert.ok(!id.includes('audit'), 'audit lintas instansi tidak boleh terlihat');
 });
 
 test('Admin Instansi tetap punya tab untuk urusan instansinya', () => {

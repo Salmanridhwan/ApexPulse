@@ -128,7 +128,7 @@ const PAKET = [
       'Semua isi paket Dasar',
       'Permintaan data: pengguna mengajukan, admin menyusun halaman',
       'Katalog data dari dokumen resmi, langsung jadi kartu dashboard',
-      'Peringatan otomatis & jejak audit lengkap',
+      'Kotak masuk notifikasi untuk tiap pengguna',
       'Ekspor CSV/PDF dan mode presentasi',
     ],
   },
@@ -201,7 +201,6 @@ export function halamanSyarat(kontak: Kontak = konfigKontak()): string {
     <li>Satu akun dipakai oleh satu orang. Kredensial tidak boleh dibagikan.</li>
     <li>Pendaftaran mandiri menghasilkan akun berstatus menunggu; akses aktif setelah disetujui admin instansi.</li>
     <li>Admin instansi bertanggung jawab menetapkan peran, menonaktifkan akun yang tidak lagi berhak, dan menjaga kerahasiaan PIN tautan bagikan.</li>
-    <li>Kegiatan masuk, perubahan data, dan tindakan administratif dicatat dalam jejak audit.</li>
   </ul>
 
   <h2>3. Penggunaan yang dilarang</h2>

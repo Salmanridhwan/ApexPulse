@@ -1,5 +1,5 @@
 import { cukupTerang, GAYA, gayaMode } from '../../services/chart/gayaVarian';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CHART_DEFAULT } from '../../services/chart/chartDefault';
 import { chartKatalogCocok, pakaiChartKatalog } from '../../services/chart/katalogCocok';
 import { createPortal } from 'react-dom';
@@ -9,6 +9,7 @@ import {
   Database,
   Edit2,
   FileSearch,
+  Loader2,
   MoreVertical,
   Target,
   Trash2,
@@ -165,6 +166,53 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   // Panel sumber dokumen: dibuka dengan mengeklik kartu (grafik: area kosong,
   // supaya klik batang tetap dipakai seleksi lintas-chart) atau ikon sumber.
   const [bukaSumber, setBukaSumber] = useState(false);
+
+  /**
+   * PEMILIH PERIODE.
+   *
+   * Kartu yang memuat beberapa periode (satu indikator dari beberapa dokumen)
+   * menampilkan satu periode pada satu waktu. Indeks -1 = semua periode, hanya
+   * ditawarkan bila semua periode punya kategori yang sama sehingga bisa
+   * digambar sebagai beberapa deret.
+   */
+  const periodeData = widget.periodeData;
+  const bolehSemua =
+    !!periodeData &&
+    periodeData.length > 1 &&
+    // Semua periode sekaligus hanya masuk akal bila kategorinya sedikit; 36
+    // kategori x 11 periode menghasilkan ratusan batang yang tidak terbaca.
+    periodeData[0].xAxis.length <= 12 &&
+    periodeData.every(
+      (p) => p.xAxis.length === periodeData[0].xAxis.length && p.xAxis.join('|') === periodeData[0].xAxis.join('|')
+    );
+  /**
+   * Periode terbaru yang PUNYA ANGKA. Kalau periode terakhir seluruhnya nol
+   * (bulan berjalan yang belum diisi), donat dan sebagian grafik tidak
+   * menggambar apa pun — jadi dipilih periode terakhir yang ada isinya.
+   */
+  const periodeAwal = (): number => {
+    if (!periodeData || periodeData.length < 2) return 0;
+    for (let i = periodeData.length - 1; i >= 0; i--) {
+      if (periodeData[i].series.some((s) => s.data.some((v) => Number(v) !== 0))) return i;
+    }
+    return periodeData.length - 1;
+  };
+  const [periodeIdx, setPeriodeIdx] = useState(periodeAwal);
+  useEffect(() => {
+    // Data kartu berganti (mis. setelah analisis ulang): kembali ke periode berisi.
+    setPeriodeIdx(periodeAwal());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id, periodeData?.length]);
+
+  const widgetTampil = useMemo(() => {
+    if (!periodeData || periodeIdx < 0 || !periodeData[periodeIdx]) return widget;
+    const p = periodeData[periodeIdx];
+    return {
+      ...widget,
+      periodeAktif: p.periode,
+      chart: { ...(widget.chart || { xAxis: [], series: [] }), xAxis: p.xAxis, series: p.series },
+    };
+  }, [widget, periodeData, periodeIdx]);
   const bisaSumber = !preview && !widget.dataKosong;
   const grafikKanvas = katalog && grafikKatalog(widget);
   const gPanel = bk ? gKatalog : gayaMode('default', mode);
@@ -256,6 +304,26 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         )}
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Pemilih periode: satu kartu memuat beberapa periode, tampil satu per satu. */}
+          {!!periodeData && periodeData.length > 1 && (
+            <select
+              value={periodeIdx}
+              onChange={(e) => setPeriodeIdx(Number(e.target.value))}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="max-w-[136px] text-[10px] font-semibold rounded-chip border border-line bg-surface px-1.5 py-0.5 text-ink-2 cursor-pointer"
+              title="Pilih periode yang ditampilkan"
+              data-testid="pilih-periode-kartu"
+            >
+              {bolehSemua && <option value={-1}>Semua periode</option>}
+              {periodeData.map((p, i) => (
+                <option key={`${p.periode}-${i}`} value={i}>
+                  {p.periode}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Hanya penanda koreksi manual yang tersisa — tanpa label provenans AI/sumber. */}
           {isManual && (
             <span
@@ -392,7 +460,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
           filter: bukaSumber ? 'blur(4px)' : 'none',
           transform: bukaSumber ? 'scale(1.04)' : 'none',
         }}
-        className={`kartu-sumber-depan flex-1 flex flex-col ${
+        className={`kartu-sumber-depan flex-1 flex flex-col overflow-y-auto gulir-tema ${
           bk
             ? padat ? 'p-1.5 min-h-0' : 'p-2.5 min-h-0'
             : padat
@@ -406,22 +474,36 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
       >
         {widget.dataKosong ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center gap-1.5 py-3">
-            <Database className="w-6 h-6 text-ink-3 opacity-60" />
-            <p className="text-[12px] font-semibold text-ink-2">Belum ada di dokumen</p>
+            {/*
+              DUA SEBAB KOSONG YANG BERBEDA. `dataTertunda` = pengisian belum
+              selesai (waktu/layanan habis) dan akan lanjut sendiri; tanpa tanda
+              ini pengguna melihat puluhan kartu "belum ada di dokumen" padahal
+              dokumennya hanya belum selesai dibaca.
+            */}
+            {widget.dataTertunda ? (
+              <Loader2 className="w-6 h-6 text-brand/70 animate-spin" />
+            ) : (
+              <Database className="w-6 h-6 text-ink-3 opacity-60" />
+            )}
+            <p className="text-[12px] font-semibold text-ink-2">
+              {widget.dataTertunda ? 'Sedang diisi dari dokumen' : 'Belum ada di dokumen'}
+            </p>
             <p className="text-[10.5px] text-ink-3 leading-relaxed max-w-[34ch]">
               {widget.catatanData || 'Indikator ini tidak ditemukan di dokumen instansi.'}
             </p>
             <p className="text-[10px] text-ink-3 italic">
-              Tidak ada angka contoh yang ditampilkan.
+              {widget.dataTertunda
+                ? 'Angka menyusul otomatis, tidak perlu muat ulang.'
+                : 'Tidak ada angka contoh yang ditampilkan.'}
             </p>
           </div>
         ) : bk?.dalam ? (
           // Gaya bening: chart digambar di atas kotak kaca buram, seperti di Template Chart.
           <div className="rounded-[16px] border p-2 flex-1 min-h-0 flex flex-col" style={bk.dalam}>
-            <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+            <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
           </div>
         ) : (
-          <WidgetRenderer widget={widget} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+          <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
         )}
       </div>
     </div>

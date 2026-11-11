@@ -132,6 +132,66 @@ function barisKosong(row: SelNilai[]): boolean {
   return row.every((c) => c === null || c === undefined || String(c).trim() === '');
 }
 
+/** Sel yang isinya angka (tipe angka, atau teks yang seluruhnya angka/ribuan). */
+function tampakAngka(v: SelNilai): boolean {
+  if (typeof v === 'number') return Number.isFinite(v);
+  const s = String(v ?? '').trim().replace(/\s|\u00a0/g, '');
+  if (!s) return false;
+  return /^[-+(]?[\d.,]+[%)]?$/.test(s) && /\d/.test(s);
+}
+
+/**
+ * Pilih baris header yang sebenarnya.
+ *
+ * Berkas nyata dari instansi hampir selalu diawali baris judul ("PT. …",
+ * "LAPORAN PEMAKAIAN ANGGARAN", "Periode Oktober 2026") yang hanya mengisi satu
+ * sel. Dulu baris pertama berisi itu dianggap header, sehingga kolomnya jadi
+ * "Kolom 2, Kolom 3, …" dan seluruh berkas tidak bisa dipetakan.
+ *
+ * Aturan yang dipakai (dan sengaja konservatif — tidak menebak data):
+ * - header adalah baris yang cukup lebar (paling sedikit 35% dari lebar maksimum
+ *   di 30 baris pertama) dan berisi teks, bukan angka;
+ * - baris sesudahnya harus berisi angka, karena header selalu diikuti data;
+ * - kalau tidak ada yang memenuhi, kembali ke perilaku lama (baris pertama yang
+ *   berisi) supaya berkas tanpa angka tetap bisa dibaca.
+ *
+ * @returns indeks baris header, atau -1 bila lembar benar-benar kosong.
+ */
+export function pilihBarisHeader(matriks: SelNilai[][]): number {
+  const batas = Math.min(matriks.length, 30);
+  const profil = matriks.slice(0, batas).map((row) => {
+    const isi = row.filter((c) => !barisKosong([c]));
+    const angka = isi.filter((c) => tampakAngka(c)).length;
+    return { isi: isi.length, angka, teks: isi.length - angka };
+  });
+  const maksIsi = profil.reduce((m, p) => Math.max(m, p.isi), 0);
+  if (maksIsi === 0) return -1;
+  const lebarMinimum = Math.max(2, Math.ceil(maksIsi * 0.35));
+
+  /** Jumlah sel angka pada lima baris setelah kandidat. */
+  const angkaSetelah = (i: number): number => {
+    let n = 0;
+    for (let j = i + 1; j < Math.min(matriks.length, i + 6); j++) {
+      n += matriks[j].filter((c) => tampakAngka(c)).length;
+    }
+    return n;
+  };
+
+  for (let i = 0; i < batas; i++) {
+    const p = profil[i];
+    if (p.isi < lebarMinimum || p.teks < 2) continue;
+    if (p.angka <= 1 && angkaSetelah(i) >= 2) return i;
+  }
+  // Cadangan: header yang memuat beberapa angka (mis. tahun tertulis sebagai angka).
+  for (let i = 0; i < batas; i++) {
+    const p = profil[i];
+    if (p.isi < lebarMinimum || p.teks < 2) continue;
+    const setelah = angkaSetelah(i);
+    if (setelah >= 3 && p.angka * 2 < setelah) return i;
+  }
+  return matriks.findIndex((row) => !barisKosong(row));
+}
+
 /**
  * Baca berkas Excel/CSV menjadi tabel terstruktur.
  *
@@ -155,8 +215,8 @@ export function bacaTabel(buffer: Buffer, sheet?: string): TabelTerbaca {
     blankrows: false,
   });
 
-  // Cari baris header: baris pertama yang punya >= 1 sel berisi.
-  let idxHeader = matriks.findIndex((row) => !barisKosong(row));
+  // Cari baris header yang sebenarnya (bukan baris judul di atasnya).
+  const idxHeader = pilihBarisHeader(matriks);
   if (idxHeader === -1) {
     return { namaSheet, daftarSheet, kolom: [], baris: [], totalBaris: 0, dipotong: false };
   }

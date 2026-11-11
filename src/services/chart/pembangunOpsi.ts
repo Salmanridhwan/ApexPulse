@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { cukupTerang, type GayaVarian } from './gayaVarian';
+import { angkaRingkas } from '../format/angkaRingkas';
 
 /**
  * BENTUK DATA TUNGGAL UNTUK SEMUA CHART.
@@ -76,29 +77,27 @@ const angkaSah = (d: DataChart): number[] =>
 
 export const format = (v: number, d: DataChart): string => {
   const desimal = typeof d.desimal === 'number' ? d.desimal : Number.isInteger(v) ? 0 : 1;
-  return v.toLocaleString('id-ID', { maximumFractionDigits: desimal });
+  return angkaRingkas(v, desimal);
 };
 
 /**
- * Label sumbu ringkas gaya Indonesia: 612.400.000 -> "612,4 jt". Sumbu tidak
- * punya ruang untuk angka penuh; angka lengkap tetap tampil di tooltip.
+ * Angka untuk tooltip. Dulu angka utuh, kini ikut aturan angka ringkas
+ * (jt/M/T) yang berlaku di semua komponen chart.
  */
-export const ringkasSumbu = (v: number): string => {
-  const mutlak = Math.abs(v);
-  const tingkat: Array<[number, string]> = [
-    [1e12, ' T'],
-    [1e9, ' M'],
-    [1e6, ' jt'],
-    [1e3, ' rb'],
-  ];
-  for (const [batas, akhiran] of tingkat) {
-    if (mutlak >= batas) return `${(v / batas).toLocaleString('id-ID', { maximumFractionDigits: 1 })}${akhiran}`;
-  }
-  return v.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+const formatPenuh = (v: number, d: DataChart): string => {
+  const desimal = typeof d.desimal === 'number' ? d.desimal : Number.isInteger(v) ? 0 : 2;
+  return angkaRingkas(v, desimal);
 };
 
+/**
+ * Label sumbu memakai aturan angka ringkas yang sama dengan tooltip, label,
+ * dan KPI (mis. 612.400.000 -> "612,4 jt"), supaya satu angka tidak tampil
+ * dalam dua bentuk berbeda di satu chart.
+ */
+export const ringkasSumbu = (v: number): string => angkaRingkas(v, 1);
+
 export const labelNilai = (v: number, d: DataChart): string =>
-  d.satuan ? `${format(v, d)} ${d.satuan}` : format(v, d);
+  d.satuan ? `${formatPenuh(v, d)} ${d.satuan}` : formatPenuh(v, d);
 
 /** Gradasi dari warna aksen ke arah yang ditentukan gaya varian. */
 const gradien = (g: GayaVarian, warna: string, tebal = 1) => {
@@ -1072,10 +1071,13 @@ export const treemapPorsi: Pembangun = (d, g, s) => {
           show: true,
           color: '#ffffff',
           fontSize: 10 * s,
-          fontWeight: 700,
+          fontWeight: 400,
+          // Huruf tebal di petak berwarna pekat terbaca berat; pakai bobot normal
+          // dengan keluarga huruf yang lebih ringan di layar.
+          fontFamily: 'Segoe UI, system-ui, -apple-system, Roboto, sans-serif',
           lineHeight: 14 * s,
           formatter: (p: any) => `${p.name}\n{n|${format(p.value, d)} · ${format((p.value / total) * 100, { ...d, desimal: 0 })}%}`,
-          rich: { n: { fontSize: 9 * s, fontWeight: 500, color: 'rgba(255,255,255,0.85)' } },
+          rich: { n: { fontSize: 9 * s, fontWeight: 400, fontFamily: 'Segoe UI, system-ui, -apple-system, Roboto, sans-serif', color: 'rgba(255,255,255,0.9)' } },
         },
         data: d.kategori.map((k, i) => ({
           name: k,

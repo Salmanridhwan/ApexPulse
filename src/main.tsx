@@ -1,9 +1,14 @@
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { PenjagaGalat } from './components/PenjagaGalat';
 import { applyTheme, getInitialTheme } from './theme';
 import './index.css';
 
 // Terapkan tema sebelum render pertama agar tidak berkedip.
 applyTheme(getInitialTheme());
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <PenjagaGalat>
+    <App />
+  </PenjagaGalat>
+);

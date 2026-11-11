@@ -5,6 +5,7 @@ import type { ButirData, PermintaanData } from '../types';
 import { DASHBOARD_TEMPLATES } from '../services/templates/dashboardTemplates';
 import { saranTemplate } from '../services/analisis/rekomendasiKategoriTemplate';
 import { isiSlotTemplate, slotKosong } from '../services/analisis/butirKeSlotTemplate';
+import { cekAturanDashboard } from '../services/analisis/aturanDashboard';
 
 /**
  * KATALOG DATA — memilih butir mana yang naik ke halaman.
@@ -122,6 +123,12 @@ export const KatalogDataPanel: React.FC<Props> = ({ permintaan, admin, onSelesai
   const buat = async () => {
     if (butirTerpilih.length === 0) {
       setGalat('Centang dulu butir yang mau dipakai.');
+      return;
+    }
+    // Aturan dashboard baru: minimal 3 chart dan semuanya berhubungan.
+    const aturan = cekAturanDashboard(butirTerpilih);
+    if (!aturan.boleh) {
+      setGalat(aturan.pesan);
       return;
     }
     setMembuat(true);

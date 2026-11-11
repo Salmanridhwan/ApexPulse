@@ -15,7 +15,6 @@ import {
   Menu,
   Pencil,
   Plus,
-  Radio,
   RefreshCw,
   Search,
   Server,
@@ -31,11 +30,9 @@ import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
 import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
-import { AlertRule, AuditLog, BumdSector, Tenant, User, UserRole } from '../types';
+import { BumdSector, Tenant, User, UserRole } from '../types';
 import { KUOTA_ANALISIS_BAWAAN } from '../services/analisis/antrean';
 
-/** Jumlah baris per halaman jejak audit di UI (server membatasi 500 bawaan). */
-const UKURAN_HALAMAN_AUDIT = 50;
 
 /** Label sektor untuk ditampilkan (sektor tetap dipetakan dari dokumen KB). */
 const LABEL_SEKTOR: Record<BumdSector, string> = {
@@ -160,27 +157,6 @@ export const Admin: React.FC<AdminProps> = ({
   const [cfgTersimpan, setCfgTersimpan] = useState('');
   /** Tampilkan API key sebagai teks (bawaan: bertopeng). */
   const [tampilKunci, setTampilKunci] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
-  /**
-   * Form aturan ambang batas baru.
-   *
-   * Dulu tab ini hanya bisa MENGUBAH aturan yang sudah ada: `POST /api/alerts`
-   * tidak punya jalur di panel, jadi instansi baru tidak bisa membuat aturan
-   * pertamanya dari sini. Satu aturan butuh beberapa nilai sekaligus, jadi
-   * dipakai form — bukan rangkaian `prompt()`.
-   */
-  const [formAturanOpen, setFormAturanOpen] = useState(false);
-  const [formAturan, setFormAturan] = useState({
-    title: '',
-    metricName: '',
-    operator: '>=' as AlertRule['operator'],
-    threshold: '',
-    unit: '%',
-    severity: 'warning' as AlertRule['severity'],
-  });
-  const [galatAturan, setGalatAturan] = useState('');
-  const [menyimpanAturan, setMenyimpanAturan] = useState(false);
   /** Tab Kuota AI (khusus Admin Aiones). */
   const [kuotaAi, setKuotaAi] = useState<number>(KUOTA_ANALISIS_BAWAAN);
   const [kuotaPer, setKuotaPer] = useState<Array<{ tenantId: string; nama: string; terpakai: number; kuota: number; sisa: number }>>([]);
@@ -188,23 +164,9 @@ export const Admin: React.FC<AdminProps> = ({
   const [pesanKuota, setPesanKuota] = useState<{ ok: boolean; teks: string } | null>(null);
   /** Ringkasan lintas instansi (Admin Aiones). Null untuk Admin Instansi. */
   const [platform, setPlatform] = useState<any>(null);
-  /** Penyaring jejak audit. Admin Instansi tidak bisa mengubah instansinya. */
-  const [filterAudit, setFilterAudit] = useState<{
-    tenantId: string;
-    aksi: string;
-    pengguna: string;
-    dari: string;
-    sampai: string;
-    offset: number;
-  }>({ tenantId: 'semua', aksi: '', pengguna: '', dari: '', sampai: '', offset: 0 });
-  const [auditTotal, setAuditTotal] = useState(0);
-  const [memuatAudit, setMemuatAudit] = useState(false);
-  /** Pesan gagal muat — supaya kegagalan tidak tampil sebagai "data kosong". */
-  const [galatAudit, setGalatAudit] = useState<string | null>(null);
   const [galatPlatform, setGalatPlatform] = useState<string | null>(null);
   /** Penjaga urutan permintaan: hanya respons terbaru yang boleh menulis state. */
   const platformSeq = useRef(0);
-  const auditSeq = useRef(0);
   const superadmin = currentUser?.role === 'superadmin';
   /** Sektor yang benar-benar dipakai instansi (bukan angka statis). */
   const sektorAktif = new Set(tenants.map((t) => t.sector)).size;
@@ -230,37 +192,6 @@ export const Admin: React.FC<AdminProps> = ({
       if (urut !== platformSeq.current) return;
       // Jangan diam: tanpa pesan, admin mengira angkanya nol padahal gagal muat.
       setGalatPlatform(err instanceof Error ? err.message : 'Ringkasan platform gagal dimuat.');
-    }
-  };
-
-  /** Muat jejak audit sesuai penyaring aktif. */
-  const muatAudit = async (saring = filterAudit) => {
-    const urut = ++auditSeq.current;
-    setMemuatAudit(true);
-    setGalatAudit(null);
-    try {
-      const q = new URLSearchParams();
-      if (superadmin && saring.tenantId) q.set('tenantId', saring.tenantId);
-      if (saring.aksi.trim()) q.set('aksi', saring.aksi.trim());
-      if (saring.pengguna.trim()) q.set('pengguna', saring.pengguna.trim());
-      if (saring.dari) q.set('dari', saring.dari);
-      if (saring.sampai) q.set('sampai', saring.sampai);
-      // Selalu minta bentuk berhalaman supaya UI tahu total sebenarnya dan bisa
-      // memberi tahu kalau data lebih banyak dari satu layar.
-      q.set('limit', String(UKURAN_HALAMAN_AUDIT));
-      q.set('offset', String(Math.max(0, saring.offset)));
-      const res = await fetch(`/api/audit-logs?${q}`);
-      if (!res.ok) throw new Error(`Server menjawab HTTP ${res.status}.`);
-      const data = await res.json();
-      if (urut !== auditSeq.current) return;
-      const baris = Array.isArray(data) ? data : Array.isArray(data?.logs) ? data.logs : [];
-      setAuditLogs(baris);
-      setAuditTotal(Array.isArray(data) ? baris.length : Number(data?.total ?? baris.length));
-    } catch (err) {
-      if (urut !== auditSeq.current) return;
-      setGalatAudit(err instanceof Error ? err.message : 'Jejak audit gagal dimuat.');
-    } finally {
-      if (urut === auditSeq.current) setMemuatAudit(false);
     }
   };
 
@@ -304,7 +235,6 @@ export const Admin: React.FC<AdminProps> = ({
 
   useEffect(() => {
     if (activeTab === 'overview') void muatPlatform();
-    if (activeTab === 'audit') void muatAudit();
     if (activeTab === 'kuota') void muatKuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -448,13 +378,11 @@ export const Admin: React.FC<AdminProps> = ({
       // Semua endpoint ini butuh sesi + role admin — kalau 401/403 jangan
       // masukkan body error ke state array (bikin .filter/.map meledak).
       const j = (r: Response) => (r.ok ? r.json() : null);
-      const [statsRes, usersRes, tenantsRes, configRes, logsRes, alertsRes] = await Promise.all([
+      const [statsRes, usersRes, tenantsRes, configRes] = await Promise.all([
         fetch('/api/admin/stats').then(j),
         fetch('/api/admin/users').then(j),
         fetch('/api/tenants').then(j),
         fetch('/api/admin/config').then(j),
-        fetch('/api/audit-logs').then(j),
-        fetch('/api/alerts').then(j),
       ]);
 
       if (statsRes) setStats(statsRes);
@@ -465,8 +393,6 @@ export const Admin: React.FC<AdminProps> = ({
         // Titik acuan "belum disimpan": setiap kali data dimuat ulang, anggap bersih.
         setCfgTersimpan(jejakCfg(configRes));
       }
-      if (Array.isArray(logsRes)) setAuditLogs(logsRes);
-      if (Array.isArray(alertsRes)) setAlertRules(alertsRes);
       const gabungRes = await fetch('/api/admin/join-requests').then(j);
       if (Array.isArray(gabungRes)) {
         setPermintaanGabung(gabungRes);
@@ -531,86 +457,6 @@ export const Admin: React.FC<AdminProps> = ({
       alert(err instanceof Error ? err.message : 'Gagal menolak pendaftaran.');
     } finally {
       setMemproses(null);
-    }
-  };
-
-  /** Ubah satu aturan ambang batas dari panel admin (ambang / status aktif). */
-  const ubahAturanAlert = async (rule: AlertRule, perubahan: Partial<AlertRule>) => {
-    try {
-      const res = await fetch(`/api/alerts/${rule.id}?tenantId=${encodeURIComponent(rule.tenantId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...perubahan, tenantId: rule.tenantId }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `Gagal menyimpan (HTTP ${res.status}).`);
-      }
-      await loadData();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menyimpan aturan ambang batas.');
-    }
-  };
-
-  /** Hapus aturan ambang batas beserta notifikasinya. */
-  const hapusAturanAlert = async (rule: AlertRule) => {
-    const yakin = window.confirm(
-      `Hapus aturan "${rule.metricName} ${rule.operator} ${rule.threshold} ${rule.unit}"? Tindakan ini tidak bisa dibatalkan.`
-    );
-    if (!yakin) return;
-    try {
-      const res = await fetch(`/api/alerts/${rule.id}?tenantId=${encodeURIComponent(rule.tenantId)}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `Gagal menghapus (HTTP ${res.status}).`);
-      }
-      await loadData();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menghapus aturan ambang batas.');
-    }
-  };
-
-  /** Simpan aturan ambang batas baru (`POST /api/alerts`). */
-  const simpanAturanBaru = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGalatAturan('');
-    if (!formAturan.metricName.trim()) {
-      setGalatAturan('Nama indikator wajib diisi (mis. NRW atau Kepatuhan SOP).');
-      return;
-    }
-    const ambang = Number(String(formAturan.threshold).replace(',', '.'));
-    if (!Number.isFinite(ambang)) {
-      setGalatAturan('Ambang batas harus berupa angka.');
-      return;
-    }
-    setMenyimpanAturan(true);
-    try {
-      const res = await fetch('/api/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formAturan.title.trim() || `${formAturan.metricName.trim()} ${formAturan.operator} ${ambang}${formAturan.unit}`,
-          metricKey: 'kpi',
-          metricName: formAturan.metricName.trim(),
-          operator: formAturan.operator,
-          threshold: ambang,
-          unit: formAturan.unit.trim() || '%',
-          severity: formAturan.severity,
-          channels: ['in_app'],
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `Gagal menyimpan aturan (HTTP ${res.status}).`);
-      setFormAturanOpen(false);
-      setFormAturan({ title: '', metricName: '', operator: '>=', threshold: '', unit: '%', severity: 'warning' });
-      await loadData();
-    } catch (err) {
-      // Jangan tutup form: admin harus melihat alasannya dan bisa memperbaiki isian.
-      setGalatAturan(err instanceof Error ? err.message : 'Gagal menyimpan aturan ambang batas.');
-    } finally {
-      setMenyimpanAturan(false);
     }
   };
 
@@ -1075,7 +921,7 @@ export const Admin: React.FC<AdminProps> = ({
 
   /** Hapus Instansi BUMD beserta data terkait */
   const handleDeleteTenant = async (tenant: Tenant) => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus instansi "${tenant.name}"?\nSeluruh data terkait instansi ini (pengguna, dashboard, tautan bagikan, notifikasi, aturan alert, riwayat audit) akan dihapus.`)) {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus instansi "${tenant.name}"?\nSeluruh data terkait instansi ini (pengguna, dashboard, tautan bagikan, notifikasi) akan dihapus.`)) {
       return;
     }
     try {
@@ -1088,7 +934,7 @@ export const Admin: React.FC<AdminProps> = ({
         return;
       }
       // Buang instansi + penggunanya dari state lokal, lalu muat ulang agar
-      // daftar pengguna/log audit/dashboard benar-benar sinkron dengan server.
+      // daftar pengguna/dashboard benar-benar sinkron dengan server.
       setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
       setUsers((prev) => prev.filter((u) => u.tenantId !== tenant.id));
       void loadData();
@@ -1463,7 +1309,6 @@ export const Admin: React.FC<AdminProps> = ({
                   { label: 'Pengguna Aktif', nilai: String(users.length), sub: 'RBAC Terproteksi', accent: 'var(--color-violet)' },
                   { label: 'Total Dashboard', nilai: stats ? String(stats.dashboardsCount) : '—', sub: stats ? `${stats.totalWidgets} widget` : 'memuat…', accent: 'var(--color-brand)' },
                   { label: 'Sitasi Resmi', nilai: stats ? String(stats.totalCitations) : '—', sub: 'Tervalidasi', accent: 'var(--color-pos)' },
-                  { label: 'Aturan Ambang', nilai: String(alertRules.length), sub: 'Evaluasi Otomatis', accent: 'var(--color-warn)' },
                   { label: 'Provider RAG', nilai: stats?.ragProvider === 'http' ? 'API HTTP' : 'Mock Lokal', sub: 'Sehat (Online)', accent: 'var(--color-brand)' },
                 ].map((m, i) => (
                   <div
@@ -1523,46 +1368,6 @@ export const Admin: React.FC<AdminProps> = ({
                 </div>
               </div>
 
-              {/* Recent Audit Activities */}
-              <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-ink flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-pos" />
-                    <span>Aktivitas & Log Audit Terakhir</span>
-                  </h3>
-                  <button
-                    onClick={() => onSelectTab('audit')}
-                    className="text-xs text-brand hover:underline font-medium"
-                  >
-                    Lihat Seluruh Log &rarr;
-                  </button>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  {auditLogs.slice(0, 5).map((log) => (
-                    <ItemCard
-                      key={log.id}
-                      accent="var(--color-brand)"
-                      icon={<span className="w-1.5 h-1.5 rounded-full bg-brand block" />}
-                      title={
-                        <>
-                          <span className="font-semibold">{log.action}</span>
-                          <span className="font-normal text-ink-2"> · {log.target}</span>
-                        </>
-                      }
-                      meta={log.details}
-                      trailing={
-                        <>
-                          <span className="text-[11px] text-ink-3">{log.userName}</span>
-                          <span className="block text-[10px] text-ink-3">
-                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </>
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -2633,408 +2438,6 @@ export const Admin: React.FC<AdminProps> = ({
             </div>
           )}
 
-          {activeTab === 'alerts' && (
-            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-ink">
-                    Daftar Aturan Ambang Batas &amp; Peringatan Otomatis
-                    {superadmin ? ' (instansi yang dipilih)' : ' (instansi Anda)'}
-                  </h3>
-                  <p className="text-xs text-ink-2">
-                    Peringatan dini bagi Direksi dan Pengawas saat indikator melanggar batasan regulasi
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  data-testid="tambah-aturan"
-                  onClick={() => { setGalatAturan(''); setFormAturanOpen((v) => !v); }}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control text-xs font-medium transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{formAturanOpen ? 'Tutup Form' : 'Tambah Aturan'}</span>
-                </button>
-              </div>
-
-              {formAturanOpen && (
-                <form onSubmit={simpanAturanBaru} className="p-4 bg-surface-2 border border-line rounded-card space-y-3 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Nama indikator</span>
-                      <input
-                        data-testid="aturan-indikator"
-                        value={formAturan.metricName}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, metricName: e.target.value }))}
-                        placeholder="mis. NRW"
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Judul aturan (opsional)</span>
-                      <input
-                        value={formAturan.title}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, title: e.target.value }))}
-                        placeholder="Kosongkan untuk dibuat otomatis"
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Operator</span>
-                      <select
-                        value={formAturan.operator}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, operator: e.target.value as AlertRule['operator'] }))}
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      >
-                        <option value=">=">&ge;</option>
-                        <option value="<=">&le;</option>
-                        <option value=">">&gt;</option>
-                        <option value="<">&lt;</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Ambang batas</span>
-                      <input
-                        data-testid="aturan-ambang"
-                        value={formAturan.threshold}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, threshold: e.target.value }))}
-                        inputMode="decimal"
-                        placeholder="mis. 25"
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Satuan</span>
-                      <input
-                        value={formAturan.unit}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, unit: e.target.value }))}
-                        placeholder="%"
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="block font-medium text-ink-2">Tingkat</span>
-                      <select
-                        value={formAturan.severity}
-                        onChange={(e) => setFormAturan((f) => ({ ...f, severity: e.target.value as AlertRule['severity'] }))}
-                        className="w-full px-2.5 py-1.5 rounded-control border border-line bg-surface text-ink"
-                      >
-                        <option value="warning">Peringatan</option>
-                        <option value="critical">Kritis</option>
-                      </select>
-                    </label>
-                  </div>
-                  {galatAturan && (
-                    <p data-testid="galat-aturan" className="text-neg">{galatAturan}</p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      data-testid="simpan-aturan"
-                      disabled={menyimpanAturan}
-                      className="px-3 py-1.5 bg-brand hover:brightness-95 text-on-brand rounded-control font-medium disabled:opacity-50"
-                    >
-                      {menyimpanAturan ? 'Menyimpan…' : 'Simpan Aturan'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormAturanOpen(false)}
-                      className="px-3 py-1.5 border border-line rounded-control text-ink-2 hover:bg-line/40"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              <div className="space-y-3">
-                {alertRules.map((rule) => {
-                  const tenant = tenants.find((t) => t.id === rule.tenantId);
-                  return (
-                    <div
-                      key={rule.id}
-                      className="p-4 bg-surface-2 border border-line rounded-card flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-ink">{rule.title}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${rule.severity === 'critical'
-                                ? 'bg-neg/15 text-neg'
-                                : 'bg-warn/15 text-warn'
-                              }`}
-                          >
-                            {rule.severity.toUpperCase()}
-                          </span>
-                        </div>
-                        <p className="text-ink-2 mt-1">
-                          Kondisi: <strong>{rule.metricName}</strong> {rule.operator} {rule.threshold} {rule.unit}
-                        </p>
-                        <p className="text-[11px] text-ink-3 mt-0.5">
-                          Instansi: {tenant?.name || 'Semua BUMD'} • Kanal: {rule.channels.join(' & ')}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 flex items-center gap-1.5">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-chip border ${
-                            rule.isActive
-                              ? 'text-pos bg-pos/15 border-pos/30'
-                              : 'text-ink-3 bg-surface border-line'
-                          }`}
-                        >
-                          <Check className="w-3 h-3" /> {rule.isActive ? 'Aktif' : 'Nonaktif'}
-                        </span>
-                        <button
-                          type="button"
-                          title={rule.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                          onClick={() => void ubahAturanAlert(rule, { isActive: !rule.isActive })}
-                          className="p-1.5 rounded-chip text-ink-3 hover:text-ink hover:bg-line/60 transition-colors"
-                        >
-                          <Radio className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Ubah ambang batas"
-                          onClick={() => {
-                            const nilai = window.prompt(
-                              `Ambang batas baru untuk "${rule.metricName}" (saat ini ${rule.operator} ${rule.threshold} ${rule.unit}):`,
-                              String(rule.threshold)
-                            );
-                            if (nilai === null) return;
-                            const angka = Number(nilai.replace(',', '.'));
-                            if (!Number.isFinite(angka)) {
-                              alert('Ambang batas harus berupa angka.');
-                              return;
-                            }
-                            void ubahAturanAlert(rule, { threshold: angka });
-                          }}
-                          className="p-1.5 rounded-chip text-brand hover:bg-brand/10 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Hapus aturan"
-                          onClick={() => void hapusAturanAlert(rule)}
-                          className="p-1.5 rounded-chip text-neg hover:bg-neg/10 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ================= TAB 6: AUDIT TRAIL ================= */}
-          {activeTab === 'audit' && (
-            <div className="bg-surface p-5 rounded-card border border-line shadow-2xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-ink">
-                  Log Audit Sistem & Rekam Jejak Kepatuhan (F-14 & F-21)
-                </h3>
-                <p className="text-xs text-ink-2">
-                  Seluruh pembuatan, perubahan widget, dan koreksi manual tercatat secara permanen
-                </p>
-              </div>
-
-              {/* Penyaring: semua label terhubung ke kontrolnya (htmlFor/id) supaya
-                  nama aksesibelnya tidak bergantung pada placeholder. */}
-              <div className="flex items-end gap-2 flex-wrap">
-                <div>
-                  <label htmlFor="audit-instansi" className="text-[11px] font-semibold text-ink-2 block mb-1">Instansi</label>
-                  <select
-                    id="audit-instansi"
-                    value={filterAudit.tenantId}
-                    onChange={(e) => {
-                      const baru = { ...filterAudit, tenantId: e.target.value, offset: 0 };
-                      setFilterAudit(baru);
-                      void muatAudit(baru);
-                    }}
-                    disabled={!superadmin}
-                    className="input text-xs py-1.5 min-h-[44px] min-w-[160px]"
-                    data-testid="filter-audit-instansi"
-                  >
-                    {superadmin
-                      ? [{ id: 'semua', name: 'Semua instansi' }, ...tenants.map((t) => ({ id: t.id, name: t.name }))].map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))
-                      : <option value={filterAudit.tenantId}>{tenants.find((t) => t.id === filterAudit.tenantId)?.name || 'Instansi saya'}</option>}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="audit-aksi" className="text-[11px] font-semibold text-ink-2 block mb-1">Cari aksi</label>
-                  <input
-                    id="audit-aksi"
-                    value={filterAudit.aksi}
-                    onChange={(e) => setFilterAudit({ ...filterAudit, aksi: e.target.value })}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void muatAudit(); }}
-                    placeholder="mis. dashboard"
-                    className="input text-xs py-1.5 min-h-[44px] w-40"
-                    data-testid="filter-audit-aksi"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="audit-pengguna" className="text-[11px] font-semibold text-ink-2 block mb-1">Pengguna</label>
-                  <input
-                    id="audit-pengguna"
-                    value={filterAudit.pengguna}
-                    onChange={(e) => setFilterAudit({ ...filterAudit, pengguna: e.target.value })}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void muatAudit(); }}
-                    placeholder="nama pengguna"
-                    className="input text-xs py-1.5 min-h-[44px] w-40"
-                    data-testid="filter-audit-pengguna"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="audit-dari" className="text-[11px] font-semibold text-ink-2 block mb-1">Dari</label>
-                  <input
-                    id="audit-dari"
-                    type="date"
-                    value={filterAudit.dari}
-                    onChange={(e) => setFilterAudit({ ...filterAudit, dari: e.target.value })}
-                    className="input text-xs py-1.5 min-h-[44px]"
-                    data-testid="filter-audit-dari"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="audit-sampai" className="text-[11px] font-semibold text-ink-2 block mb-1">Sampai</label>
-                  <input
-                    id="audit-sampai"
-                    type="date"
-                    value={filterAudit.sampai}
-                    onChange={(e) => setFilterAudit({ ...filterAudit, sampai: e.target.value })}
-                    className="input text-xs py-1.5 min-h-[44px]"
-                    data-testid="filter-audit-sampai"
-                  />
-                </div>
-                <button
-                  onClick={() => void muatAudit()}
-                  disabled={memuatAudit}
-                  className="btn-primary text-xs px-3 py-1.5 min-h-[44px]"
-                                    data-testid="muat-audit"
-                >
-                  {memuatAudit ? 'Memuat…' : 'Terapkan'}
-                </button>
-                {/* Ekspor CSV sudah didukung server (format=csv); sebelumnya tidak
-                    ada jalurnya di layar. */}
-                <a
-                  href={`/api/audit-logs?${new URLSearchParams({
-                    format: 'csv',
-                    ...(superadmin && filterAudit.tenantId !== 'semua' ? { tenantId: filterAudit.tenantId } : {}),
-                    ...(filterAudit.aksi.trim() ? { aksi: filterAudit.aksi.trim() } : {}),
-                    ...(filterAudit.pengguna.trim() ? { pengguna: filterAudit.pengguna.trim() } : {}),
-                    ...(filterAudit.dari ? { dari: filterAudit.dari } : {}),
-                    ...(filterAudit.sampai ? { sampai: filterAudit.sampai } : {}),
-                  }).toString()}`}
-                  className="btn-ghost text-xs px-3 py-1.5 min-h-[44px] inline-flex items-center gap-1.5"
-                  data-testid="ekspor-audit-csv"
-                  download
-                >
-                  <Database className="w-3.5 h-3.5" /> Ekspor CSV
-                </a>
-                <span className="text-[11px] text-ink-2 ml-auto" data-testid="info-audit">
-                  {auditTotal === 0
-                    ? '0 baris'
-                    : `${filterAudit.offset + 1}–${Math.min(filterAudit.offset + auditLogs.length, auditTotal)} dari ${auditTotal} baris`}
-                </span>
-              </div>
-
-              {galatAudit && (
-                <p className="text-xs text-neg bg-neg/10 border border-neg/30 rounded-card px-3 py-2">
-                  Jejak audit gagal dimuat: {galatAudit}
-                </p>
-              )}
-
-              {/* Mobile: kartu bertumpuk (tabel 5 kolom tidak terbaca di 390px). */}
-              <div className="sm:hidden space-y-2" data-testid="audit-kartu">
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="border border-line rounded-card p-3 space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono text-ink-3">
-                        {new Date(log.timestamp).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-surface-2 text-ink-2 break-all">
-                        {log.target}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-ink">{log.action}</p>
-                    <p className="text-[11px] text-ink-2 break-words">{log.details}</p>
-                    <p className="text-[11px] text-ink-3">{log.userName}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="hidden sm:block overflow-x-auto border border-line rounded-card">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-surface-2 text-ink-2 font-semibold border-b border-line">
-                    <tr>
-                      <th className="p-3">Waktu</th>
-                      <th className="p-3">Aksi</th>
-                      <th className="p-3">Target / Entitas</th>
-                      <th className="p-3">Pengguna</th>
-                      <th className="p-3">Detail Keterangan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line text-ink-2">
-                    {auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-surface-2/60 transition-colors">
-                        <td className="p-3 whitespace-nowrap text-ink-3 font-mono text-[11px]">
-                          {new Date(log.timestamp).toLocaleString('id-ID', {
-                            dateStyle: 'short',
-                            timeStyle: 'medium',
-                          })}
-                        </td>
-                        <td className="p-3 font-semibold text-ink">{log.action}</td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded bg-surface-2 text-ink-2 font-medium">
-                            {log.target}
-                          </span>
-                        </td>
-                        <td className="p-3 font-medium text-ink">{log.userName}</td>
-                        <td className="p-3 text-ink-2 max-w-xs truncate" title={log.details}>
-                          {log.details}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Paginasi: sebelumnya data dipotong 500 baris tanpa penanda. */}
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => {
-                    const baru = { ...filterAudit, offset: Math.max(0, filterAudit.offset - UKURAN_HALAMAN_AUDIT) };
-                    setFilterAudit(baru);
-                    void muatAudit(baru);
-                  }}
-                  disabled={memuatAudit || filterAudit.offset === 0}
-                  className="btn-ghost text-xs px-3 py-1.5 disabled:opacity-40"
-                  data-testid="audit-sebelumnya"
-                >
-                  ← Sebelumnya
-                </button>
-                <span className="text-[11px] text-ink-3">
-                  Halaman {Math.floor(filterAudit.offset / UKURAN_HALAMAN_AUDIT) + 1} · {UKURAN_HALAMAN_AUDIT} baris/halaman
-                </span>
-                <button
-                  onClick={() => {
-                    const baru = { ...filterAudit, offset: filterAudit.offset + UKURAN_HALAMAN_AUDIT };
-                    setFilterAudit(baru);
-                    void muatAudit(baru);
-                  }}
-                  disabled={memuatAudit || filterAudit.offset + auditLogs.length >= auditTotal}
-                  className="btn-ghost text-xs px-3 py-1.5 disabled:opacity-40"
-                  data-testid="audit-berikutnya"
-                >
-                  Berikutnya →
-                </button>
-              </div>
-            </div>
-          )}
         </main>
 
         {/* ================= MODAL TAMBAH PENGGUNA ================= */}

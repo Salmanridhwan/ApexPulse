@@ -11,7 +11,7 @@ test('halaman paket: tiga paket tanpa angka harga', () => {
   assert.ok(html.includes('Instansi / Grup'));
   assert.ok(html.includes('Cara mulai'));
   assert.ok(!/\bRp\s?\d/.test(html), 'tidak boleh memuat angka harga');
-  assert.ok(html.includes('Penawaran sesuai kebutuhan instansi'));
+  assert.ok(html.includes('penawaran per instansi'), 'harga ditulis sebagai penawaran per instansi');
 });
 
 test('halaman paket: tanpa WhatsApp memakai tautan email', () => {

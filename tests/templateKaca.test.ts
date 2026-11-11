@@ -7,14 +7,14 @@ import { buildOpsi, DAFTAR_CHART } from '../src/services/chart/chartDefault';
 import { contohData } from '../src/services/chart/contohData';
 
 test('template ke-4 Kaca terdaftar dengan tema sendiri', () => {
-  // Kaca tetap template ke-4; gaya Template Chart lainnya menyusul sesudahnya.
-  assert.equal(DASHBOARD_TEMPLATES[3].id, 'tpl-kaca');
+  // Sejak dua deck baru mendahului galeri, Kaca bukan lagi indeks ke-4.
+  // Yang penting: Kaca terdaftar dengan tema sendiri dan tidak menimpa Pijar.
   const kaca = DASHBOARD_TEMPLATES.find((t) => t.id === 'tpl-kaca');
   assert.ok(kaca, 'tpl-kaca tidak ada');
   assert.equal(kaca.tema, 'kaca');
   assert.ok(kaca.widgets.length > 0);
   // Id widget tidak boleh kembar dengan template Pijar yang menjadi sumber slotnya.
-  const pijar = new Set(DASHBOARD_TEMPLATES[0].widgets.map((w) => w.id));
+  const pijar = new Set(DASHBOARD_TEMPLATES.find((t) => t.id === 'tpl-ringkasan')!.widgets.map((w) => w.id));
   assert.ok(kaca.widgets.every((w) => !pijar.has(w.id)));
 });
 

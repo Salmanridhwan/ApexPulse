@@ -795,11 +795,10 @@ async function main() {
       if (!input) return { ok: false, ket: 'input berkas tidak ada' };
       await input.uploadFile(berkasUji);
       await tunggu(500);
-      await isi(pa, '[data-testid="input-judul"]', 'Berkas Uji Peran');
-      await isi(pa, '[data-testid="input-kategori"]', 'Keuangan');
+      // Formulir unggah hanya meminta berkas; judul diturunkan dari nama berkas.
       await tunggu(300);
       const kirim = await klikTestId(pa, 'kirim-unggah');
-      const muncul = await tungguDaftarBerkas(pa, 'Berkas Uji Peran');
+      const muncul = await tungguDaftarBerkas(pa, 'berkas uji');
       const pesan = await pa.evaluate(() => document.querySelector('[data-testid="pesan-berkas"]')?.textContent?.trim() || '');
       await foto(pa, '13-admin-berkas-unggah');
       return { ok: buka && kirim && muncul, ket: muncul ? 'berkas muncul di daftar' : `tidak muncul · pesan="${pesan.slice(0, 160)}"` };
@@ -1208,11 +1207,10 @@ async function main() {
       if (!input) return { ok: false, ket: 'input berkas tidak ada untuk pengguna' };
       await input.uploadFile(berkasUji);
       await tunggu(500);
-      await isi(pb, '[data-testid="input-judul"]', 'Berkas Unggahan Pengguna');
-      await isi(pb, '[data-testid="input-kategori"]', 'Keuangan');
+      // Judul berkas kini mengikuti nama berkas yang diunggah.
       await tunggu(300);
       const kirim = await klikTestId(pb, 'kirim-unggah');
-      const muncul = await tungguDaftarBerkas(pb, 'Berkas Unggahan Pengguna');
+      const muncul = await tungguDaftarBerkas(pb, 'berkas uji');
       const pesan = await pb.evaluate(() => document.querySelector('[data-testid="pesan-berkas"]')?.textContent?.trim() || '');
       await foto(pb, '34-user-berkas-unggah');
       return { ok: buka && kirim && muncul, ket: muncul ? 'berkas pengguna tampil' : `tidak tampil · pesan="${pesan.slice(0, 160)}"` };
