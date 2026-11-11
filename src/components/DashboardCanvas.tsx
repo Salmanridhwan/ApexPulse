@@ -2,10 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { LayoutGrid, Plus, Sparkles } from 'lucide-react';
 import { WidgetSpec } from '../types';
 import { WidgetCard } from './widgets/WidgetCard';
-import { hitungBarisKanvas, lebarPenuhDeret, susunTinggiGrid, tataSatuan } from '../services/tataLetak/satuHalaman';
-
-/** Kelas statis supaya Tailwind menghasilkan semua lebar 1-12 kolom di layar lebar. */
-const XL_SPAN = ['', 'xl:col-span-1', 'xl:col-span-2', 'xl:col-span-3', 'xl:col-span-4', 'xl:col-span-5', 'xl:col-span-6', 'xl:col-span-7', 'xl:col-span-8', 'xl:col-span-9', 'xl:col-span-10', 'xl:col-span-11', 'xl:col-span-12'];
+import { hitungBarisKanvas, spanTinggi, susunTinggiGrid, tataSatuan } from '../services/tataLetak/satuHalaman';
 
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
@@ -16,7 +13,8 @@ interface DashboardCanvasProps {
   onDeleteWidget: (widgetId: string) => void;
   onDuplicateWidget: (widget: WidgetSpec) => void;
   onReorderWidgets: (orderedIds: string[]) => void;
-  onResizeWidget: (widgetId: string, w: number) => void;
+  /** `h` hanya dikirim saat tinggi kartu diubah dari pegangan tepi bawah. */
+  onResizeWidget: (widgetId: string, w: number, h?: number) => void;
   /**
    * Boleh tidaknya pemirsa menyusun dashboard (menambah/mengubah widget).
    *
@@ -98,6 +96,8 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   const [previewW, setPreviewW] = useState<number | null>(null);
   const resizeInfo = useRef<{ id: string; startX: number; startW: number; pxPerCol: number; arah: 1 | -1 } | null>(null);
   const previewWRef = useRef<number | null>(null);
+  /** Resize tinggi: tarik strip di tepi bawah kartu, satuan = satu baris grid. */
+  const [previewH, setPreviewH] = useState<number | null>(null);
 
   /** Panjang kolom lg (dari 12) yang dipakai kartu, konsisten dengan pemetaan colSpan. */
   const lgCols = (w: number): number => (w >= 10 ? 12 : w >= 7 ? 8 : w >= 5 ? 6 : w >= 4 ? 4 : w >= 3 ? 3 : 2);
@@ -212,14 +212,18 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
    * Satuan baris kartu non-KPI: tiap kartu membentang `grid.h` satuan, dan kartu
    * dalam satu deret disamakan tingginya (lihat `susunTinggiGrid`).
    */
-  const tinggiGrid = useMemo(() => susunTinggiGrid(widgetsLain), [widgetsLain]);
+  // Selama tepi bawah ditarik, tinggi pratinjau ikut dihitung supaya perubahan terlihat langsung.
+  const tinggiGrid = useMemo(
+    () =>
+      susunTinggiGrid(
+        previewH === null
+          ? widgetsLain
+          : widgetsLain.map((w) => (w.id === resizeId ? { ...w, grid: { ...w.grid, h: previewH } } : w))
+      ),
+    [widgetsLain, previewH, resizeId]
+  );
   const barisLain = tinggiGrid.satuan;
   const spanKartu = useMemo(() => new Map(widgetsLain.map((w, i) => [w.id, tinggiGrid.span[i]])), [widgetsLain, tinggiGrid]);
-  /** Lebar akhir di grid 12 kolom: tiap deret dilebarkan sampai penuh (tanpa ruang kosong). */
-  const lebarPenuh = useMemo(() => {
-    const lebar = lebarPenuhDeret(widgetsLain);
-    return new Map(widgetsLain.map((w, i) => [w.id, lebar[i]]));
-  }, [widgetsLain]);
 
   /**
    * Jumlah baris SELURUH kanvas: 1 baris KPI (kalau ada KPI) + baris kartu lain.
@@ -308,6 +312,36 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
     window.addEventListener('mouseup', selesai);
   };
 
+  /**
+   * Ubah tinggi kartu (grid.h, 2-10 satuan baris) dengan menarik tepi bawah.
+   * Satu satuan = tinggi baris grid + jarak. Tinggi satu deret mengikuti kartu
+   * tertingginya, dan di mode satu halaman deret lain menyesuaikan sisa layar.
+   */
+  const mulaiResizeTinggi = (e: React.MouseEvent, widget: WidgetSpec) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startH = spanTinggi(widget);
+    const pxPerBaris = Math.max(24, tinggiBarisFinal + JARAK);
+    let h = startH;
+    setResizeId(widget.id);
+    setPreviewH(startH);
+
+    const pindah = (ev: MouseEvent) => {
+      h = Math.max(2, Math.min(10, startH + Math.round((ev.clientY - startY) / pxPerBaris)));
+      setPreviewH(h);
+    };
+    const selesai = () => {
+      window.removeEventListener('mousemove', pindah);
+      window.removeEventListener('mouseup', selesai);
+      if (h !== startH) onResizeWidget(widget.id, widget.grid?.w ?? 6, h);
+      setResizeId(null);
+      setPreviewH(null);
+    };
+    window.addEventListener('mousemove', pindah);
+    window.addEventListener('mouseup', selesai);
+  };
+
   const pindahkan = (srcId: string, dstId: string) => {
     if (!srcId || srcId === dstId) return;
     const ids = widgets.map((w) => w.id);
@@ -345,9 +379,9 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
     } else if (wAktif >= 3) {
       colSpan = 'col-span-1 md:col-span-4 xl:col-span-3';
     }
-    // Di luar resize, lebar xl mengikuti deret yang sudah dipenuhkan 12 kolom.
-    const xlPenuh = !kpi && resizeId !== widget.id ? lebarPenuh.get(widget.id) : undefined;
-    if (xlPenuh) colSpan = colSpan.replace(/xl:col-span-\d+/, XL_SPAN[xlPenuh]);
+    // Lebar mengikuti ukuran yang diatur pengguna. Aturan lama "deret dipenuhkan
+    // 12 kolom" (lebarPenuhDeret) dihapus atas permintaan pemilik aplikasi: ruang
+    // kosong boleh ada supaya kartu bisa ditempatkan bebas di kanvas.
 
     /**
      * Kartu grid membentang `span` satuan baris HANYA di layar lebar (lg, 12 kolom).
@@ -417,11 +451,23 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
             data-resize={arah === -1 ? 'kiri' : 'kanan'}
             onMouseDown={(e) => mulaiResize(e, widget, arah)}
             className={`absolute top-0 h-full w-1.5 cursor-ew-resize transition-colors z-10 ${arah === -1 ? 'left-0' : 'right-0'
-              } ${resizeId === widget.id ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
+              } ${resizeId === widget.id && previewW !== null ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
               }`}
             title="Tarik untuk ubah lebar widget"
           />
         ))}
+        {/* Pegangan tepi bawah: tarik untuk ubah tinggi. Hanya di mode satu halaman,
+            karena di layar kecil tinggi kartu tidak memakai grid.h. */}
+        {!kpi && !readOnly && !preview && span !== undefined && (
+          <span
+            data-resize="bawah"
+            onMouseDown={(e) => mulaiResizeTinggi(e, widget)}
+            className={`absolute left-0 bottom-0 w-full h-1.5 cursor-ns-resize transition-colors z-10 ${
+              resizeId === widget.id && previewH !== null ? 'bg-brand/70' : 'bg-transparent hover:bg-brand/40'
+            }`}
+            title="Tarik untuk ubah tinggi widget"
+          />
+        )}
       </div>
     );
   };

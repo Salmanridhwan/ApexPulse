@@ -180,7 +180,7 @@ export const AkunMenu: React.FC<Props> = ({ user, tenant, ciut, onLogout }) => {
                       tutup();
                       onLogout();
                     }}
-                    className="text-[12px] px-3 py-1.5 rounded-control bg-neg text-white font-semibold hover:opacity-90"
+                    className="text-[12px] px-3 py-1.5 rounded-control bg-neg text-on-neg font-semibold hover:opacity-90"
                   >
                     Ya, keluar
                   </button>

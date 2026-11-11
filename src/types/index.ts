@@ -465,6 +465,8 @@ export interface Dashboard {
     terpilih: string[];
     /** Rasa penyusunan yang dipilih pengguna (cepat / seimbang / mendalam). */
     mode?: 'cepat' | 'seimbang' | 'mendalam' | 'ultra';
+    /** Id kartu yang baru ditaruh AI, dikejar kursor AI di kanvas. */
+    kartuAktif?: string;
     galat?: string;
   };
   /**

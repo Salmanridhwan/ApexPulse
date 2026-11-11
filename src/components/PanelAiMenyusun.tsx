@@ -12,6 +12,14 @@ import type { Dashboard } from '../types';
  *
  * Panel hilang sendiri saat status berubah menjadi `siap`.
  */
+/** 45 -> "45 detik", 279 -> "4 menit 39 detik", 240 -> "4 menit". */
+function lamaTeks(detik: number) {
+  const m = Math.floor(detik / 60);
+  const s = detik % 60;
+  if (m === 0) return `${s} detik`;
+  return s === 0 ? `${m} menit` : `${m} menit ${s} detik`;
+}
+
 export function PanelAiMenyusun({ dashboard }: { dashboard: Dashboard }) {
   const ai = dashboard.ai;
   const gagal = dashboard.status === 'gagal';
@@ -32,11 +40,11 @@ export function PanelAiMenyusun({ dashboard }: { dashboard: Dashboard }) {
     return (
       <div
         data-testid="panel-ai-gagal"
-        className="mx-4 mt-4 rounded-card border border-rose-500/40 bg-rose-500/5 px-4 py-3 flex items-start gap-3"
+        className="mx-4 mt-4 rounded-card border border-neg/40 bg-neg/5 px-4 py-3 flex items-start gap-3"
       >
-        <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+        <AlertTriangle className="w-5 h-5 text-neg shrink-0 mt-0.5" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-rose-600">AI tidak bisa menyusun dashboard</p>
+          <p className="text-sm font-bold text-neg">AI tidak bisa menyusun dashboard</p>
           <p className="text-xs text-content-muted mt-1">{ai.galat || ai.pesan}</p>
           <p className="text-xs text-content-muted mt-1">
             Coba lagi dari halaman Pilih Data. Dashboard kosong ini bisa dihapus.
@@ -62,7 +70,7 @@ export function PanelAiMenyusun({ dashboard }: { dashboard: Dashboard }) {
         <Sparkles className="w-4 h-4 text-brand" />
         <p className="text-sm font-bold text-content">AI sedang menyusun dashboard</p>
         <span className="text-[11px] text-content-muted">
-          {ai.pesan} · {detik} detik
+          {ai.pesan} · {lamaTeks(detik)}
         </span>
         <Loader2 className="w-3.5 h-3.5 text-brand animate-spin ml-auto" />
       </div>
@@ -85,7 +93,7 @@ export function PanelAiMenyusun({ dashboard }: { dashboard: Dashboard }) {
           <ul className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
             {tampil.map((nama) => (
               <li key={nama} className="flex items-start gap-1.5 text-[11px] text-content">
-                <Check className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                <Check className="w-3 h-3 text-pos shrink-0 mt-0.5" />
                 <span className="truncate">{nama}</span>
               </li>
             ))}

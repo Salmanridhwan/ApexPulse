@@ -74,8 +74,14 @@ export const BATAS_KATALOG = 4600;
  * - `cepat`: katalog dipangkas dan halaman dibatasi 2-3. Model menjawab sekitar
  *   setengah menit, cukup untuk melihat bentuk dashboard lebih dulu.
  * - `seimbang`: keadaan sebelumnya (4-5 halaman, satu panggilan model).
- * - `mendalam`: dua putaran. Putaran kedua menerima varian yang belum terpakai,
- *   jadi lebih banyak butir masuk dan halamannya 6-8, tetapi waktunya 2-4 menit.
+ * - `mendalam`: sampai empat putaran dalam anggaran 8 menit (target 4-8 menit).
+ *   Tiap putaran lanjutan menerima varian yang belum terpakai, jadi makin lama
+ *   berjalan makin banyak butir masuk.
+ * - `ultra`: sampai lima putaran dalam anggaran 12 menit.
+ *
+ * `batasDetik` adalah anggaran waktu: putaran berikutnya hanya dimulai bila
+ * waktu yang tersisa cukup untuk satu putaran lagi (lihat `bolehPutaranLagi`).
+ * `tambahanMin/Maks` = halaman tambahan yang diminta tiap putaran lanjutan.
  */
 export type ModeReko = 'cepat' | 'seimbang' | 'mendalam' | 'ultra';
 
@@ -88,23 +94,86 @@ export const MODE_REKO: Record<ModeReko, {
   kartuMaks: number;
   putaran: number;
   perkiraan: string;
+  batasDetik: number;
+  /** Waktu minimal: selama belum tercapai, putaran tambahan terus dicoba (0 = tidak ada). */
+  minDetik: number;
+  tambahanMin: number;
+  tambahanMaks: number;
+  /** Minimal jenis chart berbeda dalam satu dashboard. */
+  ragamMin: number;
 }> = {
-  cepat: { nama: 'Cepat', batasKatalog: 1600, maksVarian: 40, halamanMin: 2, halamanMaks: 3, kartuMaks: 4, putaran: 1, perkiraan: '30–45 detik' },
-  seimbang: { nama: 'Seimbang', batasKatalog: 4600, maksVarian: 120, halamanMin: 4, halamanMaks: 5, kartuMaks: 5, putaran: 1, perkiraan: '1–2 menit' },
-  mendalam: { nama: 'Mendalam', batasKatalog: 4600, maksVarian: 120, halamanMin: 6, halamanMaks: 8, kartuMaks: 5, putaran: 2, perkiraan: '2–4 menit' },
+  cepat: { nama: 'Cepat', batasKatalog: 1600, maksVarian: 40, halamanMin: 2, halamanMaks: 3, kartuMaks: 4, putaran: 1, perkiraan: '30–45 detik', batasDetik: 90, minDetik: 0, tambahanMin: 0, tambahanMaks: 0, ragamMin: 4 },
+  seimbang: { nama: 'Seimbang', batasKatalog: 4600, maksVarian: 120, halamanMin: 4, halamanMaks: 5, kartuMaks: 5, putaran: 1, perkiraan: '1–2 menit', batasDetik: 180, minDetik: 0, tambahanMin: 0, tambahanMaks: 0, ragamMin: 7 },
+  mendalam: { nama: 'Mendalam', batasKatalog: 4600, maksVarian: 160, halamanMin: 6, halamanMaks: 8, kartuMaks: 6, putaran: 4, perkiraan: '4–8 menit', batasDetik: 480, minDetik: 240, tambahanMin: 3, tambahanMaks: 4, ragamMin: 9 },
   /**
-   * Ultra: tiga putaran AI, halaman 10-14, 6 kartu per halaman.
+   * Ultra: sampai lima putaran AI, halaman pertama 10-14, 6 kartu per halaman.
    *
    * Batas panjang katalog tidak bisa dinaikkan lagi (layanan RAG menolak prompt
    * di atas 8000 karakter), jadi tambahan isi datang dari PUTARAN, bukan dari
    * katalog yang lebih panjang: tiap putaran hanya menerima varian yang belum
    * terpakai sehingga tidak ada halaman kembar.
    */
-  ultra: { nama: 'Ultra', batasKatalog: 4600, maksVarian: 160, halamanMin: 10, halamanMaks: 14, kartuMaks: 6, putaran: 3, perkiraan: '8–12 menit' },
+  ultra: { nama: 'Ultra', batasKatalog: 4600, maksVarian: 160, halamanMin: 10, halamanMaks: 14, kartuMaks: 6, putaran: 5, perkiraan: '8–12 menit', batasDetik: 720, minDetik: 480, tambahanMin: 3, tambahanMaks: 5, ragamMin: 10 },
 };
 
 export const modeRekoSah = (x: unknown): ModeReko =>
   x === 'cepat' || x === 'mendalam' || x === 'seimbang' || x === 'ultra' ? x : 'seimbang';
+
+/**
+ * Putaran berikutnya hanya dimulai bila sisa anggaran cukup untuk satu putaran
+ * lagi, diukur dari rata-rata putaran yang sudah berjalan. Tanpa ini mode
+ * Mendalam bisa berjalan jauh melewati 8 menit yang tertera.
+ */
+export function bolehPutaranLagi(lewatDetik: number, rataPutaranDetik: number, batasDetik: number): boolean {
+  return lewatDetik + Math.max(0, rataPutaranDetik) <= batasDetik;
+}
+
+/** Putaran tambahan di atas target profil, dipakai hanya bila waktu minimal belum tercapai. */
+export const PUTARAN_EKSTRA = 4;
+
+/**
+ * Apakah putaran ke-`putaranKe` masih dijalankan. Sampai target profil selalu
+ * ya. Di atas target hanya bila waktu minimal mode (`minDetik`) belum tercapai,
+ * supaya Ultra benar-benar memakai 8–12 menitnya dan Mendalam 4–8 menit.
+ */
+export function masihPutaran(putaranKe: number, lewatDetik: number, mode: ModeReko): boolean {
+  const m = MODE_REKO[mode];
+  if (putaranKe <= m.putaran) return true;
+  return lewatDetik < m.minDetik && putaranKe <= m.putaran + PUTARAN_EKSTRA;
+}
+
+/** Putaran gagal atau kembar boleh menghentikan proses hanya setelah waktu minimal tercapai. */
+export function bolehBerhenti(lewatDetik: number, mode: ModeReko): boolean {
+  return lewatDetik >= MODE_REKO[mode].minDetik;
+}
+
+/** Riwayat durasi nyata (detik) per mode; hanya 10 penyusunan terakhir disimpan. */
+export type RiwayatDurasi = Partial<Record<ModeReko, number[]>>;
+
+export function catatDurasi(riwayat: RiwayatDurasi | undefined, mode: ModeReko, detik: number): RiwayatDurasi {
+  const lama = Array.isArray(riwayat?.[mode]) ? riwayat![mode]! : [];
+  return { ...(riwayat || {}), [mode]: [...lama, Math.max(1, Math.round(detik))].slice(-10) };
+}
+
+const teksDetik = (d: number): string => (d < 90 ? `${Math.round(d)} detik` : `${Math.round(d / 60)} menit`);
+
+/**
+ * Waktu yang ditampilkan di pilihan mode: rentang durasi NYATA dari riwayat
+ * (paling cepat sampai paling lama) bila sudah ada minimal satu catatan, kalau
+ * belum perkiraan bawaan profil.
+ */
+export function perkiraanNyata(riwayat: RiwayatDurasi | undefined, mode: ModeReko): { teks: string; sampel: number } {
+  const d = (riwayat?.[mode] || []).filter((x) => Number.isFinite(x) && x > 0);
+  if (d.length === 0) return { teks: MODE_REKO[mode].perkiraan, sampel: 0 };
+  const min = Math.min(...d);
+  const maks = Math.max(...d);
+  const a = teksDetik(min);
+  const b = teksDetik(maks);
+  if (a === b) return { teks: `± ${a}`, sampel: d.length };
+  // Satuan sama ("4 menit" dan "7 menit") ditulis sekali: "4–7 menit".
+  const satuanSama = a.split(' ')[1] === b.split(' ')[1];
+  return { teks: satuanSama ? `${a.split(' ')[0]}–${b}` : `${a}–${b}`, sampel: d.length };
+}
 
 const ringkasAngka = (n: number): string => {
   const abs = Math.abs(n);
@@ -354,7 +423,7 @@ export function buatPrompt(
   const m = MODE_REKO[mode];
   const aturanHalaman = lanjutan
     ? [
-        `1. Ini PUTARAN LANJUTAN ${putaranKe} dari ${m.putaran}: varian di bawah BELUM terpakai. Susun ${m.halamanMin} sampai ${m.halamanMaks} halaman TAMBAHAN dari varian itu.`,
+        `1. Ini PUTARAN LANJUTAN ${putaranKe} dari ${Math.max(m.putaran, putaranKe)}: varian di bawah BELUM terpakai. Susun ${m.tambahanMin || m.halamanMin} sampai ${m.tambahanMaks || m.halamanMaks} halaman TAMBAHAN dari varian itu.`,
         '2. Jangan mengulang topik halaman yang sudah ada; pilih sudut pandang lain (mis. per wilayah, per vendor, per jenis belanja, capaian target).',
         `3. Tiap halaman WAJIB ${m.kartuMaks} kartu. Halaman dengan 1-2 kartu tidak dipakai.`,
       ]
@@ -381,7 +450,10 @@ export function buatPrompt(
     ...aturanHalaman,
     '4. Satu id varian hanya boleh muncul di satu halaman.',
     '5. chart WAJIB diambil dari daftar chart pada baris katalog varian itu.',
-    `6. KERAGAMAN: pakai minimal ${mode === 'cepat' ? 4 : 7} jenis chart berbeda dalam satu dashboard. Dalam satu halaman, garis-tren paling banyak SATU; sisanya pakai bentuk lain yang sah untuk butir itu.`,
+    `6. KERAGAMAN: pakai minimal ${m.ragamMin} jenis chart berbeda dalam satu dashboard. Dalam satu halaman, garis-tren paling banyak SATU; sisanya pakai bentuk lain yang sah untuk butir itu.`,
+    ...(m.putaran > 1
+      ? ['6b. KUALITAS: utamakan varian yang isinya lengkap (puncak dan akhir terisi, bukan nol semua). Tiap halaman membahas satu sudut pandang yang jelas, dan kartunya saling melengkapi (angka total, tren, rincian, peringkat).']
+      : []),
     '7. Pilih bentuk sesuai isi: tren untuk deret waktu (garis-tren, area-gradasi, area-banding, bar-tumpuk, combo-batang-garis), komposisi untuk bagian dari total (donat-tebal, donat-tipis, treemap-porsi, corong-pipeline, alur-tahap, radar-aspek), peringkat untuk banyak kategori (bar-mendatar-peringkat, bar-tegak, bar-kapsul), progres untuk capaian (daftar-progres, progres-target), rincian untuk angka (tabel-ringkas, tabel-status).',
     '8. Judul halaman 1-2 kata. Judul dashboard maksimal 8 kata, tanpa tanda kutip.',
     '',

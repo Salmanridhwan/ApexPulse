@@ -26,41 +26,6 @@ export function lebarKolom(w: number | undefined): number {
   return 2;
 }
 
-/**
- * Lebar akhir tiap kartu (1-12 kolom) supaya TIDAK ADA RUANG KOSONG di kanvas.
- *
- * Kartu dipasang per deret persis seperti CSS grid (lihat `lebarKolom`). Deret
- * yang belum mencapai 12 kolom dilebarkan: sisa kolom dibagi rata, sisa
- * pembagian ke kartu terakhir. Pengelompokan deret tidak berubah karena jumlah
- * tiap deret tetap <= 12, jadi `susunTinggiGrid` dan `hitungBarisGrid` tetap sah.
- * Ini juga merapikan dashboard lama yang tersimpan dengan pola bertumpuk
- * (hero 7 + dua kartu 5) yang tidak bisa digambar grid berbasis deret.
- */
-export function lebarPenuhDeret(widgets: Array<Pick<WidgetSpec, 'grid'>>): number[] {
-  const hasil = widgets.map((w) => lebarKolom(w.grid?.w));
-  let mulai = 0;
-  let kolom = 0;
-  const tutup = (akhir: number) => {
-    const n = akhir - mulai;
-    if (n <= 0) return;
-    const sisa = KOLOM_KANVAS - kolom;
-    if (sisa > 0) {
-      const tiap = Math.floor(sisa / n);
-      for (let i = mulai; i < akhir; i++) hasil[i] += tiap;
-      hasil[akhir - 1] += sisa - tiap * n;
-    }
-    mulai = akhir;
-  };
-  hasil.forEach((c, i) => {
-    if (kolom + c > KOLOM_KANVAS) {
-      tutup(i);
-      kolom = 0;
-    }
-    kolom += c;
-  });
-  tutup(hasil.length);
-  return hasil;
-}
 
 /**
  * Jumlah baris grid 12 kolom untuk daftar widget ini (pemasangan murni).

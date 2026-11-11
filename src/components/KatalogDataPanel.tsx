@@ -125,7 +125,7 @@ export const KatalogDataPanel: React.FC<Props> = ({ permintaan, admin, onSelesai
       setGalat('Centang dulu butir yang mau dipakai.');
       return;
     }
-    // Aturan dashboard baru: minimal 3 chart dan semuanya berhubungan.
+    // Aturan dashboard baru: semua chart berhubungan (jumlah chart bebas).
     const aturan = cekAturanDashboard(butirTerpilih);
     if (!aturan.boleh) {
       setGalat(aturan.pesan);

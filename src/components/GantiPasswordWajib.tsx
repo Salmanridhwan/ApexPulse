@@ -132,7 +132,7 @@ export const GantiPasswordWajib: React.FC<Props> = ({ onSelesai, onKeluar, namaP
             <li key={s.label} className={`flex items-center gap-1.5 text-[11.5px] ${s.ok ? 'text-pos' : 'text-ink-3'}`}>
               <span
                 className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border ${
-                  s.ok ? 'bg-pos border-pos text-white' : 'border-line-strong'
+                  s.ok ? 'bg-pos border-pos text-on-pos' : 'border-line-strong'
                 }`}
               >
                 {s.ok && <Check className="w-2.5 h-2.5" strokeWidth={3} />}

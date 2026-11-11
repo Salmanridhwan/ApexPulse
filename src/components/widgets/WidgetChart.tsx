@@ -5,6 +5,7 @@ import { angkaRingkas, teksAngkaRingkas } from '../../services/format/angkaRingk
 import { pastikanPetaTerdaftar } from './petaTerdaftar';
 import { buildOpsi, type ChartId } from '../../services/chart/chartDefault';
 import { rapikanUntukUkuran } from '../../services/chart/rapikanUkuran';
+import { ringkasAngkaSemuaKomponen } from '../../services/chart/angkaSemuaKomponen';
 import { contohKartu } from '../../services/chart/contohData';
 import { ringkasWilayah } from '../../services/templates/wilayahLayanan';
 import type { DataChart, SpesifikasiHtml } from '../../services/chart/pembangunOpsi';
@@ -143,14 +144,21 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
   const hasil = useMemo(() => {
     const keluaran = buildOpsi(chartId, data, varian, skala, gaya, khas);
     const mentah: any = keluaran.opsi;
+    /**
+     * Jalur kanvas Template Chart dulu melewatkan aturan angka ringkas, sehingga
+     * tooltip menampilkan angka mentah ("484,681,230.1204167") padahal sumbunya
+     * sudah "500 jt". Sekarang seluruh komponen (tooltip, label, sumbu) ikut
+     * diringkas, sama seperti di `ChartEcharts`.
+     */
+    const ringkas = (opsi: any) => (opsi && opsi.mesin !== 'html' ? ringkasAngkaSemuaKomponen(opsi) : opsi);
     // Bentuk HTML tidak pernah disentuh panel Gaya; hanya kanvas.
-    if (pembungkus && mentah?.mesin !== 'html') return { ...keluaran, opsi: pembungkus(mentah) };
+    if (pembungkus && mentah?.mesin !== 'html') return { ...keluaran, opsi: ringkas(pembungkus(mentah)) };
     // Halaman replika yang tidak memasang pembungkus sendiri tetap menerima palet & font.
     if (gayaHalaman && mentah && mentah.mesin !== 'html') {
       const terang = Boolean(gayaHalaman.kartu && cukupTerang(gayaHalaman.kartu));
-      return { ...keluaran, opsi: gayaReplika(mentah, gayaHalaman, undefined, terang) };
+      return { ...keluaran, opsi: ringkas(gayaReplika(mentah, gayaHalaman, undefined, terang)) };
     }
-    return keluaran;
+    return { ...keluaran, opsi: ringkas(mentah) };
   }, [chartId, data, varian, skala, pembungkus, khas, gaya, gayaHalaman]);
   const html = (hasil.opsi as SpesifikasiHtml | null)?.mesin === 'html' ? (hasil.opsi as SpesifikasiHtml) : null;
 
@@ -280,8 +288,32 @@ export const WidgetChart: React.FC<WidgetChartProps> = ({
     return data.satuan === '%' ? `${teks}%` : teks;
   };
 
+  /** Warna seri ke-i seperti yang digambar ECharts (warna seri, gradasi, atau palet opsi). */
+  const warnaSeriOpsi = (i: number): string | undefined => {
+    const satu = Array.isArray((hasil.opsi as any)?.series) ? (hasil.opsi as any).series[i] : undefined;
+    const c = satu?.itemStyle?.color ?? satu?.lineStyle?.color;
+    if (typeof c === 'string') return c;
+    if (typeof c?.colorStops?.[0]?.color === 'string') return c.colorStops[0].color;
+    const warnaOpsi = (hasil.opsi as any)?.color;
+    if (Array.isArray(warnaOpsi) && warnaOpsi.length) return warnaOpsi[i % warnaOpsi.length];
+    return undefined;
+  };
+
+  /**
+   * Grafik bermulti-seri (mis. 5 pos pendapatan per bulan): legenda = nama seri.
+   * Dulu legenda selalu mendaftar kategori sumbu X, jadi tampil "Jan 2026,
+   * Feb 2026, ..." dengan warna yang tidak cocok dengan batangnya.
+   */
   const legendaIsi =
     legendaItem ??
+    (data.seri.length > 1
+      ? data.seri.map((s, i) => ({
+          label: s.nama,
+          warna: warnaSeriOpsi(i) ?? palet[i % palet.length],
+          nilai: undefined as string | undefined,
+          redup: false,
+        }))
+      : null) ??
     data.kategori.map((label, i) => ({
       label,
       // Ikuti warna yang benar-benar digambar, bukan satu warna aksen.
@@ -1392,7 +1424,7 @@ const BentukHtml: React.FC<BentukProps> = ({
               <div key={tahap} className="flex items-center gap-[0.5em] flex-1 min-h-0">
                 <div className="flex-1 flex justify-center min-w-0 h-full">
                   <div
-                    className="flex items-center justify-center px-[0.6em] text-[0.66em] font-bold truncate"
+                    className="flex items-center justify-center px-[0.6em] text-[0.66em] truncate"
                     style={{
                       width: `${lebar}%`,
                       backgroundColor: g.palet[i % g.palet.length],
@@ -1403,14 +1435,14 @@ const BentukHtml: React.FC<BentukProps> = ({
                     {tahap}
                   </div>
                 </div>
-                <span className="w-[3.2em] text-right text-[0.86em] font-extrabold tabular-nums shrink-0" style={{ color: g.teks }}>
+                <span className="w-[3.2em] text-right text-[0.86em] tabular-nums shrink-0" style={{ color: g.teks }}>
                   {format(v, desimal)}
                 </span>
               </div>
             );
           })}
         </div>
-        <div className="flex items-center justify-between text-[0.7em] font-bold pt-[0.35em]" style={{ borderTop: `1px solid ${g.garis}` }}>
+        <div className="flex items-center justify-between text-[0.7em] pt-[0.35em]" style={{ borderTop: `1px solid ${g.garis}` }}>
           <span style={{ color: g.teks2 }}>Total pipeline</span>
           <span className="tabular-nums" style={{ color: g.teks }}>
             {format(total, desimal)}

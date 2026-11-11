@@ -2,7 +2,8 @@
  * ATURAN PEMBUATAN DASHBOARD.
  *
  * Dashboard baru yang lahir dari data (Pilih Data, Rekomendasi AI) wajib:
- * 1. berisi minimal `MIN_CHART_DASHBOARD` chart, dan
+ * 1. berisi minimal satu chart (jumlahnya bebas; aturan minimal 3 chart
+ *    dihapus atas permintaan pemilik aplikasi 2026-11-11), dan
  * 2. semua chartnya saling berhubungan.
  *
  * "Berhubungan" sengaja longgar: dua chart terhubung bila sama dokumen sumber,
@@ -14,8 +15,6 @@
  * Dashboard kosong dari tombol "Dashboard Baru" tidak terkena aturan ini.
  */
 import type { ButirData } from '../../types';
-
-export const MIN_CHART_DASHBOARD = 3;
 
 type InfoButir = Pick<ButirData, 'id' | 'nama' | 'kategori' | 'periode' | 'periodeTersedia' | 'sitasi'>;
 
@@ -57,8 +56,6 @@ export function berhubungan(a: InfoButir, b: InfoButir): boolean {
 export interface HasilAturan {
   boleh: boolean;
   jumlah: number;
-  /** Jumlah chart yang masih kurang untuk mencapai batas minimal. */
-  kurang: number;
   /** Butir (unik) yang tidak tersambung ke kelompok utama. */
   tidakTerkait: InfoButir[];
   /** Kalimat siap tampil; kosong bila aturan terpenuhi. */
@@ -71,7 +68,6 @@ export interface HasilAturan {
  */
 export function cekAturanDashboard(kartu: InfoButir[]): HasilAturan {
   const jumlah = kartu.length;
-  const kurang = Math.max(0, MIN_CHART_DASHBOARD - jumlah);
 
   // Kelompok keterkaitan antar butir unik (union-find sederhana).
   const unik = [...new Map(kartu.map((b) => [b.id, b])).values()];
@@ -86,27 +82,8 @@ export function cekAturanDashboard(kartu: InfoButir[]): HasilAturan {
   const tidakTerkait = unik.filter((_, i) => akar(i) !== utama);
 
   const bagian: string[] = [];
-  if (kurang > 0) bagian.push(`Dashboard minimal berisi ${MIN_CHART_DASHBOARD} chart, masih kurang ${kurang}.`);
+  if (jumlah === 0) bagian.push('Tambahkan minimal satu chart.');
   if (tidakTerkait.length > 0)
     bagian.push(`Chart tidak berhubungan dengan chart lain: ${tidakTerkait.map((b) => b.nama).join(', ')}.`);
-  return { boleh: bagian.length === 0, jumlah, kurang, tidakTerkait, pesan: bagian.join(' ') };
-}
-
-/**
- * Saran butir yang berhubungan dengan pilihan saat ini, diurutkan dari yang
- * paling banyak berbagi ciri. Dipakai tombol "Tambahkan chart terkait" yang
- * dijalankan pengguna sendiri dan untuk melengkapi hasil Rekomendasi AI.
- */
-export function saranTerkait<T extends InfoButir>(pilihan: InfoButir[], semua: T[], maks: number): T[] {
-  if (maks <= 0) return [];
-  const sudah = new Set(pilihan.map((b) => b.id));
-  const skor = (b: T): number =>
-    pilihan.length === 0 ? 1 : pilihan.filter((p) => berhubungan(p, b)).length;
-  return semua
-    .filter((b) => !sudah.has(b.id))
-    .map((b) => ({ b, s: skor(b) }))
-    .filter((x) => x.s > 0)
-    .sort((x, y) => y.s - x.s)
-    .slice(0, maks)
-    .map((x) => x.b);
+  return { boleh: bagian.length === 0, jumlah, tidakTerkait, pesan: bagian.join(' ') };
 }

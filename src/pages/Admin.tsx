@@ -2395,7 +2395,7 @@ export const Admin: React.FC<AdminProps> = ({
                   </div>
                 </div>
                 {pesanKuota && (
-                  <p className={`text-xs mt-3 ${pesanKuota.ok ? 'text-emerald-600' : 'text-red-600'}`}>{pesanKuota.teks}</p>
+                  <p className={`text-xs mt-3 ${pesanKuota.ok ? 'text-pos' : 'text-neg'}`}>{pesanKuota.teks}</p>
                 )}
               </div>
 
@@ -2427,7 +2427,7 @@ export const Admin: React.FC<AdminProps> = ({
                         <td className="px-5 py-2 text-ink-1 font-medium">{k.nama}</td>
                         <td className="px-5 py-2 text-right tabular-nums">{k.terpakai}</td>
                         <td className="px-5 py-2 text-right tabular-nums text-ink-2">{k.kuota}</td>
-                        <td className={`px-5 py-2 text-right tabular-nums font-semibold ${k.sisa === 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <td className={`px-5 py-2 text-right tabular-nums font-semibold ${k.sisa === 0 ? 'text-neg' : 'text-pos'}`}>
                           {k.sisa}
                         </td>
                       </tr>

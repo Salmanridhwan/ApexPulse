@@ -1,6 +1,6 @@
 import { cukupTerang, GAYA, gayaMode } from '../../services/chart/gayaVarian';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CHART_DEFAULT } from '../../services/chart/chartDefault';
+import { CHART_DEFAULT, type ChartId } from '../../services/chart/chartDefault';
 import { chartKatalogCocok } from '../../services/chart/katalogCocok';
 import { createPortal } from 'react-dom';
 import {
@@ -76,6 +76,14 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
    */
   const tombolMenuRef = useRef<HTMLButtonElement>(null);
   const [posisiMenu, setPosisiMenu] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+  /**
+   * Daftar bentuk chart DIBEKUKAN saat menu dibuka.
+   *
+   * `chartKatalogCocok` menyaring menurut tipe widget, dan tipe ikut berubah
+   * setiap kali bentuk dipilih. Kalau daftar dihitung ulang tiap render, tombol
+   * berpindah-pindah di bawah kursor setelah satu pilihan diklik.
+   */
+  const [daftarChart, setDaftarChart] = useState<ChartId[]>([]);
 
   /**
    * Buka menu ⋯ DI SAMPING kartu, bukan di atasnya.
@@ -112,6 +120,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         maxHeight: muatBawah ? tinggiLayar - kartu.bottom - 2 * CELAH : Math.max(240, kartu.top - 2 * CELAH),
       });
     }
+    setDaftarChart(chartKatalogCocok(widget));
     setShowMenu(true);
   };
 
@@ -423,7 +432,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                           berganti saat itu juga (tanpa modal); menu dibiarkan terbuka
                           supaya beberapa bentuk bisa dicoba berturut-turut. */}
                       <div className="px-3 pb-2 grid grid-cols-2 gap-1 max-h-56 overflow-y-auto gulir-tema">
-                        {chartKatalogCocok(widget).map((id) => {
+                        {daftarChart.map((id) => {
                           const aktif = widget.chartId === id;
                           return (
                             <button
@@ -432,14 +441,18 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                               onClick={() => onGantiChart?.(widget, id)}
                               aria-pressed={aktif}
                               data-testid={`ganti-chart-${id}`}
-                              className={`min-h-11 sm:min-h-9 text-[11px] font-semibold px-2 py-1.5 rounded-chip border transition-colors text-left flex items-center gap-1.5 ${
+                              className={`h-11 sm:h-9 text-[11px] font-semibold px-2 rounded-chip border transition-colors text-left flex items-center gap-1.5 ${
                                 aktif
                                   ? 'bg-solid text-on-solid border-solid'
                                   : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
                               }`}
                               title={CHART_DEFAULT[id].guna}
                             >
-                              {aktif && <Check className="w-3 h-3 shrink-0" />}
+                              {/* Lebar ikon dicadangkan selalu: kalau centang baru
+                                  muncul saat aktif, isi tombol bergeser. */}
+                              <span className="w-3 h-3 shrink-0 flex items-center justify-center">
+                                {aktif && <Check className="w-3 h-3" />}
+                              </span>
                               <span className="truncate">{CHART_DEFAULT[id].nama}</span>
                             </button>
                           );

@@ -11,7 +11,7 @@ import { gayaKatalogWidget } from './bingkaiKatalog';
 import { ikonWidget } from './ikonWidget';
 import { normalizeSeriesData } from './ChartEcharts';
 import { chartIdDariTipe } from '../../services/chart/petaTipe';
-import { statistikBox } from './chartOptions';
+import { kotakDariSeri, statistikBox } from './chartOptions';
 import { useChartSelection } from './ChartSelection';
 import { adaGaya } from './widgetStyle';
 import { gayaReplika } from '../referensi/gayaReplika';
@@ -187,9 +187,13 @@ const KartuKatalogGrafik: React.FC<{ widget: WidgetSpec; onKlikKosong?: () => vo
         const [min, q1, median, q3, maks] = statistikBox(sampel);
         return { nama: namaKelompok[i] || `Kelompok ${i + 1}`, min, q1, median, q3, maks };
       });
+    } else if (widget.chartId === 'kotak-sebaran' || widget.type === 'boxplot') {
+      // Tanpa sampel mentah, sebaran tiap seri dipakai sebagai kotaknya. Tanpa
+      // cadangan ini kartu tampak kosong saat pengguna memilih Kotak sebaran.
+      dasar.kotak = kotakDariSeri(seri);
     }
     return dasar;
-  }, [widget.chart, widget.geo, widget.gantt, ikutSeleksi, selected]);
+  }, [widget.chart, widget.geo, widget.gantt, widget.chartId, widget.type, ikutSeleksi, selected]);
   // Gaya pengguna selain desain & warna kartu (keduanya sudah ada di `g`).
   const gayaLain = widget.style ? { ...widget.style, desain: undefined, kartu: undefined } : undefined;
   // gayaReplika (bukan terapkanGaya): wajah katalog mewarnai tiap batang/potongan

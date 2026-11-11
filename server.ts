@@ -81,7 +81,7 @@ import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/s
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
 import { bolehPindahInstansi, bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
 import { butirKeHalaman, butirKeWidget, ringkasHalaman, tataGrid } from './src/services/analisis/butirKeWidget';
-import { cekAturanDashboard, saranTerkait, MIN_CHART_DASHBOARD } from './src/services/analisis/aturanDashboard';
+import { cekAturanDashboard } from './src/services/analisis/aturanDashboard';
 import { bulanDariSeri, jumlahPerBulan, kolomTanggal } from './src/services/analisis/tanggalSerial';
 import {
   bacaRencana,
@@ -92,6 +92,12 @@ import {
   tataRapiHalaman,
   MODE_REKO,
   modeRekoSah,
+  bolehPutaranLagi,
+  masihPutaran,
+  bolehBerhenti,
+  catatDurasi,
+  perkiraanNyata,
+  type ModeReko,
 } from './src/services/analisis/rekomendasiAi';
 import { isiSlotTemplate, slotKosong, widgetTerisi } from './src/services/analisis/butirKeSlotTemplate';
 import {
@@ -5184,9 +5190,8 @@ ${kpiItems}
     }
 
     /**
-     * ATURAN DASHBOARD BARU: minimal 3 chart dan semuanya berhubungan
-     * (lihat `aturanDashboard.ts`). Tidak ada chart yang ditambahkan diam-diam:
-     * pengguna melengkapinya sendiri dari Pilih Data.
+     * ATURAN DASHBOARD BARU: minimal 1 chart (jumlah bebas) dan semuanya berhubungan
+     * (lihat `aturanDashboard.ts`). Tidak ada chart yang ditambahkan diam-diam.
      */
     const petaWidgetButir = new Map(dipilih.map((b) => [`w-${b.id}`, b]));
     const kartuAturan = halamanBaru
@@ -5198,7 +5203,6 @@ ${kpiItems}
       return res.status(422).json({
         error: aturan.pesan,
         kode: 'ATURAN_DASHBOARD',
-        kurang: aturan.kurang,
         tidakTerkait: aturan.tidakTerkait.map((b) => b.id),
       });
     }
@@ -5246,6 +5250,19 @@ ${kpiItems}
    *
    * Butir yang dipakai tetap butir asli; model hanya menunjuk id dan chart.
    */
+  /**
+   * Waktu NYATA tiap mode rekomendasi (rentang dari 10 penyusunan terakhir),
+   * dipakai pilihan mode di Pilih Data. Mode tanpa catatan memakai perkiraan.
+   */
+  app.get('/api/rekomendasi/durasi', (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const riwayat = (db.systemConfig as any).durasiReko;
+    const hasil: Record<string, { teks: string; sampel: number }> = {};
+    for (const m of Object.keys(MODE_REKO) as ModeReko[]) hasil[m] = perkiraanNyata(riwayat, m);
+    res.json({ mode: hasil });
+  });
+
   app.post('/api/dashboards/rekomendasi', (req: Request, res: Response) => {
     const session = butuhPenulis(req, res);
     if (!session) return;
@@ -5353,10 +5370,16 @@ ${kpiItems}
           },
         });
 
+        // Durasi tiap putaran (detik) untuk anggaran waktu putaran berikutnya.
+        const mulaiMs = Date.parse(mulai);
+        const lewatDetik = () => (Date.now() - mulaiMs) / 1000;
+        const durasiPutaran: number[] = [];
+        const awalPutaran1 = Date.now();
         const item = await ragClient.rencanaDashboard(prompt, SKEMA_RENCANA, {
           kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId),
           timeoutMs: 180,
         });
+        durasiPutaran.push((Date.now() - awalPutaran1) / 1000);
         if (!item) throw new Error('Layanan AI tidak mengembalikan susunan.');
 
         const rencana = bacaRencana(JSON.stringify(item));
@@ -5366,10 +5389,9 @@ ${kpiItems}
         if (susun.halaman.length === 0) throw new Error('AI tidak memilih satu pun butir yang dikenal aplikasi.');
 
         /**
-         * ATURAN DASHBOARD BARU (minimal 3 chart, semuanya berhubungan).
-         * Pengguna meminta AI menyusun, jadi kekurangan dilengkapi di sini:
-         * chart yang tidak berhubungan dibuang, lalu ditambah butir terkait
-         * dari kandidat sampai mencapai batas minimal.
+         * ATURAN DASHBOARD BARU (semua chart berhubungan).
+         * Jumlah chart bebas (aturan minimal 3 chart dihapus 2026-11-11).
+         * Chart yang tidak berhubungan dibuang.
          */
         {
           // Pelengkap boleh diambil dari SEMUA data yang disetujui, bukan hanya yang dicentang.
@@ -5382,16 +5404,6 @@ ${kpiItems}
             const buang = new Set(awal.tidakTerkait.map((b) => b.id));
             for (const h of susun.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
             susun.halaman = susun.halaman.filter((h) => h.widgets.length > 0);
-          }
-          const sekarang = semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b));
-          const kurang = MIN_CHART_DASHBOARD - sekarang.length;
-          if (kurang > 0) {
-            const tambahan = saranTerkait(sekarang, semua, kurang * 3)
-              .map((b, i) => butirKeWidget(b, sekarang.length + i + 1))
-              .filter((w): w is WidgetSpec => Boolean(w))
-              .slice(0, kurang);
-            if (susun.halaman.length === 0) susun.halaman.push({ judul: 'Ringkasan', widgets: [] });
-            susun.halaman[0].widgets.push(...tambahan);
           }
           susun.halaman = tataRapiHalaman(susun.halaman);
           const akhir = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
@@ -5409,28 +5421,37 @@ ${kpiItems}
          * putaran pertama tampil DULU, baru halaman lanjutan menyusul.
          */
         const tulisHalaman = async (h: { judul: string; widgets: WidgetSpec[] }) => {
-          halaman.push({ id: `hlm-${halaman.length + 1}`, judul: h.judul, widgets: h.widgets });
+          if (h.widgets.length === 0) return;
+          // KURSOR AI LIVE: kartu ditaruh satu per satu di halaman yang sedang
+          // disusun, dan halaman itu dijadikan halaman aktif supaya tampilan
+          // pengguna ikut pindah. `ai.kartuAktif` = kartu yang baru ditaruh,
+          // dikejar oleh kursor AI di kanvas.
+          const nomor = halaman.length + 1;
+          const baru = { id: `hlm-${nomor}`, judul: h.judul, widgets: [] as WidgetSpec[] };
+          halaman.push(baru);
           for (const w of h.widgets) {
+            baru.widgets = [...baru.widgets, w];
             const nama = String(w.title || '').trim();
             if (nama && !terpilih.includes(nama)) terpilih.push(nama);
+            ubah({
+              title: judulAwal,
+              halaman: halaman.map((x) => ({ ...x, widgets: [...x.widgets] })),
+              halamanAktifId: baru.id,
+              widgets: [...baru.widgets],
+              ai: {
+                tahap: 'menyusun',
+                pesan: `Halaman ${nomor}: menaruh ${nama || 'kartu'} (${baru.widgets.length}/${h.widgets.length})`,
+                mode,
+                mulai,
+                kandidat: katalog.jumlah,
+                kategori,
+                terpilih: [...terpilih],
+                kartuAktif: String(w.id),
+              },
+            });
+            await new Promise((r) => setTimeout(r, 500));
           }
-          ubah({
-            title: judulAwal,
-            halaman: [...halaman],
-            halamanAktifId: halaman[0].id,
-            widgets: halaman[0].widgets,
-            ai: {
-              tahap: 'menyusun',
-              pesan: `Halaman ${halaman.length} siap: ${h.judul}`,
-              mode,
-              mulai,
-              kandidat: katalog.jumlah,
-              kategori,
-              terpilih: [...terpilih],
-            },
-          });
-          // Jeda supaya kanvas sempat menggambar halaman satu per satu (panel
-          // kanvas menyegarkan tiap 1,5 detik).
+          // Jeda supaya kanvas sempat menggambar halaman yang sudah lengkap.
           await new Promise((r) => setTimeout(r, 700));
         };
 
@@ -5448,7 +5469,14 @@ ${kpiItems}
          * topik yang sudah ada, pengulangan berhenti dan halaman yang sudah jadi
          * tetap dipakai - pengguna tidak kehilangan hasil sebelumnya.
          */
-        for (let putaranKe = 2; putaranKe <= profil.putaran; putaranKe += 1) {
+        // Di atas target profil, putaran tambahan hanya dicoba selama waktu minimal mode belum tercapai.
+        for (let putaranKe = 2; masihPutaran(putaranKe, lewatDetik(), mode); putaranKe += 1) {
+          // Anggaran waktu: jangan mulai putaran yang diperkirakan melewati batas mode.
+          const rataPutaran = durasiPutaran.reduce((a, b) => a + b, 0) / Math.max(1, durasiPutaran.length);
+          if (!bolehPutaranLagi(lewatDetik(), rataPutaran, profil.batasDetik)) {
+            console.log(`[rekomendasi] berhenti di putaran ${putaranKe - 1}: anggaran ${profil.batasDetik} dtk hampir habis`);
+            break;
+          }
           try {
             // `susun.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
             const varianTerpakai = new Set<string>(susun.dipakai);
@@ -5474,7 +5502,7 @@ ${kpiItems}
               ubah({
                 ai: {
                   tahap: 'memilih',
-                  pesan: `Putaran ${putaranKe} dari ${profil.putaran}: menyusun halaman lanjutan`,
+                  pesan: `Putaran ${putaranKe} dari ${Math.max(profil.putaran, putaranKe)}: menyusun halaman lanjutan`,
                   mode,
                   mulai,
                   kandidat: katalog.jumlah,
@@ -5482,11 +5510,17 @@ ${kpiItems}
                   terpilih: [...terpilih],
                 },
               });
+              const awalPutaran = Date.now();
               const item2 = await ragClient.rencanaDashboard(
                 buatPrompt(teks2, katalog2.jumlah, permintaan, mode, true, putaranKe),
                 SKEMA_RENCANA,
-                { kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId), timeoutMs: 240 },
+                {
+                  kbId: kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId),
+                  // Tidak boleh menunggu melewati anggaran mode (minimal 60 dtk).
+                  timeoutMs: Math.max(60, Math.min(240, Math.round(profil.batasDetik - lewatDetik()))),
+                },
               );
+              durasiPutaran.push((Date.now() - awalPutaran) / 1000);
               const rencana2 = item2 ? bacaRencana(JSON.stringify(item2)) : null;
               if (rencana2) {
                 const tambahan = susunDariRencana(rencana2, kandidat);
@@ -5500,18 +5534,18 @@ ${kpiItems}
                   await tulisHalaman(h);
                   ditambah += 1;
                 }
-                // Semua halaman putaran ini kembar dengan yang sudah ada: berhenti.
-                if (ditambah === 0) break;
+                // Semua halaman kembar: berhenti, kecuali waktu minimal mode belum tercapai.
+                if (ditambah === 0 && bolehBerhenti(lewatDetik(), mode)) break;
               } else {
                 console.warn(`[rekomendasi] putaran ${putaranKe} tidak menghasilkan rencana`);
-                break;
+                if (bolehBerhenti(lewatDetik(), mode)) break;
               }
             } else {
               break;
             }
           } catch (err: any) {
             console.warn(`[rekomendasi] putaran ${putaranKe} dilewati:`, err?.message || err);
-            break;
+            if (bolehBerhenti(lewatDetik(), mode)) break;
           }
         }
 
@@ -5520,13 +5554,19 @@ ${kpiItems}
           `Dashboard ${tenant?.name || 'Instansi'} — ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
         ubah({
           title: judul,
-          description: `Disusun AI dari ${susun.dipakai.length} butir data dokumen.`,
+          description: `Disusun AI dari ${susun.dipakai.length} butir data dokumen dalam ${Math.max(1, Math.round(lewatDetik() / 60))} menit (mode ${profil.nama}).`,
           status: 'siap',
           ai: undefined,
           halaman,
           halamanAktifId: halaman[0].id,
           widgets: halaman[0].widgets,
         });
+        // Durasi NYATA dicatat supaya pilihan mode menampilkan waktu sebenarnya.
+        try {
+          db.updateSystemConfig({ durasiReko: catatDurasi((db.systemConfig as any).durasiReko, mode, lewatDetik()) });
+        } catch (err: any) {
+          console.warn('[rekomendasi] gagal mencatat durasi:', err?.message || err);
+        }
 
       } catch (err) {
         const pesan = jelaskanError(err);

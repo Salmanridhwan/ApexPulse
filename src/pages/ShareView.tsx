@@ -174,10 +174,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
   };
 
   /** Ubah lebar widget (bucket 4/6/8/12) — sama seperti kanvas pembuat. */
-  const handleResizeWidget = (widgetId: string, w: number) => {
+  const handleResizeWidget = (widgetId: string, w: number, h?: number) => {
     if (!dashboard) return;
     const updated = dashboard.widgets.map((wg) =>
-      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w } } : wg
+      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w, ...(h ? { h } : {}) } } : wg
     );
     return simpanWidgets(updated, 'Gagal menyimpan ukuran widget.');
   };

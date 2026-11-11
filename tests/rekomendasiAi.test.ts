@@ -11,6 +11,11 @@ import type { ButirData } from '../src/types';
 import { CHART_DEFAULT } from '../src/services/chart/chartDefault';
 import {
   MODE_REKO,
+  bolehPutaranLagi,
+  masihPutaran,
+  bolehBerhenti,
+  catatDurasi,
+  perkiraanNyata,
   bacaRencana,
   buatPrompt,
   daftarChart,
@@ -176,12 +181,15 @@ test('tataRapiHalaman mengisi enam baris dan menggabung halaman satu kartu', () 
 test('mode cepat memakai katalog lebih kecil daripada mendalam', () => {
   assert.ok(MODE_REKO.cepat.batasKatalog < MODE_REKO.seimbang.batasKatalog);
   assert.ok(MODE_REKO.cepat.maksVarian < MODE_REKO.mendalam.maksVarian);
-  assert.ok(MODE_REKO.mendalam.putaran === 2, 'mendalam memakai dua putaran');
+  assert.ok(MODE_REKO.mendalam.putaran > MODE_REKO.seimbang.putaran, 'mendalam memakai beberapa putaran');
+  assert.equal(MODE_REKO.mendalam.batasDetik, 480, 'mendalam paling lama 8 menit');
+  assert.equal(MODE_REKO.mendalam.perkiraan, '4–8 menit');
   assert.ok(MODE_REKO.mendalam.halamanMaks > MODE_REKO.seimbang.halamanMaks);
 });
 
 test('mode ultra: tiga putaran, halaman terbanyak, masih di bawah batas prompt', () => {
-  assert.equal(MODE_REKO.ultra.putaran, 3, 'ultra memakai tiga putaran');
+  assert.ok(MODE_REKO.ultra.putaran > MODE_REKO.mendalam.putaran, 'ultra putarannya paling banyak');
+  assert.ok(MODE_REKO.ultra.batasDetik > MODE_REKO.mendalam.batasDetik);
   assert.ok(MODE_REKO.ultra.halamanMin >= 10, 'ultra minimal sepuluh halaman');
   assert.ok(MODE_REKO.ultra.halamanMaks > MODE_REKO.mendalam.halamanMaks);
   assert.ok(MODE_REKO.ultra.kartuMaks >= MODE_REKO.mendalam.kartuMaks);
@@ -189,7 +197,34 @@ test('mode ultra: tiga putaran, halaman terbanyak, masih di bawah batas prompt',
   // untuk seluruh prompt), jadi ultra menambah isi lewat putaran, bukan katalog.
   assert.ok(MODE_REKO.ultra.batasKatalog <= MODE_REKO.mendalam.batasKatalog);
   const prompt = buatPrompt('- btr-1 | x | y', 1, '', 'ultra', true, 3);
-  assert.match(prompt, /PUTARAN LANJUTAN 3 dari 3/);
+  assert.match(prompt, /PUTARAN LANJUTAN 3 dari 5/);
+  assert.match(prompt, /Susun 3 sampai 5 halaman TAMBAHAN/);
+});
+
+test('anggaran waktu: putaran berikutnya hanya bila sisa waktu cukup', () => {
+  assert.equal(bolehPutaranLagi(300, 90, 480), true);
+  assert.equal(bolehPutaranLagi(420, 90, 480), false, '420 + 90 melewati 8 menit');
+});
+
+test('waktu minimal: ultra terus menambah putaran sampai 8 menit', () => {
+  assert.equal(masihPutaran(5, 100, 'ultra'), true, 'sampai target profil selalu jalan');
+  assert.equal(masihPutaran(6, 300, 'ultra'), true, 'belum 8 menit: putaran ekstra');
+  assert.equal(masihPutaran(6, 500, 'ultra'), false, 'sudah 8 menit: cukup');
+  assert.equal(masihPutaran(10, 300, 'ultra'), false, 'putaran ekstra dibatasi');
+  assert.equal(masihPutaran(2, 10, 'cepat'), false, 'cepat tetap satu putaran');
+  assert.equal(bolehBerhenti(300, 'ultra'), false);
+  assert.equal(bolehBerhenti(480, 'ultra'), true);
+  assert.equal(bolehBerhenti(0, 'seimbang'), true);
+});
+
+test('durasi nyata: riwayat 10 terakhir dan teks rentang', () => {
+  let r = catatDurasi(undefined, 'mendalam', 290);
+  for (let i = 0; i < 12; i += 1) r = catatDurasi(r, 'mendalam', 300 + i);
+  assert.equal(r.mendalam!.length, 10);
+  assert.deepEqual(perkiraanNyata({ mendalam: [270, 410] }, 'mendalam'), { teks: '5–7 menit', sampel: 2 });
+  assert.deepEqual(perkiraanNyata({ cepat: [40, 40] }, 'cepat'), { teks: '± 40 detik', sampel: 2 });
+  assert.deepEqual(perkiraanNyata({ seimbang: [50, 130] }, 'seimbang'), { teks: '50 detik–2 menit', sampel: 2 });
+  assert.equal(perkiraanNyata(undefined, 'mendalam').teks, '4–8 menit');
 });
 
 test('prompt mengikuti mode yang dipilih', () => {

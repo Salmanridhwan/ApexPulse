@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Palette, X } from 'lucide-react';
 import type { WidgetSpec, WidgetStyle } from '../types';
 import { adaGaya } from './widgets/widgetStyle';
@@ -122,18 +122,25 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [judul, keterangan, isOpen, kartu?.id]);
 
-  if (!isOpen) return null;
-
   // Kelompokkan chart yang datanya cocok, sama seperti pemilih di katalog.
-  const kelompokChart: Array<{ k: KelompokChart; ids: ChartId[] }> = [];
-  if (kartu) {
+  // Dihitung sekali per kartu (bukan tiap pilihan): `chartKatalogCocok` menyaring
+  // menurut tipe widget, dan tipe berubah setiap kali bentuk dipilih — kalau
+  // dihitung ulang, tombolnya berpindah-pindah setelah satu bentuk diklik.
+  // WAJIB di atas `if (!isOpen) return null`: hook tidak boleh dilewati.
+  const kelompokChart = useMemo(() => {
+    const hasil: Array<{ k: KelompokChart; ids: ChartId[] }> = [];
+    if (!kartu) return hasil;
     for (const id of chartKatalogCocok(kartu)) {
       const k = CHART_DEFAULT[id].kelompok;
-      const ada = kelompokChart.find((g) => g.k === k);
+      const ada = hasil.find((g) => g.k === k);
       if (ada) ada.ids.push(id);
-      else kelompokChart.push({ k, ids: [id] });
+      else hasil.push({ k, ids: [id] });
     }
-  }
+    return hasil;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kartu?.id, isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -216,13 +223,18 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
                               aria-pressed={aktif}
                               data-testid={`panel-chart-${id}`}
                               title={CHART_DEFAULT[id].guna}
-                              className={`min-h-9 px-2 py-1.5 rounded-chip border text-[11px] font-semibold text-left transition-colors ${
+                              className={`h-9 px-2 rounded-chip border text-[11px] font-semibold text-left transition-colors flex items-center gap-1.5 ${
                                 aktif
                                   ? 'bg-solid text-on-solid border-solid'
                                   : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
                               }`}
                             >
-                              {CHART_DEFAULT[id].nama}
+                              {/* Ruang centang dicadangkan supaya tombol tidak
+                                  berubah lebar/tinggi saat bentuk dipilih. */}
+                              <span className="w-3 h-3 shrink-0 flex items-center justify-center">
+                                {aktif && <Check className="w-3 h-3" />}
+                              </span>
+                              <span className="truncate">{CHART_DEFAULT[id].nama}</span>
                             </button>
                           );
                         })}

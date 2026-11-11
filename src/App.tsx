@@ -32,6 +32,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
 import { PanelAiMenyusun } from './components/PanelAiMenyusun';
+import { KursorAi } from './components/KursorAi';
 import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
@@ -290,7 +291,8 @@ export default function App() {
         /* jaringan putus sesaat: percobaan berikutnya tetap berjalan */
       }
     };
-    const t = setInterval(segarkan, 1500);
+    // 700 ms: kursor AI dan kartu yang ditaruh satu per satu terlihat bergerak.
+    const t = setInterval(segarkan, 700);
     void segarkan();
     return () => {
       hidup = false;
@@ -795,10 +797,10 @@ export default function App() {
   };
 
   // Resize lebar widget: grid.w diubah (bucket 4/6/8/12) lalu persist.
-  const handleResizeWidget = async (widgetId: string, w: number) => {
+  const handleResizeWidget = async (widgetId: string, w: number, h?: number) => {
     if (!activeDashboard || !currentTenant) return;
     const updatedWidgets = activeDashboard.widgets.map((wg) =>
-      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w } } : wg
+      wg.id === widgetId ? { ...wg, grid: { ...(wg.grid || { x: 0, y: 0, h: 2 }), w, ...(h ? { h } : {}) } } : wg
     );
     const updatedDashboard = { ...activeDashboard, widgets: updatedWidgets };
 
@@ -866,7 +868,13 @@ export default function App() {
    * halaman tujuan diproyeksikan ke field lama (`widgets`, `replika`, ...) supaya
    * seluruh kanvas dan presentasi tetap bekerja tanpa perubahan.
    */
-  const halamanDashboard = useMemo(() => daftarHalaman(activeDashboard), [activeDashboard]);
+  // Halaman aktif diambil dari field proyeksi (`widgets`, `tataLetak`, ...) yang
+  // selalu terbaru. Dulu `d.halaman` dipakai mentah, sehingga ukuran widget yang
+  // baru diubah tidak tampil di mode presentasi sampai halaman dimuat ulang.
+  const halamanDashboard = useMemo(
+    () => (activeDashboard ? tulisProyeksi(activeDashboard) : daftarHalaman(activeDashboard)),
+    [activeDashboard]
+  );
   const halamanSekarang = useMemo(() => ambilHalamanAktif(activeDashboard), [activeDashboard]);
 
   /**
@@ -1101,8 +1109,37 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drafTataLetak, drafHalamanAwal, drafGaya, activeDashboard?.tataLetak, templateAktif]);
 
-  /** Setiap gerakan kartu hanya memperbarui draft. */
-  const ubahTataLetak = (baru: Record<string, TataLetakBaris>) => setDrafTataLetak(baru);
+  /**
+   * Geser atau ubah ukuran kartu template langsung tersimpan (permintaan pemilik
+   * aplikasi), tanpa menunggu tombol Simpan. BarisGeser hanya melapor saat kartu
+   * dilepas, jadi satu gerakan = satu PATCH. Pengecualian: bila masih ada draft
+   * widget atau gaya, perubahan ikut draft supaya draft itu tidak ikut tersimpan.
+   */
+  const ubahTataLetak = (baru: Record<string, TataLetakBaris>) => {
+    const d = activeDashboard;
+    if (!d || !templateAktif || drafHalamanAwal || drafGaya) {
+      setDrafTataLetak(baru);
+      return;
+    }
+    const dBaru: Dashboard = { ...d, tataLetak: { ...(d.tataLetak || {}), [templateAktif]: baru } };
+    const halamanBaru = tulisProyeksi(dBaru);
+    terapkanDashboard({ ...dBaru, ...(Array.isArray(d.halaman) && d.halaman.length ? { halaman: halamanBaru } : {}) });
+    setDrafTataLetak(null);
+    void fetch(`/api/dashboards/${d.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tataLetak: dBaru.tataLetak,
+        halaman: halamanBaru,
+        halamanAktifId: d.halamanAktifId || halamanBaru[0]?.id,
+        tenantId: currentTenant?.id,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) console.error('Gagal menyimpan tata letak:', res.status);
+      })
+      .catch(() => undefined);
+  };
 
   /** Simpan draft ke server, lalu jadikan patokan baru. */
   const simpanTataLetak = () => {
@@ -1676,6 +1713,9 @@ export default function App() {
                   <>
                   {(activeDashboard?.status === 'menyusun' || activeDashboard?.status === 'gagal') && (
                     <PanelAiMenyusun dashboard={activeDashboard} />
+                  )}
+                  {activeDashboard?.status === 'menyusun' && activeDashboard.ai?.kartuAktif && (
+                    <KursorAi kartuId={activeDashboard.ai.kartuAktif} pesan={activeDashboard.ai.pesan} />
                   )}
                   <ChartSelectionProvider>
                   {(() => {

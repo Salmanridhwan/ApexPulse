@@ -23,7 +23,7 @@ import type { ButirData, Dashboard, WidgetSpec, WidgetType } from '../types';
 import { WidgetCard } from '../components/widgets/WidgetCard';
 import { butirKeWidget } from '../services/analisis/butirKeWidget';
 import { bentukCocok } from '../services/chart/bentukCocok';
-import { cekAturanDashboard, saranTerkait } from '../services/analisis/aturanDashboard';
+import { cekAturanDashboard } from '../services/analisis/aturanDashboard';
 import { preloadEcharts } from '../components/widgets/ChartEcharts';
 
 /**
@@ -426,6 +426,21 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
    */
   const [modeReko, setModeReko] = useState<'cepat' | 'seimbang' | 'mendalam' | 'ultra'>('seimbang');
   const [bukaMode, setBukaMode] = useState(false);
+  /** Waktu nyata tiap mode dari server (rentang penyusunan terakhir); null = belum ada. */
+  const [durasiNyata, setDurasiNyata] = useState<Record<string, { teks: string; sampel: number }> | null>(null);
+  useEffect(() => {
+    if (!bukaMode) return;
+    let hidup = true;
+    fetch('/api/rekomendasi/durasi', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (hidup && d?.mode) setDurasiNyata(d.mode);
+      })
+      .catch(() => undefined);
+    return () => {
+      hidup = false;
+    };
+  }, [bukaMode]);
 
   // Modal ditutup dengan Escape, seperti dialog lain di aplikasi ini.
   useEffect(() => {
@@ -524,7 +539,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
     [halamanAktifKanvas]
   );
   const petaButir = useMemo(() => new Map(butir.map((b) => [b.id, b])), [butir]);
-  /** Aturan dashboard baru: minimal 3 chart dan semuanya berhubungan. */
+  /** Aturan dashboard baru: minimal 1 chart dan semuanya berhubungan. */
   const aturan = useMemo(
     () =>
       cekAturanDashboard(
@@ -533,15 +548,6 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
           .filter((b): b is ButirData => Boolean(b))
       ),
     [halamanKanvas, petaButir]
-  );
-  const saranAturan = useMemo(
-    () =>
-      saranTerkait(
-        dipilih.map((id) => petaButir.get(id)).filter((b): b is ButirData => Boolean(b)),
-        butir,
-        aturan.kurang
-      ),
-    [dipilih, petaButir, butir, aturan.kurang]
   );
   const bentukAwal = (b: ButirData) => bentukCocok([b])[0]?.id || '';
   const gulirKe = (id: string) =>
@@ -569,12 +575,6 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
     gulirKe(`kanvas-${kunci}`);
   };
 
-  /** Dijalankan pengguna sendiri: tambahkan chart terkait sampai batas minimal. */
-  const tambahChartTerkait = () =>
-    ubahHalamanAktif((ks) => [
-      ...ks,
-      ...saranAturan.map((b) => ({ kunci: kunciBaru('kartu'), butirId: b.id, chartId: bentukAwal(b) })),
-    ]);
 
   const keluarkanKartu = (kunci: string) => ubahHalamanAktif((ks) => ks.filter((k) => k.kunci !== kunci));
 
@@ -1066,9 +1066,12 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                         {[
                           { id: 'cepat' as const, ikon: Timer, judul: 'Cepat', waktu: '30–45 detik', isi: '2–3 halaman, 40 varian teratas. Untuk melihat bentuknya lebih dulu.' },
                           { id: 'seimbang' as const, ikon: Sparkles, judul: 'Seimbang', waktu: '1–2 menit', isi: '4–5 halaman, katalog penuh sekali baca. Pilihan biasa.' },
-                          { id: 'mendalam' as const, ikon: Brain, judul: 'Mendalam', waktu: '2–4 menit', isi: '6–8 halaman, dua putaran AI, lebih banyak data masuk.' },
-                          { id: 'ultra' as const, ikon: Sparkles, judul: 'Ultra', waktu: '8–12 menit', isi: '10–14 halaman, tiga putaran AI. Paling lengkap; biarkan tab terbuka sampai selesai.' },
-                        ].map((m) => {
+                          { id: 'mendalam' as const, ikon: Brain, judul: 'Mendalam', waktu: '4–8 menit', isi: '6–8 halaman lalu sampai 3 putaran lanjutan, 6 kartu per halaman. Makin lama berjalan, makin banyak data masuk.' },
+                          { id: 'ultra' as const, ikon: Sparkles, judul: 'Ultra', waktu: '8–12 menit', isi: '10–14 halaman lalu sampai 4 putaran lanjutan. Paling lengkap, biarkan tab terbuka sampai selesai.' },
+                        ].map((m0) => {
+                          // Waktu yang tertera diambil dari penyusunan nyata bila sudah pernah dijalankan.
+                          const nyata = durasiNyata?.[m0.id];
+                          const m = nyata && nyata.sampel > 0 ? { ...m0, waktu: `${nyata.teks} (nyata, ${nyata.sampel}x)` } : m0;
                           const Ikon = m.ikon;
                           const aktif = modeReko === m.id;
                           return (
@@ -1134,17 +1137,6 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                     {aturan.tidakTerkait.length > 0 && ' Keluarkan chart itu atau ganti dengan data yang berhubungan.'}
                   </span>
                 </span>
-                {saranAturan.length > 0 && (
-                  <button
-                    onClick={tambahChartTerkait}
-                    data-testid="tambah-chart-terkait"
-                    title={saranAturan.map((b) => b.nama).join(', ')}
-                    className="inline-flex items-center gap-1 min-h-11 lg:min-h-0 px-2.5 py-1 font-semibold text-brand border border-brand/40 hover:bg-brand/10 rounded-control"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Tambahkan {saranAturan.length} chart terkait
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -1334,8 +1326,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                         </p>
                         {kurang > 0 && (
                           <p
-                            className="mt-1 text-[10px] font-semibold"
-                            style={{ color: '#b45309' }}
+                            className="mt-1 text-[10px] font-semibold text-warn"
                             data-testid="peringatan-titik-kosong"
                             title="Sebagian sel angka belum terbaca dari dokumen; grafik hanya memuat yang tersedia."
                           >

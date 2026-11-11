@@ -251,6 +251,45 @@ export function statistikBox(mentah: number[]): number[] {
   return [dalam[0] ?? s[0], q1, q2, q3, dalam[dalam.length - 1] ?? s[n - 1]];
 }
 
+/** Satu kotak pada chart kotak sebaran. */
+export interface KotakSebaran {
+  nama: string;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  maks: number;
+}
+
+/**
+ * KOTAK SEBARAN DARI SERI BIASA.
+ *
+ * Widget dashboard umumnya tidak menyimpan sampel mentah (`chart.boxRaw`), hanya
+ * kategori dan nilai. Tanpa cadangan ini, memilih "Kotak sebaran" menghasilkan
+ * bidang kosong: pembangun chart menerima daftar kotak yang kosong. Di sini tiap
+ * seri dijadikan satu kotak dari sebaran nilainya sendiri, jadi pilihan itu
+ * selalu punya sesuatu untuk digambar.
+ */
+export function kotakDariSeri(
+  seri: Array<{ name?: string; nama?: string; data?: Array<number | null | undefined> }>
+): KotakSebaran[] {
+  const hasil: KotakSebaran[] = [];
+  seri.forEach((s, i) => {
+    const angka = (s.data ?? [])
+      // Sel kosong dibuang SEBELUM diubah jadi angka: Number(null) = 0, dan angka
+      // palsu itu bisa menyeret minimum kotak ke nol.
+      .filter((v) => v !== null && v !== undefined)
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v));
+    if (!angka.length) return;
+    const [min, q1, median, q3, maks] = statistikBox(angka);
+    // Seri di kanvas memakai `nama`, di tempat lain `name`; keduanya diterima.
+    const label = (s.name ?? s.nama ?? '').trim();
+    hasil.push({ nama: label || `Kelompok ${i + 1}`, min, q1, median, q3, maks });
+  });
+  return hasil;
+}
+
 // ── Waterfall: hitung nilai kumulatif untuk tumpuan ──────────────────────────
 /**
  * Siapkan array tumpuan untuk waterfall.

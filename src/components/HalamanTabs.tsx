@@ -64,7 +64,7 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
                         const baru = window.prompt('Nama halaman', h.judul);
                         if (baru && baru.trim() && baru.trim() !== h.judul) onGantiNama(h.id, baru.trim());
                       }}
-                      className="p-1 rounded-chip hover:bg-black/10"
+                      className="p-1 rounded-chip hover:bg-on-brand/15"
                     >
                       <Pencil className="w-3 h-3" />
                     </button>
@@ -76,7 +76,7 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
                       onClick={() => {
                         if (window.confirm(`Hapus "${h.judul}" beserta isinya?`)) onHapus(h.id);
                       }}
-                      className="p-1 rounded-chip hover:bg-black/10"
+                      className="p-1 rounded-chip hover:bg-on-brand/15"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -88,7 +88,7 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
                         title="Geser ke kiri"
                         disabled={i === 0}
                         onClick={() => onGeser(i, i - 1)}
-                        className="p-0.5 rounded-chip hover:bg-black/10 disabled:opacity-30"
+                        className="p-0.5 rounded-chip hover:bg-on-brand/15 disabled:opacity-30"
                       >
                         <ChevronLeft className="w-3 h-3" />
                       </button>
@@ -97,7 +97,7 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
                         title="Geser ke kanan"
                         disabled={i === halaman.length - 1}
                         onClick={() => onGeser(i, i + 1)}
-                        className="p-0.5 rounded-chip hover:bg-black/10 disabled:opacity-30"
+                        className="p-0.5 rounded-chip hover:bg-on-brand/15 disabled:opacity-30"
                       >
                         <ChevronRight className="w-3 h-3" />
                       </button>
