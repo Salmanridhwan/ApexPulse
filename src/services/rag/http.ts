@@ -39,7 +39,16 @@ export class RagServiceError extends Error {
  * (/extract maupun /query), supaya halaman lain tidak ikut memicu 429 saat
  * analisis sedang berjalan.
  */
-const BATAS_BERSAMAAN_RAG = 2;
+const BATAS_BERSAMAAN_RAG = 1;
+/**
+ * Jeda minimum antar-permintaan dari proses ini (ms).
+ *
+ * Layanan RAG membatasi 5 kueri BERSAMAAN per knowledge base, dan satu kueri
+ * bisa berjalan 20 detik. Dua proses aplikasi (dua node deploy) berbagi batas
+ * yang sama, jadi proses ini hanya boleh memakai satu slot dan menaruh jeda
+ * supaya tidak menghabiskan kuota bersama.
+ */
+const JEDA_ANTAR_RAG_MS = 400;
 let ragBerjalan = 0;
 const ragMenunggu: Array<() => void> = [];
 
@@ -49,12 +58,40 @@ async function denganIzinRag<T>(kerja: () => Promise<T>): Promise<T> {
   }
   ragBerjalan += 1;
   try {
+    // Jeda kecil setelah slot didapat: mencegah dua permintaan berangkat
+    // beruntun ke layanan yang membatasi kueri per knowledge base.
+    await new Promise((r) => setTimeout(r, JEDA_ANTAR_RAG_MS));
     return await kerja();
   } finally {
     ragBerjalan -= 1;
     const berikut = ragMenunggu.shift();
     if (berikut) berikut();
   }
+}
+
+/**
+ * Baca `retry_after_seconds` dari badan 429 layanan RAG.
+ *
+ * Layanan membatasi 5 kueri bersamaan per knowledge base dan mengirim
+ * `{"error":{"code":"RATE_LIMITED","details":{"retry_after_seconds":5}}}`.
+ * Header `Retry-After` kosong, jadi angka di badan itulah yang dipakai.
+ */
+async function lamaTungguSibuk(res: Response): Promise<number | null> {
+  if (res.status !== 429) return null;
+  let detik: number | null = null;
+  const header = Number(res.headers.get('retry-after'));
+  if (Number.isFinite(header) && header > 0) detik = header;
+  if (detik === null) {
+    try {
+      const badan: any = await res.clone().json();
+      const dariBadan = Number(badan?.error?.details?.retry_after_seconds ?? badan?.retry_after_seconds);
+      if (Number.isFinite(dariBadan) && dariBadan > 0) detik = dariBadan;
+    } catch {
+      /* badan bukan JSON: pakai jeda bawaan */
+    }
+  }
+  if (detik === null) detik = 5;
+  return Math.min(20, Math.max(1, detik));
 }
 
 function pesanSibuk(pesan: string): boolean {
@@ -1109,6 +1146,7 @@ export class ConfigurableRagClient implements RagClient {
       const percobaan = Math.max(1, Math.min(opsi?.cobaLagi ?? 1, 4));
       let res: Response | null = null;
       let galatTerakhir: unknown = null;
+      let jedaSibukMs: number | null = null;
       for (let coba = 1; coba <= percobaan; coba += 1) {
         try {
           const r = await sekali();
@@ -1116,6 +1154,9 @@ export class ConfigurableRagClient implements RagClient {
             res = r;
             break;
           }
+          // Angka tunggu dari layanan (retry_after_seconds) diutamakan; tanpa
+          // itu, percobaan ulang berangkat terlalu cepat dan dibalas 429 lagi.
+          jedaSibukMs = ((await lamaTungguSibuk(r)) ?? 0) * 1000 || null;
           console.warn(`[rag] /extract dibalas ${r.status} (percobaan ${coba}/${percobaan})`);
           galatTerakhir = new Error(`Layanan RAG membalas ${r.status}.`);
           if (coba === percobaan) {
@@ -1128,7 +1169,10 @@ export class ConfigurableRagClient implements RagClient {
           if (coba === percobaan || !pesanSibuk(pesan)) throw err;
           console.warn(`[rag] /extract gagal (percobaan ${coba}/${percobaan}): ${pesan}`);
         }
-        const jeda = ConfigurableRagClient.jedaCobaUlangMs[Math.min(coba - 1, 1)] ?? 8000;
+        const jeda =
+          jedaSibukMs ??
+          ConfigurableRagClient.jedaCobaUlangMs[Math.min(coba - 1, 1)] ??
+          8000;
         await new Promise((r) => setTimeout(r, jeda));
       }
       if (!res) throw galatTerakhir ?? new Error('Layanan RAG tidak merespons.');
@@ -2000,7 +2044,9 @@ export class ConfigurableRagClient implements RagClient {
     return this.ambilPayloadExtract(dipakai, cfg, instruksi, skema, opsi.kbId ?? cfg.kbId, {
       timeoutMs: opsi.timeoutMs ?? 180,
       topK: 10,
-      cobaLagi: 2,
+      // Empat percobaan: KB bisa sedang dipakai proses lain (batas 5 kueri
+      // bersamaan per KB), dan tiap percobaan menunggu `retry_after_seconds`.
+      cobaLagi: 4,
     });
   }
 

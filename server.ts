@@ -5380,32 +5380,65 @@ ${kpiItems}
           timeoutMs: 180,
         });
         durasiPutaran.push((Date.now() - awalPutaran1) / 1000);
-        if (!item) throw new Error('Layanan AI tidak mengembalikan susunan.');
 
-        const rencana = bacaRencana(JSON.stringify(item));
-        if (!rencana) throw new Error('Jawaban AI tidak bisa dibaca sebagai susunan halaman.');
+        /**
+         * CADANGAN TANPA MODEL.
+         *
+         * Layanan AI bisa sibuk (429: batas lima kueri bersamaan per knowledge
+         * base) atau lewat tenggat. Dulu seluruh penyusunan langsung gagal
+         * walau datanya lengkap. Sekarang dashboard tetap disusun dari butir
+         * yang disetujui memakai penyusun lokal yang sama dengan halaman Pilih
+         * Data — angkanya tetap dari dokumen, bukan karangan — dan panel AI
+         * menyebut jujur bahwa susunan dibuat tanpa model.
+         */
+        let catatanCadangan = '';
+        let rencana = item ? bacaRencana(JSON.stringify(item)) : null;
+        let susun = rencana ? susunDariRencana(rencana, kandidat) : null;
+        if (!rencana || !susun || susun.halaman.length === 0) {
+          const halamanButir = butirKeHalaman(kandidat, {
+            judul: `Ringkasan ${tenant?.name || 'instansi'}`,
+          });
+          if (halamanButir.length === 0) {
+            throw new Error(
+              'Layanan AI tidak mengembalikan susunan, dan butir yang disetujui belum punya angka yang bisa ditampilkan.'
+            );
+          }
+          susun = {
+            halaman: halamanButir,
+            dipakai: halamanButir.flatMap((h) => h.widgets.map((w) => String(w.id))),
+            dibuang: [],
+          } as typeof susun;
+          catatanCadangan =
+            'Susunan dibuat langsung dari butir dokumen tanpa model, karena layanan AI sedang sibuk. Semua angka tetap dari dokumen yang disetujui.';
+          console.warn('[rekomendasi] memakai cadangan tanpa model:', jelaskanError(new Error('layanan AI sibuk')));
+        }
 
-        const susun = susunDariRencana(rencana, kandidat);
-        if (susun.halaman.length === 0) throw new Error('AI tidak memilih satu pun butir yang dikenal aplikasi.');
+        /** Alias bertipe tegas: `susun` sudah pasti terisi di titik ini,
+         *  baik dari rencana model maupun dari susunan cadangan. */
+        const susunPakai = susun as NonNullable<typeof susun>;
 
         /**
          * ATURAN DASHBOARD BARU (semua chart berhubungan).
          * Jumlah chart bebas (aturan minimal 3 chart dihapus 2026-11-11).
          * Chart yang tidak berhubungan dibuang.
+         *
+         * Dilewati saat susunan dibuat cadangan tanpa model: penyusun lokal
+         * sudah mengelompokkan butir per kategori, dan membuang kartu di sini
+         * hanya akan membuat halaman kosong.
          */
-        {
+        if (!catatanCadangan) {
           // Pelengkap boleh diambil dari SEMUA data yang disetujui, bukan hanya yang dicentang.
           const petaKandidat = new Map(semua.map((b) => [`w-${b.id}`, b]));
           const butirDari = (w: WidgetSpec) =>
             petaKandidat.get(String(w.id)) ?? petaKandidat.get(String(w.id).replace(/-\d+$/, ''));
-          const semuaKartu = () => susun.halaman.flatMap((h) => h.widgets);
+          const semuaKartu = () => susunPakai.halaman.flatMap((h) => h.widgets);
           const awal = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
           if (awal.tidakTerkait.length > 0) {
             const buang = new Set(awal.tidakTerkait.map((b) => b.id));
-            for (const h of susun.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
-            susun.halaman = susun.halaman.filter((h) => h.widgets.length > 0);
+            for (const h of susunPakai.halaman) h.widgets = h.widgets.filter((w) => !buang.has(butirDari(w)?.id ?? ''));
+            susunPakai.halaman = susunPakai.halaman.filter((h) => h.widgets.length > 0);
           }
-          susun.halaman = tataRapiHalaman(susun.halaman);
+          susunPakai.halaman = tataRapiHalaman(susunPakai.halaman);
           const akhir = cekAturanDashboard(semuaKartu().map(butirDari).filter((b): b is ButirData => Boolean(b)));
           if (!akhir.boleh) {
             throw new Error(`Data yang berhubungan tidak cukup untuk dashboard. ${akhir.pesan}`);
@@ -5455,7 +5488,7 @@ ${kpiItems}
           await new Promise((r) => setTimeout(r, 700));
         };
 
-        for (const h of susun.halaman) await tulisHalaman(h);
+        for (const h of susunPakai.halaman) await tulisHalaman(h);
 
         /**
          * PUTARAN LANJUTAN (mendalam 2 putaran, ultra 3 putaran).
@@ -5478,8 +5511,8 @@ ${kpiItems}
             break;
           }
           try {
-            // `susun.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
-            const varianTerpakai = new Set<string>(susun.dipakai);
+            // `susunPakai.dipakai` berisi id VARIAN (mis. `btr-1#tren`), bukan id butir.
+            const varianTerpakai = new Set<string>(susunPakai.dipakai);
             // Halaman tersimpan memakai `widgets`; id widget = id varian terpakai.
             for (const h of halaman) for (const w of h.widgets || []) varianTerpakai.add(String(w.id));
             const butirTerpakai = new Set([...varianTerpakai].map((v) => v.split('#')[0]));
@@ -5529,8 +5562,8 @@ ${kpiItems}
                 for (const h of tambahan.halaman) {
                   if (judulAda.has(h.judul.toLowerCase())) continue;
                   judulAda.add(h.judul.toLowerCase());
-                  susun.dipakai.push(...tambahan.dipakai);
-                  susun.dibuang.push(...tambahan.dibuang);
+                  susunPakai.dipakai.push(...tambahan.dipakai);
+                  susunPakai.dibuang.push(...tambahan.dibuang);
                   await tulisHalaman(h);
                   ditambah += 1;
                 }
@@ -5550,13 +5583,26 @@ ${kpiItems}
         }
 
         const judul =
-          String(rencana.judul || '').trim().slice(0, 80) ||
+          String(rencana?.judul || '').trim().slice(0, 80) ||
           `Dashboard ${tenant?.name || 'Instansi'} — ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
         ubah({
           title: judul,
-          description: `Disusun AI dari ${susun.dipakai.length} butir data dokumen dalam ${Math.max(1, Math.round(lewatDetik() / 60))} menit (mode ${profil.nama}).`,
+          description: catatanCadangan
+            ? `${catatanCadangan} ${susunPakai.dipakai.length} butir, mode ${profil.nama}.`
+            : `Disusun AI dari ${susunPakai.dipakai.length} butir data dokumen dalam ${Math.max(1, Math.round(lewatDetik() / 60))} menit (mode ${profil.nama}).`,
           status: 'siap',
-          ai: undefined,
+          ai: catatanCadangan
+            ? {
+                tahap: 'selesai',
+                pesan: 'Dashboard selesai disusun tanpa model (layanan AI sibuk).',
+                mode,
+                mulai,
+                kandidat: katalog.jumlah,
+                kategori,
+                terpilih: [...terpilih],
+                galat: catatanCadangan,
+              }
+            : undefined,
           halaman,
           halamanAktifId: halaman[0].id,
           widgets: halaman[0].widgets,
