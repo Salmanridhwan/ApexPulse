@@ -67,6 +67,8 @@ import { PasLayar, ReplikaHalaman } from './components/referensi/ReplikaHalaman'
 import { BingkaiKorporat } from './components/referensi/BingkaiKorporat';
 import { templateBagianId } from './services/templates/templateBagian';
 import { tokenTemaDariGaya } from './services/chart/gayaVarian';
+import { pakaiChartKatalog } from './services/chart/katalogCocok';
+import type { ChartId } from './services/chart/chartDefault';
 import { Login } from './pages/Login';
 import { GantiPasswordWajib } from './components/GantiPasswordWajib';
 
@@ -225,8 +227,8 @@ export default function App() {
   /** Simpan daftar widget ke server (UI sudah diperbarui optimistis lebih dulu).
    *  Satu tempat untuk PATCH + cek gagal; sebelumnya disalin 7x tanpa cek respons,
    *  jadi penyimpanan yang ditolak server tidak pernah terlihat. */
-  const simpanWidget = async (widgets: WidgetSpec[]) => {
-    if (!activeDashboard || !currentTenant) return;
+  const simpanWidget = async (widgets: WidgetSpec[]): Promise<boolean> => {
+    if (!activeDashboard || !currentTenant) return false;
     const res = await fetch(`/api/dashboards/${activeDashboard.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -242,6 +244,7 @@ export default function App() {
       }),
     });
     if (!res.ok) console.error('Gagal menyimpan widget:', res.status);
+    return res.ok;
   };
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   /**
@@ -278,7 +281,11 @@ export default function App() {
         const res = await fetch(`/api/dashboards/${activeDashboard.id}`, { credentials: 'include' });
         if (!res.ok || !hidup) return;
         const data = (await res.json()) as Dashboard;
-        if (hidup && data?.id) setActiveDashboard(data);
+        if (!hidup || !data?.id) return;
+        setActiveDashboard(data);
+        // Daftar Workspace ikut diperbarui. Tanpa ini kartunya tetap berjudul
+        // "AI menyusun dashboard…" sampai halaman dimuat ulang.
+        setDashboards((prev) => prev.map((x) => (x.id === data.id ? data : x)));
       } catch {
         /* jaringan putus sesaat: percobaan berikutnya tetap berjalan */
       }
@@ -328,6 +335,8 @@ export default function App() {
   // Modals & Panels State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGlobalStyleOpen, setIsGlobalStyleOpen] = useState(false);
+  /** Kartu yang judul/chart-nya diatur di panel Gaya (dibuka dari menu ⋯ kartu). */
+  const [kartuPanelId, setKartuPanelId] = useState<string | null>(null);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -526,23 +535,40 @@ export default function App() {
   };
 
   // Handler for New Blank Dashboard
+  // Kegagalan tidak boleh diam (temuan uji E2E): dulu `if (!res.ok) return;`
+  // membuat pengguna mendarat di workspace kosong tanpa pesan apa pun.
   const handleCreateDashboard = async () => {
     if (!currentTenant) return;
-    const res = await fetch('/api/dashboards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: currentTenant.id,
-        title: `Dashboard Baru ${currentTenant.shortName} ${dashboards.length + 1}`,
-        description: 'Dashboard kustom indikator kinerja',
-        sector: currentTenant.sector,
-        widgets: [],
-      }),
-    });
-    if (!res.ok) return;
-    const newDash = await res.json();
-    setDashboards((prev) => [newDash, ...prev]);
-    setActiveDashboard(newDash);
+    const gagal = (pesan: string) => {
+      setGalatDashboard(pesan);
+      setActiveDashboard(null);
+      setViewMode('dashboards');
+    };
+    try {
+      const res = await fetch('/api/dashboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: currentTenant.id,
+          title: `Dashboard Baru ${currentTenant.shortName} ${dashboards.length + 1}`,
+          description: 'Dashboard kustom indikator kinerja',
+          sector: currentTenant.sector,
+          widgets: [],
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        gagal(data?.error || `Dashboard gagal dibuat (HTTP ${res.status}). Coba lagi.`);
+        return;
+      }
+      const newDash = await res.json();
+      setGalatDashboard('');
+      setDashboards((prev) => [newDash, ...prev]);
+      setActiveDashboard(newDash);
+    } catch (err) {
+      console.error('Create dashboard error:', err);
+      gagal('Dashboard gagal dibuat: jaringan atau server tidak menjawab. Coba lagi.');
+    }
   };
 
   /**
@@ -636,14 +662,42 @@ export default function App() {
   };
 
   // Handlers for Widget Management
+  /**
+   * Atur satu kartu: judul, keterangan, dan bentuk chart-nya.
+   *
+   * Dulu ini membuka modal di tengah layar. Sekarang panel Gaya Widget di kanan
+   * dipakai bersama gaya dashboard, jadi pengguna mengatur kartu sambil melihat
+   * kanvas yang ikut berubah.
+   */
   const handleEditWidget = (widget: WidgetSpec) => {
-    setEditingWidget(widget);
-    setEditorTab('config');
+    setIsChatOpen(false);
+    setKartuPanelId(widget.id);
+    setIsGlobalStyleOpen(true);
+    setEditingWidget(null);
   };
 
   const handleManualCorrection = (widget: WidgetSpec) => {
     setEditingWidget(widget);
     setEditorTab('correction');
+  };
+
+  /**
+   * Ubah judul/keterangan satu kartu dari panel Gaya.
+   *
+   * Sama seperti ganti chart: kartu berubah di layar lebih dulu, lalu disimpan.
+   * Kalau penyimpanan gagal, tampilan dikembalikan ke nilai lama.
+   */
+  const handleUbahJudul = async (widget: WidgetSpec, patch: { title?: string; subtitle?: string }) => {
+    if (!activeDashboard || !currentTenant) return;
+    const lama = activeDashboard.widgets;
+    const baru = lama.map((w) => (w.id === widget.id ? { ...w, ...patch } : w));
+    setGalatDashboard('');
+    terapkanDashboard({ ...activeDashboard, widgets: baru });
+    const tersimpan = await simpanWidget(baru);
+    if (!tersimpan) {
+      terapkanDashboard({ ...activeDashboard, widgets: lama });
+      setGalatDashboard('Judul kartu gagal disimpan. Coba lagi.');
+    }
   };
 
   const handleSaveWidget = async (updatedWidget: WidgetSpec) => {
@@ -677,6 +731,28 @@ export default function App() {
     setDrafGaya((awal) => awal ?? { nilai: activeDashboard.gaya });
     // Semua halaman, bukan hanya halaman yang sedang dibuka.
     terapkanDashboard(terapkanGayaSemua(activeDashboard, style, target));
+  };
+
+  /**
+   * Ganti chart satu kartu langsung dari menu ⋯, tanpa membuka editor.
+   *
+   * Kartu diganti di layar lebih dulu supaya terasa langsung, lalu disimpan ke
+   * server lewat jalur yang sama dengan penyimpanan widget lain. Kalau server
+   * menolak, tampilan dikembalikan ke bentuk lama supaya layar tidak berbeda
+   * dari data tersimpan.
+   */
+  const handleGantiChart = async (widget: WidgetSpec, chartId: string) => {
+    if (!activeDashboard || !currentTenant) return;
+    const diubah = pakaiChartKatalog(widget, chartId as ChartId);
+    const lama = activeDashboard.widgets;
+    const baru = lama.map((w) => (w.id === diubah.id ? diubah : w));
+    setGalatDashboard('');
+    terapkanDashboard({ ...activeDashboard, widgets: baru });
+    const tersimpan = await simpanWidget(baru);
+    if (!tersimpan) {
+      terapkanDashboard({ ...activeDashboard, widgets: lama });
+      setGalatDashboard('Bentuk chart gagal disimpan. Coba lagi.');
+    }
   };
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -959,9 +1035,32 @@ export default function App() {
    * widget, dan menu Presentasi/Gaya hilang bila halaman aktif kosong.
    */
   const jumlahWidgetSemua = activeDashboard ? semuaWidget(activeDashboard).length : 0;
+  /** Kartu yang sedang diatur di panel Gaya Widget (null = panel gaya global). */
+  const kartuPanel = activeDashboard && kartuPanelId
+    ? semuaWidget(activeDashboard).find((w) => w.id === kartuPanelId) ?? null
+    : null;
 
   // Widget yang benar-benar tampil di kanvas internal setelah filter view-only diterapkan.
   const widgetsTampilInternal = (activeDashboard?.widgets || []).filter((w) => cocokFilter(w, viewFilters));
+
+  /**
+   * Tautan `#/v/...` yang dibuka saat aplikasi SUDAH terbuka (tautan internal,
+   * tombol back, ketik ulang URL) dulu diabaikan karena hash hanya dibaca saat
+   * mount. `replaceState` di efek bawah tidak memicu `hashchange`, jadi tidak berulang.
+   */
+  useEffect(() => {
+    const ikutiHash = () => {
+      const { halaman, dashboard } = bacaHash();
+      if (!halaman) return;
+      if (halaman === 'workspace' && dashboard) {
+        const d = dashboards.find((x) => x.id === dashboard);
+        if (d) setActiveDashboard(d);
+      }
+      setViewMode(halaman);
+    };
+    window.addEventListener('hashchange', ikutiHash);
+    return () => window.removeEventListener('hashchange', ikutiHash);
+  }, [dashboards]);
 
   // Simpan halaman aktif ke URL supaya refresh tidak melempar pengguna ke daftar.
   useEffect(() => {
@@ -1498,7 +1597,8 @@ export default function App() {
                           onClick={() => {
                             // Hanya satu panel kanan yang boleh terbuka.
                             setIsChatOpen(false);
-                                  setIsGlobalStyleOpen(true);
+                            setKartuPanelId(null);
+                            setIsGlobalStyleOpen(true);
                           }}
                           disabled={!jumlahWidgetSemua}
                           title={
@@ -1591,12 +1691,15 @@ export default function App() {
                     cadanganBawah={korporat ? 40 : 0}
                     polos={korporat}
                     onEditWidget={handleEditWidget}
+                    onGantiChart={handleGantiChart}
                     onManualCorrection={handleManualCorrection}
                     onDeleteWidget={handleDeleteWidget}
                     onDuplicateWidget={handleDuplicateWidget}
                     onReorderWidgets={handleReorderWidgets}
                     onResizeWidget={handleResizeWidget}
                     bolehMenyusun={isAdminRole(currentUser?.role)}
+                    tanpaDashboard={!activeDashboard}
+                    onLihatSemua={() => setViewMode('dashboards')}
                     onOpenChat={() => {
                       setIsGlobalStyleOpen(false);
                       setIsChatOpen(true);
@@ -1716,11 +1819,17 @@ export default function App() {
       {/* 4. Panel Gaya Widget — tombolnya ada di toolbar kanvas */}
       <GlobalStyleModal
         isOpen={isGlobalStyleOpen}
-        onClose={() => setIsGlobalStyleOpen(false)}
+        onClose={() => {
+          setIsGlobalStyleOpen(false);
+          setKartuPanelId(null);
+        }}
         jumlahWidget={jumlahWidgetSemua}
         styleAwal={gayaDashboardAktif}
         targetPalet={targetPalet}
         onApply={handleApplyStyleToAll}
+        kartu={kartuPanel}
+        onGantiChart={handleGantiChart}
+        onUbahJudul={handleUbahJudul}
       />
 
       {/* 7. Share Read-Only Link Modal */}

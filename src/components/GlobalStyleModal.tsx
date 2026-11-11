@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Palette, X } from 'lucide-react';
-import type { WidgetStyle } from '../types';
+import type { WidgetSpec, WidgetStyle } from '../types';
 import { adaGaya } from './widgets/widgetStyle';
 import { StyleControls } from './StyleControls';
+import { CHART_DEFAULT, LABEL_KELOMPOK, type ChartId, type KelompokChart } from '../services/chart/chartDefault';
+import { chartKatalogCocok } from '../services/chart/katalogCocok';
 
 interface GlobalStyleModalProps {
   isOpen: boolean;
@@ -22,6 +24,16 @@ interface GlobalStyleModalProps {
   onApply: (style: WidgetStyle | undefined, target: 'semua' | string[]) => void;
   /** Pilihan sasaran palet warna: grafik template atau widget dashboard. */
   targetPalet?: Array<{ id: string; label: string }>;
+  /**
+   * Kartu yang sedang diatur (dibuka dari menu ⋯ kartu). Bila ada, panel ini
+   * juga memuat judul, keterangan, dan pemilih bentuk chart kartu itu — bagian
+   * yang dulu ada di modal "Pengaturan & Kustomisasi Widget".
+   */
+  kartu?: WidgetSpec | null;
+  /** Ganti bentuk chart kartu: langsung tampil di kanvas. */
+  onGantiChart?: (widget: WidgetSpec, chartId: string) => void;
+  /** Ubah judul/keterangan kartu: dipanggil setelah pengguna berhenti mengetik. */
+  onUbahJudul?: (widget: WidgetSpec, patch: { title?: string; subtitle?: string }) => void;
 }
 
 /**
@@ -39,6 +51,9 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
   styleAwal,
   onApply,
   targetPalet = [],
+  kartu = null,
+  onGantiChart,
+  onUbahJudul,
 }) => {
   const [style, setStyle] = useState<WidgetStyle>(styleAwal || {});
   /** Kartu/grafik yang desain & paletnya diubah. Kosong = seluruh kartu. */
@@ -80,7 +95,45 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [style, JSON.stringify(target), isOpen]);
 
+  // ── Judul & keterangan kartu yang sedang diatur ──
+  const [judul, setJudul] = useState(kartu?.title || '');
+  const [keterangan, setKeterangan] = useState(kartu?.subtitle || '');
+  /** Penanda nilai terakhir yang sudah dikirim, supaya tidak menyimpan berulang. */
+  const kirimRef = useRef('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setJudul(kartu?.title || '');
+    setKeterangan(kartu?.subtitle || '');
+    kirimRef.current = JSON.stringify([kartu?.id, kartu?.title || '', kartu?.subtitle || '']);
+    // Sengaja bergantung pada kartu yang dibuka, bukan pada setiap ketikan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, kartu?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !kartu || !onUbahJudul) return;
+    const kunci = JSON.stringify([kartu.id, judul, keterangan]);
+    if (kunci === kirimRef.current) return;
+    const t = window.setTimeout(() => {
+      kirimRef.current = kunci;
+      onUbahJudul(kartu, { title: judul, subtitle: keterangan });
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [judul, keterangan, isOpen, kartu?.id]);
+
   if (!isOpen) return null;
+
+  // Kelompokkan chart yang datanya cocok, sama seperti pemilih di katalog.
+  const kelompokChart: Array<{ k: KelompokChart; ids: ChartId[] }> = [];
+  if (kartu) {
+    for (const id of chartKatalogCocok(kartu)) {
+      const k = CHART_DEFAULT[id].kelompok;
+      const ada = kelompokChart.find((g) => g.k === k);
+      if (ada) ada.ids.push(id);
+      else kelompokChart.push({ k, ids: [id] });
+    }
+  }
 
   return (
     <div
@@ -116,6 +169,71 @@ export const GlobalStyleModal: React.FC<GlobalStyleModalProps> = ({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 text-xs space-y-3">
+        {/* Bagian kartu: dulu ada di modal editor (tab "Jenis Grafik & Judul").
+            Ditaruh paling atas karena ini yang paling sering diubah. */}
+        {kartu && (
+          <div className="space-y-3 pb-3 border-b border-line" data-testid="panel-kartu">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3">Kartu yang diatur</p>
+              <p className="text-xs font-semibold text-ink truncate" data-testid="panel-kartu-nama">{kartu.title}</p>
+            </div>
+            <div>
+              <label className="label">Judul</label>
+              <input
+                type="text"
+                value={judul}
+                onChange={(e) => setJudul(e.target.value)}
+                data-testid="panel-judul"
+                className="w-full px-2.5 py-1.5 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+            </div>
+            <div>
+              <label className="label">Keterangan</label>
+              <input
+                type="text"
+                value={keterangan}
+                onChange={(e) => setKeterangan(e.target.value)}
+                data-testid="panel-keterangan"
+                className="w-full px-2.5 py-1.5 border border-line rounded-control bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+            </div>
+            {kelompokChart.length > 0 && (
+              <div>
+                <label className="block text-ink-2 font-medium mb-1">Ganti Chart</label>
+                <p className="text-[10px] text-ink-3 mb-2">Langsung berubah di kanvas, tanpa menutup panel.</p>
+                <div className="space-y-2.5 max-h-72 overflow-y-auto gulir-tema pr-1" data-testid="panel-pilih-chart">
+                  {kelompokChart.map(({ k, ids }) => (
+                    <div key={k}>
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3 mb-1">{LABEL_KELOMPOK[k]}</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {ids.map((id) => {
+                          const aktif = kartu.chartId === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => onGantiChart?.(kartu, id)}
+                              aria-pressed={aktif}
+                              data-testid={`panel-chart-${id}`}
+                              title={CHART_DEFAULT[id].guna}
+                              className={`min-h-9 px-2 py-1.5 rounded-chip border text-[11px] font-semibold text-left transition-colors ${
+                                aktif
+                                  ? 'bg-solid text-on-solid border-solid'
+                                  : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
+                              }`}
+                            >
+                              {CHART_DEFAULT[id].nama}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {targetPalet.length > 0 && (
           <div>
             <label className="block text-ink-2 font-medium mb-2">Terapkan Desain &amp; Palet ke</label>

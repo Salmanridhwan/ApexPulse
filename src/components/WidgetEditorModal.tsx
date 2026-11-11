@@ -211,7 +211,7 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
               }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
-            <span>Jenis Grafik & Judul</span>
+            <span>Kategori & Periode</span>
           </button>
           <button
             onClick={() => setActiveTab('tampilan')}
@@ -243,72 +243,12 @@ export const WidgetEditorModal: React.FC<WidgetEditorModalProps> = ({
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           {activeTab === 'config' ? (
             <>
-              {/* Judul & Subtitle */}
-              <div className="space-y-3">
-                <div>
-                  <label className="label">
-                    Judul Widget
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
-                  />
-                </div>
-                <div>
-                  <label className="label">
-                    Keterangan
-                  </label>
-                  <input
-                    type="text"
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-line rounded-control focus:outline-none focus:ring-1 focus:ring-brand"
-                  />
-                </div>
-              </div>
-
-              {/* Chart dari menu Template Chart, dikelompokkan seperti di katalog. */}
-              <div>
-                <label className="block text-ink-2 font-medium mb-1">
-                  Ganti Template Chart
-                </label>
-                <p className="text-[11px] text-ink-2 mb-2">
-                  Hanya chart yang datanya tersedia di kartu ini. Gaya (Pijar, Lensa, ...) diatur di tab Warna &amp; Font atau tombol Gaya Semua.
-                </p>
-                {kelompokKatalog.length === 0 ? (
-                  <p className="text-[11px] text-ink-3">Belum ada chart katalog yang cocok dengan data kartu ini.</p>
-                ) : (
-                  <div className="space-y-3" data-testid="pemilih-template-chart">
-                    {kelompokKatalog.map(({ k, ids }) => (
-                      <div key={k}>
-                        <p className="text-[10px] uppercase font-bold tracking-wider text-ink-3 mb-1.5">{LABEL_KELOMPOK[k]}</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {ids.map((id) => (
-                            <button
-                              key={id}
-                              type="button"
-                              aria-pressed={chartId === id}
-                              onClick={() => {
-                                setChartId(id);
-                                setType(CHART_DEFAULT[id].tipe);
-                              }}
-                              className={`p-2.5 rounded-card border text-left transition-all ${chartId === id
-                                  ? 'border-brand bg-surface-2/70 ring-1 ring-brand'
-                                  : 'border-line bg-surface hover:bg-surface-2'
-                                }`}
-                            >
-                              <p className="font-semibold text-ink">{CHART_DEFAULT[id].nama}</p>
-                              <p className="text-[10px] text-ink-2 mt-0.5 leading-snug">{CHART_DEFAULT[id].guna}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Judul/keterangan dan pemilih bentuk chart dipindah ke panel
+                  Gaya Widget (kanan), supaya kartu diatur sambil melihat kanvas. */}
+              <p className="text-[11px] text-ink-2">
+                Judul, keterangan, dan bentuk chart diatur di panel{' '}
+                <span className="font-semibold text-ink">Gaya Widget</span> (tombol ⋯ pada kartu).
+              </p>
 
               {/* Kategori & Periode */}
               <div className="grid grid-cols-2 gap-3 pt-2">

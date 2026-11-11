@@ -10,6 +10,8 @@ const XL_SPAN = ['', 'xl:col-span-1', 'xl:col-span-2', 'xl:col-span-3', 'xl:col-
 interface DashboardCanvasProps {
   widgets: WidgetSpec[];
   onEditWidget: (widget: WidgetSpec) => void;
+  /** Ganti chart kartu langsung dari menu ⋯ (tanpa membuka editor). */
+  onGantiChart?: (widget: WidgetSpec, chartId: string) => void;
   onManualCorrection: (widget: WidgetSpec) => void;
   onDeleteWidget: (widgetId: string) => void;
   onDuplicateWidget: (widget: WidgetSpec) => void;
@@ -22,6 +24,10 @@ interface DashboardCanvasProps {
    * jadi tidak diberi ajakan menyusun yang tidak bisa ia selesaikan.
    */
   bolehMenyusun?: boolean;
+  /** true = belum ada dashboard yang dibuka (bukan dashboard kosong). */
+  tanpaDashboard?: boolean;
+  /** Kembali ke daftar Semua Dashboard. */
+  onLihatSemua?: () => void;
   /** Opsional: di halaman tautan publik tidak ada sesi instansi, jadi tidak ditampilkan. */
   onOpenChat?: () => void;
   /** Mode lihat-saja (mis. saat filter dashboard aktif): matikan drag & resize. */
@@ -66,12 +72,15 @@ interface DashboardCanvasProps {
 export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   widgets,
   onEditWidget,
+  onGantiChart,
   onManualCorrection,
   onDeleteWidget,
   onDuplicateWidget,
   onReorderWidgets,
   onResizeWidget,
   bolehMenyusun = true,
+  tanpaDashboard = false,
+  onLihatSemua,
   onOpenChat,
   readOnly = false,
   preview = false,
@@ -395,6 +404,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           preview={preview}
           padat={pasSatuHalaman}
           onEdit={onEditWidget}
+          onGantiChart={onGantiChart}
           onManualCorrection={onManualCorrection}
           onDelete={onDeleteWidget}
           onDuplicate={onDuplicateWidget}
@@ -427,18 +437,32 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           style={{ backgroundColor: 'var(--tegas-accent)', boxShadow: '3px 3px 0 0 var(--tegas-ink)' }}>
           <LayoutGrid className="w-7 h-7 text-on-brand" />
         </div>
+        {/* Bukan "dashboard pertama": instansi bisa sudah punya banyak dashboard
+            (temuan uji E2E). Tanpa dashboard terbuka, arahkan ke daftar. */}
         <h3 className="text-base font-semibold text-ink">
-          {bisaMenyusun ? 'Bangun dashboard pertama Anda' : 'Dashboard ini masih kosong'}
+          {tanpaDashboard ? 'Belum ada dashboard yang dibuka' : 'Dashboard ini masih kosong'}
         </h3>
         <p className="text-sm text-ink-2 max-w-md mt-1 mb-6">
-          {!bisaMenyusun
+          {tanpaDashboard
+            ? 'Pilih dashboard dari daftar Semua Dashboard, atau buat yang baru dari sana.'
+            : !bisaMenyusun
             ? 'Belum ada widget yang dibagikan di sini. Widget ditambahkan oleh Admin Instansi; Anda tetap bisa menanyakan data yang tersedia lewat Asisten.'
             : onOpenChat
               ? 'Minta dashboard dari dokumen resmi BUMD lewat chat, atau susun sendiri dari preset yang sudah tersedia.'
               : 'Dashboard ini belum memiliki widget. Tambahkan widget dari workspace Aiones Boards — halaman ini hanya mengubah widget yang sudah ada.'}
         </p>
-        <div className="flex items-center gap-3">
-          {onOpenChat && (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {onLihatSemua && (
+            <button
+              onClick={onLihatSemua}
+              data-testid="ke-semua-dashboard"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-2 bg-surface-2 border border-line hover:bg-line/60 rounded-control transition-colors"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Semua Dashboard</span>
+            </button>
+          )}
+          {onOpenChat && !tanpaDashboard && (
             <button
               onClick={onOpenChat}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-brand bg-brand hover:brightness-95 rounded-control shadow-sm transition-colors"

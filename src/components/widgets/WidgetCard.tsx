@@ -1,10 +1,11 @@
 import { cukupTerang, GAYA, gayaMode } from '../../services/chart/gayaVarian';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CHART_DEFAULT } from '../../services/chart/chartDefault';
-import { chartKatalogCocok, pakaiChartKatalog } from '../../services/chart/katalogCocok';
+import { chartKatalogCocok } from '../../services/chart/katalogCocok';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
+  Check,
   Copy,
   Database,
   Edit2,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { WidgetSpec } from '../../types';
 import { WidgetRenderer } from './WidgetRenderer';
+import { PagarGrafik } from './PagarGrafik';
 import { punyaDataChart } from '../../services/spec/widgetTypes';
 import { temaKartu, warnaKartuValid } from './widgetCardTheme';
 import { useThemeMode } from '../../theme';
@@ -35,6 +37,11 @@ function ikonKartu(nama: string) {
 interface WidgetCardProps {
   widget: WidgetSpec;
   onEdit: (widget: WidgetSpec) => void;
+  /**
+   * Ganti chart kartu langsung dari menu ⋯, tanpa membuka editor.
+   * Kartu berubah saat itu juga, lalu disimpan ke server di latar.
+   */
+  onGantiChart?: (widget: WidgetSpec, chartId: string) => void;
   onManualCorrection: (widget: WidgetSpec) => void;
   onDelete: (widgetId: string) => void;
   onDuplicate: (widget: WidgetSpec) => void;
@@ -52,6 +59,7 @@ interface WidgetCardProps {
 export const WidgetCard: React.FC<WidgetCardProps> = ({
   widget,
   onEdit,
+  onGantiChart,
   onManualCorrection,
   onDelete,
   onDuplicate,
@@ -67,20 +75,43 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
    * dalam kartu. Dengan portal, menu melayang DI ATAS kartu seperti seharusnya.
    */
   const tombolMenuRef = useRef<HTMLButtonElement>(null);
-  const [posisiMenu, setPosisiMenu] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const [posisiMenu, setPosisiMenu] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
 
+  /**
+   * Buka menu ⋯ DI SAMPING kartu, bukan di atasnya.
+   *
+   * Menu ini dipakai untuk mengganti bentuk chart dan perubahannya langsung
+   * terlihat. Kalau menu menumpuk kartu, pengguna tidak bisa menilai hasilnya.
+   * Karena itu sisi kanan kartu dipakai lebih dulu, lalu sisi kiri, dan baru
+   * menumpuk kartu kalau layar memang terlalu sempit (ponsel).
+   */
   const bukaMenu = () => {
     const r = tombolMenuRef.current?.getBoundingClientRect();
     if (!r) return;
     const LEBAR_MENU = 256; // w-64
-    const PERKIRAAN_TINGGI = 380; // grid tipe grafik (3 baris) + 4 aksi
-    const right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - LEBAR_MENU - 8));
-    const tidakMuatKeBawah = r.bottom + PERKIRAAN_TINGGI > window.innerHeight - 8 && r.top > PERKIRAAN_TINGGI;
-    setPosisiMenu(
-      tidakMuatKeBawah
-        ? { bottom: window.innerHeight - r.top + 4, right }
-        : { top: r.bottom + 4, right }
-    );
+    const CELAH = 8;
+    const PERKIRAAN_TINGGI = 400; // 6 tipe grafik + 4 aksi
+    const lebarLayar = window.innerWidth;
+    const tinggiLayar = window.innerHeight;
+    const tinggiMaks = Math.max(240, tinggiLayar - 2 * CELAH);
+    const kartu = tombolMenuRef.current?.closest('[data-kartu-widget]')?.getBoundingClientRect() ?? r;
+    const topSamping = Math.max(CELAH, Math.min(kartu.top, tinggiLayar - PERKIRAAN_TINGGI - CELAH));
+
+    if (lebarLayar - kartu.right - CELAH >= LEBAR_MENU) {
+      // Sisi kanan kartu.
+      setPosisiMenu({ left: kartu.right + CELAH, top: topSamping, maxHeight: Math.min(520, tinggiMaks) });
+    } else if (kartu.left - CELAH >= LEBAR_MENU) {
+      // Sisi kiri kartu.
+      setPosisiMenu({ left: kartu.left - LEBAR_MENU - CELAH, top: topSamping, maxHeight: Math.min(520, tinggiMaks) });
+    } else {
+      // Layar sempit: taruh di bawah atau di atas kartu, bukan menutupi grafiknya.
+      const muatBawah = kartu.bottom + CELAH + 320 <= tinggiLayar;
+      setPosisiMenu({
+        left: Math.max(CELAH, Math.min(lebarLayar - LEBAR_MENU - CELAH, kartu.right - LEBAR_MENU)),
+        top: muatBawah ? kartu.bottom + CELAH : Math.max(CELAH, kartu.top - CELAH - 320),
+        maxHeight: muatBawah ? tinggiLayar - kartu.bottom - 2 * CELAH : Math.max(240, kartu.top - 2 * CELAH),
+      });
+    }
     setShowMenu(true);
   };
 
@@ -88,7 +119,12 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   // lebih baik ditutup daripada melayang di tempat yang salah.
   useEffect(() => {
     if (!showMenu) return;
-    const tutup = () => setShowMenu(false);
+    const tutup = (e: Event) => {
+      // Menggulir daftar chart di dalam menu bukan alasan menutup menu.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-menu-widget]')) return;
+      setShowMenu(false);
+    };
     window.addEventListener('scroll', tutup, true);
     window.addEventListener('resize', tutup);
     return () => {
@@ -227,6 +263,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
 
   return (
     <div
+      data-kartu-widget={widget.id}
       className={`${bk ? 'relative flex flex-col h-full overflow-hidden group rounded-card border' : 'relative card-tegas flex flex-col h-full overflow-hidden group'} kartu-sumber-kotak`}
       style={{
         ...(bk ? bk.luar : gayaKartu),
@@ -356,9 +393,12 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
             <button
               ref={tombolMenuRef}
               onClick={() => (showMenu ? setShowMenu(false) : bukaMenu())}
-              className="p-1 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              className="p-1.5 rounded-chip text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
               style={bk && !tanpaKepala ? bk.sub : undefined}
               title="Menu Opsi Widget"
+              aria-label="Menu Opsi Widget"
+              aria-haspopup="menu"
+              aria-expanded={showMenu}
             >
               <MoreVertical className="w-4 h-4" />
             </button>
@@ -367,35 +407,43 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                 <div
-                  className="fixed w-64 bg-surface rounded-control shadow-pop border border-line py-1 z-[45] text-xs text-ink-2"
-                  style={{ top: posisiMenu.top, bottom: posisiMenu.bottom, right: posisiMenu.right }}
+                  data-menu-widget={widget.id}
+                  className="fixed w-64 bg-surface rounded-control shadow-pop border border-line py-1 z-[45] text-xs text-ink-2 overflow-y-auto gulir-tema"
+                  style={{ top: posisiMenu.top, left: posisiMenu.left, maxHeight: posisiMenu.maxHeight }}
                 >
                   {punyaDataChart(widget) && (
                     <>
-                      <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-ink-3">
-                        Template Chart
+                      <div className="px-3 pt-1 pb-0.5 flex items-baseline justify-between gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-ink-3">
+                          Ganti chart
+                        </span>
+                        <span className="text-[9px] text-ink-3">langsung berubah</span>
                       </div>
-                      {/* Chart dari menu Template Chart yang datanya tersedia di kartu ini.
-                          Daftar lengkap ada di editor (Ganti Template Chart). */}
-                      <div className="px-3 pb-2 grid grid-cols-2 gap-1">
-                        {chartKatalogCocok(widget).slice(0, 6).map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => {
-                              setShowMenu(false);
-                              onEdit(pakaiChartKatalog(widget, id));
-                            }}
-                            className={`text-[11px] font-semibold px-1.5 py-1.5 rounded-chip border transition-colors truncate text-left ${
-                              widget.chartId === id
-                                ? 'bg-solid text-on-solid border-solid'
-                                : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
-                            }`}
-                            title={CHART_DEFAULT[id].guna}
-                          >
-                            {CHART_DEFAULT[id].nama}
-                          </button>
-                        ))}
+                      {/* Semua chart yang datanya tersedia di kartu ini. Klik = kartu
+                          berganti saat itu juga (tanpa modal); menu dibiarkan terbuka
+                          supaya beberapa bentuk bisa dicoba berturut-turut. */}
+                      <div className="px-3 pb-2 grid grid-cols-2 gap-1 max-h-56 overflow-y-auto gulir-tema">
+                        {chartKatalogCocok(widget).map((id) => {
+                          const aktif = widget.chartId === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => onGantiChart?.(widget, id)}
+                              aria-pressed={aktif}
+                              data-testid={`ganti-chart-${id}`}
+                              className={`min-h-11 sm:min-h-9 text-[11px] font-semibold px-2 py-1.5 rounded-chip border transition-colors text-left flex items-center gap-1.5 ${
+                                aktif
+                                  ? 'bg-solid text-on-solid border-solid'
+                                  : 'bg-surface-2 text-ink-2 border-line hover:text-ink hover:border-line-strong'
+                              }`}
+                              title={CHART_DEFAULT[id].guna}
+                            >
+                              {aktif && <Check className="w-3 h-3 shrink-0" />}
+                              <span className="truncate">{CHART_DEFAULT[id].nama}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                       <div className="border-t border-line my-1" />
                     </>
@@ -408,7 +456,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
                     className="w-full text-left px-3 py-1.5 hover:bg-surface-2 flex items-center gap-2"
                   >
                     <Edit2 className="w-3.5 h-3.5 text-brand" />
-                    <span>Ganti Template Chart & Judul</span>
+                    <span>Atur Chart & Judul (panel kanan)</span>
                   </button>
                   <button
                     onClick={() => {
@@ -500,10 +548,17 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
         ) : bk?.dalam ? (
           // Gaya bening: chart digambar di atas kotak kaca buram, seperti di Template Chart.
           <div className="rounded-[16px] border p-2 flex-1 min-h-0 flex flex-col" style={bk.dalam}>
-            <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+            {/* `key` berganti saat bentuk chart berganti: mesin gambar lama dibuang
+                utuh sebelum yang baru dipasang, jadi tidak ada dua mesin yang
+                berebut elemen DOM yang sama (penyebab layar "Halaman gagal dimuat"). */}
+            <PagarGrafik key={`${widget.chartId ?? ''}-${widget.type}`}>
+              <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+            </PagarGrafik>
           </div>
         ) : (
-          <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+          <PagarGrafik key={`${widget.chartId ?? ''}-${widget.type}`}>
+            <WidgetRenderer widget={widgetTampil} urutan={urutan} padat={padat} preview={preview} onKlikKosong={bisaSumber ? () => setBukaSumber(true) : undefined} />
+          </PagarGrafik>
         )}
       </div>
     </div>
