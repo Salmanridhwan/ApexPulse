@@ -286,3 +286,27 @@ test('kegagalan satu kartu tidak membatalkan kartu lain', async () => {
   assert.equal(hasil.kosong, 3);
   assert.ok(hasil.catatan.some((c) => /sibuk/i.test(c)), 'alasan kegagalan dicatat');
 });
+
+test('tombol Hentikan: kartu yang belum dikerjakan tidak memanggil dokumen dan ditandai tertunda', async () => {
+  let panggilan = 0;
+  const rag: RagPengambilData = {
+    ambilDataWidget: async () => {
+      panggilan += 1;
+      return { data: null, alasan: 'Indikator ini tidak ada di dokumen.' };
+    },
+  };
+  const hasil = await isiTemplateDariRag(template, {
+    ...dasar,
+    rag,
+    batasMs: 60_000,
+    berhenti: () => true,
+  });
+
+  assert.equal(panggilan, 0, 'setelah dihentikan tidak ada panggilan dokumen');
+  assert.equal(hasil.terisi, 0);
+  assert.equal(hasil.tertunda, 3, 'kartu yang belum dikerjakan dihitung tertunda, bukan tidak ada');
+  assert.ok(
+    hasil.widgets.every((w) => w.dataTertunda === true),
+    'kartu tertunda bisa dilanjutkan lagi lewat tombol Mulai'
+  );
+});

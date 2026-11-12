@@ -63,6 +63,12 @@ export interface OpsiIsiTemplate {
   }) => void;
   /** Dipanggil setiap satu kartu BERHASIL terisi, supaya hasilnya bisa langsung disimpan. */
   onKartu?: (widget: WidgetSpec) => void;
+  /**
+   * Pembatalan sopan (tombol Hentikan). Dibaca SEBELUM tiap kartu dikerjakan.
+   * Kartu yang belum sempat diproses ditandai tertunda, bukan "tidak ada di
+   * dokumen", sehingga pengisian bisa dilanjutkan tanpa mengulang dari nol.
+   */
+  berhenti?: () => boolean;
 }
 
 export interface HasilIsiTemplate {
@@ -339,7 +345,7 @@ export async function isiTemplateDariRag(
   template: DashboardTemplate,
   opsi: OpsiIsiTemplate
 ): Promise<HasilIsiTemplate> {
-  const { sector, instansi, kbId, rag, konkurensi = 4, onProgres } = opsi;
+  const { sector, instansi, kbId, rag, konkurensi = 4, onProgres, berhenti } = opsi;
   const total = template.widgets.length;
   let selesai = 0;
   /** Kartu yang sudah berisi angka — dipakai progres live di UI. */
@@ -518,7 +524,21 @@ export async function isiTemplateDariRag(
 
   const statusKartu: Array<'terisi' | 'tidak-ada' | 'sibuk'> = new Array(total).fill('tidak-ada');
   const widgets: WidgetSpec[] = new Array(total);
+  /** true = pengguna menekan Hentikan saat pengisian berjalan. */
+  let dibatalkan = false;
   await kumpulan(template.widgets, konkurensi, async (w, i) => {
+    /**
+     * TOMBOL HENTIKAN. Dicek sebelum kartu dikerjakan, bukan di tengah panggilan
+     * dokumen: hasil yang sudah berjalan tetap utuh. Kartu yang belum sempat
+     * dikerjakan ditandai tertunda (`dataTertunda`), bukan "tidak ada di
+     * dokumen" — jadi tombol Mulai melanjutkan, tidak mengulang dari nol.
+     */
+    if (berhenti?.()) {
+      dibatalkan = true;
+      widgets[i] = kosongkan(w, 'Pengisian dihentikan. Kartu ini belum diisi.', true);
+      statusKartu[i] = 'sibuk';
+      return;
+    }
     const r = await prosesKartu(w);
     widgets[i] = r.widget;
     statusKartu[i] = r.status;
@@ -536,6 +556,7 @@ export async function isiTemplateDariRag(
    */
   const putaranMaks = opsi.putaranMaks ?? 6;
   for (let putaran = 2; putaran <= putaranMaks; putaran += 1) {
+    if (dibatalkan) break;
     const sisaSibuk = statusKartu.map((s, i) => ({ s, i })).filter(({ s }) => s === 'sibuk');
     if (sisaSibuk.length === 0) break;
     if (sisaMs() < 20_000) break;
@@ -558,6 +579,7 @@ export async function isiTemplateDariRag(
    */
   const dianggapTidakAda = statusKartu.map((s, i) => ({ s, i })).filter(({ s }) => s === 'tidak-ada');
   for (const { i } of dianggapTidakAda) {
+    if (dibatalkan) break;
     const jatah = Math.min(90_000, sisaMs());
     if (jatah < 15_000) break;
     const r = await prosesKartu(template.widgets[i], jatah, 'longgar');
@@ -572,6 +594,7 @@ export async function isiTemplateDariRag(
    */
   const sisaTidakAda = statusKartu.map((s, i) => ({ s, i })).filter(({ s }) => s === 'tidak-ada');
   for (const { i } of sisaTidakAda) {
+    if (dibatalkan) break;
     if (!kueriWidget(template.widgets[i], 'kamus')) continue;
     const jatah = Math.min(90_000, sisaMs());
     if (jatah < 15_000) break;

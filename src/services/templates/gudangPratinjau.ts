@@ -17,7 +17,7 @@ import type { WidgetSpec } from '../../types';
  * (harus disiapkan ulang), jadi angka yang ditampilkan tidak pernah ketinggalan.
  */
 
-export type StatusPratinjau = 'belum' | 'proses' | 'siap' | 'gagal';
+export type StatusPratinjau = 'belum' | 'proses' | 'siap' | 'gagal' | 'dihentikan';
 
 export interface EntriPratinjau {
   tenantId: string;
@@ -55,6 +55,14 @@ export interface HasilPengisian {
 const gudang = new Map<string, EntriPratinjau>();
 /** Kunci yang sedang diproses — mencegah dua pengisian berjalan bersamaan. */
 const berjalan = new Map<string, Promise<EntriPratinjau>>();
+/**
+ * Kunci yang pengisiannya DIMINTA BERHENTI pengguna (tombol Hentikan).
+ *
+ * Hanya di memori: setelah server hidup ulang, pengisian lanjut lagi seperti
+ * biasa. Kalau bendera ini ikut disimpan, satu kali salah tekan bisa menahan
+ * template selamanya tanpa ada yang sadar.
+ */
+const dihentikan = new Set<string>();
 let berkas: string | null = null;
 
 /** Kunci unik satu pratinjau: instansi + template + basis pengetahuan. */
@@ -125,6 +133,40 @@ export function basiikanTenant(tenantId: string): void {
 }
 
 /**
+ * Hentikan pengisian satu pratinjau (tombol Hentikan).
+ *
+ * Kartu yang sudah berisi angka tetap tersimpan. Pengisian yang sedang berjalan
+ * berhenti pada kartu berikutnya — panggilan dokumen yang sudah berangkat tidak
+ * diputus di tengah jalan, supaya hasilnya tidak setengah jadi.
+ */
+export function hentikanPratinjau(kunci: string): EntriPratinjau | null {
+  dihentikan.add(kunci);
+  const e = gudang.get(kunci);
+  if (!e) return null;
+  if (e.status === 'proses') {
+    e.status = 'dihentikan';
+    simpanKeBerkas();
+  }
+  return e;
+}
+
+/** Lanjutkan lagi pengisian yang tadi dihentikan (tombol Mulai). */
+export function lanjutkanPratinjau(kunci: string): void {
+  dihentikan.delete(kunci);
+}
+
+/** Apakah pengguna meminta pengisian ini berhenti? Dibaca pekerja tiap kartu. */
+export function apakahDihentikan(kunci: string): boolean {
+  return dihentikan.has(kunci);
+}
+
+/** Tunggu pengisian yang sedang berjalan untuk kunci ini selesai (kalau ada). */
+export async function tungguPratinjau(kunci: string): Promise<void> {
+  const p = berjalan.get(kunci);
+  if (p) await p.catch(() => undefined);
+}
+
+/**
  * Siapkan (isi dari dokumen) satu pratinjau. Aman dipanggil berkali-kali:
  * kalau sudah siap & versinya sama, langsung dikembalikan; kalau sedang berjalan,
  * pemanggil menunggu pekerjaan yang sama (tidak menumpuk panggilan dokumen).
@@ -190,8 +232,12 @@ export function siapkanPratinjau(opts: {
        * ada, statusnya `belum` supaya kunjungan berikutnya MELANJUTKAN pengisian
        * (dan supaya tombol "Pakai template" belum menawarkan dashboard setengah
        * jadi).
+       *
+       * Kalau pengisian berhenti karena tombol Hentikan, statusnya `dihentikan`:
+       * galeri menampilkan tombol Mulai, dan halaman template tidak memulai
+       * ulang sendiri tanpa izin pengguna.
        */
-      entri.status = entri.tertunda > 0 ? 'belum' : 'siap';
+      entri.status = dihentikan.has(kunci) ? 'dihentikan' : entri.tertunda > 0 ? 'belum' : 'siap';
       entri.selesai = Date.now();
       if (entri.tertunda > 0) {
         console.warn(

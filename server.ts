@@ -147,11 +147,16 @@ import { GAYA, VARIAN, type Varian } from './src/services/chart/gayaVarian';
 import { isiTemplateDariRag } from './src/services/templates/isiDariRag';
 import {
   ambilPratinjau,
+  apakahDihentikan,
   aturBerkasGudang,
   basiikanTenant,
   daftarPratinjau,
+  hentikanPratinjau,
+  kunciPratinjau,
+  lanjutkanPratinjau,
   masihBerlaku,
   siapkanPratinjau,
+  tungguPratinjau,
   type EntriPratinjau,
 } from './src/services/templates/gudangPratinjau';
 import { adalahPermintaanSaran, dataDariWidget, indikatorDariPrompt, susunSaranChart } from './src/services/chat/saranChart';
@@ -458,6 +463,8 @@ function versiKbTenant(tenant: any, template?: any): string {
  */
 function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinjau> {
   const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+  /** Kunci pratinjau ini — dipakai tombol Hentikan/Mulai. */
+  const kunci = kunciPratinjau(tenant.id, template.id, kbId);
   const dasar = widgetDariTemplate(template, Date.now());
   return siapkanPratinjau({
     tenantId: tenant.id,
@@ -489,6 +496,8 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
       const batasAkhir = Date.now() + BATAS_ISI_TEMPLATE_MS;
 
       for (let putaran = 1; putaran <= PUTARAN_ISI_TEMPLATE; putaran += 1) {
+        // Tombol Hentikan: jangan buka putaran baru.
+        if (apakahDihentikan(kunci)) break;
         const sisaMs = batasAkhir - Date.now();
         if (sisaMs < 60_000) break;
         const sudahTerisi = (w: any) => w.confidence === 'sumber' && !w.dataKosong;
@@ -508,6 +517,8 @@ function siapkanTemplateTenant(tenant: any, template: any): Promise<EntriPratinj
             konkurensi: KONKURENSI_ISI_TEMPLATE,
             batasMs: sisaMs,
             putaranMaks: 6,
+            // Tombol Hentikan dibaca pengisi sebelum tiap kartu dikerjakan.
+            berhenti: () => apakahDihentikan(kunci),
             onKartu: (kartu) => {
               widgets = widgets.map((w) => (w.id === kartu.id ? kartu : w));
               simpanSebagian(widgets);
@@ -1791,7 +1802,9 @@ const app = express();
     // Setelah gagal, beri jeda 2 menit sebelum mencoba lagi: tanpa jeda, tiap
     // kunjungan halaman memicu pengisian baru dan layanan dokumen makin sibuk.
     const jedaGagal = entri?.status === 'gagal' && Date.now() - (entri.selesai ?? 0) < 120_000;
-    if (!siap && entri?.status !== 'proses' && !jedaGagal) {
+    // Status `dihentikan` = pengguna menekan Hentikan. Jangan dinyalakan sendiri
+    // setiap halaman dibuka; hanya tombol Mulai yang boleh melanjutkannya.
+    if (!siap && entri?.status !== 'proses' && entri?.status !== 'dihentikan' && !jedaGagal) {
       void siapkanTemplateTenant(tenant, template);
     }
 
@@ -1843,6 +1856,61 @@ const app = express();
     basiikanWilayah(tenant.id);
     void siapkanTemplateTenant(tenant, template);
     return res.status(202).json({ status: 'proses' });
+  });
+
+  /**
+   * HENTIKAN pengisian data satu template (tombol Hentikan di galeri).
+   *
+   * Pengisian berjalan di latar dan bisa 5–45 menit. Tanpa tombol ini pengguna
+   * hanya bisa menunggu. Kartu yang sudah terisi tetap tersimpan; kartu yang
+   * belum sempat dikerjakan ditandai tertunda, jadi tombol Mulai melanjutkan
+   * dari situ — bukan mengulang dari nol.
+   */
+  app.post('/api/templates/hentikan', (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const templateId = String(req.body?.templateId || '').trim();
+    const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const entri = hentikanPratinjau(kunciPratinjau(tenant.id, template.id, kbId));
+    return res.json({
+      ok: true,
+      status: 'dihentikan',
+      terisi: entri?.terisi ?? 0,
+      total: entri?.widgets.length || template.widgets.length,
+    });
+  });
+
+  /**
+   * MULAI / LANJUTKAN pengisian data satu template sesudah dihentikan.
+   *
+   * Panggilan dokumen yang sedang berjalan diselesaikan dulu (`tungguPratinjau`),
+   * baru pengisian baru dimulai — supaya tidak ada dua pengisian untuk template
+   * yang sama.
+   */
+  app.post('/api/templates/mulai', (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Instansi tidak ditemukan.' });
+    const templateId = String(req.body?.templateId || '').trim();
+    const template = DASHBOARD_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template tidak dikenal.' });
+
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const kunci = kunciPratinjau(tenant.id, template.id, kbId);
+    lanjutkanPratinjau(kunci);
+    void (async () => {
+      await tungguPratinjau(kunci);
+      await siapkanTemplateTenant(tenant, template);
+    })();
+    return res.status(202).json({ ok: true, status: 'proses' });
   });
 
   /** Ringkasan status semua template satu instansi (badge di galeri). */
@@ -1927,7 +1995,7 @@ const app = express();
           // Sisa waktu (ms) sampai semua kartu template ini berisi data asli.
           perkiraanMs: siap || p == null ? null : Math.round(p),
           // true = masih menunggu template lain selesai lebih dulu.
-          menungguGiliran: !siap && e?.status !== 'proses' && !t.bagian,
+          menungguGiliran: !siap && e?.status !== 'proses' && e?.status !== 'dihentikan' && !t.bagian,
           templateId: t.id,
           status: siap ? 'siap' : e?.status ?? 'belum',
           terisi: e?.terisi ?? 0,
@@ -1976,9 +2044,14 @@ const app = express();
      * belakang dan beri tahu UI bahwa datanya masih loading.
      */
     if (!masihBerlaku(entri, versi)) {
-      if (entri?.status !== 'proses') void siapkanTemplateTenant(tenant, template);
+      // Pengisian yang dihentikan pengguna tidak dinyalakan sendiri: tombol
+      // Pakai Template membalas apa adanya sampai pengguna menekan Mulai.
+      const sedangDihentikan = entri?.status === 'dihentikan';
+      if (!sedangDihentikan && entri?.status !== 'proses') void siapkanTemplateTenant(tenant, template);
       return res.status(409).json({
-        error: 'Data template masih disiapkan dari dokumen. Coba lagi sebentar lagi.',
+        error: sedangDihentikan
+          ? 'Pengisian data template ini sedang dihentikan. Tekan Mulai untuk melanjutkan, lalu coba lagi.'
+          : 'Data template masih disiapkan dari dokumen. Coba lagi sebentar lagi.',
         status: entri?.status ?? 'belum',
         progres: entri?.progres ?? null,
       });

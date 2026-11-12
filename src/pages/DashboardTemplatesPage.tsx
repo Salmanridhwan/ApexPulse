@@ -11,6 +11,8 @@ import {
   LayoutTemplate,
   Loader2,
   Palette,
+  Pause,
+  Play,
   Presentation,
   Sparkles,
   RefreshCw,
@@ -94,7 +96,7 @@ interface DashboardTemplatesPageProps {
  */
 interface StatusTemplate {
   templateId: string;
-  status: 'belum' | 'proses' | 'siap' | 'gagal';
+  status: 'belum' | 'proses' | 'siap' | 'gagal' | 'dihentikan';
   /** Kartu yang sudah berisi angka dokumen. */
   terisi: number;
   /** Kartu yang indikatornya memang tidak ada di dokumen. */
@@ -247,6 +249,39 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
     () => DASHBOARD_TEMPLATES.find((t) => t.id === aktifId) ?? DASHBOARD_TEMPLATES[0],
     [aktifId]
   );
+
+  /**
+   * HENTIKAN / MULAI pengisian data dari dokumen.
+   *
+   * Pengisian berjalan di latar dan bisa 5–45 menit, jadi pengguna harus bisa
+   * menghentikannya lalu melanjutkan lagi tanpa kehilangan kartu yang sudah
+   * terisi. Status terbaru dibaca ulang dari server sesudah tombol ditekan.
+   */
+  const [mengubahPengisian, setMengubahPengisian] = useState<'' | 'hentikan' | 'mulai'>('');
+  const ubahPengisian = async (aksi: 'hentikan' | 'mulai') => {
+    setMengubahPengisian(aksi);
+    try {
+      const res = await fetch(`/api/templates/${aksi}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: aktif.id }),
+      });
+      const isi = await res.json().catch(() => null);
+      if (!res.ok) {
+        setGalatAsli(
+          isi?.error ||
+            `Pengisian gagal ${aksi === 'hentikan' ? 'dihentikan' : 'dimulai'} (HTTP ${res.status}). Coba lagi.`
+        );
+      } else {
+        setGalatAsli(null);
+      }
+    } catch {
+      setGalatAsli('Tidak bisa menghubungi server. Periksa koneksi lalu coba lagi.');
+    } finally {
+      setMengubahPengisian('');
+      void muatStatus();
+    }
+  };
 
   /** Gaya yang benar-benar dipakai pratinjau: pilihan pengguna, atau bawaan template. */
   const gayaTampil: Varian = gaya ?? varianBawaanTemplate(aktif);
@@ -583,6 +618,8 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
         : `Data asli siap · ${st.terisi} dari ${st.total} indikator cocok dengan dokumen Anda`
       : st?.status === 'proses'
         ? `Menyiapkan data asli dari dokumen… ${st.progres?.selesai ?? st.terisi}/${st.progres?.total ?? st.total} kartu${teksSisaWaktu(st)}`
+        : st?.status === 'dihentikan'
+          ? `Pengambilan data dihentikan — ${st.terisi} dari ${st.total} kartu sudah terisi. Tekan Mulai untuk melanjutkan.`
         : st?.status === 'gagal'
           ? `Penyiapan data asli gagal — tekan tombol pratinjau untuk mencoba lagi${teksSisaWaktu(st)}`
           : st?.tertunda
@@ -819,6 +856,40 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
             </div>
             {/* Tombol simpan tepat di sebelah kiri "Mode Presentasi". */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* HENTIKAN / MULAI pengambilan data dari dokumen. Pengisian bisa
+                  5–45 menit; tanpa tombol ini pengguna hanya bisa menunggu. */}
+              {st?.status === 'proses' && (
+                <button
+                  onClick={() => void ubahPengisian('hentikan')}
+                  disabled={mengubahPengisian !== ''}
+                  data-testid="hentikan-pengisian-template"
+                  title="Hentikan pengambilan data dari dokumen. Kartu yang sudah terisi tetap disimpan."
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-ink-2 bg-surface hover:bg-surface-2 border border-line rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {mengubahPengisian === 'hentikan' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Pause className="w-3.5 h-3.5" />
+                  )}
+                  <span>{mengubahPengisian === 'hentikan' ? 'Menghentikan…' : 'Hentikan'}</span>
+                </button>
+              )}
+              {st?.status === 'dihentikan' && (
+                <button
+                  onClick={() => void ubahPengisian('mulai')}
+                  disabled={mengubahPengisian !== ''}
+                  data-testid="mulai-pengisian-template"
+                  title="Lanjutkan pengambilan data dari dokumen. Kartu yang sudah terisi tidak diulang."
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-on-brand bg-brand hover:brightness-95 rounded-control transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {mengubahPengisian === 'mulai' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5" />
+                  )}
+                  <span>{mengubahPengisian === 'mulai' ? 'Memulai…' : 'Mulai'}</span>
+                </button>
+              )}
               {asli && (
                 <button
                   onClick={() => void pakai()}

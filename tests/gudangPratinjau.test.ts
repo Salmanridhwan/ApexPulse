@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {
   aturBerkasGudang,
   ambilPratinjau,
+  apakahDihentikan,
+  hentikanPratinjau,
+  kunciPratinjau,
+  lanjutkanPratinjau,
   masihBerlaku,
   siapkanPratinjau,
   basiikanTenant,
@@ -95,4 +99,37 @@ test('basiikanTenant menandai entri satu instansi saja', async () => {
   basiikanTenant('t5');
   assert.equal(ambilPratinjau('t5', 'tpl-e', 'kb-e')?.status, 'belum');
   assert.equal(ambilPratinjau('t6', 'tpl-e', 'kb-f')?.status, 'siap');
+});
+
+test('hentikan menahan pengisian dengan hasil sebagian, mulai melanjutkan', async () => {
+  let dipanggil = 0;
+  const pekerja = async (_onProgres: any, simpan: (w: any[]) => void) => {
+    dipanggil += 1;
+    // Kartu pertama sudah tersimpan sebelum pengguna menekan Hentikan.
+    simpan([widget('Satu')]);
+    await new Promise((r) => setTimeout(r, 30));
+    return { widgets: [widget('Satu')], terisi: 1, kosong: 0, catatan: [] };
+  };
+  const kunci = kunciPratinjau('t7', 'tpl-f', 'kb-g');
+  const opsi = { tenantId: 't7', templateId: 'tpl-f', kbId: 'kb-g', versiKb: 'v1', total: 2, pekerja };
+
+  const tugas = siapkanPratinjau(opsi);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(apakahDihentikan(kunci), false, 'belum dihentikan saat pengisian mulai');
+
+  hentikanPratinjau(kunci);
+  assert.equal(apakahDihentikan(kunci), true);
+  assert.equal(ambilPratinjau('t7', 'tpl-f', 'kb-g')?.status, 'dihentikan');
+
+  const berhenti = await tugas;
+  assert.equal(berhenti.status, 'dihentikan', 'entri berhenti tidak boleh dianggap siap');
+  assert.equal(berhenti.terisi, 1, 'kartu yang sudah terisi tetap tersimpan');
+  assert.equal(masihBerlaku(berhenti, 'v1'), false);
+
+  lanjutkanPratinjau(kunci);
+  assert.equal(apakahDihentikan(kunci), false, 'tombol Mulai membersihkan bendera');
+
+  const lagi = await siapkanPratinjau(opsi);
+  assert.equal(lagi.status, 'siap');
+  assert.equal(dipanggil, 2, 'pengisian berjalan sekali lagi sesudah dimulai');
 });
