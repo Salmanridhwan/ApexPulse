@@ -87,6 +87,12 @@ export function PanelAiMenyusun({ dashboard }: { dashboard: Dashboard }) {
         ))}
       </div>
 
+      {ai.permintaan && (
+        <p className="mt-2 text-[11px] text-content-muted" data-testid="panel-ai-arahan">
+          <span className="font-semibold">Arahan Anda:</span> “{ai.permintaan}”
+        </p>
+      )}
+
       {tampil.length > 0 && (
         <div className="mt-2">
           <p className="text-[11px] font-semibold text-content-muted">Data yang sudah diambil AI</p>

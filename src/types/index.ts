@@ -467,6 +467,8 @@ export interface Dashboard {
     terpilih: string[];
     /** Rasa penyusunan yang dipilih pengguna (cepat / seimbang / mendalam). */
     mode?: 'cepat' | 'seimbang' | 'mendalam' | 'ultra';
+    /** Arahan tambahan dari pengguna saat meminta rekomendasi (opsional). */
+    permintaan?: string;
     /** Id kartu yang baru ditaruh AI, dikejar kursor AI di kanvas. */
     kartuAktif?: string;
     galat?: string;
@@ -534,6 +536,25 @@ export interface Dashboard {
 }
 
 /**
+/**
+ * INSIGHT AI SATU HALAMAN.
+ *
+ * Ditulis model dari angka yang sudah tampil di kartu halaman itu: satu paragraf
+ * tafsir (`ringkasan`), apa yang terbaca (`temuan`), dan langkah yang disarankan
+ * (`saran`). Tidak ada angka baru di sini — hanya tafsir atas angka yang ada.
+ */
+export interface InsightHalaman {
+  ringkasan: string;
+  temuan: string[];
+  saran: string[];
+  /** Waktu insight dibuat (ISO). */
+  dibuatPada: string;
+  /** Sidik isi halaman saat insight dibuat; beda = insight usang. */
+  sidik: string;
+  asal: 'rag';
+}
+
+/**
  * Satu halaman dashboard. Isinya terpisah dari halaman lain: kartu, angka,
  * tata letak, dan filternya sendiri.
  */
@@ -541,6 +562,14 @@ export interface HalamanDashboard {
   id: string;
   judul: string;
   widgets: WidgetSpec[];
+  /**
+   * INSIGHT AI halaman ini — satu paragraf tafsir + temuan + saran yang ditulis
+   * model dari angka yang sudah ada di kartu halaman.
+   *
+   * `sidik` adalah sidik isi halaman saat insight dibuat; kalau kartunya berubah,
+   * strip insight menandainya usang dan menawarkan pembaruan.
+   */
+  insight?: InsightHalaman;
   /** Tata letak kartu desain template, kunci = id template. */
   tataLetak?: Record<string, Record<string, TataLetakBaris>>;
   /** Jejak template halaman ini: desain sama, angka berbeda. */

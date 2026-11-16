@@ -2,6 +2,9 @@ import React, { useMemo } from 'react';
 import { Calendar, Layers, MapPin, RotateCcw, Save } from 'lucide-react';
 import { GlobalFilters, WidgetSpec } from '../types';
 import { kategoriEfektif, unitRingkas } from '../services/spec/kategoriWidget';
+import { cocokPeriode, periodeTersedia } from '../services/filter/periode';
+
+export { cocokPeriode, urutPeriode } from '../services/filter/periode';
 
 interface GlobalFiltersBarProps {
   filters: GlobalFilters;
@@ -10,6 +13,8 @@ interface GlobalFiltersBarProps {
   widgets: WidgetSpec[];
   /** Jumlah widget yang tampil (tidak lagi ditampilkan di UI, dipertahankan untuk kompatibilitas caller). */
   shownCount?: number;
+  /** Jumlah kartu di halaman aktif — dipakai keterangan "x dari y kartu" saat filter aktif. */
+  jumlahKartu?: number;
   /**
    * TATA LETAK BERUBAH — begitu kartu digeser atau diubah ukurannya, dua tombol
    * Simpan dan Reset muncul di ujung kanan baris filter ini. Tata letak baru
@@ -18,6 +23,14 @@ interface GlobalFiltersBarProps {
   tataLetakBerubah?: boolean;
   onSimpanTataLetak?: () => void;
   onResetTataLetak?: () => void;
+  /**
+   * Sisipan di ujung kanan baris filter — dipakai chip Insight AI halaman supaya
+   * ikut satu baris dengan Periode / Unit Kerja / Kategori.
+   *
+   * Kalau `sisipan` diisi, bar tetap tampil walau dashboard tidak punya dimensi
+   * filter (bar dulu mengembalikan null), karena chip itu tetap perlu terlihat.
+   */
+  sisipan?: React.ReactNode;
 }
 
 /**
@@ -40,11 +53,10 @@ function opsiUnik(nilai: Array<string | undefined | null>): string[] {
  * periode akan mengosongkan seluruh papan.
  */
 export const cocokFilter = (w: WidgetSpec, f: GlobalFilters): boolean => {
-  const periode = (w.periode ?? '').trim();
   const unit = unitRingkas(w.unitKerja);
   const kategori = kategoriEfektif(w);
   return (
-    (f.periode === 'Semua' || !periode || periode === f.periode) &&
+    cocokPeriode(w, f.periode) &&
     (f.unitKerja === 'Semua' || !unit || unit === f.unitKerja) &&
     (f.kategori === 'Semua' || !kategori || kategori === f.kategori)
   );
@@ -65,16 +77,21 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
   filters,
   onChange,
   widgets,
+  shownCount,
+  jumlahKartu,
   tataLetakBerubah = false,
   onSimpanTataLetak,
   onResetTataLetak,
+  sisipan,
 }) => {
-  const opsiPeriode = useMemo(() => ['Semua', ...opsiUnik(widgets.map((w) => w.periode))], [widgets]);
+  const opsiPeriode = useMemo(() => ['Semua', ...periodeTersedia(widgets)], [widgets]);
   const opsiUnit = useMemo(() => ['Semua', ...opsiUnik(widgets.map((w) => unitRingkas(w.unitKerja)))], [widgets]);
   const opsiKategori = useMemo(() => ['Semua', ...opsiUnik(widgets.map((w) => kategoriEfektif(w)))], [widgets]);
   const ada = opsiPeriode.length > 1 || opsiUnit.length > 1 || opsiKategori.length > 1;
+  /** Ada filter yang sedang aktif (dipakai keterangan "x dari y kartu"). */
+  const filterAda = filters.periode !== 'Semua' || filters.unitKerja !== 'Semua' || filters.kategori !== 'Semua';
 
-  if (!ada) return null;
+  if (!ada && !sisipan) return null;
 
   return (
     <div className="flex items-center gap-2.5 flex-wrap text-xs" data-testid="dashboard-filter-bar">
@@ -136,6 +153,14 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
         </div>
       )}
 
+      {/* Umpan balik jumlah: tanpa ini efek filter tidak terlihat saat kartu yang
+          disembunyikan sedikit (banyak kartu memang tanpa dimensi periode). */}
+      {filterAda && typeof shownCount === 'number' && typeof jumlahKartu === 'number' && (
+        <span className="text-[11px] text-ink-3 tabular-nums" data-testid="filter-jumlah">
+          {shownCount} dari {jumlahKartu} kartu
+        </span>
+      )}
+
       {/* Simpan / Reset tata letak — hanya tampil setelah kartu digeser atau diubah ukurannya */}
       {tataLetakBerubah && (
         <div className="ml-auto flex items-center gap-1.5" data-testid="aksi-tata-letak">
@@ -162,6 +187,9 @@ export const GlobalFiltersBar: React.FC<GlobalFiltersBarProps> = ({
           )}
         </div>
       )}
+
+      {/* Sisipan pemanggil (chip Insight AI) — satu baris dengan filter. */}
+      {sisipan && <div className={`shrink-0 ${tataLetakBerubah ? '' : 'ml-auto'}`}>{sisipan}</div>}
     </div>
   );
 };

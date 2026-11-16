@@ -412,6 +412,20 @@ export const SKEMA_RENCANA = {
   required: ['judul', 'halaman'],
 };
 
+/**
+ * Arahan pengguna ditulis di dalam tanda kutip pada prompt, jadi kutip dan baris
+ * baru dinormalkan lebih dulu: satu paragraf, maksimal 300 karakter (batas yang
+ * sama dengan server), supaya skema JSON tidak rusak oleh tanda kutip liar.
+ */
+function arahanRapi(teks: string): string {
+  return String(teks || '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/["“”]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300);
+}
+
 export function buatPrompt(
   katalog: string,
   jumlahButir: number,
@@ -421,6 +435,7 @@ export function buatPrompt(
   putaranKe = 2,
 ): string {
   const m = MODE_REKO[mode];
+  const arahan = arahanRapi(permintaan);
   const aturanHalaman = lanjutan
     ? [
         `1. Ini PUTARAN LANJUTAN ${putaranKe} dari ${Math.max(m.putaran, putaranKe)}: varian di bawah BELUM terpakai. Susun ${m.tambahanMin || m.halamanMin} sampai ${m.tambahanMaks || m.halamanMaks} halaman TAMBAHAN dari varian itu.`,
@@ -436,7 +451,7 @@ export function buatPrompt(
     'Anda perancang dashboard untuk instansi pemerintah/BUMD.',
     'Anda TIDAK perlu membaca dokumen: seluruh data sudah diekstrak dan ada di KATALOG.',
     'Tugas Anda: menyusun dashboard beberapa halaman dari katalog itu.',
-    permintaan ? `Permintaan pengguna: "${permintaan}"` : 'Permintaan pengguna: susun dashboard lengkap yang layak dipresentasikan.',
+    arahan ? `Permintaan pengguna: "${arahan}"` : 'Permintaan pengguna: susun dashboard lengkap yang layak dipresentasikan.',
     '',
     'DAFTAR CHART TEMPLATE (pakai id-nya):',
     daftarChart(),

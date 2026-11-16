@@ -9,6 +9,7 @@ import { selaraskanTipe } from '../spec/tipeSelaras';
 import { bersihkanRancangan } from '../chart/rancanganRag';
 import { namaSetara } from '../spec/namaSetara';
 import { periodeSeragam } from '../builder/halamanDiminta';
+import { rapikanJawabanInsight } from '../analisis/insightHalaman';
 
 /**
  * Galat layanan RAG. Dipakai supaya pemanggil bisa MEMBEDAKAN "layanan tidak
@@ -2002,6 +2003,66 @@ export class ConfigurableRagClient implements RagClient {
       const teks = potong(item?.insight, 320);
       if (!teks) return { insight: null, catatan: 'Layanan tidak mengembalikan narasi.' };
       return { insight: teks };
+    } catch (err) {
+      return { insight: null, catatan: jelaskanError(err) };
+    }
+  }
+
+  /**
+   * INSIGHT SATU HALAMAN dashboard.
+   *
+   * Model melihat SELURUH kartu satu halaman (lewat `konteks` yang sudah
+   * diringkas pemanggil) lalu menulis: satu paragraf tafsir, temuan, dan saran.
+   * Angka yang boleh disebut hanya angka yang ada di konteks — tidak ada
+   * pengambilan dokumen baru, supaya hasilnya tidak melenceng dari yang tampil.
+   */
+  async insightHalaman(
+    konteks: string,
+    sector: BumdSector,
+    instansi?: string,
+    kbId?: string
+  ): Promise<{ insight: { ringkasan: string; temuan: string[]; saran: string[] } | null; catatan?: string } | null> {
+    const cfg = this.getRagConfig();
+    if (cfg.provider !== 'http' || !cfg.baseUrl || !cfg.apiKey) return null;
+    const { dipakai } = await this.resolveBase(cfg);
+
+    const sebutanInstansi = kbId?.trim()
+      ? 'Semua dokumen di knowledge base ini milik SATU instansi. '
+      : instansi?.trim()
+        ? `Instansi: "${instansi.trim()}". `
+        : '';
+
+    const instruksi =
+      `Anda analis kinerja untuk instansi pemerintah/BUMD (${sector.toUpperCase()}). ` +
+      sebutanInstansi +
+      `Satu halaman dashboard berisi kartu-kartu berikut (angka sudah final dari dokumen instansi):\n` +
+      `${konteks}\n\n` +
+      'Tulis INSIGHT halaman ini untuk pengambil keputusan: apa yang terbaca dari kartu-kartu itu, ' +
+      'hubungan antar kartu, dan apa yang sebaiknya dilakukan.\n' +
+      'Balas HANYA JSON: {"ringkasan":"...","temuan":["..."],"saran":["..."]}\n' +
+      'Aturan:\n' +
+      '1. ringkasan: 2-3 kalimat (maksimal 60 kata) tentang pola/arah yang terlihat dan artinya.\n' +
+      '2. temuan: 2 sampai 3 butir, tiap butir maksimal 18 kata.\n' +
+      '3. saran: 2 sampai 3 butir tindakan konkret, tiap butir maksimal 18 kata, diawali kata kerja.\n' +
+      '4. Angka yang disebut WAJIB angka yang sudah ada di data di atas. Jangan menghitung atau mengarang angka, dokumen, atau tanggal baru.\n' +
+      '5. Kalau data tidak cukup untuk menyimpulkan, katakan apa adanya di ringkasan dan kosongkan saran yang tidak berdasar.\n' +
+      '6. Bahasa Indonesia, tanpa markdown, tanpa tabel.';
+
+    const skemaInsight = {
+      type: 'object',
+      properties: {
+        ringkasan: { type: 'string' },
+        temuan: { type: 'array', items: { type: 'string' } },
+        saran: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['ringkasan', 'temuan', 'saran'],
+    };
+
+    try {
+      const item = await this.ambilPayloadExtract(dipakai, cfg, instruksi, skemaInsight, kbId);
+      const bersih = rapikanJawabanInsight(item);
+      if (!bersih) return { insight: null, catatan: 'Layanan tidak mengembalikan insight halaman.' };
+      return { insight: bersih };
     } catch (err) {
       return { insight: null, catatan: jelaskanError(err) };
     }

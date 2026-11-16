@@ -426,6 +426,29 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
    */
   const [modeReko, setModeReko] = useState<'cepat' | 'seimbang' | 'mendalam' | 'ultra'>('seimbang');
   const [bukaMode, setBukaMode] = useState(false);
+  /**
+   * ARAHAN TAMBAHAN untuk AI (opsional).
+   *
+   * Kalau diisi, kalimat ini ikut dikirim sebagai "Permintaan pengguna" ke model,
+   * jadi susunan halaman mengikuti keinginan pengguna; kalau kosong, AI memilih
+   * sendiri seperti biasa. Disimpan di peramban supaya tidak perlu ditulis ulang.
+   */
+  const [arahan, setArahan] = useState(() => {
+    try {
+      return localStorage.getItem('reko-arahan-v1') || '';
+    } catch {
+      return '';
+    }
+  });
+  /** Tulis sekalian ke peramban supaya arahan tidak hilang saat modal ditutup. */
+  const ubahArahan = (v: string) => {
+    setArahan(v);
+    try {
+      localStorage.setItem('reko-arahan-v1', v);
+    } catch {
+      /* penyimpanan peramban penuh/diblokir: arahan tetap terpakai sesi ini */
+    }
+  };
   /** Waktu nyata tiap mode dari server (rentang penyusunan terakhir); null = belum ada. */
   const [durasiNyata, setDurasiNyata] = useState<Record<string, { teks: string; sampel: number }> | null>(null);
   useEffect(() => {
@@ -688,6 +711,8 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
           mode,
           ...(dipilih.length > 0 ? { butirIds: dipilih } : {}),
           ...(judul.trim() ? { judul: judul.trim() } : {}),
+          // Arahan opsional: hanya dikirim bila benar-benar diisi.
+          ...(arahan.trim() ? { prompt: arahan.trim() } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1049,7 +1074,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                         <div>
                           <h3 className="text-sm font-bold text-ink">Susun dashboard dengan AI</h3>
                           <p className="text-[11px] text-ink-2 mt-0.5">
-                            Pilih berapa lama AI bekerja dan seberapa banyak data yang dibaca.
+                            Pilih berapa lama AI bekerja dan seberapa banyak data yang dibaca. Arahan boleh dikosongkan.
                           </p>
                         </div>
                         <button
@@ -1060,6 +1085,28 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
                         >
                           <X className="w-4 h-4" />
                         </button>
+                      </div>
+
+                      <div className="px-4 pt-3 pb-1">
+                        <label htmlFor="reko-arahan" className="flex items-baseline justify-between gap-2">
+                          <span className="text-[11px] font-bold text-ink">
+                            Arahan tambahan <span className="font-normal text-ink-3">(opsional)</span>
+                          </span>
+                          <span className="text-[10px] tabular-nums text-ink-3">{arahan.length}/300</span>
+                        </label>
+                        <textarea
+                          id="reko-arahan"
+                          value={arahan}
+                          onChange={(e) => ubahArahan(e.target.value)}
+                          maxLength={300}
+                          rows={3}
+                          placeholder="Mis. fokus ke piutang dan arus kas untuk rapat direksi, tampilkan per wilayah."
+                          data-testid="rekomendasi-arahan"
+                          className="mt-1 w-full px-3 py-2 bg-surface-2 focus:bg-surface border border-line rounded-control text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-brand resize-none"
+                        />
+                        <p className="mt-1 text-[10px] leading-snug text-ink-3">
+                          Kosongkan bila ingin AI memilih sendiri. Klik salah satu mode di bawah untuk mulai.
+                        </p>
                       </div>
 
                       <div className="p-2.5 space-y-1.5">

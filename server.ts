@@ -100,6 +100,7 @@ import {
   type ModeReko,
 } from './src/services/analisis/rekomendasiAi';
 import { isiSlotTemplate, slotKosong, widgetTerisi } from './src/services/analisis/butirKeSlotTemplate';
+import { ringkasHalamanInsight, sidikHalaman } from './src/services/analisis/insightHalaman';
 import {
   butirSiapPakai,
   halamanDari,
@@ -1665,6 +1666,74 @@ const app = express();
     } catch (err) {
       sendEvent('galat', { pesan: err instanceof Error ? err.message : 'Gagal menyiapkan presentasi.' });
       res.end();
+    }
+  });
+
+  /**
+   * INSIGHT AI SATU HALAMAN.
+   *
+   * Dipanggil otomatis SEKALI saat halaman pertama kali dibuka (dan lewat tombol
+   * Perbarui). Hasilnya disimpan di `halaman[].insight`, jadi membuka halaman itu
+   * lagi tidak memanggil model lagi.
+   *
+   * Aturan: tidak ada narasi cadangan buatan aturan. Kalau layanan AI belum aktif
+   * (provider Mock) atau gagal menjawab, balasannya galat jujur — bukan teks yang
+   * menyamar sebagai hasil AI.
+   */
+  app.post('/api/dashboards/:id/halaman/:halamanId/insight', async (req: Request, res: Response) => {
+    const session = butuhPenulis(req, res);
+    if (!session) return;
+    const tenantId = effectiveTenantId(req, session);
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+
+    const dash = db.getDashboardById(req.params.id, tenantId);
+    if (!dash) return res.status(404).json({ error: 'Dashboard tidak ditemukan atau akses ditolak.' });
+
+    const semua = daftarHalaman(dash);
+    const halaman = semua.find((h) => h.id === req.params.halamanId);
+    if (!halaman) return res.status(404).json({ error: 'Halaman tidak ditemukan di dashboard ini.' });
+    if ((halaman.widgets || []).length === 0) {
+      return res.status(400).json({ error: 'Halaman ini belum punya kartu, jadi belum ada yang bisa ditafsirkan.' });
+    }
+
+    const sidik = sidikHalaman(halaman);
+    const segarkan = req.body?.segarkan === true;
+    // Isi halaman belum berubah sejak insight terakhir: pakai yang tersimpan.
+    if (!segarkan && halaman.insight && halaman.insight.sidik === sidik) {
+      return res.json({ insight: halaman.insight, dariCache: true, dashboard: dash });
+    }
+
+    const sector = (req.body?.sector || dash.sector || tenant?.sector || 'pdam') as BumdSector;
+    const kbId = kbUntukInstansi(tenant, db.systemConfig.ragKnowledgeBaseId) || '';
+    const konteks = ringkasHalamanInsight(halaman);
+
+    if (typeof ragClient.insightHalaman !== 'function') {
+      return res.status(503).json({ error: 'Layanan AI yang terpasang tidak mendukung insight halaman.' });
+    }
+
+    try {
+      const hasil = await ragClient.insightHalaman(konteks, sector, tenant?.name, kbId);
+      if (!hasil) {
+        return res.status(503).json({
+          error:
+            'Layanan AI belum aktif (mode Mock). Insight halaman butuh model yang membaca dokumen instansi.',
+        });
+      }
+      if (!hasil.insight) {
+        return res.status(502).json({ error: hasil.catatan || 'AI tidak mengembalikan insight untuk halaman ini.' });
+      }
+
+      const insight = {
+        ...hasil.insight,
+        dibuatPada: new Date().toISOString(),
+        sidik,
+        asal: 'rag' as const,
+      };
+      const halamanBaru = semua.map((h) => (h.id === halaman.id ? { ...h, insight } : h));
+      const updated = db.updateDashboard(dash.id, { halaman: halamanBaru }, tenantId);
+      res.json({ insight, dariCache: false, dashboard: updated });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Gagal menyusun insight halaman.' });
     }
   });
 
@@ -5384,6 +5453,18 @@ ${kpiItems}
       .map(([nama, jumlah]) => ({ nama, jumlah }))
       .sort((a, b) => b.jumlah - a.jumlah);
 
+    /**
+     * ARAHAN OPSIONAL dari pengguna (boleh kosong).
+     *
+     * Dibatasi 300 karakter: layanan RAG menolak `query` di atas 8000 karakter dan
+     * katalog sudah memakai sampai 4600. Baris baru diratakan supaya prompt tetap
+     * satu paragraf.
+     */
+    const permintaan = String(req.body?.prompt || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 300);
+
     const id = `dash-${Date.now()}`;
     const judulAwal = `AI menyusun dashboard ${tenant?.name || 'instansi'}…`;
     const mulai = new Date().toISOString();
@@ -5406,6 +5487,8 @@ ${kpiItems}
         kandidat: kandidat.length,
         kategori,
         terpilih: [],
+        // Disimpan supaya panel "AI menyusun" dan data dashboard menunjukkan arahan yang dipakai.
+        ...(permintaan ? { permintaan } : {}),
       },
       createdAt: mulai,
       updatedAt: mulai,
@@ -5420,7 +5503,6 @@ ${kpiItems}
       }
     };
 
-    const permintaan = String(req.body?.prompt || '').trim();
     const katalog = katalogUntukAi(kandidat, profil.maksVarian, profil.batasKatalog);
     const prompt = buatPrompt(katalog.teks, katalog.jumlah, permintaan, mode);
 

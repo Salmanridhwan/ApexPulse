@@ -50,6 +50,8 @@ interface DashboardCanvasProps {
   cadanganBawah?: number;
   /** true = tanpa latar & garis bingkai kanvas (kanvas berada di dalam bingkai lain). */
   polos?: boolean;
+  /** Periode terpilih di bar filter; diteruskan ke kartu yang punya `periodeData`. */
+  periodePilihan?: string;
 }
 
 /**
@@ -86,6 +88,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
   tinggiKpiMaks,
   cadanganBawah = 0,
   polos = false,
+  periodePilihan,
 }) => {
   // Drag-and-drop reorder widget (HTML5 DnD native, tanpa library).
   const [dragId, setDragId] = useState<string | null>(null);
@@ -437,6 +440,7 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
           urutan={urutan}
           preview={preview}
           padat={pasSatuHalaman}
+          periodePilihan={periodePilihan}
           onEdit={onEditWidget}
           onGantiChart={onGantiChart}
           onManualCorrection={onManualCorrection}

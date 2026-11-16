@@ -3,6 +3,7 @@ import { Activity, Database, Lock, Pencil, Shield, ShieldCheck, X } from 'lucide
 import { LogoTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GlobalFiltersBar, cocokFilter } from '../components/GlobalFiltersBar';
+import { terapkanPeriode } from '../services/filter/periode';
 import { ActiveChartFilterChip, ChartSelectionProvider } from '../components/widgets/ChartSelection';
 import { WidgetRenderer } from '../components/widgets/WidgetRenderer';
 import { DashboardCanvas } from '../components/DashboardCanvas';
@@ -112,7 +113,14 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
 
   const widgets: WidgetSpec[] = dashboard?.widgets ?? [];
 
-  const widgetsTampil = useMemo(() => widgets.filter((w) => cocokFilter(w, filters)), [widgets, filters]);
+  const widgetsTampil = useMemo(
+    () =>
+      widgets
+        .filter((w) => cocokFilter(w, filters))
+        // Grafik ber-sumbu bulan ikut dipotong sampai periode terpilih.
+        .map((w) => terapkanPeriode(w, filters.periode)),
+    [widgets, filters]
+  );
 
   const adaFilter =
     new Set(widgets.map((w) => w.periode).filter(Boolean)).size > 1 ||
@@ -211,6 +219,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
       onChange={setFilters}
       widgets={widgets}
       shownCount={widgetsTampil.length}
+      jumlahKartu={widgets.length}
     />
   ) : null;
 
@@ -434,6 +443,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ token, embed = false }) =>
                diubah ukurannya, diedit, digandakan, dan dihapus. */
             <DashboardCanvas
               widgets={widgetsTampil}
+              periodePilihan={filters.periode}
               onEditWidget={(w) => {
                 setEditorTab('config');
                 setEditingWidget(w);

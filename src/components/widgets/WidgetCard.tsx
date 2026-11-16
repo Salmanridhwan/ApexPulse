@@ -54,6 +54,14 @@ interface WidgetCardProps {
    * minimum badan dilepas, supaya grafik tetap terlihat saat kartu hanya ~80px.
    */
   padat?: boolean;
+  /**
+   * Periode yang dipilih di bar filter dashboard (opsional).
+   *
+   * Kalau kartu ini punya `periodeData` dan memuat periode tersebut, kartu
+   * langsung menampilkan periode itu — ini yang membuat filter periode terasa
+   * "mengubah halaman", bukan sekadar menyembunyikan kartu.
+   */
+  periodePilihan?: string;
 }
 
 export const WidgetCard: React.FC<WidgetCardProps> = ({
@@ -66,6 +74,7 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
   preview = false,
   urutan,
   padat = false,
+  periodePilihan,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   /**
@@ -248,6 +257,17 @@ export const WidgetCard: React.FC<WidgetCardProps> = ({
     setPeriodeIdx(periodeAwal());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id, periodeData?.length]);
+
+  /**
+   * Filter periode dari bar dashboard MENGUBAH periode yang ditampilkan kartu.
+   * Ditaruh setelah efek reset di atas supaya hasilnya menang saat keduanya
+   * berjalan pada render yang sama.
+   */
+  useEffect(() => {
+    if (!periodePilihan || periodePilihan === 'Semua' || !periodeData) return;
+    const i = periodeData.findIndex((p) => (p.periode || '').trim() === periodePilihan);
+    if (i >= 0) setPeriodeIdx(i);
+  }, [periodePilihan, widget.id, periodeData]);
 
   const widgetTampil = useMemo(() => {
     if (!periodeData || periodeIdx < 0 || !periodeData[periodeIdx]) return widget;

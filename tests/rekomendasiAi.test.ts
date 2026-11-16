@@ -93,6 +93,19 @@ test('prompt menyebut aturan halaman, daftar chart, dan bentuk JSON', () => {
   assert.ok(daftarChart().includes('donat-tebal'), 'katalog chart dikirim utuh');
 });
 
+test('arahan pengguna opsional: masuk prompt, kutipnya dirapikan, panjang dibatasi', () => {
+  const kosong = buatPrompt('- btr-1 | x | y', 1, '');
+  assert.match(kosong, /Permintaan pengguna: susun dashboard lengkap/, 'tanpa arahan memakai kalimat bawaan');
+
+  const isi = buatPrompt('- btr-1 | x | y', 1, '  fokus "piutang"\nuntuk rapat direksi  ');
+  assert.match(isi, /Permintaan pengguna: "fokus 'piutang' untuk rapat direksi"/, 'kutip dan baris baru dinormalkan');
+  assert.doesNotMatch(isi, /\nuntuk rapat/, 'baris baru tidak memecah prompt');
+
+  const panjang = buatPrompt('- btr-1 | x | y', 1, 'a'.repeat(900));
+  const baris = panjang.split('\n').find((l) => l.startsWith('Permintaan pengguna:')) || '';
+  assert.ok(baris.length <= 'Permintaan pengguna: "'.length + 300 + 1, `arahan dipotong 300 karakter, dapat ${baris.length}`);
+});
+
 test('prompt dengan katalog penuh tetap di bawah batas 8000 karakter', () => {
   const daftar = Array.from({ length: 60 }, (_, i) =>
     butir({

@@ -31,6 +31,7 @@ import {
 import { ChatPanel } from './components/ChatPanel';
 import { PemberitahuanVersi } from './components/PemberitahuanVersi';
 import { DashboardCanvas } from './components/DashboardCanvas';
+import { InsightHalaman } from './components/InsightHalaman';
 import { PanelAiMenyusun } from './components/PanelAiMenyusun';
 import { KursorAi } from './components/KursorAi';
 import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from './theme';
@@ -46,6 +47,7 @@ import {
   nilaiTrafikDariWidgets,
 } from './services/templates/nilaiTemplate';
 import { GlobalFiltersBar, cocokFilter } from './components/GlobalFiltersBar';
+import { terapkanPeriode } from './services/filter/periode';
 import { HalamanTabs } from './components/HalamanTabs';
 import {
   daftarHalaman,
@@ -1049,7 +1051,18 @@ export default function App() {
     : null;
 
   // Widget yang benar-benar tampil di kanvas internal setelah filter view-only diterapkan.
-  const widgetsTampilInternal = (activeDashboard?.widgets || []).filter((w) => cocokFilter(w, viewFilters));
+  /**
+   * Dua langkah: saring (periode/kategori/unit), lalu POTONG sumbu grafik ke
+   * periode terpilih ("s.d. Mei 2026"). Langkah kedua yang membuat grafik ikut
+   * berubah, bukan sekadar beberapa kartu disembunyikan.
+   */
+  const widgetsTampilInternal = useMemo(
+    () =>
+      (activeDashboard?.widgets || [])
+        .filter((w) => cocokFilter(w, viewFilters))
+        .map((w) => terapkanPeriode(w, viewFilters.periode)),
+    [activeDashboard?.widgets, viewFilters]
+  );
 
   /**
    * Tautan `#/v/...` yang dibuka saat aplikasi SUDAH terbuka (tautan internal,
@@ -1687,9 +1700,38 @@ export default function App() {
                         // Opsi filter (periode, kategori) dari SEMUA halaman, bukan halaman aktif saja.
                         widgets={semuaWidget(activeDashboard)}
                         shownCount={widgetsTampilInternal.length}
+                        jumlahKartu={(activeDashboard.widgets || []).length}
                         tataLetakBerubah={tataLetakBerubah}
                         onSimpanTataLetak={simpanTataLetak}
                         onResetTataLetak={resetTataLetak}
+                        /**
+                         * Chip INSIGHT AI halaman duduk satu baris dengan Periode /
+                         * Unit Kerja / Kategori. Hanya di kanvas widget: deck replika
+                         * punya tata letaknya sendiri.
+                         */
+                        sisipan={
+                          halamanSekarang &&
+                          activeDashboard.status !== 'menyusun' &&
+                          !(activeDashboard.replika && !tampilWidget) ? (
+                            <InsightHalaman
+                              dashboardId={activeDashboard.id}
+                              halaman={halamanSekarang}
+                              bolehBuat={isAdminRole(currentUser?.role)}
+                              onInsight={(halamanId, insight) =>
+                                setActiveDashboard((d) =>
+                                  d
+                                    ? {
+                                        ...d,
+                                        halaman: daftarHalaman(d).map((h) =>
+                                          h.id === halamanId ? { ...h, insight } : h
+                                        ),
+                                      }
+                                    : d
+                                )
+                              }
+                            />
+                          ) : undefined
+                        }
                       />
                     </div>
                   )}
@@ -1729,6 +1771,7 @@ export default function App() {
                     widgets={widgetsTampilInternal}
                     readOnly={filterAktif}
                     satuHalaman
+                    periodePilihan={viewFilters.periode}
                     tinggiKpiMaks={korporat ? 112 : undefined}
                     cadanganBawah={korporat ? 40 : 0}
                     polos={korporat}

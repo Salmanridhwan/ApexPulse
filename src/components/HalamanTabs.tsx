@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { HalamanDashboard } from '../types';
 
@@ -31,15 +31,92 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
   onGeser,
 }) => {
   const indeksAktif = Math.max(0, halaman.findIndex((h) => h.id === aktifId));
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [bisaKiri, setBisaKiri] = useState(false);
+  const [bisaKanan, setBisaKanan] = useState(false);
+
+  /**
+   * Dashboard BUMD punya 17 halaman dan strip-nya menyembunyikan scrollbar
+   * (`no-scrollbar`), jadi halaman di luar layar nyaris tak bisa dijangkau.
+   * Panah hanya tampil saat memang masih ada sisa gulir.
+   */
+  const periksaGulir = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    setBisaKiri(el.scrollLeft > 4);
+    setBisaKanan(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    periksaGulir();
+  }, [halaman.length, periksaGulir]);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    // Lebar jendela berubah (panel ditutup, zoom) bisa memunculkan/menyembunyikan panah.
+    const pengamat = new ResizeObserver(periksaGulir);
+    pengamat.observe(el);
+    return () => pengamat.disconnect();
+  }, [periksaGulir]);
+
+  // Tab aktif selalu digeser masuk pandangan supaya "17/17" tak pernah di luar layar.
+  useEffect(() => {
+    const el = stripRef.current?.querySelector<HTMLElement>('[data-aktif="true"]');
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    periksaGulir();
+  }, [aktifId, halaman.length, periksaGulir]);
+
+  // Roda mouse vertikal diterjemahkan jadi gulir horizontal pada strip.
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const saatRoda = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', saatRoda, { passive: false });
+    return () => el.removeEventListener('wheel', saatRoda);
+  }, []);
+
+  const geser = (arah: -1 | 1) => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.scrollBy({ left: arah * Math.max(180, el.clientWidth * 0.7), behavior: 'smooth' });
+  };
+
+  const perluPanah = bisaKiri || bisaKanan;
 
   return (
     <div className="flex items-center gap-2 mb-2.5" data-testid="strip-halaman">
-      <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar">
+      {perluPanah && (
+        <button
+          type="button"
+          onClick={() => geser(-1)}
+          disabled={!bisaKiri}
+          title="Halaman sebelumnya"
+          aria-label="Geser halaman ke kiri"
+          data-testid="halaman-kiri"
+          className="shrink-0 p-1 rounded-control border border-line bg-surface text-ink-2 hover:bg-surface-2 disabled:opacity-30 disabled:cursor-default transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      <div
+        ref={stripRef}
+        onScroll={periksaGulir}
+        data-testid="strip-halaman-gulir"
+        className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar"
+      >
         {halaman.map((h, i) => {
           const aktif = i === indeksAktif;
           return (
             <div
               key={h.id}
+              data-aktif={aktif ? 'true' : 'false'}
               className={`group shrink-0 inline-flex items-center gap-1 rounded-control border transition-colors ${
                 aktif
                   ? 'bg-brand text-on-brand border-brand'
@@ -50,6 +127,7 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
                 type="button"
                 onClick={() => onPilih(h.id)}
                 data-testid="tab-halaman"
+                title={h.judul}
                 className="px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap"
               >
                 {h.judul}
@@ -122,6 +200,20 @@ export const HalamanTabs: React.FC<HalamanTabsProps> = ({
         </button>
         )}
       </div>
+
+      {perluPanah && (
+        <button
+          type="button"
+          onClick={() => geser(1)}
+          disabled={!bisaKanan}
+          title="Halaman berikutnya"
+          aria-label="Geser halaman ke kanan"
+          data-testid="halaman-kanan"
+          className="shrink-0 p-1 rounded-control border border-line bg-surface text-ink-2 hover:bg-surface-2 disabled:opacity-30 disabled:cursor-default transition-colors"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       <span className="shrink-0 text-[11px] text-ink-3 tabular-nums">
         {indeksAktif + 1}/{halaman.length}

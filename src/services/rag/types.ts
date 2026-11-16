@@ -210,4 +210,22 @@ export interface RagClient {
     instansi?: string,
     kbId?: string
   ): Promise<{ insight: string | null; catatan?: string } | null>;
+
+  /**
+   * INSIGHT SATU HALAMAN dashboard: satu paragraf tafsir + temuan + saran untuk
+   * pengambil keputusan, ditulis dari angka yang sudah tampil di kartu halaman.
+   *
+   * Beda dengan `insightWidget` (satu widget, untuk slide presentasi): di sini
+   * model melihat SELURUH kartu satu halaman sekaligus, jadi bisa menyebut
+   * hubungan antar kartu (mis. realisasi rendah sementara piutang naik).
+   *
+   * Mengembalikan `null` bila layanan tidak tersedia (provider Mock / belum
+   * dikonfigurasi). Pemanggil TIDAK boleh menggantinya dengan karangan.
+   */
+  insightHalaman?(
+    konteks: string,
+    sector: BumdSector,
+    instansi?: string,
+    kbId?: string
+  ): Promise<{ insight: { ringkasan: string; temuan: string[]; saran: string[] } | null; catatan?: string } | null>;
 }
