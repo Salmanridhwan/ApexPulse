@@ -9,24 +9,24 @@
    Mode gelap menimpa variabel yang sama di [data-theme='dark'].
    ============================================================ */
 @theme {
-  --color-canvas: #f4f6f8;
+  --color-canvas: #f3f6fa;
   --color-surface: #ffffff;
-  --color-surface-2: #f1f3f6;
+  --color-surface-2: #f0f4f8;
 
-  --color-line: #e8ecf1;
-  --color-line-strong: #d1d7e0;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
 
-  --color-ink: #1a1d1f;
-  --color-ink-2: #4b5563;
+  --color-ink: #0f172a;
+  --color-ink-2: #475569;
   --color-ink-3: #5b6472;   /* dinaikkan: teks mikro 9-11px butuh kontras lebih (5.9:1 di permukaan) */
 
   --color-brand: #1fa6cc;       /* cyan — aksen/isi */
   --color-brand-ink: #0f6b85;   /* digelapkan: teks & chip lulus WCAG AA (6.07:1) */
-  --color-on-brand: #10141d;    /* teks/ikon di ATAS latar brand solid — lulus AA (6.48:1); tetap gelap di kedua mode agar brand terang (mode gelap) juga terbaca */
+  --color-on-brand: #ffffff;    /* teks/ikon di ATAS latar brand solid (brand-solid di bawah) — putih di #0a7c9c lulus AA (5.0:1) */
   --color-brand-soft: #e6f6fb;
   /* Isi latar brand SOLID (tombol/badge/avatar). Di mode gelap digelapkan supaya
      teks putih di atasnya tetap lulus kontras. */
-  --color-brand-solid: var(--color-brand);
+  --color-brand-solid: #0a7c9c; /* isi tombol brand: cyan pekat agar teks putih terbaca jelas di mode terang */
   --color-violet: #7f80d8;      /* periwinkle */
   --color-coral: #ee4b32;       /* merah-oranye */
 
@@ -42,12 +42,12 @@
 
   /* Shell (sidebar) */
   --color-shell: #ffffff;
-  --color-shell-2: #f1f3f6;
-  --color-shell-line: #e8ecf1;
-  --color-shell-ink: #1a1d1f;
-  --color-shell-ink-2: #4b5563;
+  --color-shell-2: #f0f4f8;
+  --color-shell-line: #e2e8f0;
+  --color-shell-ink: #0f172a;
+  --color-shell-ink-2: #475569;
   --color-shell-hover: rgb(31 166 204 / 0.08);
-  --color-shell-active: #e6f6fb;
+  --color-shell-active: #d9f2fa;
 
   --radius-card: 12px;
   --radius-control: 10px;
@@ -61,31 +61,32 @@
 
   /* Isian "solid" untuk tombol utama/tile ikon: gelap di mode terang, dan
      TETAP terlihat sebagai aksi (bukan putih menyilaukan) di mode gelap. */
-  --color-solid: #1a1d1f;
+  --color-solid: #0f172a;
   --color-on-solid: #ffffff;
 }
 
-/* Mode gelap — "Clean Grid" gelap (near-black netral, bukan navy). */
+/* Mode gelap — "Midnight": biru malam yang senada dengan kanvas dashboard,
+   bukan hitam netral, supaya shell dan kanvas terasa satu tampilan. */
 [data-theme='dark'] {
   color-scheme: dark;
-  --color-canvas: #0f1115;
-  --color-surface: #171a1f;
-  --color-surface-2: #1f2329;
+  --color-canvas: #0a101c;
+  --color-surface: #121c31;
+  --color-surface-2: #19253d;
 
-  --color-line: #2a2f37;
-  --color-line-strong: #3a4149;
+  --color-line: #24344f;
+  --color-line-strong: #2e4060;
 
-  --color-ink: #f2f4f7;
-  --color-ink-2: #b6bdc8;
-  --color-ink-3: #98a1af;   /* dinaikkan untuk teks mikro di mode gelap (6.4:1) */
+  --color-ink: #eaf0f8;
+  --color-ink-2: #aebbd0;
+  --color-ink-3: #8d9bb3;   /* dinaikkan untuk teks mikro di mode gelap (6.4:1) */
 
   --color-brand: #38c6e2;
   /* Teks/ikon di atas latar biru solid: PUTIH (permintaan tampilan gelap). */
   --color-on-brand: #ffffff;
   /* Biru solid digelapkan: putih di atas #38c6e2 hanya 2:1, di sini 5,6:1. */
-  --color-brand-solid: #12708c;
+  --color-brand-solid: #0b7d9e;
   --color-brand-ink: #7fdcf0;
-  --color-brand-soft: #1a3a44;
+  --color-brand-soft: #123349;
   --color-violet: #9a9be8;
   --color-coral: #f2503a;
 
@@ -98,37 +99,46 @@
   --color-on-neg: #10141d;
   --color-on-warn: #10141d;
 
-  --color-shell: #14171c;
-  --color-shell-2: #1c2026;
-  --color-shell-line: #262b33;
-  --color-shell-ink: #f2f4f7;
-  --color-shell-ink-2: #98a1af;   /* samakan dengan ink-3 gelap agar meta kecil di sidebar terbaca */
-  --color-shell-hover: rgb(255 255 255 / 0.05);
-  --color-shell-active: #1f2329;
+  --color-shell: #0b1221;
+  --color-shell-2: #141e31;
+  --color-shell-line: #1c2840;
+  --color-shell-ink: #eaf0f8;
+  --color-shell-ink-2: #8d9bb3;   /* samakan dengan ink-3 gelap agar meta kecil di sidebar terbaca */
+  --color-shell-hover: rgb(56 198 226 / 0.07);
+  --color-shell-active: #0f3a52;
 
   /* Mode gelap: tombol utama memakai aksen brand, bukan putih. */
   /* Tombol utama di mode gelap: biru digelapkan + teks PUTIH (5,6:1). */
-  --color-solid: #12708c;
+  --color-solid: #0b7d9e;
   --color-on-solid: #ffffff;
 
-  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
-  --shadow-pop-sm: 0 2px 8px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 16px 40px rgb(2 6 16 / 0.6);
+  --shadow-pop-sm: 0 2px 8px rgb(2 6 16 / 0.45);
 }
 
 /* Elevasi: bayangan sangat lembut (Clean Grid). Warna biru-gelap, bukan hitam murni. */
 :root {
-  --elev-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
-  --elev-card-hover: 0 4px 12px rgb(16 24 40 / 0.08), 0 1px 3px rgb(16 24 40 / 0.05);
-  --elev-inset: inset 0 2px 4px rgb(16 24 40 / 0.08);
+  --elev-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 2px 6px rgb(15 23 42 / 0.04);
+  --elev-card-hover: 0 8px 20px rgb(15 23 42 / 0.09), 0 2px 4px rgb(15 23 42 / 0.05);
+  --elev-inset: inset 0 2px 4px rgb(15 23 42 / 0.08);
   --glow-brand: 0 1px 3px rgb(31 166 204 / 0.2);
-  --bg-app: #f4f6f8;
+  /* Latar aplikasi berlapis: cahaya cyan lembut di kanan atas dan violet di
+     kiri bawah, supaya halaman tidak terasa rata/abu polos. */
+  --bg-app:
+    radial-gradient(1100px 560px at 88% -12%, rgb(31 166 204 / 0.13), transparent 62%),
+    radial-gradient(900px 520px at -6% 108%, rgb(127 128 216 / 0.11), transparent 60%),
+    #f3f6fa;
 }
 [data-theme='dark'] {
-  --elev-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
-  --elev-card-hover: 0 4px 14px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
-  --elev-inset: inset 0 2px 5px rgb(0 0 0 / 0.5);
-  --glow-brand: 0 1px 4px rgb(56 198 226 / 0.25);
-  --bg-app: #0f1115;
+  /* Garis sorot tipis di tepi atas kartu: kartu terbaca "naik" di latar gelap. */
+  --elev-card: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(2 6 16 / 0.5), 0 2px 8px rgb(2 6 16 / 0.35);
+  --elev-card-hover: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 24px rgb(2 6 16 / 0.55), 0 2px 4px rgb(2 6 16 / 0.4);
+  --elev-inset: inset 0 2px 5px rgb(2 6 16 / 0.55);
+  --glow-brand: 0 1px 6px rgb(56 198 226 / 0.3);
+  --bg-app:
+    radial-gradient(1100px 560px at 88% -12%, rgb(56 198 226 / 0.24), transparent 62%),
+    radial-gradient(900px 520px at -6% 108%, rgb(127 128 216 / 0.2), transparent 60%),
+    #0a101c;
 }
 /* Kelas komponen siap pakai. */
 @utility card {
@@ -992,9 +1002,9 @@
 [data-theme='dark'] {
   --tegas-accent: #3d8bff;
   --tegas-ink: #f4f5f7;
-  --tegas-canvas: #08090a;
-  --tegas-line: #3a414b;
-  --tegas-card: #15181d;
+  --tegas-canvas: #0a101c;
+  --tegas-line: #2e4060;
+  --tegas-card: #111a2b;
 }
 
 /* Bidang kanvas: rata, bersih, hanya bingkai tipis sebagai pemisah. */

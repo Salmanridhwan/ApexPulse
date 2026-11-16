@@ -1159,7 +1159,7 @@ export const Admin: React.FC<AdminProps> = ({
   }, [tenantKbId, tenantManual, editTenantId]);
 
   return (
-    <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden bg-canvas text-ink font-sans">
+    <div className="flex-1 flex flex-row min-w-0 min-h-0 h-full overflow-hidden text-ink font-sans">
       {/* Menu Panel Admin kini berada di SIDEBAR UTAMA aplikasi (lihat `components/adminTabs.ts`),
           jadi halaman ini tidak lagi merender sidebar kedua. Tab aktif datang dari App
           supaya penanda aktif di sidebar utama dan isi halaman selalu sinkron. */}

@@ -36,7 +36,7 @@ export const ChartGalleryPage: React.FC = () => {
   const g = GAYA[tab];
 
   return (
-    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
+    <div className="flex-1 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <div className="bg-surface p-5 rounded-card border border-line mb-5 flex items-start gap-3">
           <div className="w-10 h-10 rounded-control bg-solid flex items-center justify-center text-on-solid shrink-0">

@@ -39,7 +39,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({ tenantId }) => {
   );
 
   return (
-    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
+    <div className="flex-1 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         <div className="bg-surface p-5 rounded-card border border-line mb-6 flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-start gap-3">

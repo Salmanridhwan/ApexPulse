@@ -34,7 +34,7 @@ import { DashboardCanvas } from './components/DashboardCanvas';
 import { InsightHalaman } from './components/InsightHalaman';
 import { PanelAiMenyusun } from './components/PanelAiMenyusun';
 import { KursorAi } from './components/KursorAi';
-import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA } from './theme';
+import { AKSEN_TEMA, KanvasTemaContext, MODE_TEMA, useThemeMode } from './theme';
 import { ExportModal } from './components/ExportModal';
 import { ImportDataModal } from './components/ImportDataModal';
 import { ShareModal } from './components/ShareModal';
@@ -218,6 +218,9 @@ export default function App() {
 
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [activeDashboard, setActiveDashboard] = useState<Dashboard | null>(null);
+  // Mode terang/gelap aplikasi; token gaya kanvas mengikuti mode ini supaya
+  // judul & tombol di kepala kanvas tidak memakai tinta gelap di latar terang.
+  const modeAplikasi = useThemeMode();
 
   /** Perbarui dashboard aktif di dua tempat sekaligus: state aktif + daftar.
    *  Dulu lima baris ini disalin 14x; satu tempat supaya keduanya tidak pernah
@@ -1569,14 +1572,19 @@ export default function App() {
               ) : (
                 <main
                   className={`flex-1 w-full ${
-                    activeDashboard?.tema ? `tema-${activeDashboard.tema} bg-canvas` : ''
+                    activeDashboard?.tema
+                      ? `tema-${activeDashboard.tema} bg-canvas`
+                      : activeDashboard?.gaya?.desain
+                        ? 'bg-canvas'
+                        : ''
                   }`}
                   style={{
                     // Gaya Template Chart pilihan pengguna menimpa token tema
                     // template, supaya dashboard tersimpan tampil sama dengan
                     // pratinjau galeri (kartu, garis, aksen ikut berganti).
+                    // Versi terang/gelap gaya mengikuti mode aplikasi.
                     ...(activeDashboard?.gaya?.desain
-                      ? (tokenTemaDariGaya(activeDashboard.gaya.desain) as React.CSSProperties)
+                      ? (tokenTemaDariGaya(activeDashboard.gaya.desain, modeAplikasi) as React.CSSProperties)
                       : {}),
                     ...(fontKanvas ? { fontFamily: fontKanvas } : {}),
                   }}

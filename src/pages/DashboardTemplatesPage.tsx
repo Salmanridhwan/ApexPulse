@@ -629,7 +629,7 @@ export const DashboardTemplatesPage: React.FC<DashboardTemplatesPageProps> = ({
               : `Data asli belum disiapkan — tekan tombol pratinjau untuk memulai${teksSisaWaktu(st)}`;
 
   return (
-    <div className="flex-1 bg-canvas min-h-screen flex flex-col">
+    <div className="flex-1 min-h-screen flex flex-col">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 flex-1">
         {/* Kepala halaman */}
         <div className="bg-surface p-5 rounded-card border border-line mb-5 flex items-start gap-3">

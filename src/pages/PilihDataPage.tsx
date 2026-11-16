@@ -739,7 +739,7 @@ export const PilihDataPage: React.FC<Props> = ({ namaInstansi, onSelesai, onBuka
     !adaMenunggu && !adaKegagalan && !sedangBerjalan && butir.length === 0 && (ringkas?.selesai ?? 0) > 0;
 
   return (
-    <main className="flex-1 flex flex-col min-h-0 bg-canvas" data-testid="halaman-pilih-data">
+    <main className="flex-1 flex flex-col min-h-0" data-testid="halaman-pilih-data">
       {/* Tab mini untuk layar sempit: daftar data dan kanvas bergantian. */}
       <div className="lg:hidden flex gap-1 px-4 pt-2 border-b border-line bg-surface" data-testid="tab-mini">
         {(
