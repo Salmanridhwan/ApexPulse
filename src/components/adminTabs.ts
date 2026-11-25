@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Building2, Database, Gauge, Users } from 'lucide-react';
+import { Activity, Building2, Database, Gauge, KeyRound, Users } from 'lucide-react';
 
 /**
  * Daftar menu Panel Admin — SATU sumber untuk sidebar utama dan halaman Admin.
@@ -10,7 +10,7 @@ import { Activity, Building2, Database, Gauge, Users } from 'lucide-react';
  * utama (grup Panel Admin), dan halaman Admin hanya menampilkan isi
  * tab yang dipilih — tidak ada lagi sidebar kedua.
  */
-export type AdminTabId = 'overview' | 'users' | 'tenants' | 'rag' | 'kuota';
+export type AdminTabId = 'overview' | 'users' | 'tenants' | 'rag' | 'kuota' | 'apikey';
 
 export interface AdminTab {
   id: AdminTabId;
@@ -36,6 +36,7 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'tenants', label: 'Instansi & KB', judul: 'Instansi & Knowledge Base', icon: Building2, peran: 'superadmin' },
   { id: 'rag', label: 'Konfigurasi RAG', judul: 'Konfigurasi RAG', icon: Database, peran: 'superadmin' },
   { id: 'kuota', label: 'Kuota AI', judul: 'Kuota Analisis AI per Instansi', icon: Gauge, peran: 'superadmin' },
+  { id: 'apikey', label: 'Kunci API', judul: 'Kunci API Platform Mitra', icon: KeyRound, peran: 'superadmin' },
 ];
 
 /**

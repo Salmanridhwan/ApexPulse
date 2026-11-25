@@ -476,7 +476,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       {/* Messages List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
+        {messages.map((msg) => {
+          const dariPengguna = msg.sender === 'user';
+          return (
           <div
             key={msg.id}
             className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
@@ -518,7 +520,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     return codeParts.map((cp, ci) => {
                       if (ci % 2 === 1) {
                         return (
-                          <code key={ci} className="px-1 py-0.5 rounded bg-line text-ink text-[11px] font-mono">
+                          <code key={ci} className={`px-1 py-0.5 rounded text-[11px] font-mono ${dariPengguna ? 'bg-white/20 text-on-brand' : 'bg-line text-ink'}`}>
                             {cp}
                           </code>
                         );
@@ -526,25 +528,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       // split by **bold**
                       const boldParts = cp.split(/\*\*(.*?)\*\*/g);
                       return boldParts.map((bp, bi) =>
-                        bi % 2 === 1 ? <strong key={`${ci}-${bi}`} className="font-semibold text-ink">{bp}</strong> : <span key={`${ci}-${bi}`}>{bp}</span>
+                        bi % 2 === 1 ? <strong key={`${ci}-${bi}`} className={`font-semibold ${dariPengguna ? 'text-on-brand' : 'text-ink'}`}>{bp}</strong> : <span key={`${ci}-${bi}`}>{bp}</span>
                       );
                     });
                   };
 
                   // Heading: ## or ###
                   if (line.startsWith('### ')) {
-                    return <h4 key={li} className="font-bold text-ink text-xs mt-2">{renderInline(line.replace(/^###\s+/, ''))}</h4>;
+                    return <h4 key={li} className={`font-bold text-xs mt-2 ${dariPengguna ? 'text-on-brand' : 'text-ink'}`}>{renderInline(line.replace(/^###\s+/, ''))}</h4>;
                   }
                   if (line.startsWith('## ')) {
-                    return <h3 key={li} className="font-bold text-ink text-xs mt-2.5 border-b border-line/80 pb-0.5">{renderInline(line.replace(/^##\s+/, ''))}</h3>;
+                    return <h3 key={li} className={`font-bold text-xs mt-2.5 border-b pb-0.5 ${dariPengguna ? 'text-on-brand border-white/25' : 'text-ink border-line/80'}`}>{renderInline(line.replace(/^##\s+/, ''))}</h3>;
                   }
 
                   // Bullet list
                   const isBullet = line.startsWith('•') || line.startsWith('- ');
                   if (isBullet) {
                     return (
-                      <div key={li} className="flex items-start gap-1.5 pl-1.5 text-ink-2">
-                        <span className="text-brand font-bold leading-tight">•</span>
+                      <div key={li} className={`flex items-start gap-1.5 pl-1.5 ${dariPengguna ? 'text-on-brand' : 'text-ink-2'}`}>
+                        <span className={`font-bold leading-tight ${dariPengguna ? 'text-on-brand/80' : 'text-brand'}`}>•</span>
                         <span className="flex-1">{renderInline(line.replace(/^[•\-]\s*/, ''))}</span>
                       </div>
                     );
@@ -559,7 +561,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   if (line.startsWith('|') && line.endsWith('|')) {
                     const cells = line.slice(1, -1).split('|').map((c) => c.trim());
                     return (
-                      <div key={li} className="grid grid-flow-col auto-cols-fr gap-2 py-0.5 px-1 bg-surface/70 rounded text-[11px] font-mono border-b border-line/50">
+                      <div key={li} className={`grid grid-flow-col auto-cols-fr gap-2 py-0.5 px-1 rounded text-[11px] font-mono border-b ${dariPengguna ? 'bg-white/15 border-white/25 text-on-brand' : 'bg-surface/70 border-line/50'}`}>
                         {cells.map((cell, ci) => (
                           <span key={ci} className="truncate">{renderInline(cell)}</span>
                         ))}
@@ -568,7 +570,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   }
 
                   return (
-                    <p key={li} className="text-ink">
+                    <p key={li} className={dariPengguna ? 'text-on-brand' : 'text-ink'}>
                       {renderInline(line)}
                     </p>
                   );
@@ -643,7 +645,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* Live SSE Streaming Loading Card */}
         {isStreaming && (

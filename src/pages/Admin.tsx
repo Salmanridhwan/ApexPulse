@@ -30,6 +30,7 @@ import { AvatarTile } from '../components/BrandMark';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ItemCard } from '../components/ui/ItemCard';
 import { ADMIN_TABS, AdminTabId } from '../components/adminTabs';
+import { ApiKeysPanel } from '../components/admin/ApiKeysPanel';
 import { BumdSector, Tenant, User, UserRole } from '../types';
 import { KUOTA_ANALISIS_BAWAAN } from '../services/analisis/antrean';
 
@@ -2359,6 +2360,8 @@ export const Admin: React.FC<AdminProps> = ({
           })()}
 
           {/* ================= TAB 5: ALERTS ================= */}
+          {activeTab === 'apikey' && <ApiKeysPanel />}
+
           {activeTab === 'kuota' && (
             <div className="space-y-4">
               <div className="card p-5">

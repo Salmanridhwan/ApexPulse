@@ -25,6 +25,7 @@ import { pastikanChartKatalog, type ChartKustom } from '../chart/katalogKustom';
 import { normalisasiPeran, normalisasiPeranAkun } from '../auth/peran';
 import { getFallbackDemoDashboard } from '../builder/fallback';
 import { KB_SEED_TENANT } from '../rag/kbDefaults';
+import type { KunciApi } from '../apiKunci';
 
 /**
  * AuthPayload — data sesi yang tersimpan dalam cookie httpOnly.
@@ -134,6 +135,7 @@ interface PersistedState {
   analisisDokumen?: AnalisisDokumen[];
   butirData?: ButirData[];
   usulanHalaman?: UsulanHalaman[];
+  kunciApi?: KunciApi[];
 }
 
 export class InMemoryDb {
@@ -300,6 +302,11 @@ export class InMemoryDb {
   public butirData: ButirData[] = [];
   /** Usulan perubahan halaman dari asisten — belum menyentuh dashboard sampai diterapkan. */
   public usulanHalaman: UsulanHalaman[] = [];
+  /**
+   * Kunci API untuk platform mitra (tanpa login). Disimpan per-baris di MySQL;
+   * yang tersimpan hanya hash SHA-256, bukan kunci aslinya.
+   */
+  public kunciApi: KunciApi[] = [];
 
   /**
    * id instansi yang sudah dihapus admin. Dipakai agar user seed (mis.
@@ -403,6 +410,7 @@ export class InMemoryDb {
         if (Array.isArray(loaded.analisisDokumen)) this.analisisDokumen = loaded.analisisDokumen;
         if (Array.isArray(loaded.butirData)) this.butirData = loaded.butirData;
         if (Array.isArray(loaded.usulanHalaman)) this.usulanHalaman = loaded.usulanHalaman;
+        if (Array.isArray(loaded.kunciApi)) this.kunciApi = loaded.kunciApi;
         if (loaded.systemConfig) {
           this.systemConfig = { ...this.systemConfig, ...(loaded.systemConfig as object) };
         }
@@ -979,6 +987,7 @@ export class InMemoryDb {
         analisisDokumen: this.analisisDokumen,
         butirData: this.butirData,
         usulanHalaman: this.usulanHalaman,
+        kunciApi: this.kunciApi,
       };
       writeFileSync(DB_FILE, JSON.stringify(state));
     } catch (err) {
@@ -1102,6 +1111,62 @@ export class InMemoryDb {
   // ===== Koleksi kecil: tulis per-baris (tanpa snapshot penuh) =====
 
   /** Simpan satu notifikasi milik instansi (dulu ikut snapshot → hilang antar instance). */
+  // ---------------------------------------------------------------- kunci API
+  /** Daftar kunci API (tanpa hash tidak dipotong di sini — pemanggil memakai kunciAman). */
+  public daftarKunciApi(tenantId?: string): KunciApi[] {
+    const isi = tenantId ? this.kunciApi.filter((k) => k.tenantId === tenantId) : this.kunciApi;
+    return isi.slice().sort((a, b) => String(b.dibuatPada).localeCompare(String(a.dibuatPada)));
+  }
+
+  /** Cari kunci lewat hash SHA-256 (satu-satunya cara memverifikasi header X-API-Key). */
+  public kunciApiDenganHash(hash: string): KunciApi | undefined {
+    return this.kunciApi.find((k) => k.hash === hash);
+  }
+
+  /** Tambah/perbarui satu kunci API lalu simpan (MySQL per-baris + db.json). */
+  public simpanKunciApi(k: KunciApi): KunciApi {
+    const i = this.kunciApi.findIndex((x) => x.id === k.id);
+    if (i >= 0) this.kunciApi[i] = k;
+    else this.kunciApi.push(k);
+    this.mysql
+      ?.upsertApiKey(k.id, k.tenantId, k.hash, k)
+      .catch((err) => console.error('[AionesBoard DB] Simpan kunci API gagal:', err?.message || err));
+    this.persist();
+    return k;
+  }
+
+  public hapusKunciApi(id: string): boolean {
+    const i = this.kunciApi.findIndex((k) => k.id === id);
+    if (i < 0) return false;
+    this.kunciApi.splice(i, 1);
+    this.mysql
+      ?.deleteApiKeyRow(id)
+      .catch((err) => console.error('[AionesBoard DB] Hapus kunci API gagal:', err?.message || err));
+    this.persist();
+    return true;
+  }
+
+  /**
+   * Catat pemakaian kunci. Memori selalu diperbarui; tulis ke MySQL paling
+   * sering tiap 15 detik per kunci supaya 1 kunci yang dipanggil terus-menerus
+   * tidak menulis DB pada setiap request.
+   */
+  public catatPemakaianKunciApi(id: string): void {
+    const k = this.kunciApi.find((x) => x.id === id);
+    if (!k) return;
+    const sekarang = Date.now();
+    k.terakhirDipakai = new Date(sekarang).toISOString();
+    k.jumlahPermintaan = (k.jumlahPermintaan || 0) + 1;
+    const terakhir = this.kunciApiTulisTerakhir[id] || 0;
+    if (sekarang - terakhir < 15_000) return;
+    this.kunciApiTulisTerakhir[id] = sekarang;
+    this.mysql
+      ?.upsertApiKey(k.id, k.tenantId, k.hash, k)
+      .catch((err) => console.error('[AionesBoard DB] Catat pemakaian kunci gagal:', err?.message || err));
+  }
+
+  private kunciApiTulisTerakhir: Record<string, number> = {};
+
   public simpanNotifikasi(n: NotificationItem): void {
     this.trackWrite(this.mysql?.upsertBaris('notifications', n.id, n));
   }

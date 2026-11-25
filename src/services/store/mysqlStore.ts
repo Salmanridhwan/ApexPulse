@@ -10,6 +10,7 @@
 import mysql from 'mysql2/promise';
 import { Chat, Dashboard, KetersediaanPreset, NotificationItem, PermintaanData, AnalisisDokumen, ButirData, UsulanHalaman, Tenant } from '../../types';
 import { SafeUser } from './inMemoryDb';
+import type { KunciApi } from '../apiKunci';
 
 /**
  * Baris yang gagal diurai dari kolom `data`.
@@ -109,6 +110,7 @@ export interface DbSnapshot {
   analisisDokumen: AnalisisDokumen[];
   butirData: ButirData[];
   usulanHalaman: UsulanHalaman[];
+  kunciApi?: KunciApi[];
 }
 
 export interface LoadedState {
@@ -127,6 +129,7 @@ export interface LoadedState {
   analisisDokumen?: AnalisisDokumen[];
   butirData?: ButirData[];
   usulanHalaman?: UsulanHalaman[];
+  kunciApi?: KunciApi[];
 }
 
 export class MysqlStore {
@@ -326,6 +329,17 @@ export class MysqlStore {
       ) ENGINE=InnoDB
     `);
     await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id VARCHAR(128) PRIMARY KEY,
+        tenant_id VARCHAR(128) NOT NULL,
+        hash CHAR(64) NOT NULL,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_api_keys_tenant (tenant_id),
+        INDEX idx_api_keys_hash (hash)
+      ) ENGINE=InnoDB
+    `);
+    await this.pool.query(`
       CREATE TABLE IF NOT EXISTS butir_data (
         id VARCHAR(128) PRIMARY KEY,
         tenant_id VARCHAR(128) NOT NULL,
@@ -519,6 +533,27 @@ export class MysqlStore {
   async deleteUsulanHalamanRow(id: string): Promise<void> {
     if (!this.pool) return;
     await this.pool.query('DELETE FROM usulan_halaman WHERE id = ?', [id]);
+  }
+
+  /** Tambah/perbarui SATU kunci API (hash di kolom sendiri agar bisa dicari). */
+  async upsertApiKey(id: string, tenantId: string, hash: string, data: unknown): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query(
+      `INSERT INTO api_keys (id, tenant_id, hash, data) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id), hash = VALUES(hash), data = VALUES(data)`,
+      [id, tenantId, hash, JSON.stringify(data)]
+    );
+  }
+
+  async loadApiKeys(): Promise<KunciApi[]> {
+    if (!this.pool) return [];
+    const [rows] = await this.pool.query('SELECT data FROM api_keys');
+    return uraiDaftar<KunciApi>(rows as Array<{ data: any }>, 'api_keys');
+  }
+
+  async deleteApiKeyRow(id: string): Promise<void> {
+    if (!this.pool) return;
+    await this.pool.query('DELETE FROM api_keys WHERE id = ?', [id]);
   }
 
 
@@ -721,6 +756,9 @@ export class MysqlStore {
     const usulanKhusus = await this.loadUsulanHalaman();
     if (usulanKhusus.length > 0) hasil.usulanHalaman = usulanKhusus;
     else if (arrays.usulanHalaman) hasil.usulanHalaman = arrays.usulanHalaman as UsulanHalaman[];
+
+    // Kunci API selalu dari tabel khusus; tidak ada versi snapshot lama.
+    hasil.kunciApi = await this.loadApiKeys();
 
     const [kvRows] = await this.pool.query('SELECT k, data FROM kv');
     const kunciKv = ['shareTokens', 'sharePins', 'systemConfig', 'credentials', 'deletedTenantIds'];

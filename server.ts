@@ -80,6 +80,17 @@ import type { Ekstraktor } from './src/services/analisis/ekstrakButir';
 import { perluSegarKarenaKb, putusanCache, sidikDokumen, sidikKb } from './src/services/analisis/cache';
 import { kuotaPerInstansi, ringkasPlatform } from './src/services/admin/platform';
 import { bolehPindahInstansi, bolehTurunkanSuperadmin, isSuperadmin } from './src/services/auth/peran';
+import {
+  SEMUA_IZIN,
+  bersihkanIzin,
+  buatKunciBaru,
+  hashKunci,
+  izinCukup,
+  kunciAktif,
+  kunciAman,
+  kunciCocok,
+  type KunciApi,
+} from './src/services/apiKunci';
 import { butirKeHalaman, butirKeWidget, ringkasHalaman, tataGrid } from './src/services/analisis/butirKeWidget';
 import { cekAturanDashboard } from './src/services/analisis/aturanDashboard';
 import { bulanDariSeri, jumlahPerBulan, kolomTanggal } from './src/services/analisis/tanggalSerial';
@@ -220,13 +231,91 @@ function rangkaiRiwayat(messages: ChatMessage[], maksGiliran = 6): string {
 
 interface AuthedRequest extends Request {
   session?: SessionPayload;
+  /** Diisi hanya bila permintaan masuk lewat kunci API platform mitra. */
+  apiKey?: KunciApi;
+}
+
+/**
+ * Kunci API dari header `X-API-Key` (platform mitra, tanpa login).
+ *
+ * Yang dicari hanya hash SHA-256-nya; kunci asli tidak pernah disimpan. Kunci
+ * yang dicabut/kedaluwarsa dianggap tidak ada, jadi balasannya tetap 401 —
+ * tidak ada petunjuk bagi penebak.
+ */
+function kunciApiDariHeader(req: Request): KunciApi | null {
+  const mentah = String(req.header('x-api-key') || '').trim();
+  if (!mentah) return null;
+  const kandidat = db.kunciApiDenganHash(hashKunci(mentah));
+  if (!kandidat || !kunciCocok(mentah, kandidat.hash)) return null;
+  if (!kunciAktif(kandidat)) return null;
+  return kandidat;
+}
+
+/**
+ * Pembatas sederhana per kunci API: 300 permintaan / menit.
+ *
+ * Tanpa ini satu kunci yang salah tulis di loop bisa menghabiskan kuota AI
+ * instansi sebelum ada yang sadar.
+ */
+const batasKunciApi = new Map<string, { jumlah: number; sampai: number }>();
+const MAKS_PER_MENIT_KUNCI = 300;
+
+function kunciApiMelebihiBatas(id: string): number {
+  const sekarang = Date.now();
+  const catat = batasKunciApi.get(id);
+  if (!catat || catat.sampai <= sekarang) {
+    batasKunciApi.set(id, { jumlah: 1, sampai: sekarang + 60_000 });
+    return 0;
+  }
+  catat.jumlah += 1;
+  if (catat.jumlah <= MAKS_PER_MENIT_KUNCI) return 0;
+  return Math.max(1, Math.ceil((catat.sampai - sekarang) / 1000));
 }
 
 function requireAuth(req: Request, res: Response): SessionPayload | null {
-  const session = verifySession(parseSessionCookie(req));
+  let session = verifySession(parseSessionCookie(req));
+  let kunci: KunciApi | null = null;
   if (!session) {
+    kunci = kunciApiDariHeader(req);
+    if (kunci) {
+      // Peran `admin` (bukan superadmin): boleh menulis data instansinya, tetapi
+      // TIDAK boleh berpindah instansi lewat ?tenantId=.
+      session = {
+        userId: `api:${kunci.id}`,
+        role: 'admin',
+        tenantId: kunci.tenantId,
+        name: `API ${kunci.nama}`,
+        exp: Math.floor(Date.now() / 1000) + 60,
+      };
+    }
+  }
+  if (!session) {
+    // Kunci API yang salah/kedaluwarsa dibalas dengan pesan yang jelas, bukan
+    // "sesi berakhir" — platform mitra tidak pernah punya sesi.
+    if (String(req.header('x-api-key') || '').trim()) {
+      res.status(401).json({ error: 'Kunci API tidak dikenal, sudah dicabut, atau kedaluwarsa.', kode: 'API_KEY_TIDAK_SAH' });
+      return null;
+    }
     res.status(401).json({ error: 'Sesi tidak valid atau telah berakhir. Silakan login ulang.' });
     return null;
+  }
+  if (kunci) {
+    // Daftar putih jalur: chat, auth, dan panel admin tidak pernah terbuka.
+    if (!izinCukup(kunci, req.path)) {
+      res.status(403).json({
+        error: 'Kunci API ini tidak berizin untuk endpoint tersebut.',
+        kode: 'API_KEY_FORBIDDEN',
+      });
+      return null;
+    }
+    const tunggu = kunciApiMelebihiBatas(kunci.id);
+    if (tunggu > 0) {
+      res.setHeader('Retry-After', String(tunggu));
+      res.status(429).json({ error: 'Terlalu banyak permintaan dengan kunci API ini.', kode: 'TERLALU_BANYAK_PERCOBAAN' });
+      return null;
+    }
+    db.catatPemakaianKunciApi(kunci.id);
+    (req as AuthedRequest).apiKey = kunci;
   }
   // Akun yang belum/tidak disetujui tidak boleh memakai sesi lama: kalau admin
   // menonaktifkan atau menolak akun, cookie yang masih hidup harus langsung mati.
@@ -7765,6 +7854,97 @@ ${navigasi}
   });
 
   // ================= ADMIN MANAGEMENT ROUTES =================
+  /* ============================================================
+   * KUNCI API PLATFORM MITRA (superadmin)
+   * ============================================================
+   * Kunci dibuat di sini, diserahkan ke platform lain, lalu dipakai lewat
+   * header X-API-Key pada endpoint biasa (berkas, analisis, dashboards).
+   * Chat sengaja tidak termasuk: platform memakai kunci modelnya sendiri.
+   */
+  const kunciApiUntukKlien = (k: KunciApi) => ({
+    ...kunciAman(k),
+    instansi: db.tenants.find((t) => t.id === k.tenantId)?.name || k.tenantId,
+  });
+
+  app.get('/api/admin/api-keys', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireSuperadmin(session, res)) return;
+    res.json({
+      kunci: db.daftarKunciApi().map(kunciApiUntukKlien),
+      izinTersedia: SEMUA_IZIN,
+      batasPerMenit: MAKS_PER_MENIT_KUNCI,
+    });
+  });
+
+  app.post('/api/admin/api-keys', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireSuperadmin(session, res)) return;
+
+    const nama = String(req.body?.nama || '').trim();
+    if (nama.length < 3) return res.status(400).json({ error: 'Nama kunci minimal 3 karakter (mis. nama platform).' });
+
+    const tenantId = String(req.body?.tenantId || '').trim();
+    const tenant = db.tenants.find((t) => t.id === tenantId);
+    if (!tenant) return res.status(400).json({ error: 'Instansi untuk kunci ini tidak ditemukan.' });
+
+    const izin = bersihkanIzin(req.body?.izin);
+    if (izin.length === 0) return res.status(400).json({ error: 'Pilih minimal satu izin (dokumen atau dashboard).' });
+
+    const diminta = Number(req.body?.berlakuHari);
+    const hari = Number.isFinite(diminta) && diminta > 0 ? Math.min(Math.floor(diminta), 3650) : 0;
+    const sekarang = new Date();
+    const { kunci, awalan, hash } = buatKunciBaru();
+
+    const data: KunciApi = {
+      id: `key-${sekarang.getTime()}-${randomBytes(3).toString('hex')}`,
+      nama,
+      awalan,
+      hash,
+      tenantId,
+      izin,
+      dibuatPada: sekarang.toISOString(),
+      dibuatOleh: { userId: session.userId, name: session.name },
+      kedaluwarsaPada: hari > 0 ? new Date(sekarang.getTime() + hari * 86_400_000).toISOString() : undefined,
+      jumlahPermintaan: 0,
+    };
+    db.simpanKunciApi(data);
+
+    // `kunci` hanya muncul di balasan ini — tidak bisa ditampilkan ulang.
+    res.status(201).json({ kunci, data: kunciApiUntukKlien(data) });
+  });
+
+  app.patch('/api/admin/api-keys/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireSuperadmin(session, res)) return;
+    const k = db.kunciApi.find((x) => x.id === req.params.id);
+    if (!k) return res.status(404).json({ error: 'Kunci API tidak ditemukan.' });
+
+    if (typeof req.body?.nama === 'string' && req.body.nama.trim().length >= 3) k.nama = req.body.nama.trim();
+    if (req.body?.izin !== undefined) {
+      const izin = bersihkanIzin(req.body.izin);
+      if (izin.length === 0) return res.status(400).json({ error: 'Kunci harus punya minimal satu izin.' });
+      k.izin = izin;
+    }
+    if (req.body?.cabut === true) k.dicabutPada = new Date().toISOString();
+    if (req.body?.cabut === false) delete k.dicabutPada;
+
+    db.simpanKunciApi(k);
+    res.json({ data: kunciApiUntukKlien(k) });
+  });
+
+  app.delete('/api/admin/api-keys/:id', (req: Request, res: Response) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireSuperadmin(session, res)) return;
+    const ada = db.kunciApi.some((x) => x.id === req.params.id);
+    if (!ada) return res.status(404).json({ error: 'Kunci API tidak ditemukan.' });
+    db.hapusKunciApi(req.params.id);
+    res.json({ success: true });
+  });
+
   app.get('/api/admin/stats', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
     if (!session) return;

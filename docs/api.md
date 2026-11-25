@@ -4,6 +4,10 @@ Dokumen ini untuk keperluan integrasi internal (skrip, alat bantu, atau tim
 front-end). Semua jalur diawali `/api` dan mengirim/menerima JSON kecuali
 disebut lain.
 
+Integrasi untuk platform mitra memakai **kunci API** (`X-API-Key`), bukan
+cookie sesi — lihat [api-key.md](api-key.md). Tanpa kunci, seluruh jalur di
+bawah ini memerlukan cookie `aionesboard_session`.
+
 ## Autentikasi
 
 Sesi dikirim lewat cookie `aionesboard_session` (HttpOnly, `SameSite=Lax`,
