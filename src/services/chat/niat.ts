@@ -59,6 +59,14 @@ export function niatBuatDashboard(prompt: unknown): boolean {
   if (KONFIRMASI_BUAT.test(teks) || HANYA_PERINTAH.test(teks)) return true;
   // Pertanyaan tentang CARA atau ARTI selalu dijawab, bukan dieksekusi.
   if (TANYA_CARA.test(teks)) return false;
+  // "tampilkan laporan keuangan <instansi>" = permintaan MEMBACA laporan, bukan
+  // membuat dashboard. Dulu PERINTAH("tampilkan") + OBJEK("laporan") lolos ke
+  // orkestrator: pengguna menunggu beberapa menit lalu ditawari membuat dashboard
+  // padahal ia cuma minta angka. Kata lihat hanya dihitung perintah bila
+  // "dashboard/kanvas/dasbor" benar-benar disebut.
+  const VERBA_LIHAT =
+    /(?:^|[^a-z])(?:tampilkan|tunjukkan|lihat|sebutkan|cek|periksa|baca|carikan|minta)(?:kan|lah)?(?:[^a-z]|$)/i;
+  if (VERBA_LIHAT.test(teks) && !DASHBOARD.test(teks)) return false;
   // "Buat 3 chart kinerja keuangan": beberapa chart sekaligus = satu dashboard berisi
   // sejumlah itu (pembuat dashboard memangkas ke jumlahnya).
   const jumlah = parsePermintaanJumlahWidget(teks);

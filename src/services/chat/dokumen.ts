@@ -16,6 +16,10 @@ const POLA: RegExp[] = [
   /\b(?:repositori|basis\s*dokumen|basis\s*data|knowledge\s*base|kb)\b[^.?!]{0,30}\b(?:dokumen|isi|berkas|berisi)\b/i,
   /\b(?:dokumen|berkas|file)\b[^.?!]{0,25}\b(?:di|pada)\s+(?:repositori|basis|knowledge\s*base)\b/i,
   /\b(?:isi|isinya|daftar|jumlah|total)\b[^.?!]{0,25}\b(?:repositori|basis\s*dokumen|basis\s*data|knowledge\s*base)\b/i,
+  // "Data apa saja yang kamu punya tentang instansi ini?" = pertanyaan inventaris
+  // juga. Dulu tidak cocok POLA mana pun, jatuh ke RAG, dan dijawab "ada dua
+  // berkas" (yang sebenarnya dua LEMBAR dari satu berkas) padahal basis berisi 6.
+  /(?:^|[^a-z])data (?:apa saja|apa|apa sajakah)(?:[^a-z].{0,30})?(?:punya|tersedia|dimiliki|ada)(?:[^a-z]|$)/i,
 ];
 
 /**

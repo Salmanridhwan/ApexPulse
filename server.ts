@@ -42,7 +42,7 @@ import {
   hanyaKeteranganPeriode,
 } from './src/services/chat/niat';
 import { putusanJawaban } from './src/services/chat/jawaban';
-import { adalahSapaan } from './src/services/chat/sapaan';
+import { adalahSapaan, jawabanSapaan } from './src/services/chat/sapaan';
 import { angkaTakBersumber, pesanAngkaTakBersumber } from './src/services/chat/angka';
 import { db, SafeUser } from './src/services/store/inMemoryDb';
 import { daftarBarisRusak } from './src/services/store/mysqlStore';
@@ -208,7 +208,26 @@ const CHATBOT_PERSONA =
   'ATURAN WAJIB: (1) Untuk pertanyaan tentang data, angka, kinerja, atau isi dokumen instansi, jawab HANYA berdasarkan ' +
   'dokumen resmi di knowledge base ini dan sebutkan sumbernya; kalau dokumen tidak memuat, katakan jujur bahwa datanya ' +
   'tidak ditemukan — JANGAN mengarang angka. (2) Untuk sapaan atau obrolan ringan (halo, terima kasih, siapa kamu), ' +
-  'balas hangat dan tawarkan bantuan seputar dokumen instansi. (3) Jangan pernah menampilkan data contoh atau angka karangan.';
+  'balas hangat dan tawarkan bantuan seputar dokumen instansi. (3) Jangan pernah menampilkan data contoh atau angka karangan. ' +
+  // Uji chat 25 November: saat ditanya "bandingkan nilai dengan PPN dan tanpa PPN",
+  // model membaca baris rekap lembar UMUM lalu MELABELI kolom "Beban"
+  // (Rp19.834.255.802) sebagai "Nilai Non-PPN" — kolom itu kosong di baris rekap.
+  // Kesimpulannya jadi salah. Label kolom wajib diambil dari header, bukan ditebak.
+  '(4) Saat mengutip angka tabel, sebut nama kolom PERSIS seperti header dokumen. Jangan melabeli sebuah kolom dengan nama kolom lain, ' +
+  'jangan menyimpulkan isi kolom dari urutan/posisinya, dan kalau kolom yang ditanya kosong atau tidak ada, katakan itu terus terang. ' +
+  // Premis palsu: "Total piutang Rp999 miliar, benar kan?" tidak boleh dibenarkan
+  // hanya karena kalimatnya terdengar meyakinkan.
+  '(5) Kalau pengguna menyebutkan angka/premis yang tidak ada di dokumen, jangan membenarkannya: sebutkan angka yang benar-benar tercatat ' +
+  'atau nyatakan datanya tidak ditemukan. ' +
+  // Model sempat menulis "6.07733658E8" dan menyebut kolom sebagai "A"/"I" saat
+  // mengutip baris rekap — tidak terbaca oleh pengguna BUMD.
+  '(6) Tulis angka penuh tanpa notasi ilmiah (mis. 607.733.658, bukan 6.07E8), dan sebut kolom dengan NAMA header-nya, bukan huruf kolom. ' +
+  // Baris rekap (mis. baris 191 lembar UMUM) hanya berisi angka di beberapa kolom;
+  // model pernah memakai angka kolom "Beban" sebagai "Nilai Non-PPN" lalu
+  // menyimpulkan perbandingan yang salah total.
+  '(7) Jangan memakai angka dari baris rekap/agregat (baris yang kolom nama pekerjaannya kosong) untuk menyimpulkan nilai sebuah kolom, ' +
+  'dan jangan menempelkan nama atau huruf kolom pada angka baris rekap — sebut angkanya saja tanpa label kolom. ' +
+  'Kalau ditanya total sebuah kolom, jumlahkan baris data berlabel dan sebutkan berapa baris yang dihitung; kalau kolomnya kosong, katakan kosong.';
 
 /**
  * Bangun ringkasan riwayat percakapan (multi-turn) untuk dikirim ke layanan RAG.
@@ -3413,13 +3432,34 @@ const app = express();
         }
       }
 
+      // Permintaan yang TIDAK didukung lewat chat: warna/tema dan ekspor.
+      // Dijawab jujur + tunjuk panelnya, bukan diam-diam mengubah kartu.
+      // (Dulu "ganti warna semua chart jadi merah" masuk Case 2 lalu satu kartu
+      // diubah ke BAR dan asisten mengaku berhasil — tindakan merusak.)
+      const soalKanvas = /chart|grafik|kartu|widget|dashboard|kanvas/i.test(lower);
+      const mintaUbah = /ganti|ubah|jadikan|set |atur|beri/i.test(lower);
+      const mintaEkspor =
+        soalKanvas &&
+        (/ekspor|export|unduh|download/i.test(lower) || (mintaUbah && /pdf|cetak/i.test(lower)));
+      const mintaWarna =
+        mintaUbah && /warna|warnai|tema|merah|biru|hijau|kuning|ungu|gelap|terang/i.test(lower) && soalKanvas;
+      if (mintaEkspor || mintaWarna) {
+        const pesan = mintaEkspor
+          ? 'Saya belum bisa mengekspor dashboard dari kolom chat. Ekspor ada di kanvas: buka dashboard yang dimaksud, klik **Ekspor**, pilih **Laporan Eksekutif Resmi BUMD**, lalu di dialog cetak pilih **Simpan sebagai PDF**.'
+          : 'Saya belum bisa mengubah warna atau tema lewat chat. Warna kartu, font, dan palet diatur di panel **Gaya Widget** (sidebar kanan kanvas). Yang bisa saya ubah dari chat hanya jenis visualisasi: batang, garis, area, atau donat.';
+        catatAsisten({ sender: 'system', text: pesan, actionTaken: 'none' } as any);
+        sendEvent('result', { actionTaken: 'none', message: pesan });
+        sendEvent('done', { ok: false });
+        return res.end();
+      }
+
       // Case 2: Ubah tipe visualisasi chart
+      // Wajib ada JENIS GRAFIK tujuan yang jelas ("menjadi batang"). Tanpa itu,
+      // pesan yang hanya memuat kata "ganti"/"ubah" tidak boleh mengubah kartu.
+      const tipeDiminta = tipeGrafikDariTeks(bagianTujuan(prompt));
       if (
-        lower.includes('ganti') ||
-        lower.includes('ubah') ||
-        lower.includes('diagram batang') ||
-        lower.includes('diagram garis') ||
-        lower.includes('diagram donat')
+        tipeDiminta &&
+        (lower.includes('ganti') || lower.includes('ubah') || lower.includes('diagram'))
       ) {
         sendEvent('step', { id: 's1', title: 'Menyesuaikan konfigurasi visualisasi widget...', status: 'in_progress' });
         await new Promise((r) => setTimeout(r, 400));
@@ -3505,6 +3545,29 @@ const app = express();
       const isSapaan = adalahSapaan(prompt);
 
       if (!isGenerateDash) {
+        // Sapaan & pertanyaan tentang asisten dijawab LOKAL: tidak menyangkut
+        // dokumen, jadi tidak perlu menunggu RAG 30-90 dtk — dulu pesan seperti
+        // ini sering berakhir "layanan dokumen sedang tidak tersedia".
+        if (isSapaan) {
+          const pesan = jawabanSapaan(prompt, tenantChat?.name);
+          sendEvent('step', { id: 'sc0', title: 'Menyiapkan jawaban...', status: 'completed' });
+          catatAsisten({
+            sender: 'system',
+            text: pesan,
+            actionTaken: 'qa_answer',
+            modeUsed: 'Sapaan lokal',
+            citationsCount: 0,
+          } as any);
+          sendEvent('result', {
+            actionTaken: 'qa_answer',
+            message: pesan,
+            modeUsed: 'Sapaan lokal',
+            citationsCount: 0,
+          });
+          sendEvent('done', { ok: true });
+          return res.end();
+        }
+
         // ---- CHATBOT LLM (multi-turn, grounded ke dokumen instansi) ----
         sendEvent('step', { id: 'sc0', title: 'Menyiapkan jawaban dari dokumen resmi...', status: 'in_progress' });
 
@@ -3535,6 +3598,11 @@ const app = express();
             riwayat,
             persona: CHATBOT_PERSONA,
             strictGrounding: !isSapaan,
+            // Chat butuh tenggat lebih longgar dari bawaan (90 dtk): jawaban tabel
+            // butuh 55-85 dtk, dan satu balasan 429 perlu waktu tunggu sebelum
+            // diulang. Tanpa ini pengguna menerima "layanan dokumen tidak tersedia"
+            // padahal dokumennya ada.
+            timeoutMs: 120,
           });
 
           sendEvent('step', { id: 'sc0', title: 'Jawaban siap', status: 'completed' });

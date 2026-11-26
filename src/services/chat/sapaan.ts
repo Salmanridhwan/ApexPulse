@@ -51,6 +51,39 @@ function rapikan(pesan: string): string {
     .trim();
 }
 
+const TENTANG_ASISTEN2 =
+  /(?:^| )(?:kamu (?:pakai |pake |gunakan )?model apa|model apa (?:yang )?kamu pakai|kamu (?:bot|ai|robot|asisten) apa|aplikasi apa ini|apa aplikasi ini|ini (?:aplikasi|chatbot) apa|kamu dari mana)(?: |$)/;
+
+/**
+ * Balasan lokal untuk sapaan / pertanyaan tentang asisten.
+ *
+ * Sapaan tidak butuh dokumen, jadi TIDAK dikirim ke layanan RAG: dulu "halo"
+ * menunggu 30-90 dtk dan "kamu model apa" berakhir "layanan dokumen sedang
+ * tidak tersedia" — jawaban ngawur untuk pesan yang tidak menyangkut dokumen.
+ */
+export function jawabanSapaan(pesan: unknown, instansi?: string): string {
+  const teks = rapikan(String(pesan ?? '')).replace(/\?+$/, '').trim();
+  if (TENTANG_ASISTEN.test(teks) || TENTANG_ASISTEN2.test(teks)) {
+    return (
+      'Saya **Asisten Aiones Boards**, asisten di aplikasi ini. Saya menjawab pertanyaan tentang ' +
+      `dokumen resmi instansi${instansi ? ` **${instansi}**` : ''} dan bisa menyusun atau mengubah dashboard ` +
+      'dari berkas yang sudah diunggah. Jawaban data saya sandarkan ke potongan dokumen di knowledge base ' +
+      'instansi, bukan pengetahuan umum.'
+    );
+  }
+  if (TERIMA_KASIH.test(teks)) {
+    return 'Sama-sama. Kalau ada angka atau dokumen lain yang mau ditelusuri, sebut saja judul atau indikatornya.';
+  }
+  if (BASA_BASI.test(teks)) {
+    return 'Baik, terima kasih. Saya siap membantu menelusuri dokumen instansi — tanya saja angkanya, atau minta saya susun dashboard dari berkas yang ada.';
+  }
+  return (
+    'Halo! Saya **Asisten Aiones Boards**. Tanya apa saja soal dokumen instansi' +
+    `${instansi ? ` **${instansi}**` : ''} — nilai pengadaan, piutang, realisasi — ` +
+    'atau minta saya susun dashboard dari berkas yang sudah diunggah.'
+  );
+}
+
 export function adalahSapaan(pesan: unknown): boolean {
   const teks = rapikan(String(pesan ?? ''));
   if (!teks) return false;
@@ -65,6 +98,7 @@ export function adalahSapaan(pesan: unknown): boolean {
   if (SAPAAN.test(tanpaTanya)) return true;
   if (TERIMA_KASIH.test(tanpaTanya)) return true;
   if (TENTANG_ASISTEN.test(tanpaTanya)) return true;
+  if (TENTANG_ASISTEN2.test(tanpaTanya)) return true;
   if (BASA_BASI.test(tanpaTanya)) return true;
 
   // Sapaan di awal + sisa kalimat tanpa kata tanya, mis. "halo kak" / "pagi min".

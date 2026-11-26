@@ -58,7 +58,19 @@ export function perintahHapusWidget(prompt: unknown): string | null {
     /(?:^|[^a-z])(?:hapus|hapuskan|hilangkan|buang|remove|delete)(?:kan|lah)?\s+(?:widget|kartu|grafik|chart|panel)(?:nya|ku|mu)?\b(.*)$/
   );
   if (!m) return null;
-  return m[1].replace(/^[\s,:.\-–—]+/, '').trim();
+  // Penunjuk urutan/kanvas ("pertama di dashboard ini") BUKAN judul kartu.
+  // Dulu sisa kalimat itu dipakai apa adanya sehingga asisten menjawab
+  // "tidak ada widget bernama \"pertama di dashboard ini.\"" — jawaban ngawur.
+  // Kembalikan string kosong supaya pemanggil meminta judul kartunya.
+  const sisa = m[1]
+    .replace(/^[^a-z0-9]+/i, '')
+    .replace(/[^a-z0-9]+$/i, '')
+    .trim();
+  const urutan = /^(?:yang )?(?:pertama|kedua|ketiga|keempat|kelima|terakhir|paling (?:atas|bawah))$/i;
+  const rujukanKanvas =
+    /^(?:(?:pertama|kedua|ketiga|keempat|kelima|terakhir|paling (?:atas|bawah)) ?)?(?:di|dari|pada) ?(?:dashboard|kanvas|halaman)(?: ini| kita)?$/i;
+  if (!sisa || urutan.test(sisa) || rujukanKanvas.test(sisa)) return '';
+  return sisa;
 }
 
 /** Kata penting judul (dibuang kata sambung & satuan umum). */

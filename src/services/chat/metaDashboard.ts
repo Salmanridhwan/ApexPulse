@@ -12,6 +12,9 @@ import type { Dashboard, WidgetSpec } from '../../types';
 const TANYA_HALAMAN =
   /\b(?:berapa|jumlah)\s+halaman\b|\bhalaman(?:nya)?\s+(?:apa\s+saja|ada\s+berapa|berapa)\b|\bnama(?:-nama)?\s+halaman(?:nya)?\b|\bdaftar\s+halaman\b/i;
 const TANYA_SUMBER = /\b(?:sumber|asal)(?:\s+data)?(?:nya)?\b|\bdari\s+mana\b|\bdiambil\s+dari\b/i;
+/** "berapa kartu", "jumlah widget", "kartu apa saja" — dijawab dari metadata, bukan RAG. */
+const TANYA_JUMLAH_KARTU =
+  /(?:berapa|jumlah|total)[^?]{0,30}(?:kartu|widget|chart|grafik|diagram)|(?:kartu|widget)(?:nya)? (?:apa saja|apa|ada apa)/i;
 const KATA_KARTU = /\b(?:kartu|widget|chart|grafik|diagram|tabel)\b/i;
 /** Halaman di dokumen ("halaman berapa di PDF-nya") bukan halaman dashboard. */
 const KONTEKS_DOKUMEN = /\b(?:dokumen|pdf|berkas|file|laporan)\b/i;
@@ -69,6 +72,24 @@ export function jawabMetaDashboard(prompt: unknown, d: Dashboard | undefined): s
       });
       return `${kepala}\n\nSumber datanya:\n${baris.join('\n')}`;
     }
+  }
+
+  if (TANYA_JUMLAH_KARTU.test(t) && !KONTEKS_DOKUMEN.test(t)) {
+    const hal = daftarHalaman(d);
+    const total = hal.reduce((n, h) => n + (h.widgets || []).length, 0);
+    const rincian = hal.map((h) => `- ${h.judul}: ${(h.widgets || []).length} kartu`).join('\n');
+    // "kartu apa saja" -> sebutkan judulnya selama masih terbaca (maks 12).
+    const mintaDaftar = /(?:kartu|widget)(?:nya)? (?:apa saja|apa)(?: |$)/i.test(t);
+    if (mintaDaftar && total > 0 && total <= 12) {
+      const judul = hal.flatMap((h) =>
+        (h.widgets || []).map((w) => `- ${w.title} (${w.type}, halaman ${h.judul})`)
+      );
+      return `Kartu di dashboard **${d.title}**:\n\n${judul.join('\n')}`;
+    }
+    return (
+      `Dashboard **${d.title}** punya **${total} kartu** yang tersebar di **${hal.length} halaman**:\n\n` +
+      `${rincian}\n\nSebutkan judul salah satu kartu kalau ingin rincian angkanya.`
+    );
   }
 
   if (TANYA_HALAMAN.test(t) && !KONTEKS_DOKUMEN.test(t)) {

@@ -10,6 +10,7 @@ import { bersihkanRancangan } from '../chart/rancanganRag';
 import { namaSetara } from '../spec/namaSetara';
 import { periodeSeragam } from '../builder/halamanDiminta';
 import { rapikanJawabanInsight } from '../analisis/insightHalaman';
+import { perluRiwayat } from '../chat/riwayat';
 
 /**
  * Galat layanan RAG. Dipakai supaya pemanggil bisa MEMBEDAKAN "layanan tidak
@@ -2176,8 +2177,13 @@ export class ConfigurableRagClient implements RagClient {
       // ponytail: persona+riwayat ikut jadi teks pencarian dan kadang membuat hasil
       // retrieval kosong (dokumen ada tapi tidak terambil) — kalau kosong, ulangi
       // dengan pertanyaan saja sebelum menjawab "tidak ditemukan".
+      // Riwayat TIDAK selalu ikut jadi teks pencarian. Dulu selalu ditempel, dan
+      // retrieval bergeser mengikuti topik lama: pertanyaan yang sama dijawab
+      // benar di percakapan baru, tetapi `no_source` setelah percakapan membahas
+      // hal lain (uji 26 Nov 2026). Riwayat hanya ikut bila pengguna merujuk
+      // giliran sebelumnya atau pertanyaannya sangat pendek.
       const teksQuery = options.mode === 'prose'
-        ? [options.persona?.trim(), options.riwayat?.trim(), options.prompt]
+        ? [options.persona?.trim(), perluRiwayat(options.prompt, !!options.riwayat?.trim()) ? options.riwayat?.trim() : '', options.prompt]
             .filter(Boolean)
             .join('\n\n')
         : options.prompt;
